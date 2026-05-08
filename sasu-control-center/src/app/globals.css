@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  color: theme("colors.ink.900");
+  background: #ffffff;
+  font-feature-settings: "ss01", "cv01", "cv11";
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  /** Apple-style flat card on white background */
+  .surface-card {
+    @apply rounded-2xl border border-ink-200 bg-white;
+  }
+  /** Card placed on the gray section bg — subtle white card */
+  .surface-glass {
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card;
+  }
+
+  /** Section that uses the signature Apple light-gray bg */
+  .section-alt {
+    @apply rounded-3xl bg-ink-100 p-6 sm:p-8;
+  }
+
+  /** Pill primary button (Apple CTA) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
+  }
+  /** Pill secondary button (white pill on gray) */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400;
+  }
+  /** Tertiary text-link "Learn more ›" */
+  .btn-link {
+    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700;
+  }
+
+  /** Skeleton with shimmer */
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-ink-200/70;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(255, 255, 255, 0.7) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  /** Apple-grade hero text */
+  .h-display {
+    @apply font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl md:text-6xl;
+  }
+  .h-section {
+    @apply font-display text-3xl font-semibold leading-tight tracking-apple-tight text-ink-900 sm:text-4xl;
+  }
+  .h-eyebrow {
+    @apply text-sm font-medium text-ink-600;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scrollbar-clean::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-clean::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+  }
+}
+
+/* Privacy mode: blur every [data-private] node when <html class="privacy-blur"> */
+html.privacy-blur [data-private] {
+  filter: blur(8px);
+  transition: filter 180ms ease;
+  user-select: none;
+  cursor: help;
+}
+html.privacy-blur [data-private]:hover,
+html.privacy-blur [data-private]:focus-within {
+  filter: blur(0);
+}
