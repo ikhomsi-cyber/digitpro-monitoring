@@ -509,205 +509,6 @@ export function DashboardClient({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card variant="solid" className="lg:col-span-2">
-          <CardHeader className="items-start">
-            <div>
-              <DashboardBlockTitle icon={FileSpreadsheet}>Transactions</DashboardBlockTitle>
-              <CardValue>Importer / Ajouter</CardValue>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="btn-primary cursor-pointer">
-                <Upload className="h-4 w-4 text-white/90" />
-                Importer un CSV
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void onImportFile(f);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-              {canWrite ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={onClickDeduplicate}
-                    disabled={isPending}
-                    className="btn-secondary disabled:opacity-60"
-                    title="Recalcule les empreintes (date+label+amount), supprime les doublons existants et garantit que les imports futurs n’en créent plus."
-                  >
-                    <Sparkles className="h-4 w-4 text-ink-500" />
-                    Dédupliquer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClickTagQonto}
-                    disabled={isPending}
-                    className="btn-secondary disabled:opacity-60"
-                    title="Tag « Qonto » les transactions historiques avec un solde renseigné pour activer le calcul du Cash available."
-                  >
-                    <Sparkles className="h-4 w-4 text-ink-500" />
-                    Tag Qonto
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </CardHeader>
-          <CardBody>
-            {importPreview ? (
-              <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 shadow-sm">
-                <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">Import preview</div>
-                    <div className="mt-0.5 text-xs text-slate-600">
-                      {importPreview.fileName} · {importPreview.format === "qonto" ? "Qonto" : "Generic"} ·{" "}
-                      {importPreview.rows.length} row{importPreview.rows.length !== 1 ? "s" : ""}
-                    </div>
-                    {importPreview.warnings.length ? (
-                      <div className="mt-2 text-xs text-slate-500">{importPreview.warnings.join(" ")}</div>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    <button
-                      type="button"
-                      onClick={cancelImportPreview}
-                      disabled={isPending}
-                      className="btn-secondary disabled:opacity-60"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="button"
-                      onClick={confirmImportPreview}
-                      disabled={isPending}
-                      className="btn-primary disabled:opacity-60"
-                    >
-                      Confirmer l’import
-                    </button>
-                  </div>
-                </div>
-                <div className="max-h-72 overflow-auto px-2 py-2">
-                  <table className="w-full min-w-[620px] border-collapse text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs font-medium text-slate-500">
-                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Date</th>
-                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Label</th>
-                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Société</th>
-                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Category</th>
-                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 text-right backdrop-blur-sm">
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
-                      {importPreview.rows.slice(0, PREVIEW_ROW_LIMIT).map((row, i) => (
-                        <tr key={`preview-row-${i}`} className="text-slate-800">
-                          <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600">
-                            {formatDateFr(row.date)}
-                          </td>
-                          <td
-                            className="max-w-[200px] truncate px-3 py-2 text-xs font-medium"
-                            title={row.label}
-                            data-private
-                          >
-                            {row.label}
-                          </td>
-                          <td
-                            className="max-w-[140px] truncate px-3 py-2 text-xs text-slate-600"
-                            title={row.company}
-                            data-private
-                          >
-                            {row.company.trim() ? row.company : "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600">{row.category}</td>
-                          <td
-                            className="whitespace-nowrap px-3 py-2 text-right text-xs font-semibold"
-                            data-private
-                          >
-                            {formatSignedEur(row.amount)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {importPreview.rows.length > PREVIEW_ROW_LIMIT ? (
-                  <div className="border-t border-slate-200 bg-white px-4 py-2 text-center text-xs text-slate-500">
-                    Showing first {PREVIEW_ROW_LIMIT} of {importPreview.rows.length} rows
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {!canWrite ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {preferencesDemoActive
-                  ? "Création/suppression désactivées : mode démo volontaire (aucune écriture en base)."
-                  : "Création/suppression désactivée : mode démo (variables Supabase absentes)."}
-              </div>
-            ) : (
-              <form action={createTransactionAction} className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-                <div className="sm:col-span-3">
-                  <label className="text-xs font-medium text-slate-600">Date</label>
-                  <input
-                    type="date"
-                    name="date"
-                    required
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
-                  />
-                </div>
-                <div className="sm:col-span-5">
-                  <label className="text-xs font-medium text-slate-600">Label</label>
-                  <input
-                    name="label"
-                    required
-                    placeholder="Ex: Facture client, URSSAF, abonnement…"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
-                  />
-                </div>
-                <div className="sm:col-span-4">
-                  <label className="text-xs font-medium text-slate-600">Société</label>
-                  <input
-                    name="company"
-                    placeholder="Ex: Ma SASU"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
-                  />
-                </div>
-                <div className="sm:col-span-4">
-                  <label className="text-xs font-medium text-slate-600">Catégorie</label>
-                  <input
-                    name="category"
-                    required
-                    placeholder="Clients"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
-                  />
-                </div>
-                <div className="sm:col-span-4">
-                  <label className="text-xs font-medium text-slate-600">Montant</label>
-                  <input
-                    name="amount"
-                    required
-                    inputMode="decimal"
-                    placeholder="1200"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
-                  />
-                </div>
-                <div className="sm:col-span-4 flex items-end justify-end pb-0.5">
-                  <button disabled={isPending} className="btn-primary disabled:opacity-60">
-                    Enregistrer
-                    <ArrowUpRight className="h-4 w-4 text-white/90" />
-                  </button>
-                </div>
-              </form>
-            )}
-          </CardBody>
-        </Card>
-      </section>
-
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card variant="solid">
           <CardHeader className="pb-3">
@@ -1109,6 +910,205 @@ export function DashboardClient({
                 {filteredTx.length - recentTx.length} de plus sur la période.
               </div>
             ) : null}
+          </CardBody>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card variant="solid" className="lg:col-span-2">
+          <CardHeader className="items-start">
+            <div>
+              <DashboardBlockTitle icon={FileSpreadsheet}>Transactions</DashboardBlockTitle>
+              <CardValue>Importer / Ajouter</CardValue>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="btn-primary cursor-pointer">
+                <Upload className="h-4 w-4 text-white/90" />
+                Importer un CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onImportFile(f);
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
+              {canWrite ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onClickDeduplicate}
+                    disabled={isPending}
+                    className="btn-secondary disabled:opacity-60"
+                    title="Recalcule les empreintes (date+label+amount), supprime les doublons existants et garantit que les imports futurs n’en créent plus."
+                  >
+                    <Sparkles className="h-4 w-4 text-ink-500" />
+                    Dédupliquer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClickTagQonto}
+                    disabled={isPending}
+                    className="btn-secondary disabled:opacity-60"
+                    title="Tag « Qonto » les transactions historiques avec un solde renseigné pour activer le calcul du Cash available."
+                  >
+                    <Sparkles className="h-4 w-4 text-ink-500" />
+                    Tag Qonto
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardBody>
+            {importPreview ? (
+              <div className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80 shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Import preview</div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      {importPreview.fileName} · {importPreview.format === "qonto" ? "Qonto" : "Generic"} ·{" "}
+                      {importPreview.rows.length} row{importPreview.rows.length !== 1 ? "s" : ""}
+                    </div>
+                    {importPreview.warnings.length ? (
+                      <div className="mt-2 text-xs text-slate-500">{importPreview.warnings.join(" ")}</div>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelImportPreview}
+                      disabled={isPending}
+                      className="btn-secondary disabled:opacity-60"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={confirmImportPreview}
+                      disabled={isPending}
+                      className="btn-primary disabled:opacity-60"
+                    >
+                      Confirmer l’import
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-auto px-2 py-2">
+                  <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-xs font-medium text-slate-500">
+                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Date</th>
+                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Label</th>
+                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Société</th>
+                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 backdrop-blur-sm">Category</th>
+                        <th className="sticky top-0 bg-slate-50/95 px-3 py-2 text-right backdrop-blur-sm">
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {importPreview.rows.slice(0, PREVIEW_ROW_LIMIT).map((row, i) => (
+                        <tr key={`preview-row-${i}`} className="text-slate-800">
+                          <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600">
+                            {formatDateFr(row.date)}
+                          </td>
+                          <td
+                            className="max-w-[200px] truncate px-3 py-2 text-xs font-medium"
+                            title={row.label}
+                            data-private
+                          >
+                            {row.label}
+                          </td>
+                          <td
+                            className="max-w-[140px] truncate px-3 py-2 text-xs text-slate-600"
+                            title={row.company}
+                            data-private
+                          >
+                            {row.company.trim() ? row.company : "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-xs text-slate-600">{row.category}</td>
+                          <td
+                            className="whitespace-nowrap px-3 py-2 text-right text-xs font-semibold"
+                            data-private
+                          >
+                            {formatSignedEur(row.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {importPreview.rows.length > PREVIEW_ROW_LIMIT ? (
+                  <div className="border-t border-slate-200 bg-white px-4 py-2 text-center text-xs text-slate-500">
+                    Showing first {PREVIEW_ROW_LIMIT} of {importPreview.rows.length} rows
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {!canWrite ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                {preferencesDemoActive
+                  ? "Création/suppression désactivées : mode démo volontaire (aucune écriture en base)."
+                  : "Création/suppression désactivée : mode démo (variables Supabase absentes)."}
+              </div>
+            ) : (
+              <form action={createTransactionAction} className="grid grid-cols-1 gap-3 sm:grid-cols-12">
+                <div className="sm:col-span-3">
+                  <label className="text-xs font-medium text-slate-600">Date</label>
+                  <input
+                    type="date"
+                    name="date"
+                    required
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+                  />
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="text-xs font-medium text-slate-600">Label</label>
+                  <input
+                    name="label"
+                    required
+                    placeholder="Ex: Facture client, URSSAF, abonnement…"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="text-xs font-medium text-slate-600">Société</label>
+                  <input
+                    name="company"
+                    placeholder="Ex: Ma SASU"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="text-xs font-medium text-slate-600">Catégorie</label>
+                  <input
+                    name="category"
+                    required
+                    placeholder="Clients"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+                  />
+                </div>
+                <div className="sm:col-span-4">
+                  <label className="text-xs font-medium text-slate-600">Montant</label>
+                  <input
+                    name="amount"
+                    required
+                    inputMode="decimal"
+                    placeholder="1200"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+                  />
+                </div>
+                <div className="sm:col-span-4 flex items-end justify-end pb-0.5">
+                  <button disabled={isPending} className="btn-primary disabled:opacity-60">
+                    Enregistrer
+                    <ArrowUpRight className="h-4 w-4 text-white/90" />
+                  </button>
+                </div>
+              </form>
+            )}
           </CardBody>
         </Card>
       </section>

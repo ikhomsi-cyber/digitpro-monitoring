@@ -9,7 +9,7 @@ const SUGGESTIONS = [
   "Quel est mon chiffre d’affaires ce mois ?",
   "Top 5 dépenses des 90 derniers jours",
   "Compare mon CA aux 3 derniers mois",
-  "Combien de jours facturés à 820 € HT ce trimestre ?"
+  "Quels clients ont le plus contribué à mon CA sur les 90 derniers jours ?"
 ];
 
 /**

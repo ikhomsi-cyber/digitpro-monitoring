@@ -133,7 +133,7 @@ export default async function DashboardPage() {
         </div>
       </nav>
 
-      <header className="py-12 text-center sm:py-16">
+      <header className="py-7 text-center sm:py-9">
         <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700">
           <span
             className={`h-1.5 w-1.5 rounded-full ${
@@ -146,17 +146,27 @@ export default async function DashboardPage() {
               ? "Mode démo activé — données fictives."
               : `Connecté · ${user?.email}`}
         </div>
-        <h1 className="mt-5 h-display text-balance">
-          DigitPro Consultion Monitoring.
+        <h1 className="mt-4 text-balance font-display text-3xl font-semibold tracking-apple-tight text-ink-900 sm:text-4xl">
+          DigitPro Consulting Monitoring
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-balance text-lg text-ink-600 sm:text-xl">
+
+        <div className="mx-auto mt-3 flex w-full max-w-2xl items-center justify-center gap-3">
+          <span className="h-px w-10 bg-ink-200" aria-hidden />
+          <span
+            className="h-2 w-2 rounded-full bg-brand-500 shadow-[0_0_0_4px_rgba(0,122,255,0.10)]"
+            aria-hidden
+          />
+          <span className="h-px w-10 bg-ink-200" aria-hidden />
+        </div>
+
+        <p className="mx-auto mt-3 max-w-2xl text-balance text-base text-ink-600 sm:text-lg">
           {envMode === "DEMO"
             ? "Aucune configuration Supabase détectée : données de démonstration uniquement."
             : demoPreferenceOn
               ? "Prévisualisation hors base. Utilisez le commutateur pour revenir aux données Supabase."
               : "Pilotage finances, trésorerie et chiffre d’affaires — en temps réel."}
         </p>
-        <div className="mt-3 text-sm text-ink-500">by Iliass KHOMSI</div>
+        <div className="mt-2 text-sm text-ink-500">by Iliass KHOMSI</div>
       </header>
 
       <DashboardClient
