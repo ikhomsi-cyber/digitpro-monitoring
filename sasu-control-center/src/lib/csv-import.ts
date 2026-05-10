@@ -60,15 +60,27 @@ export function detectCsvFormat(delimiter: string, headersRaw: string[]): CsvImp
   const norms = headersRaw.map((h) => normalizeHeaderKey(h));
   const hasGenericCore =
     norms.some((n) => n === "date") &&
-    norms.some((n) => n === "label") &&
-    norms.some((n) => n === "amount");
+    norms.some((n) => n === "amount" || n === "montant") &&
+    norms.some((n) => n === "label" || n === "description" || n.startsWith("libell"));
   if (hasGenericCore) return "generic";
 
   const joined = foldAccents(headersRaw.join(" | ").toLowerCase());
-  if (delimiter === ";") return "qonto";
-  if (/libell|montant|operation|opération|qonto/.test(joined)) return "qonto";
+  // Some French personal finance exports are semicolon-separated but are NOT Qonto.
+  // Only mark as qonto if we see a strong Qonto signature in headers.
+  if (
+    /qonto|categorie de tresorerie|nom du compte|solde du compte|date d operation|operation date|booking date/.test(
+      joined
+    )
+  ) {
+    return "qonto";
+  }
 
-  return "qonto";
+  // Otherwise treat as generic (works with headers like Date / Description / Compte / Montant / Catégorie…).
+  if (delimiter === ";") return "generic";
+
+  // Conservative default: Qonto-like.
+  if (/libell|montant|operation|opération/.test(joined)) return "qonto";
+  return "generic";
 }
 
 /** Parse amounts like "1 234,56 €", "-42", "(100)" → number */
@@ -226,6 +238,7 @@ function buildColumnMapping(headersRaw: string[]): ColumnMapping | null {
   const companyIdxRaw = firstMatchingColumnIndex(headersNorm, [
     /^nom du compte$/,
     /^account name$/,
+    /^compte$/,
     /^nom societe$/,
     /^nom de la societe$/,
     /^company$/,

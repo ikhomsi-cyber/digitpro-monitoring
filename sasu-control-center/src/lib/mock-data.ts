@@ -18,6 +18,7 @@ export type Transaction = {
   category: "Clients" | "Outils" | "Banque" | "Charges" | "Impôts" | "Autres";
   amount: number; // positive = revenue, negative = expense
   company?: string;
+  scope?: "pro" | "personal";
 };
 
 export const monthlyRevenue: MonthlyPoint[] = [
@@ -140,18 +141,18 @@ export function getMockTransactions(now = new Date()): Transaction[] {
   const demoCompanyB = "SASU Lab";
 
   const rows: Omit<Transaction, "id">[] = [
-    { date: toIsoDateUTC(daysAgo(1)), label: "Facture Client — Forfait mensuel", category: "Clients", amount: 4800, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(2)), label: "Google Workspace", category: "Outils", amount: -12, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(3)), label: "Stripe fees", category: "Banque", amount: -83, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(4)), label: "URSSAF — charges", category: "Charges", amount: -1120, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(5)), label: "Abonnement Notion", category: "Outils", amount: -10, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(7)), label: "Facture Client — Mission produit", category: "Clients", amount: 3200, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(9)), label: "Acompte IS", category: "Impôts", amount: -640, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(11)), label: "Assurance RC Pro", category: "Charges", amount: -34, company: demoCompanyA },
-    { date: toIsoDateUTC(daysAgo(13)), label: "Virement client", category: "Clients", amount: 2100, company: demoCompanyB },
-    { date: toIsoDateUTC(daysAgo(16)), label: "Frais bancaires", category: "Banque", amount: -9, company: demoCompanyB },
-    { date: toIsoDateUTC(daysAgo(19)), label: "Matériel — clavier", category: "Autres", amount: -129, company: demoCompanyB },
-    { date: toIsoDateUTC(daysAgo(22)), label: "Facture Client — Support", category: "Clients", amount: 1450, company: demoCompanyB }
+    { date: toIsoDateUTC(daysAgo(1)), label: "Facture Client — Forfait mensuel", category: "Clients", amount: 4800, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(2)), label: "Google Workspace", category: "Outils", amount: -12, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(3)), label: "Stripe fees", category: "Banque", amount: -83, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(4)), label: "URSSAF — charges", category: "Charges", amount: -1120, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(5)), label: "Abonnement Notion", category: "Outils", amount: -10, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(7)), label: "Facture Client — Mission produit", category: "Clients", amount: 3200, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(9)), label: "Acompte IS", category: "Impôts", amount: -640, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(11)), label: "Assurance RC Pro", category: "Charges", amount: -34, company: demoCompanyA, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(13)), label: "Virement client", category: "Clients", amount: 2100, company: demoCompanyB, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(16)), label: "Frais bancaires", category: "Banque", amount: -9, company: demoCompanyB, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(19)), label: "Matériel — clavier", category: "Autres", amount: -129, company: demoCompanyB, scope: "pro" },
+    { date: toIsoDateUTC(daysAgo(22)), label: "Facture Client — Support", category: "Clients", amount: 1450, company: demoCompanyB, scope: "pro" }
   ];
 
   return rows.map((r, i) => ({

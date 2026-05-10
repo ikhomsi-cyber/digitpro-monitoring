@@ -9,10 +9,13 @@ import {
 } from "@/lib/dashboard-demo-preference";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
 import {
-  computeMonthlyMetricsFromMovements,
-  trailingTwelveMonthStartDateIso
+  computeMetricsFromTransactions,
+  trailingTwelveMonthStartDateIso,
+  type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { transactionImportHash } from "@/lib/transaction-hash";
+import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
+import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 
 type ImportTx = {
   date: string;
@@ -21,6 +24,7 @@ type ImportTx = {
   amount: number;
   balance?: number | null;
   company: string;
+  scope?: "pro" | "personal";
 };
 
 type SupabaseServer = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
@@ -130,15 +134,22 @@ async function fetchExistingIdsByContentHashes(
 
 async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
   const start = trailingTwelveMonthStartDateIso();
-  const { data: rows, error } = await client.from("transactions").select("date,amount").gte("date", start);
+  const { data: rows, error } = await client
+    .from("transactions")
+    .select("date,amount,label,category,company")
+    .gte("date", start);
   if (error) throw new Error(error.message);
 
-  const metrics = computeMonthlyMetricsFromMovements(
-    (rows ?? []).map((r) => ({
-      date: String(r.date).slice(0, 10),
-      amount: Number(r.amount)
-    }))
-  );
+  const txs: DashboardTx[] = (rows ?? []).map((r, i) => ({
+    id: `_sync_${i}`,
+    date: String(r.date).slice(0, 10),
+    label: String(r.label ?? ""),
+    category: String(r.category ?? ""),
+    amount: Number(r.amount),
+    company: String(r.company ?? "").trim()
+  }));
+
+  const metrics = computeMetricsFromTransactions(txs, new Date());
 
   for (const m of metrics) {
     const { error: upErr } = await client
@@ -169,6 +180,8 @@ export async function createTransaction(formData: FormData) {
   const category = String(formData.get("category") || "");
   const amount = Number(formData.get("amount") || 0);
   const company = String(formData.get("company") || "").trim();
+  const scopeRaw = String(formData.get("scope") || "pro");
+  const scope: "pro" | "personal" = scopeRaw === "personal" ? "personal" : "pro";
 
   const supabase = await createSupabaseServerClient();
   if (!supabase) throw new Error("Supabase not configured (demo mode).");
@@ -177,14 +190,21 @@ export async function createTransaction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase.from("transactions").insert({
+  const insertBase = {
     date,
     label,
-    category,
+    category: mapExpenseCategoryLabel(category),
     amount,
     company
-  });
-  if (error) throw new Error(error.message);
+  };
+  const withScope = { ...insertBase, scope };
+  const { error } = await supabase.from("transactions").insert(withScope);
+  if (error && isMissingColumnError(error, "scope")) {
+    const { error: retryErr } = await supabase.from("transactions").insert(insertBase);
+    if (retryErr) throw new Error(retryErr.message);
+  } else if (error) {
+    throw new Error(error.message);
+  }
 
   await syncMonthlyMetricsFromDb(supabase);
   revalidatePath("/dashboard");
@@ -225,7 +245,12 @@ export async function importTransactions(
     return { inserted: [], metrics, skippedInFile: 0, merged: 0, importSessionId: null };
   }
 
-  const originalCount = transactions.length;
+  const importRows = transactions.map((t) => ({
+    ...t,
+    category: mapExpenseCategoryLabel(t.category)
+  }));
+
+  const originalCount = importRows.length;
 
   let fileHashSupported = true;
 
@@ -292,7 +317,7 @@ export async function importTransactions(
   if (sessionInsert.error) throw new Error(sessionInsert.error.message);
   const importSessionId = sessionInsert.data!.id;
 
-  const { unique: prepared, skippedInFile } = dedupeImportRows(transactions);
+  const { unique: prepared, skippedInFile } = dedupeImportRows(importRows);
   const hashes = prepared.map((p) => p.content_hash);
   const existingIds = await fetchExistingIdsByContentHashes(client, hashes);
 
@@ -319,6 +344,7 @@ export async function importTransactions(
     amount: number;
     balance?: number | null;
     company: string;
+    scope?: "pro" | "personal";
     content_hash: string;
     import_session_id: string;
   };
@@ -329,6 +355,7 @@ export async function importTransactions(
     amount: p.amount,
     balance: p.balance ?? null,
     company: p.company,
+    scope: p.scope === "personal" ? "personal" : "pro",
     content_hash: p.content_hash,
     import_session_id: importSessionId
   }));
@@ -347,6 +374,7 @@ export async function importTransactions(
     category: string;
     amount: number;
     company: string;
+    scope?: "pro" | "personal";
   }> = [];
 
   const batchSize = 200;
@@ -356,12 +384,25 @@ export async function importTransactions(
     let attempt = await client
       .from("transactions")
       .insert(balanceSupported ? slice : stripBalanceFromInsert(slice))
-      .select("id,date,label,category,amount,company");
+      .select("id,date,label,category,amount,company,scope");
     if (attempt.error && balanceSupported && isMissingColumnError(attempt.error, "balance")) {
       balanceSupported = false;
       attempt = await client
         .from("transactions")
         .insert(stripBalanceFromInsert(slice))
+        .select("id,date,label,category,amount,company,scope");
+    }
+    if (attempt.error && isMissingColumnError(attempt.error, "scope")) {
+      // Backwards-compat when the column does not exist yet.
+      attempt = await client
+        .from("transactions")
+        .insert(
+          (balanceSupported ? slice : stripBalanceFromInsert(slice)).map((r) => {
+            const copy = { ...r } as InsertedPayload;
+            delete copy.scope;
+            return copy;
+          })
+        )
         .select("id,date,label,category,amount,company");
     }
     if (attempt.error) throw new Error(attempt.error.message);
@@ -373,7 +414,8 @@ export async function importTransactions(
         label: r.label,
         category: r.category,
         amount: Number(r.amount),
-        company: String(r.company ?? "")
+        company: String(r.company ?? ""),
+        scope: r.scope === "personal" ? "personal" : "pro"
       });
     }
   }
@@ -427,6 +469,34 @@ export async function importTransactions(
   };
 }
 
+/**
+ * Récupère les transactions via l’API Qonto (clé secrète serveur) et les enregistre
+ * comme un import CSV (même dédoublonnage `content_hash`).
+ */
+export async function syncQontoTransactionsFromApi(): Promise<{
+  inserted: number;
+  merged: number;
+  skippedInFile: number;
+  totalFromApi: number;
+  bankAccountSummary: string;
+}> {
+  await assertSupabaseWritesEnabled();
+  const { rows, bankAccountSummary } = await fetchQontoTransactionsForImport();
+  const result = await importTransactions(rows, {
+    sourceFilename: `Qonto API · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
+    format: "qonto",
+    fileHash: null
+  });
+
+  return {
+    inserted: result.inserted.length,
+    merged: result.merged,
+    skippedInFile: result.skippedInFile,
+    totalFromApi: rows.length,
+    bankAccountSummary
+  };
+}
+
 export async function deleteTransaction(id: string) {
   await assertSupabaseWritesEnabled();
   const supabase = await createSupabaseServerClient();
@@ -460,7 +530,7 @@ export async function updateTransaction(id: string, formData: FormData) {
 
   const { error } = await supabase
     .from("transactions")
-    .update({ date, label, category, amount, company })
+    .update({ date, label, category: mapExpenseCategoryLabel(category), amount, company })
     .eq("id", id);
   if (error) throw new Error(error.message);
 
@@ -601,7 +671,7 @@ export async function deduplicateExistingTransactions(): Promise<{
  * Backfill : pour les transactions historiques qui possèdent un `balance`
  * non-null mais dont le champ `company` ne mentionne pas Qonto (ex. import
  * antérieur où company = "DigitPro SASU"), on suffixe « (Qonto) » afin que
- * la KPI "Cash available" puisse identifier la dernière transaction Qonto.
+ * la KPI « Solde Qonto » puisse identifier la dernière transaction Qonto.
  *
  * Idempotent : ne touche pas les lignes déjà taggées.
  */

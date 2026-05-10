@@ -13,7 +13,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardDemoToggle } from "@/components/DashboardDemoToggle";
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { DashboardClient } from "./DashboardClient";
+import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderProfile";
+import { ParisWeatherBadge } from "@/components/dashboard/ParisWeatherBadge";
 import { Logo } from "@/components/ui/Logo";
 import { PrivacyToggle } from "@/components/PrivacyToggle";
 
@@ -57,7 +60,7 @@ export default async function DashboardPage() {
     id: t.id,
     date: t.date,
     label: t.label,
-    category: t.category,
+    category: mapExpenseCategoryLabel(t.category),
     amount: t.amount,
     company: (t.company ?? "").trim()
   }));
@@ -70,26 +73,36 @@ export default async function DashboardPage() {
     amount: number | string;
     balance?: number | string | null;
     company: string | null;
+    scope?: "pro" | "personal" | null;
   };
 
   let rawRows: SupabaseTxRow[] = [];
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
     const withBalance = await supabase!
       .from("transactions")
-      .select("id,date,label,category,amount,balance,company")
+      .select("id,date,label,category,amount,balance,company,scope")
       .order("date", { ascending: false })
       .limit(5000);
 
-    const balanceColumnMissing =
-      withBalance.error &&
-      typeof withBalance.error.message === "string" &&
-      /balance/i.test(withBalance.error.message) &&
-      /(could not find|schema cache|does not exist)/i.test(withBalance.error.message);
+    const errMsg =
+      withBalance.error && typeof withBalance.error.message === "string"
+        ? withBalance.error.message
+        : "";
+    const missingColumn = (col: string) =>
+      errMsg &&
+      new RegExp(col, "i").test(errMsg) &&
+      /(could not find|schema cache|does not exist)/i.test(errMsg);
+    const balanceColumnMissing = missingColumn("balance");
+    const scopeColumnMissing = missingColumn("scope");
 
-    if (balanceColumnMissing) {
+    if (balanceColumnMissing || scopeColumnMissing) {
       const withoutBalance = await supabase!
         .from("transactions")
-        .select("id,date,label,category,amount,company")
+        .select(
+          scopeColumnMissing
+            ? "id,date,label,category,amount,company"
+            : "id,date,label,category,amount,company,scope"
+        )
         .order("date", { ascending: false })
         .limit(5000);
       if (!withoutBalance.error) {
@@ -107,10 +120,11 @@ export default async function DashboardPage() {
           id: String(row.id),
           date: String(row.date).slice(0, 10),
           label: String(row.label ?? ""),
-          category: String(row.category ?? ""),
+          category: mapExpenseCategoryLabel(String(row.category ?? "")),
           amount: Number(row.amount),
           balance: row.balance == null ? null : Number(row.balance),
-          company: String(row.company ?? "").trim()
+          company: String(row.company ?? "").trim(),
+          scope: row.scope === "personal" ? "personal" : "pro"
         }));
 
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
@@ -118,8 +132,17 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
       <nav className="flex items-center justify-between border-b border-ink-200 pb-4">
-        <Logo />
+        <div className="flex items-center gap-3">
+          <Logo />
+          <DashboardHeaderProfile variant="nav" />
+        </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href="/analyse"
+            className="inline-flex rounded-full border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-analyze-600 shadow-sm transition hover:border-analyze-200 hover:bg-analyze-50/80"
+          >
+            Analyse
+          </Link>
           <PrivacyToggle />
           {envMode === "SUPABASE" ? <DashboardDemoToggle enabled={demoPreferenceOn} /> : null}
           {envMode === "DEMO" ? null : (
@@ -146,9 +169,13 @@ export default async function DashboardPage() {
               ? "Mode démo activé — données fictives."
               : `Connecté · ${user?.email}`}
         </div>
-        <h1 className="mt-4 text-balance font-display text-3xl font-semibold tracking-apple-tight text-ink-900 sm:text-4xl">
-          DigitPro Consulting Monitoring
-        </h1>
+        <div className="mt-4 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-6">
+          <ParisWeatherBadge className="order-first sm:order-none" />
+          <DashboardHeaderProfile />
+          <h1 className="text-balance text-center font-display text-3xl font-semibold tracking-apple-tight text-ink-900 sm:text-left sm:text-4xl">
+            DigitPro Consulting Monitoring
+          </h1>
+        </div>
 
         <div className="mx-auto mt-3 flex w-full max-w-2xl items-center justify-center gap-3">
           <span className="h-px w-10 bg-ink-200" aria-hidden />
@@ -171,7 +198,6 @@ export default async function DashboardPage() {
 
       <DashboardClient
         runtimeMode={dataMode}
-        preferencesDemoActive={demoPreferenceOn}
         canWrite={dataMode === "SUPABASE"}
         syncKey={syncKey}
         initialTransactions={transactions}

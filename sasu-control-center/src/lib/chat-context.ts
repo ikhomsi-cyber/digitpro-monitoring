@@ -1,5 +1,11 @@
-import type { DashboardTx } from "@/lib/dashboard-metrics";
-import { isRevenueCategory } from "@/lib/revenue-category";
+import {
+  BNC_PAYROLL_EXPENSE_CATEGORY,
+  effectiveRevenueAnalyticsDateIso,
+  REVENUE_END_OF_MONTH_ROLL_DAYS,
+  type DashboardTx
+} from "@/lib/dashboard-metrics";
+import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import { isRevenueCategory, revenueCounterpartyDisplayName } from "@/lib/revenue-category";
 import { isPrimaryBankCompany, PRIMARY_BANK_LABEL } from "@/lib/bank";
 
 /**
@@ -11,7 +17,8 @@ import { isPrimaryBankCompany, PRIMARY_BANK_LABEL } from "@/lib/bank";
  * Revenue / expense definitions match the dashboard KPI cards exactly:
  *   - revenue  = transactions whose category matches "Chiffre d'affaires"
  *                (see lib/revenue-category for matching rules)
- *   - expenses = sum of |amount| for transactions where amount < 0
+ *   - expenses = sum of |amount| for sorties (amount &lt; 0) hors bucket dérivé BNC
+ *                (voir deriveExpenseBucket)
  */
 
 /**
@@ -72,10 +79,11 @@ function aggregateTotals(transactions: DashboardTx[], today: Date): TxAggregate 
   for (const t of transactions) {
     if (isRevenueCategory(t.category)) {
       totalRevenueAllTime += t.amount;
-      if (t.date >= cut12Iso) totalRevenue12mo += t.amount;
-      if (t.date >= cut90Iso) totalRevenue90d += t.amount;
+      const revDay = effectiveRevenueAnalyticsDateIso(t);
+      if (revDay >= cut12Iso) totalRevenue12mo += t.amount;
+      if (revDay >= cut90Iso) totalRevenue90d += t.amount;
     }
-    if (t.amount < 0) {
+    if (t.amount < 0 && deriveExpenseBucket(t) !== BNC_PAYROLL_EXPENSE_CATEGORY) {
       totalExpensesAllTime += Math.abs(t.amount);
       if (t.date >= cut12Iso) totalExpenses12mo += Math.abs(t.amount);
       if (t.date >= cut90Iso) totalExpenses90d += Math.abs(t.amount);
@@ -114,13 +122,32 @@ function aggregateTotals(transactions: DashboardTx[], today: Date): TxAggregate 
 
 function aggregateByMonth(transactions: DashboardTx[]) {
   const map = new Map<string, { revenue: number; expenses: number; count: number }>();
-  for (const t of transactions) {
-    const key = t.date.slice(0, 7);
+
+  const bump = (
+    key: string,
+    delta: { revenue?: number; expenses?: number; count?: number }
+  ) => {
     const cur = map.get(key) ?? { revenue: 0, expenses: 0, count: 0 };
-    if (isRevenueCategory(t.category)) cur.revenue += t.amount;
-    if (t.amount < 0) cur.expenses += Math.abs(t.amount);
-    cur.count += 1;
+    if (delta.revenue != null) cur.revenue += delta.revenue;
+    if (delta.expenses != null) cur.expenses += delta.expenses;
+    if (delta.count != null) cur.count += delta.count;
     map.set(key, cur);
+  };
+
+  for (const t of transactions) {
+    if (isRevenueCategory(t.category)) {
+      bump(effectiveRevenueAnalyticsDateIso(t).slice(0, 7), {
+        revenue: t.amount,
+        count: 1
+      });
+    }
+    if (t.amount < 0 && deriveExpenseBucket(t) !== BNC_PAYROLL_EXPENSE_CATEGORY) {
+      const expKey = t.date.slice(0, 7);
+      bump(expKey, {
+        expenses: Math.abs(t.amount),
+        ...(isRevenueCategory(t.category) ? {} : { count: 1 })
+      });
+    }
   }
   return Array.from(map.entries())
     .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
@@ -130,15 +157,16 @@ function aggregateByMonth(transactions: DashboardTx[]) {
 function aggregateByCategory(transactions: DashboardTx[]) {
   const map = new Map<string, { total: number; count: number }>();
   for (const t of transactions) {
-    const cat = (t.category ?? "").trim() || "—";
+    if (t.amount >= 0) continue;
+    const cat = deriveExpenseBucket(t);
     const cur = map.get(cat) ?? { total: 0, count: 0 };
-    cur.total += t.amount;
+    cur.total += Math.abs(t.amount);
     cur.count += 1;
     map.set(cat, cur);
   }
   return Array.from(map.entries())
     .map(([category, v]) => ({ category, ...v }))
-    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+    .sort((a, b) => b.total - a.total)
     .slice(0, 15);
 }
 
@@ -146,13 +174,14 @@ function aggregateByCounterparty(transactions: DashboardTx[]) {
   const revMap = new Map<string, { total: number; count: number }>();
   const expMap = new Map<string, { total: number; count: number }>();
   for (const t of transactions) {
-    const key = (t.label ?? "").trim().slice(0, 80) || "—";
     if (isRevenueCategory(t.category)) {
+      const key = revenueCounterpartyDisplayName(t).slice(0, 80) || "—";
       const cur = revMap.get(key) ?? { total: 0, count: 0 };
       cur.total += t.amount;
       cur.count += 1;
       revMap.set(key, cur);
     } else if (t.amount < 0) {
+      const key = (t.label ?? "").trim().slice(0, 80) || "—";
       const cur = expMap.get(key) ?? { total: 0, count: 0 };
       cur.total += Math.abs(t.amount);
       cur.count += 1;
@@ -182,7 +211,9 @@ function asCsvBlock(transactions: DashboardTx[]): string {
       t.balance == null ? "" : t.balance.toFixed(2),
       t.date,
       csvEscape(t.label.slice(0, 50)),
-      csvEscape((t.category ?? "").slice(0, 24)),
+      csvEscape(
+        (t.amount < 0 ? deriveExpenseBucket(t) : (t.category ?? "")).slice(0, 24)
+      ),
       csvEscape((t.company ?? "").slice(0, 24))
     ].join(",")
   );
@@ -229,6 +260,9 @@ export function buildChatContext(
   lines.push("- Les montants des transactions « Chiffre d’affaires » sont stockés en TTC. Pour obtenir le HT : montant_ttc / 1,20.");
   lines.push("- Le dashboard affiche le « Total revenue » en HT (CA HT). Quand l’utilisateur dit « CA » ou « Total revenue » sans précision, il parle du HT.");
   lines.push("- « Chiffre d’affaires » = transactions dont la catégorie commence par « Chiffre d’affaires » (singulier ou pluriel, accents tolérés).");
+  lines.push(
+    `- Encaissements CA positifs datés sur les ${REVENUE_END_OF_MONTH_ROLL_DAYS} derniers jours civils du mois sont rattachés analytiquement au 1er jour du mois suivant (filtres, graphiques, totaux) ; la date en base reste celle de la banque.`
+  );
   lines.push("- « Dépenses » = toutes les transactions à montant négatif (toute sortie bancaire), peu importe la catégorie.");
   lines.push("- « Résultat net » = CA HT − Dépenses (les dépenses restent en TTC, simplification métier assumée).");
   lines.push(
@@ -307,7 +341,7 @@ export function buildChatContext(
     `# Transactions détaillées (${csvIncluded}/${transactions.length} les plus récentes, format CSV)`
   );
   lines.push(
-    "Colonnes : amt=montant TTC, bal=solde du compte, d=date YYYY-MM-DD, lbl=libellé, cat=catégorie, co=compte. Pour les analyses globales, fie-toi en priorité aux agrégats ci-dessus (Synthèse / Mensuel / Top catégories / Top contreparties)."
+    "Colonnes : amt=montant TTC, bal=solde du compte, d=date YYYY-MM-DD, lbl=libellé, cat=bucket dépense dérivé (ou catégorie entrée), co=compte. Agrégats : Synthèse / Mensuel / Dépenses par bucket / Top contreparties."
   );
   lines.push("```csv");
   lines.push(asCsvBlock(transactions));

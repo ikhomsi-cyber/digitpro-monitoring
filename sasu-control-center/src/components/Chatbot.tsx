@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
-import { ArrowUp, Bot, Loader2, Sparkles, X } from "lucide-react";
+import { DefaultChatTransport } from "ai";
+import { ArrowUp, Bot, KeyRound, Loader2, MessageSquareText, Sparkles, X } from "lucide-react";
 import { clsx } from "clsx";
 
 const SUGGESTIONS = [
@@ -23,7 +24,15 @@ export function Chatbot() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const { messages, sendMessage, status, error, stop } = useChat();
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat"
+      }),
+    []
+  );
+
+  const { messages, sendMessage, status, error, stop } = useChat({ transport });
 
   const busy = status === "submitted" || status === "streaming";
 
@@ -106,8 +115,8 @@ export function Chatbot() {
                   ))}
                   {busy ? (
                     <li className="flex items-center gap-2 text-xs text-ink-500">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      L’assistant analyse vos transactions…
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
+                      <span>L’assistant analyse vos transactions en direct</span>
                     </li>
                   ) : null}
                 </ul>
@@ -116,7 +125,7 @@ export function Chatbot() {
               {error ? (
                 <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
                   {error.message ||
-                    "Erreur de l’assistant. Vérifiez OPENAI_API_KEY ou réessayez."}
+                    "Erreur de l’assistant. Vérifiez OPENAI_API_KEY (ou GROQ_API_KEY) côté serveur, puis redémarrez."}
                 </div>
               ) : null}
             </div>
@@ -140,7 +149,7 @@ export function Chatbot() {
                       submit();
                     }
                   }}
-                  placeholder="Demandez n’importe quoi sur vos transactions…"
+                  placeholder="Posez une question précise sur vos transactions ou votre trésorerie"
                   className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm leading-snug text-ink-900 outline-none placeholder:text-ink-400"
                   disabled={busy}
                 />
@@ -164,10 +173,30 @@ export function Chatbot() {
                   </button>
                 )}
               </div>
-              <div className="mt-2 px-1 text-[11px] text-ink-500">
-                Appuyez sur <kbd className="rounded bg-ink-100 px-1">Entrée</kbd> pour envoyer ·{" "}
-                <kbd className="rounded bg-ink-100 px-1">Maj</kbd>+
-                <kbd className="rounded bg-ink-100 px-1">Entrée</kbd> pour une nouvelle ligne.
+              <div className="mt-2 space-y-2 px-1">
+                <p className="text-[11px] text-ink-500">
+                  Appuyez sur <kbd className="rounded bg-ink-100 px-1">Entrée</kbd> pour envoyer ·{" "}
+                  <kbd className="rounded bg-ink-100 px-1">Maj</kbd>+
+                  <kbd className="rounded bg-ink-100 px-1">Entrée</kbd> pour une nouvelle ligne.
+                </p>
+                <div className="flex items-start gap-2 rounded-xl border border-ink-100 bg-ink-50/90 px-2.5 py-2 text-[11px] leading-snug text-ink-600">
+                  <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-500" aria-hidden />
+                  <p>
+                    Clés côté serveur dans{" "}
+                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900">
+                      .env.local
+                    </code>
+                    :{" "}
+                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900">
+                      OPENAI_API_KEY
+                    </code>{" "}
+                    et{" "}
+                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900">
+                      CHAT_PROVIDER=openai
+                    </code>{" "}
+                    pour n’utiliser que ChatGPT (sans Groq). Redémarrez le serveur après modification.
+                  </p>
+                </div>
               </div>
             </form>
           </aside>
@@ -200,7 +229,14 @@ function MessageBubble({ role, text }: { role: "user" | "assistant" | "system"; 
  * renders **bold**, `code`, and bullet/number lists, plus pipe tables.
  */
 function FormattedText({ text, dim }: { text: string; dim?: boolean }) {
-  if (!text) return <span className="opacity-60">…</span>;
+  if (!text) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-ink-400">
+        <MessageSquareText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        <span className="text-xs">Message vide</span>
+      </span>
+    );
+  }
 
   const blocks = text.split(/\n{2,}/);
   return (

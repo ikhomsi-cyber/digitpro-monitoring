@@ -1,6 +1,6 @@
 /**
  * Single source of truth for which transactions are tied to the primary
- * banking account (Qonto). Used to compute "Cash available" — the latest
+ * banking account (Qonto). Used to compute the dashboard "Solde Qonto" KPI — the latest
  * known balance from Qonto, ignoring side accounts / paper entries.
  *
  * The match is permissive (case-insensitive substring) so all common

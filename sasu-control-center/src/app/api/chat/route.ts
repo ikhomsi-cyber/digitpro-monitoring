@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { buildChatContext } from "@/lib/chat-context";
+import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ async function loadTransactions(): Promise<{
       id: t.id,
       date: t.date,
       label: t.label,
-      category: t.category,
+      category: mapExpenseCategoryLabel(t.category),
       amount: t.amount,
       company: (t.company ?? "").trim()
     }));
@@ -45,7 +46,7 @@ async function loadTransactions(): Promise<{
       id: t.id,
       date: t.date,
       label: t.label,
-      category: t.category,
+      category: mapExpenseCategoryLabel(t.category),
       amount: t.amount,
       company: (t.company ?? "").trim()
     }));
@@ -96,7 +97,7 @@ async function loadTransactions(): Promise<{
     id: String(row.id),
     date: String(row.date).slice(0, 10),
     label: String(row.label ?? ""),
-    category: String(row.category ?? ""),
+    category: mapExpenseCategoryLabel(String(row.category ?? "")),
     amount: Number(row.amount),
     balance: row.balance == null ? null : Number(row.balance),
     company: String(row.company ?? "").trim()
@@ -106,20 +107,34 @@ async function loadTransactions(): Promise<{
 }
 
 /**
- * Picks the chat provider/model based on which API keys are present.
- * Groq is preferred (free, fast); OpenAI is the fallback.
- * The exact model can be overridden via env vars.
+ * Choix du modèle : Groq et/ou OpenAI selon les clés et CHAT_PROVIDER.
+ * - CHAT_PROVIDER=openai : uniquement OpenAI (aucun repli Groq).
+ * - CHAT_PROVIDER=groq : Groq en priorité, repli OpenAI si besoin.
+ * - Sinon : Groq en priorité si les deux clés sont présentes (défaut), sinon l’une ou l’autre.
  */
 function pickChatModel(): { model: LanguageModel; provider: string } | null {
-  if (process.env.GROQ_API_KEY) {
+  const pref = (process.env.CHAT_PROVIDER ?? "").trim().toLowerCase();
+  const hasGroq = Boolean(process.env.GROQ_API_KEY?.trim());
+  const hasOpenai = Boolean(process.env.OPENAI_API_KEY?.trim());
+
+  const groqModel = (): { model: LanguageModel; provider: string } | null => {
+    if (!hasGroq) return null;
     const modelId = process.env.GROQ_CHAT_MODEL || "llama-3.3-70b-versatile";
     return { model: groq(modelId), provider: `groq:${modelId}` };
-  }
-  if (process.env.OPENAI_API_KEY) {
+  };
+  const openaiModel = (): { model: LanguageModel; provider: string } | null => {
+    if (!hasOpenai) return null;
     const modelId = process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini";
     return { model: openai(modelId), provider: `openai:${modelId}` };
+  };
+
+  if (pref === "openai") {
+    return openaiModel();
   }
-  return null;
+  if (pref === "groq") {
+    return groqModel() ?? openaiModel();
+  }
+  return groqModel() ?? openaiModel();
 }
 
 export async function POST(req: Request) {
@@ -128,7 +143,7 @@ export async function POST(req: Request) {
     return new Response(
       JSON.stringify({
         error:
-          "Aucune clé d’API IA configurée. Définissez GROQ_API_KEY (gratuit) ou OPENAI_API_KEY dans .env.local pour activer l’assistant."
+          "Aucune clé d’API IA utilisable. Définissez GROQ_API_KEY (recommandé) ou OPENAI_API_KEY dans .env.local, puis redémarrez. CHAT_PROVIDER=openai force uniquement OpenAI."
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     );
@@ -186,15 +201,19 @@ function jsonError(err: unknown, provider: string): Response {
     lower.includes("tokens per minute") ||
     lower.includes("tpm") ||
     lower.includes("request too large");
-  const isQuota = lower.includes("insufficient_quota") || lower.includes("quota");
+  const isQuota =
+    lower.includes("insufficient_quota") ||
+    lower.includes("exceeded your current quota");
 
   let userMessage = `L’assistant (${provider}) a renvoyé une erreur : ${message}`;
   if (isRateLimit) {
     userMessage =
-      "L’assistant a été temporairement bridé par le fournisseur (limite de tokens/minute). Patientez ~30 s et reposez votre question, ou réduisez votre message. Vous pouvez aussi passer sur un modèle plus large (ex. OPENAI_API_KEY) ou activer un palier payant côté fournisseur.";
+      "L’assistant a été temporairement bridé par le fournisseur (limite de tokens/minute). Patientez ~30 s et reposez votre question, ou réduisez votre message.";
   } else if (isQuota) {
     userMessage =
-      "Quota du fournisseur dépassé. Configurez une autre clé (GROQ_API_KEY pour le gratuit) ou attendez le renouvellement de votre crédit.";
+      provider.startsWith("openai")
+        ? "OpenAI indique un quota insuffisant : vérifiez la facturation et les limites sur https://platform.openai.com/account/billing (crédit, mode payant, plafond mensuel). En attendant, vous pouvez utiliser Groq gratuit : renseignez GROQ_API_KEY dans .env.local, retirez ou commentez CHAT_PROVIDER=openai (ou mettez CHAT_PROVIDER=groq), puis redémarrez le serveur."
+        : "Quota du fournisseur dépassé. Vérifiez votre plan ou utilisez une autre clé (ex. OpenAI avec facturation active).";
   }
 
   return new Response(

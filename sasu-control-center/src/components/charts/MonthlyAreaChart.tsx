@@ -7,7 +7,7 @@ const MonthlyAreaChartClient = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-64 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+      <div className="h-[288px] min-h-[288px] animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
     )
   }
 );
