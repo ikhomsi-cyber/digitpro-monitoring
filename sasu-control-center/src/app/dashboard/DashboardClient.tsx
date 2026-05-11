@@ -447,11 +447,11 @@ export function DashboardClient({
     startTransition(async () => {
       try {
         const result = await syncQontoTransactionsFromApi();
-        router.refresh();
         toast.success("Qonto synchronisé", {
           id: toastId,
           description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.bankAccountSummary}`
         });
+        router.refresh();
       } catch (e) {
         toast.error("Synchronisation Qonto échouée", {
           id: toastId,
@@ -583,7 +583,7 @@ export function DashboardClient({
                         className={clsx(
                           "min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:py-1",
                           on
-                            ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-950/40 dark:text-brand-100 dark:shadow-none"
+                            ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-900/60 dark:text-white dark:shadow-brand-950/40"
                             : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
                         )}
                       >
@@ -669,32 +669,32 @@ export function DashboardClient({
                 ariaLabel={`Évolution du chiffre d’affaires HT par mois — ${periodLabel}`}
               />
               <div
-                className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/50 px-3 py-3 dark:border-emerald-800/60 dark:bg-emerald-950/30"
+                className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
                 aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}
               >
                 <div className="flex items-start gap-2.5">
                   <span
-                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-ink-900 dark:text-emerald-300"
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
                     aria-hidden
                   >
                     <CalendarClock className="h-4 w-4" strokeWidth={2} />
                   </span>
                   <div className="min-w-0 flex-1 space-y-1.5 text-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
                       Projection fin {revenueYearProjection.calendarYear}
                     </p>
-                    <p className="font-display text-lg font-bold tabular-nums text-emerald-950" data-private>
+                    <p className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100" data-private>
                       {formatEur(revenueYearProjection.projectedYearEndHt)}{" "}
-                      <span className="text-xs font-semibold text-emerald-800/80">HT</span>
+                      <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">HT</span>
                     </p>
-                    <p className="text-xs text-emerald-900/75" data-private>
+                    <p className="text-xs text-emerald-900/75 dark:text-emerald-300/80" data-private>
                       Équivalent TTC estimé{" "}
                       <span className="font-medium">{formatEur(revenueYearProjection.projectedYearEndTtc)}</span>
                     </p>
-                    <p className="text-xs leading-snug text-emerald-900/70" data-private>
+                    <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
                       Réalisé YTD HT :{" "}
-                      <span className="font-medium text-emerald-950">{formatEur(revenueYearProjection.ytdHt)}</span>
-                      <span className="text-emerald-800/80">
+                      <span className="font-medium text-emerald-950 dark:text-emerald-200">{formatEur(revenueYearProjection.ytdHt)}</span>
+                      <span className="text-emerald-800/80 dark:text-emerald-400/80">
                         {" "}
                         ·{" "}
                         {revenueYearProjection.projectionBasis === "workdays" ? (
@@ -711,15 +711,15 @@ export function DashboardClient({
                         )}
                       </span>
                     </p>
-                    <p className="text-[11px] leading-snug text-emerald-800/75">
+                    <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
                       {revenueYearProjection.projectionBasis === "workdays" ? (
                         <>
                           Extrapolation au prorata des{" "}
-                          <span className="font-medium text-emerald-900">
+                          <span className="font-medium text-emerald-900 dark:text-emerald-300">
                             jours ouvrés (lun–ven, fériés FR exclus) et de vos coches calendrier
                           </span>{" "}
                           sur {revenueYearProjection.calendarYear}, et non sur 365 jours civils. Périmètre :{" "}
-                          <span className="font-medium text-emerald-900">{scope === "pro" ? "SASU" : "Privé"}</span>
+                          <span className="font-medium text-emerald-900 dark:text-emerald-300">{scope === "pro" ? "SASU" : "Privé"}</span>
                           , hors fenêtre graphique.
                         </>
                       ) : (

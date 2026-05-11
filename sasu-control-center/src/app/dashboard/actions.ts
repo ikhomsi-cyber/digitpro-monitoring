@@ -133,6 +133,11 @@ async function fetchExistingIdsByContentHashes(
 }
 
 async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
+  const {
+    data: { user }
+  } = await client.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
   const start = trailingTwelveMonthStartDateIso();
   const { data: rows, error } = await client
     .from("transactions")
@@ -150,13 +155,19 @@ async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
   }));
 
   const metrics = computeMetricsFromTransactions(txs, new Date());
+  if (!metrics.length) return;
 
-  for (const m of metrics) {
-    const { error: upErr } = await client
-      .from("monthly_metrics")
-      .upsert({ month: m.month, revenue: m.revenue, expenses: m.expenses }, { onConflict: "user_id,month" });
-    if (upErr) throw new Error(upErr.message);
-  }
+  const payload = metrics.map((m) => ({
+    user_id: user.id,
+    month: m.month,
+    revenue: m.revenue,
+    expenses: m.expenses
+  }));
+
+  const { error: upErr } = await client
+    .from("monthly_metrics")
+    .upsert(payload, { onConflict: "user_id,month" });
+  if (upErr) throw new Error(upErr.message);
 }
 
 async function fetchLatestMetrics(client: SupabaseServer) {

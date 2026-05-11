@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, BriefcaseBusiness, CarFront, Utensils } from "lucide-react";
 import { clsx } from "clsx";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { formatEur } from "@/lib/format";
@@ -432,7 +432,7 @@ export function BillableDaysCalendarBlock({
     return buildInvoiceWorkedDaysPastMonthsSeries(treasuryTransactions, treasuryScope);
   }, [treasuryTransactions, treasuryScope]);
 
-  const [workedDaysChartYear, setWorkedDaysChartYear] = useState<number | "all">("all");
+  const [workedDaysChartYear, setWorkedDaysChartYear] = useState<number | "all">(now.getFullYear());
   const [workedDaysChartQuarter, setWorkedDaysChartQuarter] = useState<"full" | 1 | 2 | 3 | 4>("full");
 
   useEffect(() => {
@@ -486,7 +486,7 @@ export function BillableDaysCalendarBlock({
               Jours travaillés & TJM
             </CardTitle>
             <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500 dark:text-ink-400 sm:text-xs">
-              Coches = jours facturés · CA HT ≈ jours × {formatEur(tjmHt)}
+              Coches = jours facturés · CA HT ≈ jours × TJM
             </p>
           </div>
         </div>
@@ -594,14 +594,14 @@ export function BillableDaysCalendarBlock({
                                 "bg-sky-50/95 font-medium text-sky-950 ring-1 ring-sky-200/75 hover:bg-sky-100/95 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-800/50 dark:hover:bg-sky-900/45",
                               !isHoliday && !isSchoolVacation && isWeekend && "text-ink-500 dark:text-ink-500",
                               isToday &&
-                                "after:absolute after:bottom-0.5 after:left-1/2 after:h-0.5 after:w-3 after:-translate-x-1/2 after:rounded-full after:bg-brand-500 dark:after:bg-brand-400",
+                                "ring-2 ring-brand-500 ring-offset-1 dark:ring-brand-400 dark:ring-offset-ink-900",
                               isToday &&
                                 !on &&
                                 (isHoliday
-                                  ? "font-semibold text-amber-900 dark:text-amber-200"
+                                  ? "bg-amber-50 font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
                                   : isSchoolVacation
-                                    ? "font-semibold text-sky-900 dark:text-sky-200"
-                                    : "font-semibold text-brand-700 dark:text-brand-400")
+                                    ? "bg-sky-50 font-bold text-sky-900 dark:bg-sky-950/50 dark:text-sky-200"
+                                    : "bg-brand-50 font-bold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300")
                             )
                       )}
                     >
@@ -699,62 +699,73 @@ export function BillableDaysCalendarBlock({
                 )}
               </p>
 
-              <div className="mt-3 space-y-3 border-t border-ink-100 pt-3 dark:border-ink-800">
-                <div>
-                  <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">1) Brut type TJM (HT)</p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                    {formatEur(brutTjmMoisEncoursHt)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-ink-500 dark:text-ink-400">
-                    {selectedViewMonthStats.countedDays} j. × {formatEur(tjmHt)} HT
-                  </p>
-                  <WorkdaysMonthGauge
-                    isCurrent={tjmWorkdayGauge.isCurrent}
-                    countedBillable={tjmWorkdayGauge.countedBillable}
-                    remainingBillable={tjmWorkdayGauge.remainingBillable}
-                    totalBillableMonth={tjmWorkdayGauge.totalBillableMonth}
-                  />
+              <div className="mt-3 space-y-2.5 border-t border-ink-100 pt-3 dark:border-ink-800">
+                {/* TJM */}
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <BriefcaseBusiness className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM (HT)</p>
+                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
+                      {formatEur(brutTjmMoisEncoursHt)}
+                    </p>
+                    <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                      {selectedViewMonthStats.countedDays} j. × {formatEur(tjmHt)}
+                    </p>
+                    <WorkdaysMonthGauge
+                      isCurrent={tjmWorkdayGauge.isCurrent}
+                      countedBillable={tjmWorkdayGauge.countedBillable}
+                      remainingBillable={tjmWorkdayGauge.remainingBillable}
+                      totalBillableMonth={tjmWorkdayGauge.totalBillableMonth}
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
-                    2) Indemnité kilométrique aller-retour (estim.)
-                  </p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-analyze-800 dark:text-analyze-300">
-                    {formatEur(ikMoisEncours)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-ink-500 dark:text-ink-400">
-                    {selectedViewMonthStats.countedDays} j. × {formatEur(ikPerDay)} (aller-retour / jour)
-                  </p>
-                  <BudgetGauge
-                    label="Jauge IK"
-                    valueEur={ikMoisEncours}
-                    referenceEur={IK_REFERENCE_EUR}
-                    tone="analyze"
-                  />
+                {/* IK */}
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-200/80 bg-violet-50 text-violet-600 dark:border-violet-800/60 dark:bg-violet-950/50 dark:text-violet-400">
+                    <CarFront className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">IK aller-retour</p>
+                    <p className="font-display text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                      {formatEur(ikMoisEncours)}
+                    </p>
+                    <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                      {selectedViewMonthStats.countedDays} j. × {formatEur(ikPerDay)}
+                    </p>
+                    <BudgetGauge
+                      label="Jauge IK"
+                      valueEur={ikMoisEncours}
+                      referenceEur={IK_REFERENCE_EUR}
+                      tone="analyze"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">3) Frais de repas et NDF</p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                    {formatEur(mealFeesForViewedMonth?.total ?? 0)}
-                  </p>
-                  {mealFeesForViewedMonth ? (
-                    <p className="mt-0.5 text-[10px] text-ink-500 dark:text-ink-400">
-                      repas dirigeant (mois affiché) : {formatEur(mealFeesForViewedMonth.dirigeant)} · NDF (mois
-                      suivant) : {formatEur(mealFeesForViewedMonth.ndfMoisSuivant)}
+                {/* Repas + NDF */}
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-200/80 bg-amber-50 text-amber-600 dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
+                    <Utensils className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">Repas &amp; NDF</p>
+                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
+                      {formatEur(mealFeesForViewedMonth?.total ?? 0)}
                     </p>
-                  ) : (
-                    <p className="mt-0.5 text-[10px] text-ink-400 dark:text-ink-500">
-                      (nécessite les transactions du périmètre pour calculer)
-                    </p>
-                  )}
-                  <BudgetGauge
-                    label="Jauge repas + NDF"
-                    valueEur={mealFeesForViewedMonth?.total ?? 0}
-                    referenceEur={MEALS_REFERENCE_EUR}
-                    tone="emerald"
-                  />
+                    {mealFeesForViewedMonth ? (
+                      <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                        Dirigeant {formatEur(mealFeesForViewedMonth.dirigeant)} · NDF {formatEur(mealFeesForViewedMonth.ndfMoisSuivant)}
+                      </p>
+                    ) : null}
+                    <BudgetGauge
+                      label="Jauge repas + NDF"
+                      valueEur={mealFeesForViewedMonth?.total ?? 0}
+                      referenceEur={MEALS_REFERENCE_EUR}
+                      tone="emerald"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -812,49 +823,73 @@ export function BillableDaysCalendarBlock({
 
         {treasuryTransactions != null && treasuryScope != null ? (
           <div className="mt-5 border-t border-ink-100/90 pt-5 dark:border-ink-800">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-              <div className="flex min-w-[140px] flex-col gap-0.5">
-                <label htmlFor="inv-days-year" className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
-                  Année (axe mois B)
-                </label>
-                <select
-                  id="inv-days-year"
-                  value={workedDaysChartYear === "all" ? "all" : String(workedDaysChartYear)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setWorkedDaysChartYear(v === "all" ? "all" : Number(v));
-                  }}
-                  className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs text-ink-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-900 dark:text-ink-100 dark:shadow-none dark:focus:ring-brand-400/25"
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              {/* Sélecteur période — même style pill que "Fenêtre d'analyse" */}
+              <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                Période (axe B)
+              </span>
+              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+                <button
+                  type="button"
+                  aria-pressed={workedDaysChartYear === "all"}
+                  onClick={() => setWorkedDaysChartYear("all")}
+                  className={clsx(
+                    "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                    workedDaysChartYear === "all"
+                      ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                      : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
+                  )}
                 >
-                  <option value="all">Toute la période</option>
-                  {workedDaysChartAvailableYears.map((y) => (
-                    <option key={y} value={String(y)}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {workedDaysChartYear !== "all" ? (
-                <div className="flex min-w-[180px] flex-col gap-0.5">
-                  <label htmlFor="inv-days-quarter" className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
-                    Trimestre
-                  </label>
-                  <select
-                    id="inv-days-quarter"
-                    value={workedDaysChartQuarter === "full" ? "full" : String(workedDaysChartQuarter)}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setWorkedDaysChartQuarter(v === "full" ? "full" : (Number(v) as 1 | 2 | 3 | 4));
-                    }}
-                    className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs text-ink-900 shadow-sm outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-900 dark:text-ink-100 dark:shadow-none dark:focus:ring-brand-400/25"
+                  Tout
+                </button>
+                {workedDaysChartAvailableYears.map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    aria-pressed={workedDaysChartYear === y}
+                    onClick={() => setWorkedDaysChartYear(y)}
+                    className={clsx(
+                      "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                      workedDaysChartYear === y
+                        ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                        : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
+                    )}
                   >
-                    <option value="full">Année complète</option>
-                    <option value="1">T1 (janv.–mars)</option>
-                    <option value="2">T2 (avr.–juin)</option>
-                    <option value="3">T3 (juil.–sept.)</option>
-                    <option value="4">T4 (oct.–déc.)</option>
-                  </select>
-                </div>
+                    {y}
+                  </button>
+                ))}
+              </div>
+
+              {/* Trimestre — visible seulement si une année est sélectionnée */}
+              {workedDaysChartYear !== "all" ? (
+                <>
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                    Trimestre
+                  </span>
+                  <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+                    {(["full", 1, 2, 3, 4] as const).map((q) => {
+                      const label =
+                        q === "full" ? "Année" : q === 1 ? "T1" : q === 2 ? "T2" : q === 3 ? "T3" : "T4";
+                      const on = workedDaysChartQuarter === q;
+                      return (
+                        <button
+                          key={String(q)}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => setWorkedDaysChartQuarter(q)}
+                          className={clsx(
+                            "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                            on
+                              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                              : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
               ) : null}
             </div>
             <BillableInvoiceWorkedDaysChart

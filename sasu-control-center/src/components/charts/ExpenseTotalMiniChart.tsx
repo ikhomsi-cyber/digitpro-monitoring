@@ -85,6 +85,8 @@ export function ExpenseTotalMiniChart({
 
   if (!data.length) return null;
 
+  const step = data.length > 36 ? 6 : data.length > 18 ? 3 : data.length > 12 ? 2 : 1;
+
   return (
     <div
       className={`mt-3 w-full${clickable ? " cursor-pointer" : ""}`}
@@ -123,7 +125,7 @@ export function ExpenseTotalMiniChart({
               tickLine={false}
               axisLine={{ stroke: gridStroke }}
               tickMargin={2}
-              interval={0}
+              interval={step - 1}
               angle={-35}
               textAnchor="end"
               tick={{ fill: tickFill, fontSize: 8 }}

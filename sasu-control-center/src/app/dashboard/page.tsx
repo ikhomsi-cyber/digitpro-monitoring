@@ -159,12 +159,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
-      <nav className="flex flex-col gap-4 border-b border-ink-200 pb-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
+      <nav className="sticky top-[env(safe-area-inset-top)] z-40 flex flex-col gap-4 border-b border-ink-200 bg-white/95 backdrop-blur pb-4 dark:border-ink-800 dark:bg-ink-950/95 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap min-w-0 items-center gap-3">
           <Logo />
           <DashboardHeaderProfile variant="nav" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                dataMode === "DEMO" ? "bg-amber-500" : "bg-emerald-500"
+              }`}
+            />
+            {envMode === "DEMO"
+              ? "Mode démo — variables Supabase absentes."
+              : demoPreferenceOn
+                ? "Mode démo activé — données fictives."
+                : `Connecté · ${user?.email}`}
+          </div>
         </div>
         <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
+          <ParisWeatherBadge />
           {showDarkModeToggle ? <DarkModeToggle /> : null}
           <PrivacyToggle />
           {envMode === "SUPABASE" ? <DashboardDemoToggle enabled={demoPreferenceOn} /> : null}
@@ -183,20 +196,7 @@ export default async function DashboardPage() {
       </nav>
 
       <header className="py-6 text-center sm:py-9">
-        <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
-          <span
-            className={`h-1.5 w-1.5 rounded-full ${
-              dataMode === "DEMO" ? "bg-amber-500" : "bg-emerald-500"
-            }`}
-          />
-          {envMode === "DEMO"
-            ? "Mode démo — variables Supabase absentes."
-            : demoPreferenceOn
-              ? "Mode démo activé — données fictives."
-              : `Connecté · ${user?.email}`}
-        </div>
         <div className="mt-4 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-6">
-          <ParisWeatherBadge className="order-first sm:order-none" />
           <DashboardHeaderProfile />
           <h1 className="text-balance text-center font-display text-3xl font-semibold tracking-apple-tight text-ink-900 dark:text-ink-50 sm:text-left sm:text-4xl">
             DigitPro Consulting Monitoring

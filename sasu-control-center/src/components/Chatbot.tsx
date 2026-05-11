@@ -19,6 +19,10 @@ const SUGGESTIONS = [
  * — no transactions are sent over the wire from the client.
  */
 export function Chatbot() {
+  // Pour le moment : on masque le bouton flottant et le panneau assistant.
+  // Si tu veux le réactiver plus tard, repasse SHOW_ASSISTANT à true.
+  const SHOW_ASSISTANT = false;
+
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -51,6 +55,8 @@ export function Chatbot() {
     sendMessage({ text: value });
     setInput("");
   }
+
+  if (!SHOW_ASSISTANT) return null;
 
   return (
     <>

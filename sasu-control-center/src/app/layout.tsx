@@ -32,6 +32,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="color-scheme" content="light dark" />
         <script dangerouslySetInnerHTML={{ __html: htmlBootstrap }} />
+        <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <link rel="apple-touch-icon" href="/icons/digitpro-icon.svg" />
+        <meta name="theme-color" content="#ffffff" />
       </head>
       <body
         className={`${inter.variable} ${display.variable} font-sans bg-white text-ink-900 transition-colors duration-200 dark:bg-ink-950 dark:text-ink-100`}
