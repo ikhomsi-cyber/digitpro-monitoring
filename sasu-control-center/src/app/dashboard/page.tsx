@@ -159,35 +159,44 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
-      <nav className="sticky top-[env(safe-area-inset-top)] z-40 flex flex-col gap-4 border-b border-ink-200 bg-white/95 backdrop-blur pb-4 dark:border-ink-800 dark:bg-ink-950/95 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap min-w-0 items-center gap-3">
+      <nav className="sticky top-[env(safe-area-inset-top)] z-40 flex flex-row items-center justify-between gap-2 border-b border-ink-200 bg-white/95 py-2 backdrop-blur dark:border-ink-800 dark:bg-ink-950/95 sm:gap-3 sm:py-3">
+        {/* Gauche : logo + avatar + badge connexion */}
+        <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
           <Logo />
           <DashboardHeaderProfile variant="nav" />
-          <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
+          <div className="hidden min-w-0 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-2.5 py-1 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 sm:inline-flex">
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                 dataMode === "DEMO" ? "bg-amber-500" : "bg-emerald-500"
               }`}
             />
-            {envMode === "DEMO"
-              ? "Mode démo — variables Supabase absentes."
-              : demoPreferenceOn
-                ? "Mode démo activé — données fictives."
-                : `Connecté · ${user?.email}`}
+            <span className="truncate max-w-[16rem]">
+              {envMode === "DEMO"
+                ? "Mode démo"
+                : demoPreferenceOn
+                  ? "Mode démo activé"
+                  : `Connecté · ${user?.email}`}
+            </span>
           </div>
         </div>
-        <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
+
+        {/* Droite : actions */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ParisWeatherBadge />
           {showDarkModeToggle ? <DarkModeToggle /> : null}
-          <PrivacyToggle />
-          {envMode === "SUPABASE" ? <DashboardDemoToggle enabled={demoPreferenceOn} /> : null}
+          {/* Masquer chiffres + Mode démo : desktop uniquement */}
+          <span className="hidden sm:contents">
+            <PrivacyToggle />
+            {envMode === "SUPABASE" ? <DashboardDemoToggle enabled={demoPreferenceOn} /> : null}
+          </span>
           {envMode === "DEMO" ? null : (
             <form action="/logout" method="post" className="contents">
               <button
                 type="submit"
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-4 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500 sm:flex-initial"
+                title="Déconnexion"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-3 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500 sm:min-w-0 sm:px-4"
               >
-                Déconnexion
+                <span className="hidden sm:inline">Déconnexion</span>
                 <LogOut className="h-4 w-4 text-ink-500 dark:text-ink-400" />
               </button>
             </form>
