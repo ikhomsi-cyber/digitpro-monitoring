@@ -16,7 +16,7 @@ import {
 import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
-import { powensListAccounts, powensListTransactions } from "@/lib/powens/client";
+import { powensListAccounts, powensListTransactionsForAccounts } from "@/lib/powens/client";
 import {
   isRevolutPersonalPowensAccount,
   pickPowensAccountLabel
@@ -537,9 +537,10 @@ export async function syncRevolutPersonalPowensFromApi(): Promise<{
     .upsert(accountRows, { onConflict: "user_id,powens_account_id" });
   if (upAcc.error) throw new Error(upAcc.error.message);
 
-  const txs = await powensListTransactions(token, { limit: 1000 });
-  const allowed = new Set(revolutAccounts.map((a) => String(a.id)));
-  const filtered = txs.filter((t) => allowed.has(String(t.id_account)) && !t.deleted);
+  const accountIds = revolutAccounts.map((a) => a.id);
+  const txs = await powensListTransactionsForAccounts(token, accountIds, { limit: 1000 });
+  const allowed = new Set(accountIds.map(String));
+  const filtered = txs.filter((t) => allowed.has(String(t.id_account)));
 
   const txRows = filtered.map((t) => ({
     powens_transaction_id: String(t.id),

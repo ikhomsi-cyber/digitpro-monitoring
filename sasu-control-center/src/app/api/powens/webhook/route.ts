@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { powensListAccounts, powensListTransactions } from "@/lib/powens/client";
+import { powensListAccounts, powensListTransactionsForAccounts } from "@/lib/powens/client";
 import { isRevolutPersonalPowensAccount, pickPowensAccountLabel } from "@/lib/powens/revolut-account-filter";
 import type { Json } from "@/lib/supabase/types";
 
@@ -47,8 +47,9 @@ export async function POST(req: Request) {
     if (upAcc.error) return NextResponse.json({ ok: false, error: upAcc.error.message }, { status: 400 });
   }
 
-  const txs = await powensListTransactions(authToken, { limit: 1000 });
-  const filtered = txs.filter((t) => allowedAccountIds.has(String(t.id_account)) && !t.deleted);
+  const accountIds = revolutAccounts.map((a) => a.id);
+  const txs = await powensListTransactionsForAccounts(authToken, accountIds, { limit: 1000 });
+  const filtered = txs.filter((t) => allowedAccountIds.has(String(t.id_account)));
 
   const txRows = filtered.map((t) => ({
     user_id: userId,
