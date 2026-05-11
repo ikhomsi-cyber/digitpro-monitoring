@@ -1,16 +1,30 @@
 import type { DashboardTx } from "@/lib/dashboard-metrics";
-import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import {
+  ASSURANCE_CATEGORY_LABEL,
+  ICLOUD_IA_STORE_CATEGORY_LABEL,
+  IK_CATEGORY_LABEL,
+  IMPOT_CATEGORY_LABEL,
+  mapExpenseCategoryLabel,
+  MUTUELLE_CATEGORY_LABEL,
+  QONTO_CATEGORY_LABEL
+} from "@/lib/expense-category-map";
 
 /** Libellés affichés pour la répartition des dépenses (règles métier + libellé / société / catégorie). */
 export const DERIVED_EXPENSE_BUCKETS = [
   "BNC",
   "TVA",
+  IMPOT_CATEGORY_LABEL,
   "Urssaf",
   "Hiway",
+  IK_CATEGORY_LABEL,
   "Repas d'affaire",
   "Repas dirigeant",
   "CESU",
   "Mobile et Internet",
+  ICLOUD_IA_STORE_CATEGORY_LABEL,
+  QONTO_CATEGORY_LABEL,
+  ASSURANCE_CATEGORY_LABEL,
+  MUTUELLE_CATEGORY_LABEL,
   "Autres"
 ] as const;
 
@@ -29,6 +43,42 @@ function txBlob(tx: DashboardTx): string {
   return fold(`${tx.label} ${tx.company} ${tx.category}`);
 }
 
+/** Abonnement Qonto offre solo_basic (ex. libellé « Qonto · solo_basic »). */
+function textLooksLikeQontoSoloBasic(b: string): boolean {
+  if (!b.includes("qonto")) return false;
+  return b.includes("solo_basic") || b.includes("solo basic");
+}
+
+/**
+ * Prélèvement à la source (PAS) : le mot « pas » seul est ambigu en français (« ce n’est pas »).
+ */
+function textLooksLikePasImpot(b: string): boolean {
+  if (!/\bpas\b/.test(b)) return false;
+  return (
+    b.includes("prelevement") ||
+    b.includes("prlv") ||
+    b.includes("dgfip") ||
+    b.includes("gfip") ||
+    b.includes("a la source") ||
+    b.includes("retenue") ||
+    b.includes("liberatoire") ||
+    b.includes("impot") ||
+    b.includes("dts") ||
+    /^pas[-\s]/.test(b) ||
+    b.startsWith("pas ")
+  );
+}
+
+/** Indemnités kilométriques / IK (libellé, catégorie ou mention « IK »). */
+function textLooksLikeIndemniteKilometrique(b: string): boolean {
+  if (/\bik\b/.test(b)) return true;
+  if (b.includes("indemnite") && b.includes("kilomet")) return true;
+  if (b.includes("indemnites") && b.includes("kilomet")) return true;
+  if (b.includes("kilometrique") && b.includes("indemn")) return true;
+  if (b.includes("frais kilomet") || b.includes("note kilomet")) return true;
+  return false;
+}
+
 /**
  * Catégorie d’affichage pour une dépense (montant &lt; 0).
  * Ordre des règles : plus spécifique d’abord.
@@ -39,6 +89,24 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const b = txBlob(tx);
 
   if (b.includes("hiway")) return "Hiway";
+
+  if (textLooksLikeIndemniteKilometrique(b)) return IK_CATEGORY_LABEL;
+
+  if (
+    b.includes("apple.com/bill") ||
+    b.includes("apple com bill") ||
+    b.includes("apple.com bill") ||
+    (b.includes("cursor") && (b.includes("ai powered") || /\bide\b/.test(b)))
+  ) {
+    return ICLOUD_IA_STORE_CATEGORY_LABEL;
+  }
+
+  if (textLooksLikeQontoSoloBasic(b)) return QONTO_CATEGORY_LABEL;
+
+  /** AXA / SOGAREP (ex. « AXA SOGAREP », SOGAREP seul, ou AXA assurance). */
+  if (b.includes("sogarep") || /\baxa\b/.test(b)) return ASSURANCE_CATEGORY_LABEL;
+
+  if (b.includes("wemind")) return MUTUELLE_CATEGORY_LABEL;
 
   if (b.includes("pluxee") || b.includes("edenred")) return "CESU";
 
@@ -57,14 +125,20 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   }
   if (/\bfreebox\b/.test(b)) return "Mobile et Internet";
 
+  if (/\bdsn\b/.test(b) || textLooksLikePasImpot(b)) return IMPOT_CATEGORY_LABEL;
+
   if (
     b.includes("urssaf") ||
     b.includes("cgss") ||
-    /\bdsn\b/.test(b) ||
     b.includes("cotisation sociale") ||
     b.includes("cotisations sociales")
   ) {
     return "Urssaf";
+  }
+
+  if (b.includes("dgfip")) {
+    if (b.includes("tva")) return "TVA";
+    return IMPOT_CATEGORY_LABEL;
   }
 
   if (
@@ -107,7 +181,29 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const mk = fold(mapped);
   if (mk === "bnc" || mapped === "BNC") return "BNC";
   if (mk === "tva" || mapped === "TVA") return "TVA";
+  if (
+    mapped === IMPOT_CATEGORY_LABEL ||
+    mk === "impot" ||
+    /\bdsn\b/.test(mk) ||
+    textLooksLikePasImpot(mk) ||
+    textLooksLikePasImpot(b)
+  ) {
+    return IMPOT_CATEGORY_LABEL;
+  }
   if (mapped === "Hiway") return "Hiway";
+  if (mapped === IK_CATEGORY_LABEL || textLooksLikeIndemniteKilometrique(mk)) return IK_CATEGORY_LABEL;
+  if (mapped === ICLOUD_IA_STORE_CATEGORY_LABEL || mk.includes("icloud ia store")) {
+    return ICLOUD_IA_STORE_CATEGORY_LABEL;
+  }
+  if (
+    mapped === ASSURANCE_CATEGORY_LABEL ||
+    mk === "assurance" ||
+    (mk.includes("axa") && mk.includes("sogarep")) ||
+    mk.includes("sogarep")
+  ) {
+    return ASSURANCE_CATEGORY_LABEL;
+  }
+  if (mapped === MUTUELLE_CATEGORY_LABEL || mk === "mutuelle") return MUTUELLE_CATEGORY_LABEL;
   if (mapped === "Repas d'affaires" || (mk.includes("repas") && mk.includes("affair"))) return "Repas d'affaire";
   if (mapped === "Repas Ilias" || mk.includes("repas ilias")) return "Repas dirigeant";
 

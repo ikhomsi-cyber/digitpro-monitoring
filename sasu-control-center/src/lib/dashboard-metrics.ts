@@ -1,5 +1,6 @@
 import { importDedupePayload } from "./import-dedupe-payload";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
+import { getFrenchPublicHolidaysForYear } from "./fr-public-holidays";
 import { isRevenueCategory } from "./revenue-category";
 
 export type DashboardTx = {
@@ -75,22 +76,264 @@ export function transactionAnalyticsDayIso(tx: DashboardTx): string {
   return tx.date;
 }
 
+function localCalendarYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function daysInCalendarYear(year: number): number {
+  const start = new Date(year, 0, 1);
+  const nextJan1 = new Date(year + 1, 0, 1);
+  return Math.round((nextJan1.getTime() - start.getTime()) / 86400000);
+}
+
+function dayOfCalendarYearLocal(d: Date): number {
+  const start = new Date(d.getFullYear(), 0, 1);
+  const noon = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+  return Math.floor((noon.getTime() - start.getTime()) / 86400000) + 1;
+}
+
+/** Tous les ISO YYYY-MM-DD du 1er janv. au 31 déc. (calendrier local). */
+function iterLocalIsosInCalendarYear(year: number): string[] {
+  const out: string[] = [];
+  for (let m0 = 0; m0 < 12; m0++) {
+    const dim = new Date(year, m0 + 1, 0).getDate();
+    for (let day = 1; day <= dim; day++) {
+      out.push(
+        `${year}-${String(m0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      );
+    }
+  }
+  return out;
+}
+
+function isWeekendLocalIso(iso: string): boolean {
+  const p = parseUtcYmd(iso);
+  if (!p) return false;
+  const wd = new Date(p.y, p.m0, p.d).getDay();
+  return wd === 0 || wd === 6;
+}
+
+/**
+ * Jours « utiles » pour extrapoler le CA sur l’année : chaque date cochée au calendrier,
+ * plus tous les **jours ouvrés** FR (lun–ven hors jours fériés métropole) non encore couverts.
+ */
+export function buildYearRevenueCapacityDaySet(
+  year: number,
+  calendarSelected: ReadonlySet<string>
+): Set<string> {
+  const holidays = getFrenchPublicHolidaysForYear(year);
+  const capacity = new Set<string>();
+  for (const iso of iterLocalIsosInCalendarYear(year)) {
+    if (calendarSelected.has(iso)) {
+      capacity.add(iso);
+      continue;
+    }
+    if (!isWeekendLocalIso(iso) && !holidays.has(iso)) {
+      capacity.add(iso);
+    }
+  }
+  return capacity;
+}
+
+function countCapacityDaysNotAfter(capacity: ReadonlySet<string>, lastIsoInclusive: string): number {
+  let n = 0;
+  for (const iso of capacity) {
+    if (iso <= lastIsoInclusive) n++;
+  }
+  return n;
+}
+
+export type RevenueYearProjection = {
+  calendarYear: number;
+  /** CA encaissé (TTC) depuis le 1er janv., date analytique ≤ aujourd’hui (calendrier local). */
+  ytdTtc: number;
+  ytdHt: number;
+  /** Estimation au 31/12 si le rythme observé se poursuit (extrapolation au prorata de l’année civile). */
+  projectedYearEndTtc: number;
+  projectedYearEndHt: number;
+  /** Part utilisée pour l’extrapolation (jours ouvrés + calendrier, ou à défaut prorata calendaire). */
+  fractionOfYearElapsed: number;
+  /** Jour civil dans l’année (1…365/366), indicatif. */
+  dayOfYear: number;
+  daysInYear: number;
+  /** Base du dénominateur de la fraction. */
+  projectionBasis: "calendar" | "workdays";
+  /** Jours écoulés / total retenus pour la fraction (calendaire ou capacité). */
+  capacityDaysElapsed: number;
+  capacityDaysTotal: number;
+};
+
+/**
+ * Projection linéaire du CA jusqu’à fin d’année civile : CA_YTD / fraction écoulée.
+ * Si `billableWorkDayIsos` est fourni : fraction = jours de capacité écoulés / total capacité sur l’année,
+ * où la capacité = **saisies calendrier** ∪ **jours ouvrés** (lun–ven, fériés FR métropole exclus).
+ * Sinon : fraction = jour civil / nombre de jours de l’année (comportement historique).
+ *
+ * Mêmes règles de catégorie et de date analytique que le reste du dashboard.
+ */
+export function computeRevenueYearToDateProjection(
+  transactions: DashboardTx[],
+  options: {
+    now?: Date;
+    vatRate?: number;
+    /** Jours cochés « jours travaillés » ; fusionnés avec les jours ouvrés FR pour le prorata. */
+    billableWorkDayIsos?: readonly string[];
+  } = {}
+): RevenueYearProjection {
+  const now = options.now ?? new Date();
+  const vatRate = options.vatRate ?? 0.2;
+  const calendarYear = now.getFullYear();
+  const todayIso = localCalendarYmd(now);
+  const yearPrefix = `${calendarYear}-`;
+
+  let ytdTtc = 0;
+  for (const tx of transactions) {
+    if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
+    const revIso = effectiveRevenueAnalyticsDateIso(tx);
+    if (!revIso.startsWith(yearPrefix)) continue;
+    if (revIso > todayIso) continue;
+    ytdTtc += tx.amount;
+  }
+
+  const daysInYear = daysInCalendarYear(calendarYear);
+  const dayOfYear = dayOfCalendarYearLocal(now);
+  const calendarFraction = Math.min(1, Math.max(1 / daysInYear, dayOfYear / daysInYear));
+
+  let fraction: number;
+  let projectionBasis: "calendar" | "workdays";
+  let capacityDaysElapsed: number;
+  let capacityDaysTotal: number;
+
+  if (options.billableWorkDayIsos !== undefined) {
+    const selectedInYear = new Set(
+      options.billableWorkDayIsos.filter((iso) => iso.startsWith(yearPrefix))
+    );
+    const capacitySet = buildYearRevenueCapacityDaySet(calendarYear, selectedInYear);
+    capacityDaysTotal = capacitySet.size;
+    capacityDaysElapsed = countCapacityDaysNotAfter(capacitySet, todayIso);
+    if (capacityDaysTotal > 0) {
+      projectionBasis = "workdays";
+      fraction = Math.min(
+        1,
+        Math.max(1 / capacityDaysTotal, capacityDaysElapsed / capacityDaysTotal)
+      );
+    } else {
+      projectionBasis = "calendar";
+      capacityDaysElapsed = dayOfYear;
+      capacityDaysTotal = daysInYear;
+      fraction = calendarFraction;
+    }
+  } else {
+    projectionBasis = "calendar";
+    capacityDaysElapsed = dayOfYear;
+    capacityDaysTotal = daysInYear;
+    fraction = calendarFraction;
+  }
+
+  const ytdHt = ytdTtc / (1 + vatRate);
+  const projectedYearEndTtc = ytdTtc / fraction;
+  const projectedYearEndHt = projectedYearEndTtc / (1 + vatRate);
+
+  return {
+    calendarYear,
+    ytdTtc,
+    ytdHt,
+    projectedYearEndTtc,
+    projectedYearEndHt,
+    fractionOfYearElapsed: fraction,
+    dayOfYear,
+    daysInYear,
+    projectionBasis,
+    capacityDaysElapsed,
+    capacityDaysTotal
+  };
+}
+
 export type MonthlyFinanceMetric = {
   month: string; // YYYY-MM
   revenue: number;
   expenses: number;
 };
 
-/** Trois tons seulement (indigo analyse + deux ardoises) — lisible sans arc-en-ciel. */
-const EXPENSE_CATEGORY_STACK_PALETTE = ["#4f46e5", "#64748b", "#475569"] as const;
+/**
+ * Palette large pour catégories non mappées — teintes saturées, contrastes distincts en empilement.
+ */
+const EXPENSE_CATEGORY_VIBRANT_FALLBACK: readonly string[] = [
+  "#e11d48",
+  "#f97316",
+  "#ca8a04",
+  "#16a34a",
+  "#059669",
+  "#0d9488",
+  "#0891b2",
+  "#2563eb",
+  "#4f46e5",
+  "#7c3aed",
+  "#9333ea",
+  "#c026d3",
+  "#db2777",
+  "#dc2626",
+  "#65a30d",
+  "#0ea5e9",
+  "#6366f1",
+  "#d97706",
+  "#15803d",
+  "#be185d",
+  "#0f766e",
+  "#1d4ed8",
+  "#6d28d9",
+  "#b45309"
+] as const;
 
-/** Couleur stable par catégorie (cycle court sur 3 teintes). */
+function normExpenseCategoryKey(category: string): string {
+  return category
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[''`´]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Couleur d’accent par catégorie (libellé affiché dashboard).
+ * Libellés connus → teinte dédiée ; sinon hachage stable sur une palette étendue.
+ */
 export function expenseCategoryColor(category: string): string {
+  const n = normExpenseCategoryKey(category);
+
+  if (n === "bnc") return "#6366f1";
+  if (n === "tva") return "#64748b";
+  if (n === "autres") return "#78716c";
+  if (n === "hiway") return "#2563eb";
+  if (n === "urssaf") return "#e11d48";
+  if (n === "cesu") return "#a855f7";
+  if (n === "qonto") return "#14b8a6";
+  if (n.includes("icloud ia store")) return "#5856d6";
+  if (n === "assurance") return "#0284c7";
+  if (n === "mutuelle") return "#db2777";
+  if (n.includes("repas d'affaire") || n.includes("repas d affaire") || n.includes("repas daffaire"))
+    return "#ea580c";
+  if (n.includes("repas dirigeant")) return "#f59e0b";
+  if (n.includes("repas ilias") || n.includes("repas ilia")) return "#fb7185";
+  if (n.includes("mobile et internet")) return "#0ea5e9";
+  if (n.includes("indemnit") && n.includes("kilomet")) return "#22c55e";
+  if (n.includes("indemnit")) return "#10b981";
+  if (n.includes("loyer") || n.includes("logement")) return "#8b5cf6";
+  if (n.includes("transport") || n.includes("essence") || n.includes("parking")) return "#0891b2";
+  if (n.includes("shopping") || n.includes("fourniture")) return "#ec4899";
+  if (n.includes("sante") || n.includes("mutuelle")) return "#f43f5e";
+  if (n.includes("impot") || n.includes("taxe") || n.includes("cfe")) return "#dc2626";
+  if (n.includes("logiciel") || n.includes("saas") || n.includes("abonnement")) return "#7c3aed";
+
   let h = 0;
   for (let i = 0; i < category.length; i++) {
     h = (Math.imul(31, h) + category.charCodeAt(i)) >>> 0;
   }
-  return EXPENSE_CATEGORY_STACK_PALETTE[h % EXPENSE_CATEGORY_STACK_PALETTE.length];
+  return EXPENSE_CATEGORY_VIBRANT_FALLBACK[h % EXPENSE_CATEGORY_VIBRANT_FALLBACK.length];
 }
 
 export type ExpenseCategoryMonthRow = {
@@ -108,9 +351,18 @@ export type ExpenseCategoryMonthlyBreakdown = {
 /** Catégorie isolée dans le bloc BNC du tableau de bord (dépenses pro). */
 export const BNC_PAYROLL_EXPENSE_CATEGORY = "BNC";
 
-/** Dépenses prises en compte dans les KPI « Total expenses » (hors bucket BNC). */
-function countsTowardDashboardExpenseTotal(tx: DashboardTx): boolean {
-  return tx.amount < 0 && deriveExpenseBucket(tx) !== BNC_PAYROLL_EXPENSE_CATEGORY;
+/** Bucket TVA (paiements / crédits TVA), exclu des KPI « Total expenses » comme le BNC. */
+export const TVA_DERIVED_EXPENSE_BUCKET = "TVA";
+
+/** Buckets dérivés exclus des totaux dépenses dashboard (KPI, courbes, camembert centre). */
+export function isDerivedBucketExcludedFromExpenseKpis(bucket: string): boolean {
+  return bucket === BNC_PAYROLL_EXPENSE_CATEGORY || bucket === TVA_DERIVED_EXPENSE_BUCKET;
+}
+
+/** Dépenses comptées dans les KPI « Total expenses » et séries mensuelles (hors BNC et TVA). */
+export function countsTowardDashboardExpenseTotal(tx: DashboardTx): boolean {
+  if (tx.amount >= 0) return false;
+  return !isDerivedBucketExcludedFromExpenseKpis(deriveExpenseBucket(tx));
 }
 
 /** Retire des catégories du breakdown (ex. pour le graphique « dépenses hors BNC »). */
@@ -280,8 +532,8 @@ export function getAnalyticsMonthKeys(yearMode: number | null, now = new Date())
  *
  * Definitions (kept in sync with KPI cards):
  *   - revenue  = sum of transactions whose category is "Chiffre d'affaires"
- *   - expenses = sum of |amount| for outgoing flows (amount &lt; 0) sauf bucket dérivé **BNC**
- *               (voir `deriveExpenseBucket` — aligné avec le détail hors BNC du dashboard)
+ *   - expenses = sum of |amount| pour sorties (amount &lt; 0) sauf buckets dérivés **BNC** et **TVA**
+ *               (voir `deriveExpenseBucket`)
  */
 export function computeMetricsFromTransactions(
   transactions: DashboardTx[],

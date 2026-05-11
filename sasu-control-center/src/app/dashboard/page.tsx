@@ -127,6 +127,31 @@ export default async function DashboardPage() {
           scope: row.scope === "personal" ? "personal" : "pro"
         }));
 
+  let initialBillableWorkDays: string[] = [];
+  let initialBillableTjmHt: number | null = null;
+  if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase && user) {
+    const daysRes = await supabase
+      .from("billable_work_days")
+      .select("work_date")
+      .eq("user_id", user.id)
+      .order("work_date", { ascending: true });
+    if (!daysRes.error && daysRes.data) {
+      initialBillableWorkDays = daysRes.data.map((r) =>
+        String((r as { work_date: string }).work_date).slice(0, 10)
+      );
+    }
+    const setRes = await supabase
+      .from("user_billable_settings")
+      .select("tjm_ht")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!setRes.error && setRes.data != null) {
+      const raw = (setRes.data as { tjm_ht: number | string }).tjm_ht;
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) initialBillableTjmHt = n;
+    }
+  }
+
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
 
   return (
@@ -201,6 +226,8 @@ export default async function DashboardPage() {
         canWrite={dataMode === "SUPABASE"}
         syncKey={syncKey}
         initialTransactions={transactions}
+        initialBillableWorkDays={initialBillableWorkDays}
+        initialBillableTjmHt={initialBillableTjmHt}
       />
 
       <footer className="mt-16 flex flex-col gap-3 border-t border-ink-200 pt-8 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">

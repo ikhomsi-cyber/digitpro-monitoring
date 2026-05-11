@@ -1,30 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   Briefcase,
   Calendar,
+  CalendarClock,
   CalendarRange,
   CloudDownload,
-  Layers,
   Receipt,
   TrendingDown,
   TrendingUp,
   User,
   Users
 } from "lucide-react";
-import { MonthlyAreaChart } from "@/components/charts/MonthlyAreaChart";
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { MonthlyStackedExpenseChart } from "@/components/charts/MonthlyStackedExpenseChart";
+import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
-import { DashboardExpenseDonutSection } from "@/components/dashboard/DashboardExpenseDonutSection";
-import type { StackedExpenseChartRow } from "@/components/charts/MonthlyStackedExpenseChartClient";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { Chatbot } from "@/components/Chatbot";
 import { formatEur } from "@/lib/format";
@@ -39,11 +36,13 @@ import {
   BNC_PAYROLL_EXPENSE_CATEGORY,
   computeDashboardMonthlyMetrics,
   computeDerivedExpenseCategoryMonthlyBreakdown,
+  computeRevenueYearToDateProjection,
   expenseCategoryColor,
   filterDashboardTransactions,
   omitExpenseCategoriesFromBreakdown,
   singleCategoryExpenseBreakdown,
   transactionAnalyticsDayIso,
+  TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { syncQontoTransactionsFromApi } from "./actions";
@@ -102,25 +101,34 @@ function monthLabelFr(yyyyMm: string) {
   return new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(d);
 }
 
+/** Mois civil courant (local), aligné avec les dates des transactions YYYY-MM-DD. */
+function dashboardMonthKeyNowLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function DashboardClient({
   runtimeMode,
   canWrite,
   syncKey,
-  initialTransactions
+  initialTransactions,
+  initialBillableWorkDays,
+  initialBillableTjmHt
 }: {
   runtimeMode: SupabaseRuntimeMode;
   canWrite: boolean;
   syncKey: string;
   initialTransactions: DashboardTx[];
+  initialBillableWorkDays: string[];
+  initialBillableTjmHt: number | null;
 }) {
   const router = useRouter();
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [scope, setScope] = useState<"pro" | "personal">("pro");
   /** null = fenêtre glissante 12 mois ; sinon une ou plusieurs années civiles */
   const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
-  /** Catégories masquées dans le graphique empilé des dépenses (la légende permet de les réactiver). */
-  const [hiddenExpenseCategories, setHiddenExpenseCategories] = useState<Set<string>>(() => new Set());
-  /** Drill-down mois (YYYY-MM) pour la liste des transactions sous les graphiques. */
+  /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) pour la carte Total expenses. */
+  const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
 
   useEffect(() => {
     setTransactions(initialTransactions);
@@ -134,6 +142,28 @@ export function DashboardClient({
   }, [initialTransactions]);
 
   const [isPending, startTransition] = useTransition();
+
+  const billableTjmEffective = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
+  const persistBillableToSupabase = canWrite && runtimeMode === "SUPABASE";
+
+  const serverBillableKey = useMemo(
+    () => [...initialBillableWorkDays].sort().join("|"),
+    [initialBillableWorkDays]
+  );
+  const [billableWorkDayIsos, setBillableWorkDayIsos] = useState<string[]>(() =>
+    [...initialBillableWorkDays].sort()
+  );
+  useEffect(() => {
+    setBillableWorkDayIsos([...initialBillableWorkDays].sort());
+  }, [serverBillableKey, initialBillableWorkDays]);
+
+  const onBillableWorkDaysChange = useCallback((isos: readonly string[]) => {
+    setBillableWorkDayIsos((prev) => {
+      const next = [...isos].sort();
+      if (prev.join("|") === next.join("|")) return prev;
+      return next;
+    });
+  }, []);
 
   const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
 
@@ -152,13 +182,30 @@ export function DashboardClient({
     [filteredTx, selectedYears]
   );
 
+  /** Mois de la fenêtre d’analyse déjà écoulés (≤ mois en cours), pour les moyennes. */
+  const monthsElapsedInDashboardPeriod = useMemo(() => {
+    if (!metrics.length) return 0;
+    const cap = dashboardMonthKeyNowLocal();
+    return metrics.filter((m) => m.month <= cap).length;
+  }, [metrics]);
+
+  useEffect(() => {
+    if (totalExpensesMonthFilter == null) return;
+    const keys = new Set(metrics.map((m) => m.month));
+    if (!keys.has(totalExpensesMonthFilter)) setTotalExpensesMonthFilter(null);
+  }, [metrics, totalExpensesMonthFilter]);
+
   const expenseCategoryBreakdown = useMemo(
     () => computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, { years: selectedYears }),
     [filteredTx, selectedYears]
   );
 
   const expenseCategoryBreakdownMain = useMemo(
-    () => omitExpenseCategoriesFromBreakdown(expenseCategoryBreakdown, [BNC_PAYROLL_EXPENSE_CATEGORY]),
+    () =>
+      omitExpenseCategoriesFromBreakdown(expenseCategoryBreakdown, [
+        BNC_PAYROLL_EXPENSE_CATEGORY,
+        TVA_DERIVED_EXPENSE_BUCKET
+      ]),
     [expenseCategoryBreakdown]
   );
 
@@ -166,25 +213,6 @@ export function DashboardClient({
     () => singleCategoryExpenseBreakdown(expenseCategoryBreakdown, BNC_PAYROLL_EXPENSE_CATEGORY),
     [expenseCategoryBreakdown]
   );
-
-  const visibleExpenseCategories = useMemo(
-    () => expenseCategoryBreakdownMain.categories.filter((c) => !hiddenExpenseCategories.has(c)),
-    [expenseCategoryBreakdownMain.categories, hiddenExpenseCategories]
-  );
-
-  const stackedExpenseChartData = useMemo(() => {
-    const rows: StackedExpenseChartRow[] = expenseCategoryBreakdownMain.rows.map((r) => {
-      const row: StackedExpenseChartRow = {
-        month: monthLabelFr(r.monthKey),
-        monthKey: r.monthKey
-      };
-      for (const c of visibleExpenseCategories) {
-        row[c] = r.values[c] ?? 0;
-      }
-      return row;
-    });
-    return rows;
-  }, [expenseCategoryBreakdownMain.rows, visibleExpenseCategories]);
 
   const stackedBncChartData = useMemo(() => {
     const cat = BNC_PAYROLL_EXPENSE_CATEGORY;
@@ -195,32 +223,58 @@ export function DashboardClient({
     }));
   }, [bncExpenseBreakdown.rows]);
 
-  const monthlyExpensesExcludingBnc = useMemo(
-    () =>
-      expenseCategoryBreakdownMain.rows.map((r) => ({
-        month: monthLabelFr(r.monthKey),
-        monthKey: r.monthKey,
-        value: Math.round(sum(Object.values(r.values)))
-      })),
-    [expenseCategoryBreakdownMain.rows]
-  );
-
-  const avgMonthlyExpensesMain = useMemo(() => {
-    if (!monthlyExpensesExcludingBnc.length) return 0;
-    return sum(monthlyExpensesExcludingBnc.map((p) => p.value)) / monthlyExpensesExcludingBnc.length;
-  }, [monthlyExpensesExcludingBnc]);
-
-  const avgMonthlyBnc = useMemo(() => {
+  const totalBncPeriod = useMemo(() => {
     const cat = BNC_PAYROLL_EXPENSE_CATEGORY;
-    if (!bncExpenseBreakdown.rows.length) return 0;
-    return sum(bncExpenseBreakdown.rows.map((r) => r.values[cat] ?? 0)) / bncExpenseBreakdown.rows.length;
+    return sum(bncExpenseBreakdown.rows.map((r) => r.values[cat] ?? 0));
   }, [bncExpenseBreakdown.rows]);
 
-  const totalExpenses = useMemo(() => sum(metrics.map((m) => m.expenses)), [metrics]);
+  const avgMonthlyBnc = useMemo(() => {
+    if (!monthsElapsedInDashboardPeriod) return 0;
+    return totalBncPeriod / monthsElapsedInDashboardPeriod;
+  }, [totalBncPeriod, monthsElapsedInDashboardPeriod]);
+
+  const totalExpensesCard = useMemo(() => {
+    if (totalExpensesMonthFilter) {
+      const m = metrics.find((x) => x.month === totalExpensesMonthFilter);
+      return m ? m.expenses : 0;
+    }
+    return sum(metrics.map((x) => x.expenses));
+  }, [metrics, totalExpensesMonthFilter]);
+
+  const expenseCategoryTotalsForTotalExpensesCard = useMemo(() => {
+    const cats = expenseCategoryBreakdownMain.categories;
+    if (!cats.length) return [];
+    if (!totalExpensesMonthFilter) {
+      const totals = new Map<string, number>();
+      for (const c of cats) totals.set(c, 0);
+      for (const row of expenseCategoryBreakdownMain.rows) {
+        for (const c of cats) {
+          totals.set(c, (totals.get(c) ?? 0) + (row.values[c] ?? 0));
+        }
+      }
+      return cats
+        .map((name) => ({ name, total: totals.get(name) ?? 0 }))
+        .filter((x) => x.total > 0);
+    }
+    const row = expenseCategoryBreakdownMain.rows.find((r) => r.monthKey === totalExpensesMonthFilter);
+    if (!row) return [];
+    return cats
+      .map((name) => ({ name, total: row.values[name] ?? 0 }))
+      .filter((x) => x.total > 0);
+  }, [expenseCategoryBreakdownMain, totalExpensesMonthFilter]);
 
   const VAT_RATE = 0.2;
   const totalRevenues = useMemo(() => sum(metrics.map((m) => m.revenue)), [metrics]);
   const totalRevenuesHt = useMemo(() => totalRevenues / (1 + VAT_RATE), [totalRevenues]);
+
+  const revenueYearProjection = useMemo(
+    () =>
+      computeRevenueYearToDateProjection(scopedTx, {
+        vatRate: VAT_RATE,
+        billableWorkDayIsos: billableWorkDayIsos
+      }),
+    [scopedTx, billableWorkDayIsos, VAT_RATE]
+  );
 
   const monthlyRevenueHt = useMemo(
     () =>
@@ -256,29 +310,20 @@ export function DashboardClient({
     [metrics]
   );
 
-  const expenseCategoryPeriodTotals = useMemo(() => {
-    const cats = expenseCategoryBreakdown.categories.filter(
-      (c) => c !== BNC_PAYROLL_EXPENSE_CATEGORY
-    );
-    if (!cats.length) return [];
-    const totals = new Map<string, number>();
-    for (const c of cats) totals.set(c, 0);
-    for (const row of expenseCategoryBreakdown.rows) {
-      for (const c of cats) {
-        totals.set(c, (totals.get(c) ?? 0) + (row.values[c] ?? 0));
-      }
-    }
-    return cats
-      .map((name) => ({ name, total: totals.get(name) ?? 0 }))
-      .filter((x) => x.total > 0);
-  }, [expenseCategoryBreakdown]);
-
   const periodLabel = useMemo(() => {
     if (selectedYears == null) return "12 derniers mois (fenêtre glissante)";
     if (selectedYears.length === 1) return `Année ${selectedYears[0]}`;
     const sorted = [...selectedYears].sort((a, b) => a - b);
     return `Années ${sorted.join(", ")}`;
   }, [selectedYears]);
+
+  const totalExpensesCardSubtitle = useMemo(() => {
+    const base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET}`;
+    if (totalExpensesMonthFilter) {
+      return `${base} · ${monthLabelFr(totalExpensesMonthFilter)} (mois sélectionné) · ${periodLabel}`;
+    }
+    return `${base} · ${periodLabel}`;
+  }, [totalExpensesMonthFilter, periodLabel]);
 
   const yearOptions = useMemo(() => {
     const ys = new Set<number>();
@@ -333,6 +378,15 @@ export function DashboardClient({
 
   return (
     <main className="mt-8 space-y-8">
+      <BillableDaysCalendarBlock
+        tjmHt={billableTjmEffective}
+        persistToSupabase={persistBillableToSupabase}
+        initialWorkDayIsos={initialBillableWorkDays}
+        onWorkDaysChange={onBillableWorkDaysChange}
+        treasuryTransactions={transactions}
+        treasuryScope={scope}
+      />
+
       <section className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -470,30 +524,99 @@ export function DashboardClient({
                   <TrendingUp className="h-4 w-4" strokeWidth={2.2} />
                 </span>
                 <span className="leading-snug">
-                  <span className="font-medium text-ink-700">TTC</span>{" "}
-                  <span data-private>{formatEur(totalRevenues)}</span>
-                  <span className="block text-xs font-normal text-ink-500">{periodLabel}</span>
+                  <span className="font-medium text-ink-700">Chiffre d’affaires HT</span>
+                  <span className="block text-xs font-normal text-ink-500">
+                    Équivalent TTC <span data-private>{formatEur(totalRevenues)}</span> · {periodLabel}
+                  </span>
                 </span>
               </div>
               <RevenueMiniChart
                 data={monthlyRevenueHt}
                 ariaLabel={`Évolution du chiffre d’affaires HT par mois — ${periodLabel}`}
               />
+              <div
+                className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/50 px-3 py-3"
+                aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}
+              >
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700"
+                    aria-hidden
+                  >
+                    <CalendarClock className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90">
+                      Projection fin {revenueYearProjection.calendarYear}
+                    </p>
+                    <p className="font-display text-lg font-bold tabular-nums text-emerald-950" data-private>
+                      {formatEur(revenueYearProjection.projectedYearEndHt)}{" "}
+                      <span className="text-xs font-semibold text-emerald-800/80">HT</span>
+                    </p>
+                    <p className="text-xs text-emerald-900/75" data-private>
+                      Équivalent TTC estimé{" "}
+                      <span className="font-medium">{formatEur(revenueYearProjection.projectedYearEndTtc)}</span>
+                    </p>
+                    <p className="text-xs leading-snug text-emerald-900/70" data-private>
+                      Réalisé YTD HT :{" "}
+                      <span className="font-medium text-emerald-950">{formatEur(revenueYearProjection.ytdHt)}</span>
+                      <span className="text-emerald-800/80">
+                        {" "}
+                        ·{" "}
+                        {revenueYearProjection.projectionBasis === "workdays" ? (
+                          <>
+                            {revenueYearProjection.capacityDaysElapsed} /{" "}
+                            {revenueYearProjection.capacityDaysTotal} jours prévus (
+                            {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % écoulés)
+                          </>
+                        ) : (
+                          <>
+                            jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
+                            {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                          </>
+                        )}
+                      </span>
+                    </p>
+                    <p className="text-[11px] leading-snug text-emerald-800/75">
+                      {revenueYearProjection.projectionBasis === "workdays" ? (
+                        <>
+                          Extrapolation au prorata des{" "}
+                          <span className="font-medium text-emerald-900">
+                            jours ouvrés (lun–ven, fériés FR exclus) et de vos coches calendrier
+                          </span>{" "}
+                          sur {revenueYearProjection.calendarYear}, et non sur 365 jours civils. Périmètre :{" "}
+                          <span className="font-medium text-emerald-900">{scope === "pro" ? "SASU" : "Privé"}</span>
+                          , hors fenêtre graphique.
+                        </>
+                      ) : (
+                        <>
+                          Extrapolation au prorata calendaire (CA réalisé ÷ part d’année écoulée). Périmètre :{" "}
+                          <span className="font-medium text-emerald-900">{scope === "pro" ? "SASU" : "Privé"}</span>
+                          , indépendamment de la fenêtre graphique ci-dessus.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div className="mt-3 flex min-h-0 flex-1 flex-col space-y-2 border-t border-ink-200 pt-3" data-private>
                 {revenueCounterpartyTotals.length ? (
                   <>
                     <p className="text-[10px] font-medium uppercase tracking-wide text-ink-400">
-                      Contreparties / clients
+                      Contreparties / clients · HT
                     </p>
                     <ul
                       className="max-h-36 space-y-1.5 overflow-y-auto pr-0.5 text-xs"
                       aria-label="Montants encaissés par contrepartie"
                     >
                       {revenueCounterpartyTotals.map(({ name, total }) => {
+                        const totalHt = total / (1 + VAT_RATE);
                         const pct =
-                          totalRevenues > 0 ? Math.min(100, Math.round((total / totalRevenues) * 100)) : 0;
+                          totalRevenuesHt > 0
+                            ? Math.min(100, Math.round((totalHt / totalRevenuesHt) * 100))
+                            : 0;
                         const showBillableDays = isCounterpartyBillableDaysAtTjm(name);
-                        const htForClient = total / (1 + VAT_RATE);
+                        const htForClient = totalHt;
                         const workedDays = showBillableDays ? htForClient / BILLABLE_CLIENT_TJM_HT : 0;
                         return (
                           <li
@@ -513,7 +636,7 @@ export function DashboardClient({
                               </span>
                             </span>
                             <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
-                              <span className="font-medium text-emerald-800">{formatEur(total)}</span>
+                              <span className="font-medium text-emerald-800">{formatEur(totalHt)}</span>
                               <span className="w-8 text-right text-[10px] text-ink-400">{pct}%</span>
                             </span>
                           </li>
@@ -530,164 +653,144 @@ export function DashboardClient({
             </CardBody>
           </Card>
 
-          <Card variant="solid" className="flex h-full min-h-0 flex-col">
-          <CardHeader className="pb-3">
-            <DashboardBlockTitle icon={TrendingDown} iconTone="expense">
-              Total expenses
-            </DashboardBlockTitle>
-          </CardHeader>
-          <CardBody className="flex flex-1 flex-col pt-0">
-            <CardValue>
-              <span data-private>{formatEur(totalExpenses)}</span>
-            </CardValue>
-            <div className="mt-3 flex items-start gap-2.5 text-sm text-ink-500">
-              <span
-                className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-700"
-                aria-hidden
-              >
-                <Receipt className="h-4 w-4" strokeWidth={2.2} />
-              </span>
-              <span className="leading-snug">
-                <span className="font-medium text-ink-700">Total sorties</span>
-                <span className="block text-xs font-normal text-ink-500">{periodLabel}</span>
-              </span>
-            </div>
-            <ExpenseTotalMiniChart
-              data={monthlyTotalExpensesSeries}
-              ariaLabel={`Évolution des dépenses totales par mois — ${periodLabel}`}
-            />
-            <div className="mt-3 flex min-h-0 flex-1 flex-col space-y-2 border-t border-ink-200 pt-3" data-private>
-              {expenseCategoryPeriodTotals.length ? (
-                <>
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-ink-400">
-                    Détail sur la période
-                  </p>
-                  <ul className="max-h-36 space-y-1.5 overflow-y-auto pr-0.5 text-xs" aria-label="Détail des dépenses par catégorie">
-                    {expenseCategoryPeriodTotals.map(({ name, total }) => {
-                      const pct =
-                        totalExpenses > 0 ? Math.min(100, Math.round((total / totalExpenses) * 100)) : 0;
-                      const color = expenseCategoryColor(name);
-                      const CatIcon = categoryGlyph(name);
-                      return (
-                        <li
-                          key={name}
-                          className="flex items-baseline justify-between gap-2 border-b border-ink-100 pb-1.5 last:border-0 last:pb-0"
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border bg-white text-ink-700 shadow-sm"
-                              style={{ borderColor: color, color }}
-                              aria-hidden
-                            >
-                              <CatIcon className="h-3 w-3" strokeWidth={2} />
-                            </span>
-                            <span className="truncate text-ink-700">{name}</span>
-                          </span>
-                          <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
-                            <span className="font-medium text-ink-900">{formatEur(total)}</span>
-                            <span className="w-8 text-right text-[10px] text-ink-400">{pct}%</span>
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              ) : (
-                <p className="text-xs text-ink-500">Aucune dépense sur cette période.</p>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-        </div>
-      </section>
-
-      <section className="space-y-4" aria-label="Graphiques et répartition des dépenses">
-        <div className="grid grid-cols-1 gap-4">
-          <Card>
-            <CardHeader className="items-start">
-            <div>
-              <DashboardBlockTitle icon={BarChart3} iconTone="chart">
-                Monthly expenses
-              </DashboardBlockTitle>
-              <CardValue>
-                <span data-private>{formatEur(avgMonthlyExpensesMain)}</span>
-              </CardValue>
-              <div className="mt-1 text-xs text-ink-500">
-                Moyenne mensuelle (hors {BNC_PAYROLL_EXPENSE_CATEGORY}) · {periodLabel}
+          <Card className="flex h-full min-h-0 flex-col border-ink-200/90 bg-gradient-to-b from-ink-50/40 to-white">
+            <CardHeader className="flex flex-col gap-4 border-b border-ink-100/80 pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <span
+                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-rose-200/60 bg-rose-50/80 text-rose-700"
+                  aria-hidden
+                >
+                  <TrendingDown className="h-[19px] w-[19px]" strokeWidth={1.85} />
+                </span>
+                <div className="min-w-0">
+                  <CardTitle className="!mt-0 text-base font-semibold tracking-tight text-ink-900">
+                    Total expenses
+                  </CardTitle>
+                  <div className="mt-1 text-xs leading-relaxed text-ink-500">{totalExpensesCardSubtitle}</div>
+                  <CardValue className="mt-2">
+                    <span data-private>{formatEur(totalExpensesCard)}</span>
+                  </CardValue>
+                </div>
               </div>
-            </div>
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs font-medium text-ink-700">
-              <Calendar className="h-3.5 w-3.5 text-ink-500" aria-hidden />
-              {metrics.length || 0} mois
-            </div>
-          </CardHeader>
-          <CardBody>
-            <div data-private className="space-y-4">
-              {expenseCategoryBreakdownMain.categories.length === 0 ? (
-                <MonthlyAreaChart
-                  data={monthlyExpensesExcludingBnc}
-                  color={{ stroke: "#ef4444", fill: "#ef4444" }}
-                />
-              ) : (
-                <>
-                  <MonthlyStackedExpenseChart
-                    data={stackedExpenseChartData}
-                    visibleCategories={visibleExpenseCategories}
-                  />
-                  <div className="border-t border-ink-200 pt-4">
-                    <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-500">
-                      <Layers className="h-3.5 w-3.5 text-ink-400" aria-hidden />
-                      Catégories (clic pour afficher ou masquer)
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                <label htmlFor="total-expenses-month-filter" className="sr-only">
+                  Filtrer Total expenses par mois
+                </label>
+                <select
+                  id="total-expenses-month-filter"
+                  value={totalExpensesMonthFilter ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTotalExpensesMonthFilter(v === "" ? null : v);
+                  }}
+                  className="min-w-[11.5rem] rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                  aria-label="Filtrer les totaux et catégories par mois civil"
+                >
+                  <option value="">Toute la période</option>
+                  {metrics.map((m) => (
+                    <option key={m.month} value={m.month}>
+                      {monthLabelFr(m.month)}
+                    </option>
+                  ))}
+                </select>
+                <div
+                  className="inline-flex items-center justify-end gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-800 shadow-sm"
+                  title={
+                    totalExpensesMonthFilter
+                      ? undefined
+                      : "Nombre de mois écoulés dans la fenêtre (jusqu’au mois en cours), utilisé pour les moyennes"
+                  }
+                >
+                  <Calendar className="h-3.5 w-3.5 text-ink-500" aria-hidden />
+                  {totalExpensesMonthFilter
+                    ? monthLabelFr(totalExpensesMonthFilter)
+                    : `${monthsElapsedInDashboardPeriod || 0} mois`}
+                </div>
+              </div>
+            </CardHeader>
+            <CardBody className="flex flex-1 flex-col pt-6">
+              <div className="mb-1 flex items-start gap-2.5 text-sm text-ink-500">
+                <span
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50/90 text-rose-700"
+                  aria-hidden
+                >
+                  <Receipt className="h-4 w-4" strokeWidth={2.2} />
+                </span>
+                <span className="leading-snug">
+                  <span className="font-medium text-ink-700">Synthèse des dépenses</span>
+                  <span className="block text-xs font-normal text-ink-500">
+                    Total sur la période · graphique ci-dessous
+                  </span>
+                </span>
+              </div>
+              <ExpenseTotalMiniChart
+                data={monthlyTotalExpensesSeries}
+                ariaLabel={`Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}`}
+              />
+              <div className="mt-4 flex min-h-0 flex-1 flex-col space-y-2 border-t border-ink-200 pt-4" data-private>
+                {expenseCategoryTotalsForTotalExpensesCard.length ? (
+                  <>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                      {totalExpensesMonthFilter
+                        ? "Catégories · ce mois"
+                        : "Catégories · total période et moy. / mois (période écoulée)"}
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {expenseCategoryBreakdownMain.categories.map((cat) => {
-                        const visible = !hiddenExpenseCategories.has(cat);
-                        const color = expenseCategoryColor(cat);
-                        const CatIcon = categoryGlyph(cat);
+                    <ul
+                      className="max-h-40 space-y-1.5 overflow-y-auto pr-0.5 text-xs"
+                      aria-label="Détail des dépenses par catégorie"
+                    >
+                      {expenseCategoryTotalsForTotalExpensesCard.map(({ name, total }) => {
+                        const pct =
+                          totalExpensesCard > 0 ? Math.min(100, Math.round((total / totalExpensesCard) * 100)) : 0;
+                        const color = expenseCategoryColor(name);
+                        const CatIcon = categoryGlyph(name);
+                        const avgMonthly =
+                          monthsElapsedInDashboardPeriod > 0
+                            ? total / monthsElapsedInDashboardPeriod
+                            : 0;
                         return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => {
-                              setHiddenExpenseCategories((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(cat)) next.delete(cat);
-                                else next.add(cat);
-                                return next;
-                              });
-                            }}
-                            className={`chip max-w-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 ${
-                              visible ? "border-ink-300 opacity-100" : "border-ink-200 opacity-45"
-                            }`}
-                            aria-pressed={visible}
-                            aria-label={
-                              visible
-                                ? `Masquer la catégorie ${cat} du graphique`
-                                : `Afficher la catégorie ${cat} dans le graphique`
-                            }
+                          <li
+                            key={name}
+                            className="flex items-center justify-between gap-2 border-b border-ink-100 pb-2 last:border-0 last:pb-0"
                           >
-                            <span
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border bg-white text-ink-700"
-                              style={{ borderColor: color, color }}
-                              aria-hidden
-                            >
-                              <CatIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-white text-ink-700 shadow-sm"
+                                style={{ borderColor: color, color }}
+                                aria-hidden
+                              >
+                                <CatIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                              </span>
+                              <span className="truncate text-sm font-medium text-ink-800">{name}</span>
                             </span>
-                            <span className="min-w-0 max-w-[16rem] break-words text-left leading-snug">
-                              {cat}
+                            <span className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
+                              <span className="flex items-baseline gap-2">
+                                <span className="text-sm font-semibold text-ink-900">{formatEur(total)}</span>
+                                <span className="w-7 text-right text-[10px] font-medium text-ink-400">
+                                  {pct}%
+                                </span>
+                              </span>
+                              {!totalExpensesMonthFilter && monthsElapsedInDashboardPeriod > 0 ? (
+                                <span className="text-[11px] font-medium text-rose-700/90">
+                                  moy. {formatEur(avgMonthly)} <span className="font-normal text-ink-500">/ mois</span>
+                                </span>
+                              ) : null}
                             </span>
-                          </button>
+                          </li>
                         );
                       })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-xs text-ink-500">Aucune dépense sur cette période.</p>
+                )}
+              </div>
             </CardBody>
           </Card>
         </div>
+      </section>
 
+      <section className="space-y-4" aria-label="Graphiques des dépenses">
         <Card>
           <CardHeader className="items-start">
             <div>
@@ -695,14 +798,28 @@ export function DashboardClient({
                 BNC
               </DashboardBlockTitle>
               <CardValue>
-                <span data-private>{formatEur(avgMonthlyBnc)}</span>
+                <span data-private>{formatEur(totalBncPeriod)}</span>
               </CardValue>
-              <div className="mt-1 text-xs text-ink-500">Moyenne mensuelle · {periodLabel}</div>
+              <div className="mt-1 text-xs text-ink-500">Total sur la période · {periodLabel}</div>
               <div className="mt-0.5 text-xs text-ink-400">{BNC_PAYROLL_EXPENSE_CATEGORY} uniquement</div>
+              <div className="mt-4 border-t border-ink-200 pt-3">
+                <div
+                  className="font-display text-xl font-semibold tabular-nums text-ink-900"
+                  data-private
+                >
+                  {formatEur(avgMonthlyBnc)}
+                </div>
+                <div className="mt-1 text-xs text-ink-500">
+                  Moyenne mensuelle <span className="text-ink-400">(période écoulée)</span>
+                </div>
+              </div>
             </div>
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs font-medium text-ink-700">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-xs font-medium text-ink-700"
+              title="Mois écoulés dans la fenêtre (jusqu’au mois en cours), base de la moyenne BNC"
+            >
               <Calendar className="h-3.5 w-3.5 text-ink-500" aria-hidden />
-              {metrics.length || 0} mois
+              {monthsElapsedInDashboardPeriod || 0} mois
             </div>
           </CardHeader>
           <CardBody>
@@ -714,13 +831,6 @@ export function DashboardClient({
             </div>
           </CardBody>
         </Card>
-
-        <DashboardExpenseDonutSection
-          metrics={metrics}
-          filteredTx={filteredTx}
-          expenseCategoryBreakdown={expenseCategoryBreakdown}
-          canWrite={canWrite}
-        />
       </section>
 
 

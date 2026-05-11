@@ -1,7 +1,9 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 
 export type DonutSegment = {
   name: string;
@@ -10,25 +12,45 @@ export type DonutSegment = {
   Icon: LucideIcon;
 };
 
-function iconPositionsPx(
-  segments: Pick<DonutSegment, "value">[],
-  cx: number,
-  cy: number,
-  radius: number
-): { x: number; y: number }[] {
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  if (total <= 0) return segments.map(() => ({ x: cx, y: cy }));
-  let cumulative = 0;
-  return segments.map((seg) => {
-    const sweep = (seg.value / total) * 360;
-    const mid = cumulative + sweep / 2;
-    cumulative += sweep;
-    const rad = ((mid - 90) * Math.PI) / 180;
-    return {
-      x: cx + radius * Math.cos(rad),
-      y: cy + radius * Math.sin(rad)
-    };
-  });
+const RAD = Math.PI / 180;
+
+/** Icône minuscule au milieu de l’anneau pour chaque secteur (sauf parts &lt; ~3 %). */
+function DonutSegmentMiniIcon(props: PieLabelRenderProps) {
+  const { cx, cy, midAngle, innerRadius, outerRadius, payload, percent } = props;
+  const seg = payload as DonutSegment | undefined;
+  if (!seg || seg.name === "_empty" || percent == null || percent < 0.03) return null;
+
+  const Icon = seg.Icon;
+  if (!Icon) return null;
+
+  const ir = Number(innerRadius);
+  const or = Number(outerRadius);
+  if (!Number.isFinite(ir) || !Number.isFinite(or) || or - ir < 10) return null;
+
+  const angle = midAngle ?? 0;
+  const rMid = (ir + or) / 2;
+  const mx = cx + rMid * Math.cos(-angle * RAD);
+  const my = cy + rMid * Math.sin(-angle * RAD);
+
+  /** ~10 px — pictogramme volontairement très petit */
+  const box = 11;
+  const half = box / 2;
+
+  return (
+    <g transform={`translate(${mx},${my})`} pointerEvents="none">
+      <foreignObject x={-half} y={-half} width={box} height={box}>
+        <div
+          className="flex h-full w-full items-center justify-center"
+          style={{
+            color: "rgba(255,255,255,0.96)",
+            filter: "drop-shadow(0 0.5px 1.2px rgba(0,0,0,0.45))"
+          }}
+        >
+          <Icon className="h-[9px] w-[9px]" strokeWidth={2.35} aria-hidden />
+        </div>
+      </foreignObject>
+    </g>
+  );
 }
 
 export function ExpenseDonut({
@@ -45,16 +67,12 @@ export function ExpenseDonut({
   /** Clic sur une part du donut (nom de catégorie). */
   onSegmentClick?: (segmentName: string) => void;
 }) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const iconR = size * 0.33;
-
   const chartData = segments.filter((s) => s.value > 0);
-  const positions =
-    chartData.length > 0 ? iconPositionsPx(chartData, cx, cy, iconR) : [];
 
-  const pieRows =
-    chartData.length > 0 ? chartData : [{ name: "_empty", value: 1, color: "#e2e8f0" }];
+  const pieRows: DonutSegment[] =
+    chartData.length > 0
+      ? chartData
+      : [{ name: "_empty", value: 1, color: "#e2e8f0", Icon: MoreHorizontal }];
 
   return (
     <div className="relative mx-auto" style={{ width: size, height: size }}>
@@ -65,14 +83,16 @@ export function ExpenseDonut({
             dataKey="value"
             cx="50%"
             cy="50%"
-            innerRadius="68%"
-            outerRadius="92%"
-            paddingAngle={chartData.length > 1 ? 1.6 : 0}
-            stroke="#f8fafc"
+            innerRadius="74%"
+            outerRadius="88%"
+            paddingAngle={chartData.length > 1 ? 1.1 : 0}
+            stroke="#ffffff"
             strokeWidth={2}
-            cornerRadius={6}
+            cornerRadius={4}
             startAngle={90}
             endAngle={-270}
+            label={DonutSegmentMiniIcon}
+            labelLine={false}
             isAnimationActive
             animationDuration={550}
             style={{ cursor: onSegmentClick && chartData.length ? "pointer" : "default" }}
@@ -98,26 +118,6 @@ export function ExpenseDonut({
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-
-      {chartData.map((seg, i) => {
-        const pos = positions[i];
-        if (!pos) return null;
-        const Icon = seg.Icon;
-        return (
-          <div
-            key={`well-${seg.name}-${i}`}
-            className="pointer-events-none absolute flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 bg-white shadow-sm shadow-slate-900/6"
-            style={{
-              left: pos.x,
-              top: pos.y,
-              borderColor: seg.color,
-              color: seg.color
-            }}
-          >
-            <Icon className="h-[18px] w-[18px]" strokeWidth={2.25} aria-hidden />
-          </div>
-        );
-      })}
 
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
         <p

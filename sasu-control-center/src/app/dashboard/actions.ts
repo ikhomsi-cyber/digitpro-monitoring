@@ -733,3 +733,81 @@ export async function tagExistingTransactionsAsQonto(): Promise<{
   revalidatePath("/dashboard");
   return { scanned: all.length, updated: updates.length };
 }
+
+const ISO_CAL_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isValidIsoCalendarDate(s: string): boolean {
+  const m = ISO_CAL_DATE_RE.exec(s);
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+
+/**
+ * Remplace tous les jours travaillés cochés et enregistre le TJM HT (table `user_billable_settings`).
+ * Nécessite les migrations `billable_work_days` et `user_billable_settings`.
+ */
+export async function replaceBillableWorkDays(isoDates: string[], tjmHt: number): Promise<void> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  if (!Number.isFinite(tjmHt) || tjmHt <= 0 || tjmHt > 1_000_000) {
+    throw new Error("TJM invalide");
+  }
+
+  for (const s of isoDates) {
+    if (typeof s !== "string" || !isValidIsoCalendarDate(s)) {
+      throw new Error(`Date invalide : ${String(s)}`);
+    }
+  }
+
+  const unique = [...new Set(isoDates)];
+
+  const { error: delErr } = await supabase.from("billable_work_days").delete().eq("user_id", user.id);
+  if (delErr) {
+    const msg = delErr.message ?? "";
+    if (/billable_work_days|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « billable_work_days » introuvable : exécutez la migration Supabase (fichier 20260511120000_billable_work_days.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  if (unique.length > 0) {
+    const { error: insErr } = await supabase.from("billable_work_days").insert(
+      unique.map((work_date) => ({
+        user_id: user.id,
+        work_date
+      }))
+    );
+    if (insErr) throw new Error(insErr.message);
+  }
+
+  const { error: upsertErr } = await supabase.from("user_billable_settings").upsert(
+    {
+      user_id: user.id,
+      tjm_ht: Math.round(tjmHt * 100) / 100
+    },
+    { onConflict: "user_id" }
+  );
+  if (upsertErr) {
+    const msg = upsertErr.message ?? "";
+    if (/user_billable_settings|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « user_billable_settings » introuvable : exécutez la migration Supabase (20260511120000_billable_work_days.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  revalidatePath("/dashboard");
+}

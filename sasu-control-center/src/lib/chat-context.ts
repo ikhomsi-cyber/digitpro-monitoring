@@ -1,5 +1,5 @@
 import {
-  BNC_PAYROLL_EXPENSE_CATEGORY,
+  countsTowardDashboardExpenseTotal,
   effectiveRevenueAnalyticsDateIso,
   REVENUE_END_OF_MONTH_ROLL_DAYS,
   type DashboardTx
@@ -17,8 +17,8 @@ import { isPrimaryBankCompany, PRIMARY_BANK_LABEL } from "@/lib/bank";
  * Revenue / expense definitions match the dashboard KPI cards exactly:
  *   - revenue  = transactions whose category matches "Chiffre d'affaires"
  *                (see lib/revenue-category for matching rules)
- *   - expenses = sum of |amount| for sorties (amount &lt; 0) hors bucket dérivé BNC
- *                (voir deriveExpenseBucket)
+ *   - expenses = sum of |amount| pour sorties (amount &lt; 0) hors buckets BNC et TVA
+ *                (`countsTowardDashboardExpenseTotal`)
  */
 
 /**
@@ -83,7 +83,7 @@ function aggregateTotals(transactions: DashboardTx[], today: Date): TxAggregate 
       if (revDay >= cut12Iso) totalRevenue12mo += t.amount;
       if (revDay >= cut90Iso) totalRevenue90d += t.amount;
     }
-    if (t.amount < 0 && deriveExpenseBucket(t) !== BNC_PAYROLL_EXPENSE_CATEGORY) {
+    if (countsTowardDashboardExpenseTotal(t)) {
       totalExpensesAllTime += Math.abs(t.amount);
       if (t.date >= cut12Iso) totalExpenses12mo += Math.abs(t.amount);
       if (t.date >= cut90Iso) totalExpenses90d += Math.abs(t.amount);
@@ -141,7 +141,7 @@ function aggregateByMonth(transactions: DashboardTx[]) {
         count: 1
       });
     }
-    if (t.amount < 0 && deriveExpenseBucket(t) !== BNC_PAYROLL_EXPENSE_CATEGORY) {
+    if (countsTowardDashboardExpenseTotal(t)) {
       const expKey = t.date.slice(0, 7);
       bump(expKey, {
         expenses: Math.abs(t.amount),

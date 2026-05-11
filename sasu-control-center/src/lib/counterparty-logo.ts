@@ -1,6 +1,6 @@
 /**
  * Logos contreparties : favicon public par domaine (Google s2) + repli initiales côté UI.
- * Les noms courts canoniques (ex. « Skylab Consulting ») sont mappés à un domaine connu.
+ * Noms mappés à un domaine pour favicon (Google s2). Laisser vide pour forcer les initiales.
  */
 
 export function normalizeCounterpartyKey(name: string): string {
@@ -16,9 +16,7 @@ export function normalizeCounterpartyKey(name: string): string {
  * Domaine dont on affiche le favicon (icône marque), clé = `normalizeCounterpartyKey(nom affiché)`.
  * Étendre cette liste au fil des clients récurrents.
  */
-const COUNTERPARTY_BRAND_DOMAINS: Readonly<Record<string, string>> = {
-  "skylab consulting": "skylab.fr"
-};
+const COUNTERPARTY_BRAND_DOMAINS: Readonly<Record<string, string>> = {};
 
 const UNRESOLVED_KEYS = new Set(["contrepartie non renseignee", ""]);
 
@@ -54,6 +52,8 @@ export function counterpartyLogoHref(displayName: string, size = 64): string | n
 export function counterpartyInitials(name: string): string {
   const t = (name ?? "").trim();
   if (!t || /^contrepartie non renseignée$/i.test(t)) return "?";
+  const key = normalizeCounterpartyKey(t);
+  if (key === "skylab consulting") return "SK";
   const parts = t.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     const a = parts[0]!.charAt(0);

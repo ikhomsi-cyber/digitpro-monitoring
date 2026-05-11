@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 
-/** Portrait dans `public/images/` — remplacez ce fichier par votre photo si besoin. */
+/** Portrait : fichier `public/images/iliass-khomsi.png` (photo carrée ou paysage, le cercle rogne avec `object-cover`). */
 const PROFILE_SRC = "/images/iliass-khomsi.png";
 
 const sizeClass = {
@@ -45,7 +45,7 @@ export function DashboardHeaderProfile({ variant = "hero" }: { variant?: "hero" 
         src={PROFILE_SRC}
         alt="Iliass KHOMSI — DigitPro Consulting Monitoring"
         fill
-        className="object-cover object-top"
+        className="object-cover object-center"
         sizes={sizesAttr[variant]}
         priority={variant === "hero"}
         onError={() => setFailed(true)}

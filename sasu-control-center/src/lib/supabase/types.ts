@@ -130,6 +130,39 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      user_billable_settings: {
+        Row: {
+          user_id: string;
+          tjm_ht: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id?: string;
+          tjm_ht?: number;
+        };
+        Update: Partial<{
+          tjm_ht: number;
+        }>;
+        Relationships: [];
+      };
+      billable_work_days: {
+        Row: {
+          id: string;
+          user_id: string;
+          work_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          work_date: string;
+        };
+        Update: Partial<{
+          work_date: string;
+        }>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
