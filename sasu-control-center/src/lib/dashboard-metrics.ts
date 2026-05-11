@@ -2,6 +2,7 @@ import { importDedupePayload } from "./import-dedupe-payload";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
 import { getFrenchPublicHolidaysForYear } from "./fr-public-holidays";
 import { isRevenueCategory } from "./revenue-category";
+import { revenueAnalyticsDateOverride } from "./transaction-analytics-overrides";
 
 export type DashboardTx = {
   id: string;
@@ -18,11 +19,11 @@ export type DashboardTx = {
 };
 
 /**
- * Encaissements « Chiffre d’affaires » (montant &gt; 0) dont la date tombe sur l’un des
- * **N derniers jours civils du mois** sont rattachés, pour tout le dashboard, au **1er jour du mois suivant**.
+ * Encaissements « Chiffre d’affaires » (montant &gt; 0) : jours civils **1 à N** (inclus) →
+ * rattachés au **mois de la date bancaire** ; au-delà → **1er jour du mois suivant** (agrégats dashboard).
  * La date en base ne change pas — uniquement filtres et agrégats analytiques.
  */
-export const REVENUE_END_OF_MONTH_ROLL_DAYS = 4;
+export const REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY = 26;
 
 function parseUtcYmd(iso: string): { y: number; m0: number; d: number } | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
@@ -34,10 +35,6 @@ function parseUtcYmd(iso: string): { y: number; m0: number; d: number } | null {
   return { y, m0: mo - 1, d };
 }
 
-function utcLastDayOfMonth(y: number, monthIndex0: number): number {
-  return new Date(Date.UTC(y, monthIndex0 + 1, 0)).getUTCDate();
-}
-
 /** 1er jour du mois civil suivant `iso` (UTC). */
 export function firstDayOfNextCalendarMonthIso(iso: string): string | null {
   const p = parseUtcYmd(iso);
@@ -46,27 +43,34 @@ export function firstDayOfNextCalendarMonthIso(iso: string): string | null {
   return next.toISOString().slice(0, 10);
 }
 
-/** True si le jour est parmi les `REVENUE_END_OF_MONTH_ROLL_DAYS` derniers du mois (UTC). */
-export function isRevenueEndOfMonthCalendarDay(iso: string): boolean {
+/**
+ * True si l’encaissement CA (date `YYYY-MM-DD` en UTC) doit être rattaché au **mois suivant**
+ * (1er jour) : jours civils **strictement après** `REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY`.
+ */
+export function isRevenueRollToNextMonthDay(iso: string): boolean {
   const p = parseUtcYmd(iso);
   if (!p) return false;
-  const n = Math.max(1, REVENUE_END_OF_MONTH_ROLL_DAYS);
-  const last = utcLastDayOfMonth(p.y, p.m0);
-  return p.d > last - n;
+  const n = Math.max(1, REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY);
+  return p.d > n;
 }
 
-/** Date analytique pour les encaissements CA (fin de mois → mois suivant). */
-export function effectiveRevenueAnalyticsDateIso(
-  tx: Pick<DashboardTx, "date" | "category" | "amount">
-): string {
+/** @deprecated Utiliser `isRevenueRollToNextMonthDay` (seuil au jour 26). */
+export function isRevenueEndOfMonthCalendarDay(iso: string): boolean {
+  return isRevenueRollToNextMonthDay(iso);
+}
+
+/** Date analytique pour les encaissements CA (corrections métier, puis jours 27+ → mois suivant). */
+export function effectiveRevenueAnalyticsDateIso(tx: DashboardTx): string {
   if (!isRevenueCategory(tx.category) || tx.amount <= 0) return tx.date;
-  if (!isRevenueEndOfMonthCalendarDay(tx.date)) return tx.date;
+  const forced = revenueAnalyticsDateOverride(tx);
+  if (forced) return forced;
+  if (!isRevenueRollToNextMonthDay(tx.date)) return tx.date;
   return firstDayOfNextCalendarMonthIso(tx.date) ?? tx.date;
 }
 
 /**
  * Date utilisée pour filtres / années : dépenses = date réelle ;
- * encaissements CA = date décalée si fin de mois.
+ * encaissements CA = date décalée si jour &gt; 26 (rattaché au 1er du mois suivant).
  */
 export function transactionAnalyticsDayIso(tx: DashboardTx): string {
   if (tx.amount < 0) return tx.date;
@@ -308,7 +312,8 @@ export function expenseCategoryColor(category: string): string {
   if (n === "bnc") return "#6366f1";
   if (n === "tva") return "#64748b";
   if (n === "autres") return "#78716c";
-  if (n === "hiway") return "#2563eb";
+  if (n.startsWith("compta") && n.includes("admin")) return "#2563eb";
+  if (n === "ndf") return "#0f766e";
   if (n === "urssaf") return "#e11d48";
   if (n === "cesu") return "#a855f7";
   if (n === "qonto") return "#14b8a6";

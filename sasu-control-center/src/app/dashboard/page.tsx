@@ -19,6 +19,8 @@ import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderPr
 import { ParisWeatherBadge } from "@/components/dashboard/ParisWeatherBadge";
 import { Logo } from "@/components/ui/Logo";
 import { PrivacyToggle } from "@/components/PrivacyToggle";
+import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 
 /** Always evaluate Supabase env + session at request time. */
 export const dynamic = "force-dynamic";
@@ -153,36 +155,35 @@ export default async function DashboardPage() {
   }
 
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
+  const showDarkModeToggle = isDarkModeUiEnabled();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <nav className="flex items-center justify-between border-b border-ink-200 pb-4">
-        <div className="flex items-center gap-3">
+    <div className="mx-auto max-w-6xl px-4 pb-10 pt-[max(1.5rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
+      <nav className="flex flex-col gap-4 border-b border-ink-200 pb-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-start">
           <Logo />
           <DashboardHeaderProfile variant="nav" />
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Link
-            href="/analyse"
-            className="inline-flex rounded-full border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-analyze-600 shadow-sm transition hover:border-analyze-200 hover:bg-analyze-50/80"
-          >
-            Analyse
-          </Link>
+        <div className="flex flex-wrap items-stretch gap-2 sm:justify-end">
+          {showDarkModeToggle ? <DarkModeToggle /> : null}
           <PrivacyToggle />
           {envMode === "SUPABASE" ? <DashboardDemoToggle enabled={demoPreferenceOn} /> : null}
           {envMode === "DEMO" ? null : (
-            <form action="/logout" method="post">
-              <button className="inline-flex items-center gap-2 rounded-full border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-900 transition hover:border-ink-400">
+            <form action="/logout" method="post" className="contents">
+              <button
+                type="submit"
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-4 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500 sm:flex-initial"
+              >
                 Déconnexion
-                <LogOut className="h-4 w-4 text-ink-500" />
+                <LogOut className="h-4 w-4 text-ink-500 dark:text-ink-400" />
               </button>
             </form>
           )}
         </div>
       </nav>
 
-      <header className="py-7 text-center sm:py-9">
-        <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700">
+      <header className="py-6 text-center sm:py-9">
+        <div className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200">
           <span
             className={`h-1.5 w-1.5 rounded-full ${
               dataMode === "DEMO" ? "bg-amber-500" : "bg-emerald-500"
@@ -197,28 +198,28 @@ export default async function DashboardPage() {
         <div className="mt-4 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap sm:gap-6">
           <ParisWeatherBadge className="order-first sm:order-none" />
           <DashboardHeaderProfile />
-          <h1 className="text-balance text-center font-display text-3xl font-semibold tracking-apple-tight text-ink-900 sm:text-left sm:text-4xl">
+          <h1 className="text-balance text-center font-display text-3xl font-semibold tracking-apple-tight text-ink-900 dark:text-ink-50 sm:text-left sm:text-4xl">
             DigitPro Consulting Monitoring
           </h1>
         </div>
 
         <div className="mx-auto mt-3 flex w-full max-w-2xl items-center justify-center gap-3">
-          <span className="h-px w-10 bg-ink-200" aria-hidden />
+          <span className="h-px w-10 bg-ink-200 dark:bg-ink-700" aria-hidden />
           <span
             className="h-2 w-2 rounded-full bg-brand-500 shadow-[0_0_0_4px_rgba(0,122,255,0.10)]"
             aria-hidden
           />
-          <span className="h-px w-10 bg-ink-200" aria-hidden />
+          <span className="h-px w-10 bg-ink-200 dark:bg-ink-700" aria-hidden />
         </div>
 
-        <p className="mx-auto mt-3 max-w-2xl text-balance text-base text-ink-600 sm:text-lg">
+        <p className="mx-auto mt-3 max-w-2xl text-balance text-base text-ink-600 dark:text-ink-300 sm:text-lg">
           {envMode === "DEMO"
             ? "Aucune configuration Supabase détectée : données de démonstration uniquement."
             : demoPreferenceOn
               ? "Prévisualisation hors base. Utilisez le commutateur pour revenir aux données Supabase."
               : "Pilotage finances, trésorerie et chiffre d’affaires — en temps réel."}
         </p>
-        <div className="mt-2 text-sm text-ink-500">by Iliass KHOMSI</div>
+        <div className="mt-2 text-sm text-ink-500 dark:text-ink-400">by Iliass KHOMSI</div>
       </header>
 
       <DashboardClient
@@ -230,7 +231,7 @@ export default async function DashboardPage() {
         initialBillableTjmHt={initialBillableTjmHt}
       />
 
-      <footer className="mt-16 flex flex-col gap-3 border-t border-ink-200 pt-8 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="mt-16 flex flex-col gap-3 border-t border-ink-200 pt-8 text-xs text-ink-500 dark:border-ink-800 dark:text-ink-400 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Logo size={20} withWordmark={false} />
           <span>

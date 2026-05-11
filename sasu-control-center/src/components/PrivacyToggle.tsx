@@ -47,10 +47,10 @@ export function PrivacyToggle() {
       aria-pressed={enabled}
       title={enabled ? "Afficher les montants" : "Masquer les montants"}
       className={clsx(
-        "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+        "inline-flex min-h-[44px] items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-medium transition",
         hydrated && enabled
-          ? "border-brand-500 bg-brand-50 text-brand-700 hover:bg-brand-100"
-          : "border-ink-300 bg-white text-ink-900 hover:border-ink-400"
+          ? "border-brand-500 bg-brand-50 text-brand-700 hover:bg-brand-100 dark:border-brand-400 dark:bg-brand-950/50 dark:text-brand-200 dark:hover:bg-brand-900/40"
+          : "border-ink-300 bg-white text-ink-900 hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500"
       )}
     >
       {hydrated && enabled ? (

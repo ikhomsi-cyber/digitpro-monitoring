@@ -20,9 +20,11 @@ export function Card({
     <div
       className={clsx(
         "animate-floatIn",
-        variant === "glass" && "rounded-2xl border border-ink-200 bg-white shadow-card",
-        variant === "solid" && "rounded-2xl border border-ink-200 bg-white",
-        variant === "ghost" && "rounded-2xl bg-ink-100",
+        variant === "glass" &&
+          "rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/75 dark:shadow-none",
+        variant === "solid" &&
+          "rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/75",
+        variant === "ghost" && "rounded-2xl bg-ink-100 dark:bg-ink-900/50",
         className
       )}
     >
@@ -39,7 +41,7 @@ export function CardHeader({
   children: React.ReactNode;
 }) {
   return (
-    <div className={clsx("flex items-start justify-between gap-4 p-6", className)}>
+    <div className={clsx("flex items-start justify-between gap-4 p-4 sm:p-6", className)}>
       {children}
     </div>
   );
@@ -53,7 +55,7 @@ export function CardTitle({
   children: React.ReactNode;
 }) {
   return (
-    <div className={clsx("text-sm font-medium text-ink-600", className)}>
+    <div className={clsx("text-sm font-medium text-ink-600 dark:text-ink-400", className)}>
       {children}
     </div>
   );
@@ -69,7 +71,7 @@ export function CardValue({
   return (
     <div
       className={clsx(
-        "mt-1 font-display text-3xl font-semibold tracking-apple-tight text-ink-900",
+        "mt-1 font-display text-3xl font-semibold tracking-apple-tight text-ink-900 dark:text-ink-50",
         className
       )}
     >
@@ -85,5 +87,5 @@ export function CardBody({
   className?: string;
   children: React.ReactNode;
 }) {
-  return <div className={clsx("px-6 pb-6", className)}>{children}</div>;
+  return <div className={clsx("px-4 pb-5 sm:px-6 sm:pb-6", className)}>{children}</div>;
 }

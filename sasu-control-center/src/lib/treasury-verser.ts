@@ -1,9 +1,7 @@
 import type { DashboardTx } from "./dashboard-metrics";
-import {
-  effectiveRevenueAnalyticsDateIso,
-  TVA_DERIVED_EXPENSE_BUCKET
-} from "./dashboard-metrics";
+import { effectiveRevenueAnalyticsDateIso } from "./dashboard-metrics";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
+import { IK_CATEGORY_LABEL } from "./expense-category-map";
 import { isRevenueCategory } from "./revenue-category";
 
 /** Taux CSG / cotisations sur le brut des encaissements HT (paramètre métier). */
@@ -18,17 +16,14 @@ export type TreasuryVerserSnapshot = {
   caEncaisseHt: number;
   csgDue: number;
   tvaTheorique: number;
-  /** Somme des prélèvements classés TVA sur le mois civil (date d’opération). */
-  tvaPrelevee: number;
-  /**
-   * Montant à provisionner sur les encaissements du mois, net des prélèvements TVA déjà passés :
-   * CSG + TVA théorique − TVA prélevée.
-   */
-  provisionsFiscalesNet: number;
+  /** Dépenses du mois civil (date d’opération), montants absolus. */
+  ikMois: number;
+  ndfMois: number;
+  bncMois: number;
+  /** IK + NDF + BNC sur le mois civil. */
+  verseCeMois: number;
   /** Dernier solde connu sur le périmètre (colonne Solde Qonto). */
   qontoSolde: number | null;
-  /** Solde − provisions fiscales nettes (indicatif). */
-  disponibleAVerser: number | null;
 };
 
 function monthKeyFromView(y: number, month0: number): string {
@@ -39,8 +34,8 @@ function monthKeyFromView(y: number, month0: number): string {
  * Indicateur trésorerie pour le mois affiché dans le calendrier :
  * - CA encaissé (TTC / HT) : encaissements « Chiffre d’affaires » avec date analytique dans le mois.
  * - CSG : 9,7 % du HT encaissé.
- * - TVA : 20 % du HT encaissé, comparée aux sorties classées TVA du mois civil.
- * - Disponible : dernier solde Qonto − provisions nettes (CSG + TVA nette).
+ * - TVA théorique : 20 % du HT encaissé.
+ * - IK / NDF / BNC : totaux des dépenses du mois civil ; « Versé ce mois » = leur somme.
  */
 export function computeTreasuryVerserSnapshot(
   transactions: DashboardTx[],
@@ -62,22 +57,26 @@ export function computeTreasuryVerserSnapshot(
   const csgDue = caHt * TREASURY_CSG_RATE;
   const tvaTheorique = caHt * TREASURY_VAT_RATE;
 
-  let tvaPrelevee = 0;
+  let ikMois = 0;
+  let ndfMois = 0;
+  let bncMois = 0;
   for (const tx of scoped) {
     if (tx.amount >= 0) continue;
     if (tx.date.slice(0, 7) !== monthKey) continue;
-    if (deriveExpenseBucket(tx) !== TVA_DERIVED_EXPENSE_BUCKET) continue;
-    tvaPrelevee += Math.abs(tx.amount);
+    const bucket = deriveExpenseBucket(tx);
+    const abs = Math.abs(tx.amount);
+    if (bucket === IK_CATEGORY_LABEL) ikMois += abs;
+    else if (bucket === "NDF") ndfMois += abs;
+    else if (bucket === "BNC") bncMois += abs;
   }
 
-  const provisionsFiscalesNet = csgDue + tvaTheorique - tvaPrelevee;
+  const verseCeMois = ikMois + ndfMois + bncMois;
 
   const withBal = scoped
     .filter((t) => t.balance != null && Number.isFinite(Number(t.balance)))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id.localeCompare(b.id)));
 
   const qontoSolde = withBal.length > 0 ? Number(withBal[0].balance) : null;
-  const disponibleAVerser = qontoSolde != null ? qontoSolde - provisionsFiscalesNet : null;
 
   return {
     monthKey,
@@ -85,9 +84,10 @@ export function computeTreasuryVerserSnapshot(
     caEncaisseHt: caHt,
     csgDue,
     tvaTheorique,
-    tvaPrelevee,
-    provisionsFiscalesNet,
-    qontoSolde,
-    disponibleAVerser
+    ikMois,
+    ndfMois,
+    bncMois,
+    verseCeMois,
+    qontoSolde
   };
 }

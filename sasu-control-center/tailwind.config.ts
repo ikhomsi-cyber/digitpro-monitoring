@@ -8,6 +8,7 @@ import type { Config } from "tailwindcss";
  * - Almost-flat shadows, generous whitespace, subtle borders
  */
 const config: Config = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
@@ -34,7 +35,7 @@ const config: Config = {
         ]
       },
       colors: {
-        /** Bankin-style analyse accent (indigo / violet) */
+        /** Accent indigo / violet (UI) */
         analyze: {
           50: "#eef2ff",
           100: "#e0e7ff",
@@ -89,7 +90,7 @@ const config: Config = {
         xl: "0.875rem",
         "2xl": "1.125rem",
         "3xl": "1.5rem",
-        /** ~24px — analyse cards */
+        /** ~24px — cartes accent */
         analyze: "1.5rem"
       },
       keyframes: {

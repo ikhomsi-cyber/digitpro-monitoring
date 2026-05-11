@@ -3,6 +3,126 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      powens_users: {
+        Row: {
+          id: string;
+          user_id: string;
+          powens_user_id: number | null;
+          auth_token: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          powens_user_id?: number | null;
+          auth_token: string;
+        };
+        Update: Partial<{
+          powens_user_id: number | null;
+          auth_token: string;
+        }>;
+        Relationships: [];
+      };
+      lcl_accounts: {
+        Row: {
+          id: string;
+          user_id: string;
+          powens_account_id: string;
+          connection_id: string | null;
+          label: string;
+          iban: string | null;
+          balance: number | null;
+          currency: string;
+          raw: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          powens_account_id: string;
+          connection_id?: string | null;
+          label?: string;
+          iban?: string | null;
+          balance?: number | null;
+          currency?: string;
+          raw?: Json;
+        };
+        Update: Partial<{
+          powens_account_id: string;
+          connection_id: string | null;
+          label: string;
+          iban: string | null;
+          balance: number | null;
+          currency: string;
+          raw: Json;
+        }>;
+        Relationships: [];
+      };
+      lcl_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          powens_transaction_id: string;
+          powens_account_id: string;
+          connection_id: string | null;
+          date: string;
+          rdate: string | null;
+          label: string;
+          amount: number;
+          category: string | null;
+          raw: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          powens_transaction_id: string;
+          powens_account_id: string;
+          connection_id?: string | null;
+          date: string;
+          rdate?: string | null;
+          label?: string;
+          amount: number;
+          category?: string | null;
+          raw?: Json;
+        };
+        Update: Partial<{
+          powens_transaction_id: string;
+          powens_account_id: string;
+          connection_id: string | null;
+          date: string;
+          rdate: string | null;
+          label: string;
+          amount: number;
+          category: string | null;
+          raw: Json;
+        }>;
+        Relationships: [];
+      };
+      expense_notes: {
+        Row: {
+          id: string;
+          user_id: string;
+          transaction_id: string;
+          tag: "note_de_frais" | "repas_client";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          transaction_id: string;
+          tag: "note_de_frais" | "repas_client";
+        };
+        Update: Partial<{
+          transaction_id: string;
+          tag: "note_de_frais" | "repas_client";
+        }>;
+        Relationships: [];
+      };
       transactions: {
         Row: {
           id: string;

@@ -5,15 +5,18 @@ import { isRevenueCategory } from "./revenue-category";
 
 const VAT_RATE = 0.2;
 
+/** Premier mois affiché sur l’axe du graphique « Jours facturés » (mois-barre B, format YYYY-MM). */
+export const INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY = "2022-10";
+
 export type InvoiceWorkedDayMonth = {
-  /** Mois affiché sur l’axe (mois civil complet passé). */
+  /** Mois sur l’axe du graphique (mois « décalé » : la barre est placée 2 mois avant l’encaissement CA). */
   monthKey: string;
   label: string;
-  /** Jours = CA HT du mois (M − 2) ÷ 820 €. */
+  /** Jours = CA HT du mois d’encaissement (mois barre + 2) ÷ 820 €. */
   days: number;
   /** CA HT retenu pour le calcul (encaissements du mois source). */
   caHt: number;
-  /** Mois dont provient la facture / les encaissements (avant-avant). */
+  /** Mois d’encaissement du CA (deux mois après le mois de la barre). */
   sourceMonthKey: string;
 };
 
@@ -33,47 +36,58 @@ function parseMonthKey(mk: string): { y: number; m0: number } {
 }
 
 /**
- * Série pour graphique « jours travaillés » dérivés de la facturation :
- * pour chaque **mois civil complet écoulé** M (jusqu’à M−1 par rapport à aujourd’hui),
- * on prend le **CA HT encaissé du mois M − 2** (mois d’avant le précédent : avant-dernier mois avant M),
- * puis **CA HT ÷ 820 €** (TJM de référence).
+ * Série pour le graphique « Jours facturés » :
+ * pour chaque mois civil **B** affiché sur l’axe, la hauteur de la barre vient du **CA HT encaissé
+ * en B + 2** (ex. encaissements avril → barre en février), puis **CA HT ÷ 820 €** (TJM de référence).
+ * Les encaissements sont pris jusqu’au **mois civil en cours** (inclut le mois partiel en cours).
+ * L’axe commence au plus tôt en **`INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY`** (oct. 2022).
+ * Passez `maxMonths` pour limiter en plus aux N derniers mois-barres (lisibilité).
  */
 export function buildInvoiceWorkedDaysPastMonthsSeries(
   transactions: DashboardTx[],
   scope: "pro" | "personal",
   now = new Date(),
-  maxMonths = 24
+  /** Si défini et strictement positif : au plus ce nombre de mois-barres ; sinon tout l’historique. */
+  maxMonths?: number
 ): InvoiceWorkedDayMonth[] {
   const scoped = transactions.filter((t) => (t.scope ?? "pro") === scope);
 
-  const lastComplete = addCalendarMonths(now.getFullYear(), now.getMonth(), -1);
-  const endKey = monthKeyFromYm(lastComplete.y, lastComplete.m0);
+  /** Dernier mois d’encaissement pris en compte (mois calendaire courant, y compris partiel). */
+  const end = { y: now.getFullYear(), m0: now.getMonth() };
+  const endKey = monthKeyFromYm(end.y, end.m0);
 
-  let earliest: string | null = null;
+  let earliestEnc: string | null = null;
   for (const tx of scoped) {
     if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
     const mk = effectiveRevenueAnalyticsDateIso(tx).slice(0, 7);
-    if (!earliest || mk < earliest) earliest = mk;
+    if (!earliestEnc || mk < earliestEnc) earliestEnc = mk;
   }
-  if (!earliest || earliest > endKey) return [];
+  if (!earliestEnc || earliestEnc > endKey) return [];
 
-  const windowStart = addCalendarMonths(lastComplete.y, lastComplete.m0, -(maxMonths - 1));
-  let startKey = monthKeyFromYm(windowStart.y, windowStart.m0);
-  if (startKey < earliest) startKey = earliest;
+  /** Dernier mois B pour lequel B+2 ≤ mois courant (encaissements connus jusqu’à ce mois). */
+  const lastBar = addCalendarMonths(end.y, end.m0, -2);
+  const lastBarKey = monthKeyFromYm(lastBar.y, lastBar.m0);
 
-  const monthKeys: string[] = [];
-  let cy = Number(startKey.slice(0, 4));
-  let cm0 = Number(startKey.slice(5, 7)) - 1;
-  const endY = lastComplete.y;
-  const endM0 = lastComplete.m0;
-  for (;;) {
-    const key = monthKeyFromYm(cy, cm0);
-    monthKeys.push(key);
-    if (cy === endY && cm0 === endM0) break;
-    const next = addCalendarMonths(cy, cm0, 1);
-    cy = next.y;
-    cm0 = next.m0;
+  /** Premier mois B pour lequel on a au moins un encaissement en B+2. */
+  const ep = parseMonthKey(earliestEnc);
+  const firstBarFromData = addCalendarMonths(ep.y, ep.m0, -2);
+  const firstBarKey = monthKeyFromYm(firstBarFromData.y, firstBarFromData.m0);
+
+  const lastBarParsed = parseMonthKey(lastBarKey);
+  let startKey: string;
+  if (maxMonths != null && maxMonths > 0) {
+    const windowBack = addCalendarMonths(lastBarParsed.y, lastBarParsed.m0, -(maxMonths - 1));
+    startKey = monthKeyFromYm(windowBack.y, windowBack.m0);
+    if (startKey < firstBarKey) startKey = firstBarKey;
+  } else {
+    startKey = firstBarKey;
   }
+
+  if (startKey < INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY) {
+    startKey = INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY;
+  }
+
+  if (startKey > lastBarKey) return [];
 
   const caTtcByMonth = new Map<string, number>();
   for (const tx of scoped) {
@@ -85,9 +99,23 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
 
   const labelFmt = new Intl.DateTimeFormat("fr-FR", { month: "short", year: "2-digit" });
 
+  const monthKeys: string[] = [];
+  let cy = Number(startKey.slice(0, 4));
+  let cm0 = Number(startKey.slice(5, 7)) - 1;
+  const endY = Number(lastBarKey.slice(0, 4));
+  const endM0 = Number(lastBarKey.slice(5, 7)) - 1;
+  for (;;) {
+    const key = monthKeyFromYm(cy, cm0);
+    monthKeys.push(key);
+    if (cy === endY && cm0 === endM0) break;
+    const next = addCalendarMonths(cy, cm0, 1);
+    cy = next.y;
+    cm0 = next.m0;
+  }
+
   return monthKeys.map((mk) => {
     const { y, m0 } = parseMonthKey(mk);
-    const src = addCalendarMonths(y, m0, -2);
+    const src = addCalendarMonths(y, m0, 2);
     const sourceMonthKey = monthKeyFromYm(src.y, src.m0);
     const caTtc = caTtcByMonth.get(sourceMonthKey) ?? 0;
     const caHt = caTtc / (1 + VAT_RATE);

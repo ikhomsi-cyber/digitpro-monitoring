@@ -1,7 +1,7 @@
 import {
   countsTowardDashboardExpenseTotal,
   effectiveRevenueAnalyticsDateIso,
-  REVENUE_END_OF_MONTH_ROLL_DAYS,
+  REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
@@ -261,7 +261,7 @@ export function buildChatContext(
   lines.push("- Le dashboard affiche le « Total revenue » en HT (CA HT). Quand l’utilisateur dit « CA » ou « Total revenue » sans précision, il parle du HT.");
   lines.push("- « Chiffre d’affaires » = transactions dont la catégorie commence par « Chiffre d’affaires » (singulier ou pluriel, accents tolérés).");
   lines.push(
-    `- Encaissements CA positifs datés sur les ${REVENUE_END_OF_MONTH_ROLL_DAYS} derniers jours civils du mois sont rattachés analytiquement au 1er jour du mois suivant (filtres, graphiques, totaux) ; la date en base reste celle de la banque.`
+    `- Encaissements CA positifs : jours 1 à ${REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY} du mois civil → agrégés dans ce mois ; à partir du jour ${REVENUE_STAYS_IN_CURRENT_MONTH_THROUGH_DAY + 1} → rattachés analytiquement au 1er jour du mois suivant (filtres, graphiques, totaux) ; la date en base reste celle de la banque.`
   );
   lines.push("- « Dépenses » = toutes les transactions à montant négatif (toute sortie bancaire), peu importe la catégorie.");
   lines.push("- « Résultat net » = CA HT − Dépenses (les dépenses restent en TTC, simplification métier assumée).");

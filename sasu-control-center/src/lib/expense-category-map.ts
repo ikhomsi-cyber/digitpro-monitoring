@@ -11,13 +11,17 @@ export const ASSURANCE_CATEGORY_LABEL = "Assurance";
 export const MUTUELLE_CATEGORY_LABEL = "Mutuelle";
 /** Prélèvements DGFIP hors TVA (IS, CFE, etc.). */
 export const IMPOT_CATEGORY_LABEL = "Impôt";
+/** Regroupement affiché pour frais de compta / secrétariat / outils de gestion (libellés bancaires « hiway », etc.). */
+export const COMPTA_ADMIN_BUCKET_LABEL = "Compta & admin.";
 
 const RAW_ENTRIES: [string, string][] = [
+  ["Notes de frais", "NDF"],
+  ["Note de frais", "NDF"],
   ["Frais de personnel", "BNC"],
   ["Impôts et taxes", "TVA"],
   ["Travel Expenses", IK_CATEGORY_LABEL],
   ["Dépenses liées au marketing", "Repas d'affaires"],
-  ["Dépenses administratives", "Hiway"],
+  ["Dépenses administratives", COMPTA_ADMIN_BUCKET_LABEL],
   ["Frais de nourriture et boissons", "Repas Ilias"],
   ["AXA SOGAREP", ASSURANCE_CATEGORY_LABEL],
   ["DSN", IMPOT_CATEGORY_LABEL],
@@ -53,8 +57,8 @@ function buildMap(): Map<string, string> {
     ["mileage", IK_CATEGORY_LABEL],
     ["depenses liees au marketing", "Repas d'affaires"],
     ["marketing expenses", "Repas d'affaires"],
-    ["depenses administratives", "Hiway"],
-    ["administrative expenses", "Hiway"],
+    ["depenses administratives", COMPTA_ADMIN_BUCKET_LABEL],
+    ["administrative expenses", COMPTA_ADMIN_BUCKET_LABEL],
     ["frais de nourriture et boissons", "Repas Ilias"],
     ["food and drink", "Repas Ilias"],
     ["apple.com bill", ICLOUD_IA_STORE_CATEGORY_LABEL],
@@ -63,7 +67,9 @@ function buildMap(): Map<string, string> {
     ["axa sogarep", ASSURANCE_CATEGORY_LABEL],
     ["sogarep", ASSURANCE_CATEGORY_LABEL],
     ["dsn", IMPOT_CATEGORY_LABEL],
-    ["pas", IMPOT_CATEGORY_LABEL]
+    ["pas", IMPOT_CATEGORY_LABEL],
+    ["notes de frais", "NDF"],
+    ["note de frais", "NDF"]
   ];
   for (const [k, v] of aliases) {
     if (!m.has(k)) m.set(k, v);

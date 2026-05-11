@@ -55,10 +55,10 @@ export function Logo({
       <Mark size={size} />
       {withWordmark && (
         <div className="flex items-baseline gap-1.5 leading-none">
-          <span className="font-display text-[15px] font-semibold tracking-apple-tight text-ink-900">
+          <span className="font-display text-[15px] font-semibold tracking-apple-tight text-ink-900 dark:text-ink-50">
             DigitPro
           </span>
-          <span className="text-[12px] font-normal text-ink-500">Monitoring</span>
+          <span className="text-[12px] font-normal text-ink-500 dark:text-ink-400">Monitoring</span>
         </div>
       )}
     </div>

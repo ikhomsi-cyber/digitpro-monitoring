@@ -20,14 +20,15 @@ import {
   Zap
 } from "lucide-react";
 
-/** Icon + hints for donut / list rows (French keywords). */
+/** Icône Lucide par catégorie de dépense (libellés dashboard, mots-clés FR). */
 export function categoryGlyph(category: string): LucideIcon {
   const n = category.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
   if (n === "bnc") return Briefcase;
   if (n === "tva") return Percent;
   if (n === "urssaf") return HeartPulse;
-  if (n === "hiway") return Building2;
+  if (n.startsWith("compta") && n.includes("admin")) return Building2;
+  if (n === "ndf") return Receipt;
   if (n === "cesu") return Gift;
   if (n.includes("icloud ia store")) return Cloud;
   if (n === "qonto") return Landmark;

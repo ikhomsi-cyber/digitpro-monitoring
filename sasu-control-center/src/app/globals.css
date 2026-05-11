@@ -6,14 +6,16 @@
   color-scheme: light;
 }
 
+.dark {
+  color-scheme: dark;
+}
+
 html,
 body {
   height: 100%;
 }
 
 body {
-  color: theme("colors.ink.900");
-  background: #ffffff;
   font-feature-settings: "ss01", "cv01", "cv11";
 }
 
@@ -25,38 +27,38 @@ body {
 @layer components {
   /** Apple-style flat card on white background */
   .surface-card {
-    @apply rounded-2xl border border-ink-200 bg-white;
+    @apply rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/80;
   }
   /** Card placed on the gray section bg — subtle white card */
   .surface-glass {
-    @apply rounded-2xl border border-ink-200 bg-white shadow-card;
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/80 dark:shadow-none;
   }
 
   /** Section that uses the signature Apple light-gray bg */
   .section-alt {
-    @apply rounded-3xl bg-ink-100 p-6 sm:p-8;
+    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-ink-900/60;
   }
 
   /** Pill primary button (Apple CTA) */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
   }
   /** Pill secondary button (white pill on gray) */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500;
   }
   /** Tertiary text-link "Learn more ›" */
   .btn-link {
-    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600;
+    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200;
   }
 
   /** Skeleton with shimmer */
   .skeleton {
-    @apply relative overflow-hidden rounded-md bg-ink-200/70;
+    @apply relative overflow-hidden rounded-md bg-ink-200/70 dark:bg-ink-800/80;
   }
   .skeleton::after {
     content: "";
@@ -74,13 +76,13 @@ body {
 
   /** Apple-grade hero text */
   .h-display {
-    @apply font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl md:text-6xl;
+    @apply font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl md:text-6xl dark:text-ink-50;
   }
   .h-section {
-    @apply font-display text-3xl font-semibold leading-tight tracking-apple-tight text-ink-900 sm:text-4xl;
+    @apply font-display text-3xl font-semibold leading-tight tracking-apple-tight text-ink-900 sm:text-4xl dark:text-ink-50;
   }
   .h-eyebrow {
-    @apply text-sm font-medium text-ink-600;
+    @apply text-sm font-medium text-ink-600 dark:text-ink-400;
   }
 }
 
@@ -95,6 +97,9 @@ body {
   .scrollbar-clean::-webkit-scrollbar-thumb {
     background: rgba(0, 0, 0, 0.18);
     border-radius: 999px;
+  }
+  .dark .scrollbar-clean::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22);
   }
 }
 

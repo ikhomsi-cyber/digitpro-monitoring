@@ -1,9 +1,29 @@
 "use client";
 
 import { useId } from "react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { clsx } from "clsx";
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import type { MonthlyPoint } from "@/lib/mock-data";
 import { formatEur } from "@/lib/format";
+import { useRootIsDark } from "@/lib/use-root-is-dark";
+
+function formatCompactEur(value: number): string {
+  const v = Math.abs(value);
+  if (v >= 1_000_000) return `${Math.round(value / 100_000) / 10}M`;
+  if (v >= 10_000) return `${Math.round(value / 1000)}k`;
+  if (v >= 1000) return `${Math.round(value / 100) / 10}k`;
+  return String(Math.round(value));
+}
 
 function MiniTooltip({
   active,
@@ -14,12 +34,20 @@ function MiniTooltip({
   payload?: Array<{ value?: number }>;
   label?: string;
 }) {
+  const isDark = useRootIsDark();
   if (!active || !payload?.length) return null;
   const value = typeof payload[0]?.value === "number" ? payload[0].value : 0;
   return (
-    <div className="rounded-lg border border-ink-200 bg-white px-2 py-1.5 text-xs shadow-card ring-1 ring-black/[0.04]">
-      <div className="font-medium text-ink-900">{label}</div>
-      <div className="tabular-nums text-ink-700">{formatEur(value)}</div>
+    <div
+      className={clsx(
+        "rounded-lg border px-2 py-1.5 text-xs shadow-card ring-1",
+        isDark
+          ? "border-ink-600 bg-ink-900 text-ink-100 ring-white/10"
+          : "border-ink-200 bg-white ring-black/[0.04]"
+      )}
+    >
+      <div className="font-medium">{label}</div>
+      <div className={clsx("tabular-nums", isDark ? "text-ink-200" : "text-ink-700")}>{formatEur(value)}</div>
     </div>
   );
 }
@@ -28,44 +56,96 @@ const STROKE = "#e11d48";
 
 /**
  * Courbe compacte carte KPI — total des sorties par mois (toutes catégories).
+ * Clic sur un mois : `onMonthClick(monthKey)` si `monthKey` est présent sur les points.
  */
 export function ExpenseTotalMiniChart({
   data,
-  ariaLabel
+  ariaLabel,
+  selectedMonthKey,
+  onMonthClick
 }: {
   data: MonthlyPoint[];
   ariaLabel: string;
+  /** YYYY-MM — affiche un repère vertical sur le mois choisi (liste déroulante ou clic graphique). */
+  selectedMonthKey?: string | null;
+  /** Filtre carte Total expenses sur le mois (YYYY-MM). Re-clic sur le même mois : à gérer côté parent si besoin. */
+  onMonthClick?: (monthKey: string) => void;
 }) {
   const uid = useId().replace(/:/g, "");
   const gradientId = `expense-mini-${uid}`;
+  const isDark = useRootIsDark();
+  const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
+  const tickFill = isDark ? "#a1a1aa" : "#86868B";
+  const cursorStroke = isDark ? "#52525b" : "#D2D2D7";
+  const clickable = Boolean(onMonthClick && data.some((d) => d.monthKey));
+  const selectedTickLabel =
+    selectedMonthKey && data.length
+      ? data.find((d) => d.monthKey === selectedMonthKey)?.month
+      : undefined;
 
   if (!data.length) return null;
 
   return (
-    <div className="mt-3 w-full" data-private role="img" aria-label={ariaLabel}>
-      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-ink-400">
-        Évolution mensuelle
-      </p>
-      <div className="h-[7.25rem] w-full sm:h-28">
+    <div
+      className={`mt-3 w-full${clickable ? " cursor-pointer" : ""}`}
+      data-private
+      role="img"
+      aria-label={ariaLabel}
+    >
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-ink-400 dark:text-ink-500">
+          Évolution mensuelle
+        </p>
+        {clickable ? (
+          <p className="text-[9px] font-medium normal-case tracking-normal text-ink-500 dark:text-ink-400">
+            Clic sur un mois pour filtrer
+          </p>
+        ) : null}
+      </div>
+      <div className="h-[9rem] w-full sm:h-36">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 6, right: 4, left: 0, bottom: 36 }}>
+          <ComposedChart
+            data={data}
+            margin={{ top: 8, right: 8, left: 0, bottom: 34 }}
+            barCategoryGap="12%"
+            // Évite tabIndex=0 sur le SVG (focus clavier / contour coloré au clic souris).
+            accessibilityLayer={false}
+          >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={STROKE} stopOpacity={0.26} />
                 <stop offset="100%" stopColor={STROKE} stopOpacity={0} />
               </linearGradient>
             </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="month"
               tickLine={false}
-              axisLine={false}
+              axisLine={{ stroke: gridStroke }}
               tickMargin={2}
               interval={0}
               angle={-35}
               textAnchor="end"
-              tick={{ fill: "#86868B", fontSize: 8 }}
+              tick={{ fill: tickFill, fontSize: 8 }}
             />
-            <Tooltip content={<MiniTooltip />} cursor={{ stroke: "#D2D2D7", strokeWidth: 1 }} />
+            <YAxis
+              tickLine={false}
+              axisLine={{ stroke: gridStroke }}
+              width={34}
+              tickMargin={6}
+              tick={{ fill: tickFill, fontSize: 8 }}
+              tickFormatter={formatCompactEur}
+            />
+            <Tooltip content={<MiniTooltip />} cursor={{ stroke: cursorStroke, strokeWidth: 1 }} />
+            {selectedTickLabel ? (
+              <ReferenceLine
+                x={selectedTickLabel}
+                stroke={STROKE}
+                strokeOpacity={0.45}
+                strokeDasharray="4 3"
+                ifOverflow="extendDomain"
+              />
+            ) : null}
             <Area
               type="monotone"
               dataKey="value"
@@ -75,9 +155,27 @@ export function ExpenseTotalMiniChart({
               isAnimationActive={data.length < 24}
               animationDuration={400}
               dot={false}
-              activeDot={{ r: 3, strokeWidth: 1.5, stroke: "#fff", fill: STROKE }}
+              activeDot={{
+                r: 3,
+                strokeWidth: 1.5,
+                stroke: isDark ? "#27272a" : "#fff",
+                fill: STROKE
+              }}
             />
-          </AreaChart>
+            {clickable ? (
+              <Bar
+                dataKey="value"
+                fill="transparent"
+                stroke="transparent"
+                maxBarSize={28}
+                isAnimationActive={false}
+                onClick={(cell: { payload?: MonthlyPoint }) => {
+                  const mk = cell?.payload?.monthKey;
+                  if (mk) onMonthClick!(mk);
+                }}
+              />
+            ) : null}
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>

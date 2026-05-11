@@ -4,6 +4,7 @@ import {
   ICLOUD_IA_STORE_CATEGORY_LABEL,
   IK_CATEGORY_LABEL,
   IMPOT_CATEGORY_LABEL,
+  COMPTA_ADMIN_BUCKET_LABEL,
   mapExpenseCategoryLabel,
   MUTUELLE_CATEGORY_LABEL,
   QONTO_CATEGORY_LABEL
@@ -15,7 +16,9 @@ export const DERIVED_EXPENSE_BUCKETS = [
   "TVA",
   IMPOT_CATEGORY_LABEL,
   "Urssaf",
-  "Hiway",
+  COMPTA_ADMIN_BUCKET_LABEL,
+  /** Notes de frais (libellé / catégorie). */
+  "NDF",
   IK_CATEGORY_LABEL,
   "Repas d'affaire",
   "Repas dirigeant",
@@ -88,7 +91,9 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
 
   const b = txBlob(tx);
 
-  if (b.includes("hiway")) return "Hiway";
+  if (b.includes("note de frais") || b.includes("notes de frais") || /\bndf\b/.test(b)) return "NDF";
+
+  if (b.includes("hiway")) return COMPTA_ADMIN_BUCKET_LABEL;
 
   if (textLooksLikeIndemniteKilometrique(b)) return IK_CATEGORY_LABEL;
 
@@ -172,13 +177,14 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
     b.includes("dejeuner affaire") ||
     b.includes("diner d affaire") ||
     b.includes("diner affaire") ||
-    (b.includes("restaurant") && (b.includes("client") || b.includes("affaire") || b.includes("invitation")))
+    (b.includes("restaurant") && (b.includes("affaire") || b.includes("invitation")))
   ) {
     return "Repas d'affaire";
   }
 
   const mapped = mapExpenseCategoryLabel(tx.category);
   const mk = fold(mapped);
+  if (mapped === "NDF" || mk.includes("note de frais") || mk === "ndf") return "NDF";
   if (mk === "bnc" || mapped === "BNC") return "BNC";
   if (mk === "tva" || mapped === "TVA") return "TVA";
   if (
@@ -190,7 +196,7 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   ) {
     return IMPOT_CATEGORY_LABEL;
   }
-  if (mapped === "Hiway") return "Hiway";
+  if (mapped === COMPTA_ADMIN_BUCKET_LABEL) return COMPTA_ADMIN_BUCKET_LABEL;
   if (mapped === IK_CATEGORY_LABEL || textLooksLikeIndemniteKilometrique(mk)) return IK_CATEGORY_LABEL;
   if (mapped === ICLOUD_IA_STORE_CATEGORY_LABEL || mk.includes("icloud ia store")) {
     return ICLOUD_IA_STORE_CATEGORY_LABEL;

@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
+import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,25 +23,29 @@ export const metadata: Metadata = {
     "Pilotage financier DigitPro — transactions, indicateurs et simulation. Interface SaaS premium."
 };
 
-/** Inline script that applies the privacy class before paint to avoid flicker. */
-const privacyBootstrap = `try{if(localStorage.getItem('privacyBlur')==='1'){document.documentElement.classList.add('privacy-blur')}}catch(e){}`;
+/** Inline script : privacy + thème sombre avant paint (évite flash). */
+const htmlBootstrap = `try{var d=document.documentElement;if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1')d.classList.add('dark')}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: privacyBootstrap }} />
+        <meta name="color-scheme" content="light dark" />
+        <script dangerouslySetInnerHTML={{ __html: htmlBootstrap }} />
       </head>
-      <body className={`${inter.variable} ${display.variable} font-sans`}>
+      <body
+        className={`${inter.variable} ${display.variable} font-sans bg-white text-ink-900 transition-colors duration-200 dark:bg-ink-950 dark:text-ink-100`}
+      >
         <div className="min-h-dvh">{children}</div>
         <Toaster
           position="top-center"
           closeButton
           toastOptions={{
             classNames: {
-              toast: "rounded-2xl border border-ink-200 bg-white shadow-card",
-              title: "font-semibold text-ink-900",
-              description: "text-ink-600"
+              toast:
+                "rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-700 dark:bg-ink-900 dark:shadow-none",
+              title: "font-semibold text-ink-900 dark:text-ink-50",
+              description: "text-ink-600 dark:text-ink-400"
             }
           }}
         />

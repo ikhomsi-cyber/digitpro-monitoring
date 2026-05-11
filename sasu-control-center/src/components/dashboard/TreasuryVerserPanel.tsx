@@ -39,23 +39,23 @@ export function TreasuryVerserPanel({
   return (
     <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
       <div
-        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] sm:p-3.5"
+        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-violet-800/50 dark:from-violet-950/40 dark:to-ink-900/80 dark:shadow-none dark:ring-white/5 sm:p-3.5"
         data-private
       >
         <div className="flex items-start gap-2">
           <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-violet-700/50 dark:bg-violet-950/50 dark:text-violet-300 dark:shadow-none"
             aria-hidden
           >
             <Scale className="h-4 w-4" strokeWidth={1.85} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-800/80">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-800/80 dark:text-violet-300/90">
               Disponible à verser (estim.)
             </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-ink-600">
-              Mois affiché : <span className="font-medium capitalize text-ink-800">{titleMonth}</span>
-              <span className="text-ink-500">
+            <p className="mt-0.5 text-[11px] leading-snug text-ink-600 dark:text-ink-300">
+              Mois affiché : <span className="font-medium capitalize text-ink-800 dark:text-ink-100">{titleMonth}</span>
+              <span className="text-ink-500 dark:text-ink-400">
                 {" "}
                 · périmètre {scope === "pro" ? "SASU" : "Privé"}
               </span>
@@ -63,74 +63,64 @@ export function TreasuryVerserPanel({
           </div>
         </div>
 
-        <div className="mt-3 space-y-2.5 border-t border-violet-100/90 pt-3 text-[11px] leading-snug text-ink-600">
+        <div className="mt-3 space-y-2.5 border-t border-violet-100/90 pt-3 text-[11px] leading-snug text-ink-600 dark:border-violet-900/40 dark:text-ink-300">
           <div className="flex justify-between gap-2">
-            <span className="text-ink-500">CA encaissé TTC</span>
-            <span className="shrink-0 font-semibold tabular-nums text-ink-900">
+            <span className="text-ink-500 dark:text-ink-400">CA encaissé TTC</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
               {formatEur(snap.caEncaisseTtc)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-ink-500">CA encaissé HT</span>
-            <span className="shrink-0 font-semibold tabular-nums text-ink-900">
+            <span className="text-ink-500 dark:text-ink-400">CA encaissé HT</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
               {formatEur(snap.caEncaisseHt)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-ink-500">CSG ({csgPct} % HT)</span>
-            <span className="shrink-0 font-semibold tabular-nums text-rose-800">
+            <span className="text-ink-500 dark:text-ink-400">CSG ({csgPct} % HT)</span>
+            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-300">
               {formatEur(snap.csgDue)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-ink-500">TVA théorique ({tvaPct} % HT)</span>
-            <span className="shrink-0 font-semibold tabular-nums text-rose-800">
+            <span className="text-ink-500 dark:text-ink-400">TVA théorique ({tvaPct} % HT)</span>
+            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-300">
               {formatEur(snap.tvaTheorique)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="text-ink-500">TVA prélevée (mois)</span>
-            <span className="shrink-0 font-semibold tabular-nums text-emerald-800">
-              − {formatEur(snap.tvaPrelevee)}
-            </span>
-          </div>
-          <div className="flex justify-between gap-2 border-t border-violet-100/80 pt-2">
-            <span className="font-medium text-ink-700">Provisions nettes</span>
-            <span className="shrink-0 font-bold tabular-nums text-ink-900">
-              {formatEur(snap.provisionsFiscalesNet)}
+            <span className="text-ink-500 dark:text-ink-400">IK (mois)</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
+              {formatEur(snap.ikMois)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
-            <span className="inline-flex items-center gap-1 text-ink-500">
+            <span className="text-ink-500 dark:text-ink-400">NDF (mois)</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
+              {formatEur(snap.ndfMois)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="text-ink-500 dark:text-ink-400">BNC (mois)</span>
+            <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
+              {formatEur(snap.bncMois)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-2 border-t border-violet-100/80 pt-2 dark:border-violet-900/40">
+            <span className="font-medium text-ink-700 dark:text-ink-200">Versé ce mois</span>
+            <span className="shrink-0 font-bold tabular-nums text-ink-900 dark:text-ink-50">
+              {formatEur(snap.verseCeMois)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-2">
+            <span className="inline-flex items-center gap-1 text-ink-500 dark:text-ink-400">
               <Landmark className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
               Solde Qonto (dernier connu)
             </span>
-            <span className="shrink-0 font-semibold tabular-nums text-ink-900">
+            <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
               {snap.qontoSolde != null ? formatEur(snap.qontoSolde) : "—"}
             </span>
           </div>
-        </div>
-
-        <div className="mt-3 rounded-xl border border-violet-200/90 bg-white/90 px-3 py-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-violet-800/70">
-            Écart (solde − provisions)
-          </p>
-          <p
-            className={`mt-1 font-display text-lg font-bold tabular-nums ${
-              snap.disponibleAVerser == null
-                ? "text-ink-400"
-                : snap.disponibleAVerser >= 0
-                  ? "text-emerald-800"
-                  : "text-rose-800"
-            }`}
-          >
-            {snap.disponibleAVerser != null ? formatEur(snap.disponibleAVerser) : "—"}
-          </p>
-          <p className="mt-1.5 text-[10px] leading-relaxed text-ink-500">
-            Indicatif : même règle de date CA que le tableau de bord (fin de mois → mois suivant). TVA
-            prélevée = opérations du mois civil classées TVA. Sans colonne Solde sur les mouvements, le
-            solde n’apparaît pas.
-          </p>
         </div>
       </div>
     </div>
