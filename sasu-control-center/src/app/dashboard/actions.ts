@@ -500,6 +500,8 @@ export async function syncRevolutPersonalPowensFromApi(): Promise<{
   accounts: { total: number; kept: number };
   transactions: { total: number; kept: number; upserted: number };
   dashboardImported: number;
+  /** Message UX si comptes OK mais 0 mouvement côté Powens. */
+  hint?: string;
 }> {
   await assertSupabaseWritesEnabled();
   const supabase = await createSupabaseServerClient();
@@ -589,10 +591,19 @@ export async function syncRevolutPersonalPowensFromApi(): Promise<{
     fileHash: null
   });
 
+  let hint: string | undefined;
+  if (filtered.length === 0 && revolutAccounts.length > 0) {
+    hint =
+      "Powens ne renvoie aucune transaction pour ces comptes (fenêtre ~36 mois). Attends la synchro agrégée, ou vérifie l’historique dans l’espace Powens. Comptes UK : IBAN GB…REVO… pris en charge ; sinon le libellé doit contenir « Revolut ».";
+  } else if (imp.inserted.length > 0) {
+    hint = "Les lignes Revolut sont en périmètre « Privé » : passe l’interrupteur SASU / Privé en haut du tableau pour les voir.";
+  }
+
   return {
     accounts: { total: accounts.length, kept: revolutAccounts.length },
     transactions: { total: txs.length, kept: filtered.length, upserted: txRows.length },
-    dashboardImported: imp.inserted.length
+    dashboardImported: imp.inserted.length,
+    hint
   };
 }
 

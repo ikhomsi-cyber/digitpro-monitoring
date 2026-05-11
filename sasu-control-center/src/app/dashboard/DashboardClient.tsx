@@ -221,7 +221,9 @@ export function DashboardClient({
         const json = await syncRevolutPersonalPowensFromApi();
         toast.success("Revolut synchronisé", {
           id: toastId,
-          description: `Comptes: ${json.accounts.kept} · lignes Powens: ${json.transactions.upserted} · import dashboard: ${json.dashboardImported}`
+          description: `Comptes: ${json.accounts.kept} · lignes Powens: ${json.transactions.upserted} · import dashboard: ${json.dashboardImported}${
+            json.hint ? ` · ${json.hint}` : ""
+          }`
         });
         try {
           await router.refresh();

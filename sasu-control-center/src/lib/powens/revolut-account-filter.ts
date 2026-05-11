@@ -12,14 +12,16 @@ export function pickPowensAccountLabel(a: { name?: string | null; original_name?
  * Comptes Revolut **personnel** visibles dans Powens Connect.
  * Dans la webview, connecte uniquement Revolut (compte perso).
  *
- * Heuristique : libellé « revolut », ou IBAN LT (Revolut Bank UAB) + usage PRIV.
+ * Heuristique : libellé « revolut », ou IBAN Revolut EU (LT) / UK (GB…REVO…) + usage PRIV.
  */
 export function isRevolutPersonalPowensAccount(acc: PowensAccount): boolean {
   if (acc.deleted) return false;
   const label = `${acc.name ?? ""} ${acc.original_name ?? ""}`.toLowerCase();
   if (label.includes("revolut")) return true;
   const usage = String(acc.usage ?? "").toUpperCase();
+  if (usage !== "PRIV") return false;
   const iban = (acc.iban ?? "").replace(/\s/g, "").toUpperCase();
-  if (usage === "PRIV" && iban.startsWith("LT") && iban.length >= 15) return true;
+  if (iban.startsWith("LT") && iban.length >= 15) return true;
+  if (/^GB\d{2}REVO/i.test(iban)) return true;
   return false;
 }
