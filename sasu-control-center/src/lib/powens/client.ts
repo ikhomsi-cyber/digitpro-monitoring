@@ -1,12 +1,15 @@
 import "server-only";
 
-import { getPowensEnv } from "./config";
+import { getPowensDomainMisconfigurationMessage, getPowensEnv } from "./config";
 
 export type PowensUserToken = { auth_token: string; id_user?: number | null; type?: string | null };
 
 async function readErrorBody(res: Response): Promise<string> {
   try {
     const text = await res.text();
+    if (/<!DOCTYPE html>|<title>.*404/i.test(text)) {
+      return "(réponse HTML 404 — souvent POWENS_DOMAIN = URL du site au lieu de xxx.biapi.pro)";
+    }
     return text.slice(0, 2000);
   } catch {
     return "";
@@ -16,6 +19,8 @@ async function readErrorBody(res: Response): Promise<string> {
 export async function powensInitUser(): Promise<{ authToken: string; powensUserId: number | null }> {
   const env = getPowensEnv();
   if (!env) throw new Error("Powens env missing (POWENS_DOMAIN/CLIENT_ID/CLIENT_SECRET/REDIRECT_URI).");
+  const badHost = getPowensDomainMisconfigurationMessage(env.domain);
+  if (badHost) throw new Error(badHost);
   const url = `https://${env.domain}/2.0/auth/init`;
   const res = await fetch(url, {
     method: "POST",
@@ -37,6 +42,8 @@ export async function powensInitUser(): Promise<{ authToken: string; powensUserI
 export async function powensTemporaryCode(authToken: string): Promise<string> {
   const env = getPowensEnv();
   if (!env) throw new Error("Powens env missing.");
+  const badHost = getPowensDomainMisconfigurationMessage(env.domain);
+  if (badHost) throw new Error(badHost);
   const url = `https://${env.domain}/2.0/auth/token/code?type=singleAccess`;
   const res = await fetch(url, {
     method: "GET",
@@ -134,3 +141,4 @@ export async function powensListTransactions(authToken: string, opts?: { limit?:
   return first;
 }
 
+export { powensListTransactionsForAccounts } from "./list-transactions-for-accounts";
