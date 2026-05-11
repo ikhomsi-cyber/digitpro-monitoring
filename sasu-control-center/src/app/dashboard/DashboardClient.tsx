@@ -45,7 +45,7 @@ import {
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
-import { syncQontoTransactionsFromApi } from "./actions";
+import { syncQontoTransactionsFromApi, syncRevolutPersonalPowensFromApi } from "./actions";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 
@@ -191,10 +191,9 @@ export function DashboardClient({
     });
   }, []);
 
-  const onClickConnectLclPowens = useCallback(async () => {
+  const onClickConnectRevolutPowens = useCallback(async () => {
     if (!canUsePowens) return;
     try {
-      // Ensure user token exists in DB.
       const initRes = await fetch("/api/powens/init", { method: "POST" });
       const initJson = (await initRes.json().catch(() => null)) as null | { ok?: boolean; error?: string };
       if (!initRes.ok || !initJson?.ok) {
@@ -208,31 +207,35 @@ export function DashboardClient({
       }
 
       window.open(urlJson.url, "_blank", "noopener,noreferrer");
-      toast.success("Ouverture Powens Connect (LCL). Finalise la connexion puis reviens synchroniser.");
+      toast.success("Powens Connect : choisis Revolut (compte personnel), puis reviens synchroniser.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Impossible de démarrer Powens Connect.");
     }
   }, [canUsePowens]);
 
-  const onClickSyncLclPowens = useCallback(async () => {
+  function onClickSyncRevolutPowens() {
     if (!canUsePowens) return;
-    try {
-      const res = await fetch("/api/powens/sync", { method: "POST" });
-      const json = (await res.json().catch(() => null)) as null | {
-        ok?: boolean;
-        error?: string;
-        accounts?: { total: number; kept: number };
-        transactions?: { total: number; kept: number; upserted: number };
-      };
-      if (!res.ok || !json?.ok) throw new Error(json?.error || `Powens sync failed (${res.status})`);
-      toast.success(
-        `LCL synchronisé · comptes: ${json.accounts?.kept ?? 0} · transactions: ${json.transactions?.upserted ?? 0}`
-      );
-      startTransition(() => router.refresh());
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Synchronisation LCL impossible.");
-    }
-  }, [canUsePowens, router, startTransition]);
+    const toastId = toast.loading("Synchronisation Revolut (Powens)…");
+    startTransition(async () => {
+      try {
+        const json = await syncRevolutPersonalPowensFromApi();
+        toast.success("Revolut synchronisé", {
+          id: toastId,
+          description: `Comptes: ${json.accounts.kept} · lignes Powens: ${json.transactions.upserted} · import dashboard: ${json.dashboardImported}`
+        });
+        try {
+          await router.refresh();
+        } catch {
+          toast.message("Si les chiffres ne se mettent pas à jour, rechargez la page (F5).", { duration: 8000 });
+        }
+      } catch (e) {
+        toast.error("Synchronisation Revolut impossible", {
+          id: toastId,
+          description: e instanceof Error ? e.message : undefined
+        });
+      }
+    });
+  }
 
   const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
 
@@ -610,23 +613,23 @@ export function DashboardClient({
               <>
                 <button
                   type="button"
-                  onClick={onClickConnectLclPowens}
+                  onClick={onClickConnectRevolutPowens}
                   disabled={isPending}
                   className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                  title="Démarre Powens Connect pour connecter LCL (variables POWENS_* côté serveur)."
+                  title="Powens Connect : variables POWENS_* côté serveur. Choisis Revolut personnel dans la webview."
                 >
                   <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
-                  Connecter LCL
+                  Connecter Revolut
                 </button>
                 <button
                   type="button"
-                  onClick={onClickSyncLclPowens}
+                  onClick={onClickSyncRevolutPowens}
                   disabled={isPending}
                   className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                  title="Synchronise les comptes/transactions LCL (compte courant uniquement)."
+                  title="Importe les transactions Revolut personnel dans le dashboard (périmètre privé)."
                 >
                   <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                  Synchroniser LCL
+                  Synchroniser Revolut
                 </button>
               </>
             ) : null}

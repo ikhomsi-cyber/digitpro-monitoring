@@ -25,11 +25,12 @@ export type PowensEnv = {
 };
 
 /**
- * Required server env vars:
+ * Powens (Budget Insight) — utilisé pour **Revolut personnel** (webview connect).
+ * Variables serveur :
  * - POWENS_DOMAIN (ex: "mydomain.biapi.pro")
  * - POWENS_CLIENT_ID
  * - POWENS_CLIENT_SECRET
- * - POWENS_REDIRECT_URI (must be whitelisted in Powens console)
+ * - POWENS_REDIRECT_URI (whitelist dans la console Powens, ex. …/api/powens/callback)
  */
 export function getPowensEnv(): PowensEnv | null {
   const domainRaw = env("POWENS_DOMAIN");

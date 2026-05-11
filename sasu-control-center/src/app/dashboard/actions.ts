@@ -16,6 +16,13 @@ import {
 import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import { powensListAccounts, powensListTransactions } from "@/lib/powens/client";
+import {
+  isRevolutPersonalPowensAccount,
+  pickPowensAccountLabel
+} from "@/lib/powens/revolut-account-filter";
+import type { Json } from "@/lib/supabase/types";
+import { REVOLUT_PERSONAL_COMPANY } from "@/lib/revolut-personal";
 
 type ImportTx = {
   date: string;
@@ -25,6 +32,8 @@ type ImportTx = {
   balance?: number | null;
   company: string;
   scope?: "pro" | "personal";
+  /** Clé optionnelle pour le content_hash (ex. id transaction Powens). */
+  dedupeKey?: string;
 };
 
 type SupabaseServer = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
@@ -90,7 +99,8 @@ function dedupeImportRows(rows: ImportTx[]): {
     const h = transactionImportHash({
       date: r.date,
       label: r.label,
-      amount: r.amount
+      amount: r.amount,
+      dedupeKey: r.dedupeKey
     });
     if (!h) {
       skippedInFile++;
@@ -477,6 +487,111 @@ export async function importTransactions(
     skippedInFile,
     merged,
     importSessionId
+  };
+}
+
+/**
+ * Synchronise Revolut **personnel** via Powens Connect : comptes + transactions en tables
+ * `revolut_personal_*`, puis import dans `transactions` (scope `personal`, société
+ * `Revolut (personnel)`). Les anciennes lignes dashboard pour ce périmètre sont remplacées
+ * à chaque sync pour refléter l’état Powens.
+ */
+export async function syncRevolutPersonalPowensFromApi(): Promise<{
+  accounts: { total: number; kept: number };
+  transactions: { total: number; kept: number; upserted: number };
+  dashboardImported: number;
+}> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const tokenRes = await supabase.from("powens_users").select("auth_token").maybeSingle();
+  if (tokenRes.error) throw new Error(tokenRes.error.message);
+  const token = String(tokenRes.data?.auth_token ?? "").trim();
+  if (!token) throw new Error("Powens non initialisé : clique d’abord sur « Connecter Revolut ».");
+
+  const accounts = await powensListAccounts(token);
+  const revolutAccounts = accounts.filter((a) => isRevolutPersonalPowensAccount(a));
+  if (!revolutAccounts.length) {
+    throw new Error(
+      "Aucun compte Revolut personnel détecté dans Powens. Connecte Revolut dans la webview (pas une autre banque) ou vérifie le libellé / IBAN du compte."
+    );
+  }
+
+  const accountRows = revolutAccounts.map((a) => ({
+    powens_account_id: String(a.id),
+    connection_id: a.id_connection == null ? null : String(a.id_connection),
+    label: pickPowensAccountLabel(a),
+    iban: a.iban ?? null,
+    balance: a.balance == null ? null : Number(a.balance),
+    currency: (a.currency as { code?: string } | null)?.code ?? "EUR",
+    raw: a as unknown as Json
+  }));
+
+  const upAcc = await supabase
+    .from("revolut_personal_accounts")
+    .upsert(accountRows, { onConflict: "user_id,powens_account_id" });
+  if (upAcc.error) throw new Error(upAcc.error.message);
+
+  const txs = await powensListTransactions(token, { limit: 1000 });
+  const allowed = new Set(revolutAccounts.map((a) => String(a.id)));
+  const filtered = txs.filter((t) => allowed.has(String(t.id_account)) && !t.deleted);
+
+  const txRows = filtered.map((t) => ({
+    powens_transaction_id: String(t.id),
+    powens_account_id: String(t.id_account),
+    connection_id: t.id_connection == null ? null : String(t.id_connection),
+    date: String(t.date).slice(0, 10),
+    rdate: t.rdate ? String(t.rdate).slice(0, 10) : null,
+    label: String(t.wording ?? t.simplified_wording ?? t.original_wording ?? "").trim(),
+    amount: Number(t.value ?? 0),
+    category: Array.isArray(t.categories) ? String(t.categories[0]?.code ?? "") || null : null,
+    raw: t as unknown as Json
+  }));
+
+  if (txRows.length) {
+    const upTx = await supabase
+      .from("revolut_personal_transactions")
+      .upsert(txRows, { onConflict: "user_id,powens_transaction_id" });
+    if (upTx.error) throw new Error(upTx.error.message);
+  }
+
+  const { error: delErr } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("company", REVOLUT_PERSONAL_COMPANY);
+  if (delErr) throw new Error(delErr.message);
+
+  const importRows: ImportTx[] = filtered.map((t) => {
+    const catRaw = Array.isArray(t.categories) ? String(t.categories[0]?.code ?? "").trim() : "";
+    const mapped = mapExpenseCategoryLabel(catRaw);
+    const category = mapped || "Banque";
+    return {
+      date: String(t.date).slice(0, 10),
+      label: String(t.wording ?? t.simplified_wording ?? t.original_wording ?? "").trim() || "—",
+      category,
+      amount: Number(t.value ?? 0),
+      company: REVOLUT_PERSONAL_COMPANY,
+      scope: "personal" as const,
+      dedupeKey: `powens_tx:${t.id}`
+    };
+  });
+
+  const imp = await importTransactions(importRows, {
+    sourceFilename: `Powens Revolut personnel · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
+    format: "generic",
+    fileHash: null
+  });
+
+  return {
+    accounts: { total: accounts.length, kept: revolutAccounts.length },
+    transactions: { total: txs.length, kept: filtered.length, upserted: txRows.length },
+    dashboardImported: imp.inserted.length
   };
 }
 

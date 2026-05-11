@@ -2,6 +2,8 @@ export type ImportDedupeInput = {
   date: string;
   label: string;
   amount: number;
+  /** Suffixe stable (ex. id Powens) pour éviter les collisions inter-sources. */
+  dedupeKey?: string;
 };
 
 /** Canonical fingerprint preimage — matches DB content_hash = sha256(payload). Safe on client. */
@@ -10,5 +12,6 @@ export function importDedupePayload(t: ImportDedupeInput): string {
   const amt = Number(t.amount);
   if (!Number.isFinite(amt)) return "";
   const amtStr = amt.toFixed(4);
-  return `${t.date}|${label}|${amtStr}`;
+  const suffix = t.dedupeKey?.trim() ? `|${t.dedupeKey.trim()}` : "";
+  return `${t.date}|${label}|${amtStr}${suffix}`;
 }

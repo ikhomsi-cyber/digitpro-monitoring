@@ -14,7 +14,7 @@ function fold(raw: string): string {
  * Dates analytiques **forcées** pour certains encaissements CA (la date en base ne change pas).
  * S’applique avant la règle « jour &gt; 26 → 1er jour du mois suivant ».
  *
- * Éditer ici si les libellés bancaires diffèrent (Qonto / LCL / CSV).
+ * Éditer ici si les libellés bancaires diffèrent (Qonto / Revolut / CSV).
  */
 export function revenueAnalyticsDateOverride(
   tx: Pick<DashboardTx, "id" | "date" | "label" | "category" | "amount">

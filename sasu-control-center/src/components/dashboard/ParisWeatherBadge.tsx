@@ -58,7 +58,7 @@ export function ParisWeatherBadge({ className }: { className?: string }) {
     return (
       <div
         className={clsx(
-          "inline-flex h-10 items-center justify-center rounded-2xl border border-ink-200 bg-white px-2.5 text-xs text-ink-400 shadow-sm dark:border-ink-700 dark:bg-ink-900 dark:text-ink-500",
+          "inline-flex h-10 min-w-[7.5rem] items-center justify-center rounded-2xl border border-ink-200 bg-white px-3 text-xs text-ink-400 shadow-sm",
           className
         )}
         aria-busy
@@ -73,7 +73,7 @@ export function ParisWeatherBadge({ className }: { className?: string }) {
     return (
       <div
         className={clsx(
-          "inline-flex h-10 items-center gap-1.5 rounded-2xl border border-ink-200 bg-white px-2.5 text-xs text-ink-400 shadow-sm dark:border-ink-700 dark:bg-ink-900 dark:text-ink-500",
+          "inline-flex h-10 items-center gap-2 rounded-2xl border border-ink-200 bg-white px-3 text-xs text-ink-400 shadow-sm",
           className
         )}
         title="Météo indisponible"
@@ -86,16 +86,16 @@ export function ParisWeatherBadge({ className }: { className?: string }) {
   return (
     <div
       className={clsx(
-        "inline-flex h-10 items-center gap-1.5 rounded-2xl border border-ink-200 bg-white px-2.5 shadow-sm dark:border-ink-700 dark:bg-ink-900",
+        "inline-flex h-10 items-center gap-2 rounded-2xl border border-ink-200 bg-white px-3 shadow-sm",
         className
       )}
       title="Météo Paris aujourd’hui (Open-Meteo)"
     >
-      <span className="text-base leading-none" aria-hidden>
+      <span className="text-lg leading-none" aria-hidden>
         {wmoEmoji(state.code)}
       </span>
-      <span className="text-sm font-semibold tabular-nums text-ink-900 dark:text-ink-100">{state.temp}°C</span>
-      <span className="hidden text-xs font-medium text-ink-500 dark:text-ink-400 sm:inline">Paris</span>
+      <span className="text-sm font-semibold tabular-nums text-ink-900">{state.temp}°C</span>
+      <span className="text-xs font-medium text-ink-500">Paris</span>
     </div>
   );
 }

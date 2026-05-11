@@ -305,7 +305,7 @@ for delete
 using (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
--- Powens LCL (separate tables)
+-- Powens — Revolut personnel (tables de staging, connecteur Powens)
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.powens_users (
@@ -344,7 +344,7 @@ for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create table if not exists public.lcl_accounts (
+create table if not exists public.revolut_personal_accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
   powens_account_id text not null,
@@ -359,36 +359,36 @@ create table if not exists public.lcl_accounts (
   unique (user_id, powens_account_id)
 );
 
-create index if not exists lcl_accounts_user_powens_idx
-on public.lcl_accounts (user_id, powens_account_id);
+create index if not exists revolut_personal_accounts_user_powens_idx
+on public.revolut_personal_accounts (user_id, powens_account_id);
 
-drop trigger if exists set_lcl_accounts_updated_at on public.lcl_accounts;
-create trigger set_lcl_accounts_updated_at
-before update on public.lcl_accounts
+drop trigger if exists set_revolut_personal_accounts_updated_at on public.revolut_personal_accounts;
+create trigger set_revolut_personal_accounts_updated_at
+before update on public.revolut_personal_accounts
 for each row execute function public.set_updated_at();
 
-alter table public.lcl_accounts enable row level security;
+alter table public.revolut_personal_accounts enable row level security;
 
-drop policy if exists "lcl_accounts_select_own" on public.lcl_accounts;
-create policy "lcl_accounts_select_own"
-on public.lcl_accounts
+drop policy if exists "revolut_personal_accounts_select_own" on public.revolut_personal_accounts;
+create policy "revolut_personal_accounts_select_own"
+on public.revolut_personal_accounts
 for select
 using (auth.uid() = user_id);
 
-drop policy if exists "lcl_accounts_insert_own" on public.lcl_accounts;
-create policy "lcl_accounts_insert_own"
-on public.lcl_accounts
+drop policy if exists "revolut_personal_accounts_insert_own" on public.revolut_personal_accounts;
+create policy "revolut_personal_accounts_insert_own"
+on public.revolut_personal_accounts
 for insert
 with check (auth.uid() = user_id);
 
-drop policy if exists "lcl_accounts_update_own" on public.lcl_accounts;
-create policy "lcl_accounts_update_own"
-on public.lcl_accounts
+drop policy if exists "revolut_personal_accounts_update_own" on public.revolut_personal_accounts;
+create policy "revolut_personal_accounts_update_own"
+on public.revolut_personal_accounts
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create table if not exists public.lcl_transactions (
+create table if not exists public.revolut_personal_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
   powens_transaction_id text not null,
@@ -405,34 +405,34 @@ create table if not exists public.lcl_transactions (
   unique (user_id, powens_transaction_id)
 );
 
-create index if not exists lcl_transactions_user_date_idx
-on public.lcl_transactions (user_id, date desc);
+create index if not exists revolut_personal_transactions_user_date_idx
+on public.revolut_personal_transactions (user_id, date desc);
 
-create index if not exists lcl_transactions_user_account_date_idx
-on public.lcl_transactions (user_id, powens_account_id, date desc);
+create index if not exists revolut_personal_transactions_user_account_date_idx
+on public.revolut_personal_transactions (user_id, powens_account_id, date desc);
 
-drop trigger if exists set_lcl_transactions_updated_at on public.lcl_transactions;
-create trigger set_lcl_transactions_updated_at
-before update on public.lcl_transactions
+drop trigger if exists set_revolut_personal_transactions_updated_at on public.revolut_personal_transactions;
+create trigger set_revolut_personal_transactions_updated_at
+before update on public.revolut_personal_transactions
 for each row execute function public.set_updated_at();
 
-alter table public.lcl_transactions enable row level security;
+alter table public.revolut_personal_transactions enable row level security;
 
-drop policy if exists "lcl_transactions_select_own" on public.lcl_transactions;
-create policy "lcl_transactions_select_own"
-on public.lcl_transactions
+drop policy if exists "revolut_personal_transactions_select_own" on public.revolut_personal_transactions;
+create policy "revolut_personal_transactions_select_own"
+on public.revolut_personal_transactions
 for select
 using (auth.uid() = user_id);
 
-drop policy if exists "lcl_transactions_insert_own" on public.lcl_transactions;
-create policy "lcl_transactions_insert_own"
-on public.lcl_transactions
+drop policy if exists "revolut_personal_transactions_insert_own" on public.revolut_personal_transactions;
+create policy "revolut_personal_transactions_insert_own"
+on public.revolut_personal_transactions
 for insert
 with check (auth.uid() = user_id);
 
-drop policy if exists "lcl_transactions_update_own" on public.lcl_transactions;
-create policy "lcl_transactions_update_own"
-on public.lcl_transactions
+drop policy if exists "revolut_personal_transactions_update_own" on public.revolut_personal_transactions;
+create policy "revolut_personal_transactions_update_own"
+on public.revolut_personal_transactions
 for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);

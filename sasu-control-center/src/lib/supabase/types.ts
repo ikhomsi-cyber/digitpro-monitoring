@@ -24,7 +24,7 @@ export type Database = {
         }>;
         Relationships: [];
       };
-      lcl_accounts: {
+      revolut_personal_accounts: {
         Row: {
           id: string;
           user_id: string;
@@ -60,7 +60,7 @@ export type Database = {
         }>;
         Relationships: [];
       };
-      lcl_transactions: {
+      revolut_personal_transactions: {
         Row: {
           id: string;
           user_id: string;

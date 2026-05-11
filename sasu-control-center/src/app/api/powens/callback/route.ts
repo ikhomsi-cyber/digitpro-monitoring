@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  * - ?error=...&error_description=...
  *
  * This route intentionally returns a simple HTML response so it can be used as a redirect URI
- * during early integration. The dashboard will still require a manual "Synchroniser LCL" click.
+ * during early integration. Le dashboard propose « Synchroniser Revolut » pour l’import.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
   </head>
   <body>
     <div class="card">
-      <h1>${ok ? "Connexion LCL terminée" : "Connexion LCL échouée"}</h1>
+      <h1>${ok ? "Connexion Revolut terminée" : "Connexion Revolut échouée"}</h1>
       <p class="${ok ? "ok" : "bad"}">
         ${ok ? "Powens a renvoyé un connection_id." : "Powens a renvoyé une erreur."}
       </p>
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
           ? `<p>connection_id: <code>${connectionId}</code></p>`
           : `<p>error: <code>${err ?? ""}</code></p><p>description: <code>${errDesc ?? ""}</code></p>`
       }
-      <p>Vous pouvez maintenant revenir au dashboard et cliquer sur “Synchroniser LCL”.</p>
+      <p>Vous pouvez maintenant revenir au dashboard et cliquer sur « Synchroniser Revolut ».</p>
       <p><a href="/dashboard">Retour au dashboard</a></p>
     </div>
   </body>
