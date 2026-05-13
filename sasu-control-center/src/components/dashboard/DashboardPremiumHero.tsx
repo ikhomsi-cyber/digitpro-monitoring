@@ -14,8 +14,11 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
 
   const tiles = [
     { label: "CA mensuel", value: formatEur(stats.caMensuelEur) },
-    { label: "Cash net (mois)", value: formatEur(stats.cashNetMonthEur) },
-    { label: "Charges (mois)", value: formatEur(stats.chargesMoisEur) },
+    {
+      label: "Solde Qonto",
+      value: stats.soldeQontoEur != null ? formatEur(stats.soldeQontoEur) : "—"
+    },
+    { label: "Dépenses du mois (Qonto)", value: formatEur(stats.depensesQontoSasuMoisEur) },
     { label: "TJM (indicatif)", value: formatEur(stats.tjmAfficheEur) }
   ];
 

@@ -1,5 +1,6 @@
 import type { DashboardTx } from "./dashboard-metrics";
 import { effectiveRevenueAnalyticsDateIso } from "./dashboard-metrics";
+import { computeLatestQontoBalanceEur } from "./bank";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
 import { IK_CATEGORY_LABEL } from "./expense-category-map";
 import { isRevenueCategory } from "./revenue-category";
@@ -72,11 +73,7 @@ export function computeTreasuryVerserSnapshot(
 
   const verseCeMois = ikMois + ndfMois + bncMois;
 
-  const withBal = scoped
-    .filter((t) => t.balance != null && Number.isFinite(Number(t.balance)))
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id.localeCompare(b.id)));
-
-  const qontoSolde = withBal.length > 0 ? Number(withBal[0].balance) : null;
+  const qontoSolde = computeLatestQontoBalanceEur(transactions, scope);
 
   return {
     monthKey,
