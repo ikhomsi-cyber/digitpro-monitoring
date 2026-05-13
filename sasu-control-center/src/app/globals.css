@@ -25,7 +25,27 @@ body {
 }
 
 @layer components {
-  /** Apple-style flat card on white background */
+  /** Fond immersif dashboard (s’active sous `html.dark`). */
+  .premium-dashboard-page {
+    @apply transition-colors;
+  }
+  .dark .premium-dashboard-page {
+    background-color: #050505;
+    background-image: radial-gradient(900px 480px at 15% 0%, rgba(16, 185, 129, 0.14), transparent 55%),
+      radial-gradient(700px 400px at 85% 0%, rgba(56, 189, 248, 0.1), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  .premium-cta {
+    @apply rounded-full px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition;
+    background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);
+  }
+  .premium-cta:hover {
+    filter: brightness(1.07);
+  }
+  .premium-cta:focus-visible {
+    @apply outline-none ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
+  }
   .surface-card {
     @apply rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/80;
   }

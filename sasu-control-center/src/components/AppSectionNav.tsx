@@ -30,7 +30,7 @@ export function AppSectionNav({
   return (
     <div
       className={clsx(
-        "sticky z-[35] -mx-4 border-b border-ink-200 bg-white/95 py-2.5 shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] backdrop-blur dark:border-ink-800 dark:bg-ink-950/95 dark:shadow-[0_8px_28px_-10px_rgba(0,0,0,0.45)] sm:-mx-6",
+        "sticky z-[35] -mx-4 border-b border-ink-200/80 bg-white/90 py-2.5 shadow-[0_6px_24px_-8px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-white/[0.06] dark:bg-black/50 dark:shadow-[0_12px_40px_-10px_rgba(0,0,0,0.65)] sm:-mx-6",
         TOP_OFFSET[offset],
         className
       )}

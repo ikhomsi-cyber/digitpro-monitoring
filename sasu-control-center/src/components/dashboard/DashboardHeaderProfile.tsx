@@ -23,13 +23,19 @@ const sizesAttr = {
   hero: "(max-width: 640px) 80px, 112px"
 } as const;
 
-export function DashboardHeaderProfile({ variant = "hero" }: { variant?: "hero" | "nav" }) {
+export function DashboardHeaderProfile({
+  variant = "hero",
+  className
+}: {
+  variant?: "hero" | "nav";
+  className?: string;
+}) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
     return (
       <div
-        className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink-200 bg-gradient-to-br from-brand-500 to-brand-700 font-semibold text-white shadow-md ring-2 ring-white ${sizeClass[variant]} ${fallbackTextClass[variant]}`}
+        className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink-200 bg-gradient-to-br from-brand-500 to-brand-700 font-semibold text-white shadow-md ring-2 ring-white ${sizeClass[variant]} ${fallbackTextClass[variant]} ${className ?? ""}`}
         aria-hidden
       >
         IK
@@ -39,7 +45,7 @@ export function DashboardHeaderProfile({ variant = "hero" }: { variant?: "hero" 
 
   return (
     <div
-      className={`relative shrink-0 overflow-hidden rounded-full border-2 border-white shadow-md ring-2 ring-ink-200/90 ${sizeClass[variant]}`}
+      className={`relative shrink-0 overflow-hidden rounded-full border-2 border-white shadow-md ring-2 ring-ink-200/90 ${sizeClass[variant]} ${className ?? ""}`}
     >
       <Image
         src={PROFILE_SRC}

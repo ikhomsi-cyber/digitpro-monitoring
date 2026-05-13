@@ -63,7 +63,7 @@ export function AppNavigationDesktop() {
 
   return (
     <nav
-      className="flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-ink-200/90 bg-white/90 p-1 shadow-sm backdrop-blur-sm dark:border-ink-600/90 dark:bg-ink-900/90"
+      className="flex max-w-full flex-wrap items-center justify-center gap-0.5 rounded-2xl border border-ink-200/90 bg-white/90 p-1 shadow-sm backdrop-blur-md dark:border-white/[0.08] dark:bg-black/40 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5)]"
       aria-label="Accès rapide aux sections"
     >
       {NAV_ITEMS.map((item) => {
@@ -79,8 +79,8 @@ export function AppNavigationDesktop() {
             className={clsx(
               "inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition sm:px-3.5 sm:text-[13px]",
               active
-                ? "bg-brand-500 text-white shadow-sm shadow-brand-500/25 dark:bg-brand-600 dark:text-white"
-                : "text-ink-600 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-ink-50"
+                ? "bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-[0_0_24px_rgba(16,185,129,0.35)] dark:from-emerald-500 dark:to-emerald-700 dark:text-white"
+                : "text-ink-600 hover:bg-ink-100 hover:text-ink-900 dark:text-white/55 dark:hover:bg-white/[0.06] dark:hover:text-white",
             )}
           >
             <Icon className="h-3.5 w-3.5 shrink-0 opacity-90 sm:h-4 sm:w-4" strokeWidth={2} aria-hidden />

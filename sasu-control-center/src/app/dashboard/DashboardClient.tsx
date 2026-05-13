@@ -543,7 +543,7 @@ export function DashboardClient({
   }, []);
 
   return (
-    <main className="mt-6 space-y-6 sm:mt-8 sm:space-y-8">
+    <main id="dashboard-main" className="mt-6 space-y-6 sm:mt-8 sm:space-y-8 scroll-mt-28">
       {scope === "personal" ? (
         <PersonalMonitoringBlock
           transactionsWindow={periodFilteredTx}

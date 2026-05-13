@@ -20,11 +20,11 @@ export function Card({
     <div
       className={clsx(
         "animate-floatIn",
-        variant === "glass" &&
-          "rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/75 dark:shadow-none",
         variant === "solid" &&
-          "rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/75",
-        variant === "ghost" && "rounded-2xl bg-ink-100 dark:bg-ink-900/50",
+          "rounded-3xl border border-ink-200 bg-white shadow-[0_8px_32px_-12px_rgba(0,0,0,0.08)] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-white/[0.07] dark:to-white/[0.02] dark:shadow-[0_12px_48px_-8px_rgba(0,0,0,0.55)]",
+        variant === "glass" &&
+          "rounded-3xl border border-ink-200 bg-white shadow-card dark:border-white/[0.08] dark:bg-[#0c0c0c]/90 dark:shadow-[0_12px_48px_-8px_rgba(0,0,0,0.55)] dark:backdrop-blur-xl",
+        variant === "ghost" && "rounded-3xl bg-ink-100 dark:bg-white/[0.03]",
         className
       )}
     >

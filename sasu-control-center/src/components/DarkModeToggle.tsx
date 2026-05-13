@@ -14,7 +14,7 @@ function readDarkFromDom(): boolean {
  * Bascule la classe `dark` sur `<html>` et synchronise le localStorage.
  * L’état initial au premier paint est appliqué par le script inline du layout.
  */
-export function DarkModeToggle() {
+export function DarkModeToggle({ className }: { className?: string }) {
   const [dark, setDark] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -45,7 +45,8 @@ export function DarkModeToggle() {
         "inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full border text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950",
         ready && dark
           ? "border-amber-400/50 bg-amber-950/40 text-amber-200 hover:bg-amber-900/50"
-          : "border-ink-300 bg-white text-ink-800 hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500"
+          : "border-ink-300 bg-white text-ink-800 hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500",
+        className
       )}
     >
       {ready && dark ? <Sun className="h-5 w-5" strokeWidth={2} aria-hidden /> : null}
