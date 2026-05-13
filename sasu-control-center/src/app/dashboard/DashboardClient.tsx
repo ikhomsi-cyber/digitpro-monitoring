@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   Briefcase,
@@ -56,6 +58,20 @@ import { syncQontoTransactionsFromApi, importBankinPersonalXlsx } from "./action
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
 export type { DashboardTx };
+
+const DASHBOARD_SECTION_SLIDE_VARIANTS = {
+  initial: (dir: number) => ({ opacity: 0, x: dir * 56 }),
+  animate: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const }
+  },
+  exit: (dir: number) => ({
+    opacity: 0,
+    x: dir * -56,
+    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+  })
+};
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -145,6 +161,32 @@ export function DashboardClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const dashboardSection = useMemo(() => {
+    const s = searchParams.get("section");
+    if (s === "activite") return "activite" as const;
+    if (s === "sasu") return "sasu" as const;
+    if (s === "private") return "private" as const;
+    return "full" as const;
+  }, [searchParams]);
+
+  /** Ordre des pilules périmètre : gauche → droite (pour le sens du slide). */
+  const sectionOrder: Record<typeof dashboardSection, number> = {
+    full: 0,
+    activite: 1,
+    sasu: 2,
+    private: 3
+  };
+  const prevSectionRef = useRef(dashboardSection);
+  const slideDirRef = useRef(1);
+  if (prevSectionRef.current !== dashboardSection) {
+    const from = sectionOrder[prevSectionRef.current];
+    const to = sectionOrder[dashboardSection];
+    slideDirRef.current = to >= from ? 1 : -1;
+  }
+  useLayoutEffect(() => {
+    prevSectionRef.current = dashboardSection;
+  }, [dashboardSection]);
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
     initialDashboardScope === "personal" ? "personal" : "pro"
@@ -176,10 +218,19 @@ export function DashboardClient({
 
   useEffect(() => {
     if (!pathname.startsWith("/dashboard")) return;
+    const sec = searchParams.get("section");
     const q = searchParams.get("scope");
-    if (q === "personal") setScope("personal");
-    else if (q === "pro") setScope("pro");
-    else setScope("pro");
+    if (sec === "activite" || sec === "sasu") {
+      setScope("pro");
+    } else if (sec === "private") {
+      setScope("personal");
+    } else if (q === "personal") {
+      setScope("personal");
+    } else if (q === "pro") {
+      setScope("pro");
+    } else {
+      setScope("pro");
+    }
   }, [pathname, searchParams]);
 
   const [isPending, startTransition] = useTransition();
@@ -543,14 +594,46 @@ export function DashboardClient({
   }, []);
 
   return (
-    <main id="dashboard-main" className="mt-6 space-y-6 sm:mt-8 sm:space-y-8 scroll-mt-28">
-      {scope === "personal" ? (
+    <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
+      {canWrite ? (
+        <input
+          ref={bankinFileInputRef}
+          type="file"
+          accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          aria-hidden
+          tabIndex={-1}
+          onChange={onBankinFileSelected}
+        />
+      ) : null}
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.div
+          key={dashboardSection}
+          custom={slideDirRef.current}
+          variants={DASHBOARD_SECTION_SLIDE_VARIANTS}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          className="space-y-6 sm:space-y-8"
+        >
+      {dashboardSection === "activite" ? (
+        <BillableDaysCalendarBlock
+          tjmHt={billableTjmEffective}
+          persistToSupabase={persistBillableToSupabase}
+          initialWorkDayIsos={initialBillableWorkDays}
+          onWorkDaysChange={onBillableWorkDaysChange}
+          treasuryTransactions={transactions}
+          treasuryScope="pro"
+        />
+      ) : null}
+      {dashboardSection === "full" && scope === "personal" ? (
         <PersonalMonitoringBlock
           transactionsWindow={periodFilteredTx}
           personalTransactionsFull={personalTransactionsFull}
           selectedYears={selectedYears}
         />
-      ) : (
+      ) : null}
+      {dashboardSection === "full" && scope !== "personal" ? (
         <BillableDaysCalendarBlock
           tjmHt={billableTjmEffective}
           persistToSupabase={persistBillableToSupabase}
@@ -559,9 +642,17 @@ export function DashboardClient({
           treasuryTransactions={transactions}
           treasuryScope={scope}
         />
-      )}
+      ) : null}
+      {dashboardSection === "private" ? (
+        <PersonalMonitoringBlock
+          transactionsWindow={periodFilteredTx}
+          personalTransactionsFull={personalTransactionsFull}
+          selectedYears={selectedYears}
+        />
+      ) : null}
 
-      <section className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
+      {dashboardSection === "full" ? (
+      <section id="dashboard-analytics" className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <span className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
@@ -674,15 +765,6 @@ export function DashboardClient({
                 </button>
                 {scope === "personal" ? (
                   <>
-                    <input
-                      ref={bankinFileInputRef}
-                      type="file"
-                      accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      className="hidden"
-                      aria-hidden
-                      tabIndex={-1}
-                      onChange={onBankinFileSelected}
-                    />
                     <button
                       type="button"
                       onClick={() => bankinFileInputRef.current?.click()}
@@ -703,6 +785,57 @@ export function DashboardClient({
           </p>
         </div>
       </section>
+      ) : null}
+
+      {(dashboardSection === "full" || dashboardSection === "sasu" || dashboardSection === "private") && (
+        <>
+          {(dashboardSection === "sasu" || dashboardSection === "private") && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-ink-200/90 bg-white/90 p-4 dark:border-white/[0.08] dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
+                  Vue ciblée
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-ink-900 dark:text-white">
+                  {dashboardSection === "sasu" ? "SASU — revenus & dépenses" : "Privé — revenus & dépenses"}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">
+                  Période : <span className="font-medium text-ink-700 dark:text-ink-200">{periodLabel}</span>
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {canWrite && dashboardSection === "sasu" ? (
+                  <button
+                    type="button"
+                    onClick={onClickSyncQontoApi}
+                    disabled={isPending}
+                    className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
+                    title="Récupère les transactions via l’API Qonto."
+                  >
+                    <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+                    Synchroniser Qonto
+                  </button>
+                ) : null}
+                {canWrite && dashboardSection === "private" ? (
+                  <button
+                    type="button"
+                    onClick={() => bankinFileInputRef.current?.click()}
+                    disabled={isPending}
+                    className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
+                    title="Import Bankin (.xls / .xlsx) — onglet Privé."
+                  >
+                    <Upload className="h-4 w-4 text-ink-500" aria-hidden />
+                    Importer Bankin
+                  </button>
+                ) : null}
+                <Link
+                  href="/dashboard"
+                  className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-ink-300 bg-ink-50 px-4 text-sm font-semibold text-ink-800 transition hover:bg-ink-100 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 sm:min-h-0"
+                >
+                  Tableau de bord complet
+                </Link>
+              </div>
+            </div>
+          )}
 
       <section className="space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
@@ -1017,7 +1150,10 @@ export function DashboardClient({
             </CardBody>
           </Card>
 
-          <Card className="flex h-full min-h-0 flex-col border-ink-200/90 bg-gradient-to-b from-ink-50/40 to-white dark:border-ink-800 dark:from-ink-900/80 dark:to-ink-950">
+          <Card
+            id="dashboard-fiscal"
+            className="flex h-full min-h-0 flex-col border-ink-200/90 bg-gradient-to-b from-ink-50/40 to-white dark:border-ink-800 dark:from-ink-900/80 dark:to-ink-950"
+          >
             <CardHeader className="flex flex-col gap-4 border-b border-ink-100/80 pb-4 dark:border-ink-800 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 flex-1 items-start gap-3">
                 <span
@@ -1317,9 +1453,12 @@ export function DashboardClient({
           </Card>
         </div>
       </section>
+        </>
+      )}
 
-
-      <Chatbot />
+      {dashboardSection !== "activite" ? <Chatbot /> : null}
+        </motion.div>
+      </AnimatePresence>
     </main>
   );
 }

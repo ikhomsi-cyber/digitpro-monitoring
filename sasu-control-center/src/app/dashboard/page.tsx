@@ -20,6 +20,7 @@ import { DashboardClient } from "./DashboardClient";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
 import { Logo } from "@/components/ui/Logo";
 import { AppSectionNav } from "@/components/AppSectionNav";
+import { DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
@@ -168,7 +169,7 @@ export default async function DashboardPage({
   const showContextBanner = envMode === "DEMO" || demoPreferenceOn;
 
   return (
-    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-10 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 lg:px-8">
+    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}
@@ -229,6 +230,10 @@ export default async function DashboardPage({
         </div>
         <span>Copyright © {new Date().getFullYear()} DigitPro · Iliass KHOMSI.</span>
       </footer>
+
+      <Suspense fallback={null}>
+        <DashboardFloatingDock />
+      </Suspense>
     </div>
   );
 }

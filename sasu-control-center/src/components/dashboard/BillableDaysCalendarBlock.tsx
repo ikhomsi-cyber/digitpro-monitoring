@@ -203,6 +203,8 @@ export function BillableDaysCalendarBlock({
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth0, setViewMonth0] = useState(now.getMonth());
+  /** Calendrier détaillé masqué jusqu’au clic (UX type fintech). */
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [hydrated, setHydrated] = useState(false);
   const [, startTransition] = useTransition();
@@ -423,6 +425,14 @@ export function BillableDaysCalendarBlock({
     };
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
 
+  const calendarStickyKpis = useMemo(() => {
+    const jours = tjmWorkdayGauge.countedBillable;
+    const caEstime = brutTjmMoisEncoursHt;
+    const resteAFacturer = Math.max(0, tjmWorkdayGauge.totalBillableMonth - jours) * tjmHt;
+    const projectionFinMois = tjmWorkdayGauge.totalBillableMonth * tjmHt;
+    return { jours, caEstime, resteAFacturer, projectionFinMois };
+  }, [tjmWorkdayGauge, brutTjmMoisEncoursHt, tjmHt]);
+
   const toggleDay = useCallback((iso: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -508,11 +518,8 @@ export function BillableDaysCalendarBlock({
   }, [filteredInvoiceWorkedDaysSeries]);
 
   return (
-    <Card
-      variant="solid"
-      className="overflow-hidden border-ink-200/90 bg-white shadow-sm dark:border-ink-700 dark:bg-gradient-to-b dark:from-ink-950 dark:to-ink-900 dark:shadow-none"
-    >
-      <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-3 dark:border-ink-800 dark:from-ink-900/95 dark:to-ink-950">
+    <Card variant="solid" className="overflow-hidden">
+      <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-white/[0.06] dark:bg-gradient-to-b dark:from-[#0f1412] dark:via-[#0a0c0b] dark:to-[#060606]">
         <div className="flex items-start gap-3">
           <span
             className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:shadow-none"
@@ -521,23 +528,57 @@ export function BillableDaysCalendarBlock({
             <CalendarDays className="h-4 w-4" strokeWidth={1.85} />
           </span>
           <div className="min-w-0 flex-1">
-            <CardTitle className="!mt-0 text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">
+            <CardTitle className="!mt-0 text-base font-semibold tracking-tight text-ink-900 dark:text-[#f4f4f2]">
               Jours travaillés & TJM
             </CardTitle>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500 dark:text-ink-400 sm:text-xs">
-              Coches = jours facturés · CA HT ≈ jours × TJM
+            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500 dark:text-white/50 sm:text-xs">
+              Vue calendrier type Linear — dépliez pour cocher les jours facturés.
             </p>
           </div>
         </div>
       </CardHeader>
-      <CardBody className="pt-4">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
+      {!calendarExpanded ? (
+        <CardBody className="px-4 pb-6 pt-2 sm:px-6">
+          <div className="rounded-2xl border border-ink-200/80 bg-gradient-to-b from-white to-ink-50/90 p-5 dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#0c0e0d] dark:to-[#050505]">
+            <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-ink-500 dark:text-emerald-300/80">
+              Aperçu
+            </p>
+            <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {[
+                { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
+                { k: "CA estimé", v: formatEur(calendarStickyKpis.caEstime) },
+                { k: "Reste à facturer", v: formatEur(calendarStickyKpis.resteAFacturer) },
+                { k: "Projection fin de mois", v: formatEur(calendarStickyKpis.projectionFinMois) }
+              ].map((row) => (
+                <div
+                  key={row.k}
+                  className="rounded-2xl border border-ink-200/80 bg-white/80 px-3 py-3 text-left dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                >
+                  <dt className="text-[10px] font-medium text-ink-500 dark:text-white/45">{row.k}</dt>
+                  <dd className="mt-1 font-display text-base font-semibold tabular-nums text-ink-900 dark:text-white">
+                    {row.v}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <button
+              type="button"
+              onClick={() => setCalendarExpanded(true)}
+              className="premium-cta mt-5 w-full py-3.5 text-sm font-semibold"
+            >
+              Ouvrir le calendrier & TJM
+            </button>
+          </div>
+        </CardBody>
+      ) : (
+        <CardBody className="relative px-4 pb-28 pt-4 sm:px-6 md:pb-10">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4 lg:shrink-0">
           {/* Calendrier compact */}
           <div className="flex shrink-0 flex-col items-center sm:items-start">
             <div
-              className="w-full max-w-[238px] rounded-2xl border border-ink-200/70 bg-white p-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-black/[0.02] dark:border-ink-700 dark:bg-ink-900/70 dark:shadow-none dark:ring-white/5 sm:p-3"
+              className="w-full max-w-[260px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-white/[0.06] sm:p-3.5"
               role="group"
               aria-label={`Calendrier ${monthTitleFr(viewYear, viewMonth0)}`}
             >
@@ -576,14 +617,14 @@ export function BillableDaysCalendarBlock({
                 {WEEKDAYS_SHORT.map((w) => (
                   <div
                     key={w}
-                    className="flex h-5 items-end justify-center pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500"
+                    className="flex h-5 items-end justify-center pb-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-400 dark:text-white/40"
                   >
                     {w}
                   </div>
                 ))}
                 {matrix.map((cell, i) => {
                   if (!cell) {
-                    return <div key={`e-${i}`} className="h-7 w-7 sm:h-7 sm:w-7" aria-hidden />;
+                    return <div key={`e-${i}`} className="h-8 w-8" aria-hidden />;
                   }
                   const iso = toIso(viewYear, viewMonth0, cell.day);
                   const on = selected.has(iso);
@@ -603,6 +644,11 @@ export function BillableDaysCalendarBlock({
                     .filter(Boolean)
                     .join(", ");
 
+                  const billable = isBillableWorkdayIso(iso, publicHolidays);
+                  const pastMissed = billable && !on && !isHoliday && !isSchoolVacation && iso < todayIsoLive;
+                  const futurePlanned = billable && !on && !isHoliday && !isSchoolVacation && iso >= todayIsoLive;
+                  const heat = billable ? Math.min(1, 0.15 + (on ? 0.55 : pastMissed ? 0.35 : futurePlanned ? 0.25 : 0.12)) : 0;
+
                   return (
                     <button
                       key={iso}
@@ -613,33 +659,40 @@ export function BillableDaysCalendarBlock({
                         on ? ", sélectionné" : ""
                       }${isToday ? ", aujourd’hui" : ""}`}
                       onClick={() => toggleDay(iso)}
+                      style={heat > 0 ? { boxShadow: `inset 0 0 0 999px rgba(16,185,129,${heat * 0.12})` } : undefined}
                       className={clsx(
-                        "relative flex h-7 w-7 items-center justify-center rounded-md text-[11px] font-medium tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-900",
+                        "relative flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-semibold tabular-nums transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#0a0a0a]",
                         on
                           ? clsx(
-                              "bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-sm shadow-emerald-900/15 dark:from-emerald-600 dark:to-emerald-700 dark:shadow-emerald-950/40",
+                              "bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)] dark:from-emerald-500 dark:to-emerald-700",
                               isHoliday &&
-                                "ring-2 ring-amber-300/90 ring-offset-0 ring-offset-transparent dark:ring-amber-500/70",
+                                "ring-2 ring-orange-300/90 ring-offset-0 ring-offset-transparent dark:ring-orange-400/70",
                               !isHoliday &&
                                 isSchoolVacation &&
-                                "ring-2 ring-sky-300/90 ring-offset-0 ring-offset-transparent dark:ring-sky-500/70"
+                                "ring-2 ring-orange-200/90 ring-offset-0 ring-offset-transparent dark:ring-orange-500/60"
                             )
                           : clsx(
-                              "text-ink-800 hover:bg-ink-100/90 dark:text-ink-200 dark:hover:bg-ink-800",
+                              "text-ink-800 hover:bg-ink-100/90 dark:text-ink-200 dark:hover:bg-white/5",
                               isHoliday &&
-                                "bg-amber-50/95 font-semibold text-amber-900 ring-1 ring-amber-200/80 hover:bg-amber-100/95 dark:bg-amber-950/45 dark:text-amber-100 dark:ring-amber-800/60 dark:hover:bg-amber-900/50",
+                                "bg-orange-50/95 font-semibold text-orange-950 ring-1 ring-orange-200/90 hover:bg-orange-100/95 dark:bg-orange-950/50 dark:text-orange-100 dark:ring-orange-800/60 dark:hover:bg-orange-900/55",
                               !isHoliday &&
                                 isSchoolVacation &&
-                                "bg-sky-50/95 font-medium text-sky-950 ring-1 ring-sky-200/75 hover:bg-sky-100/95 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-800/50 dark:hover:bg-sky-900/45",
-                              !isHoliday && !isSchoolVacation && isWeekend && "text-ink-500 dark:text-ink-500",
+                                "bg-orange-50/90 font-medium text-orange-950 ring-1 ring-orange-200/80 hover:bg-orange-100/90 dark:bg-orange-950/45 dark:text-orange-50 dark:ring-orange-800/55 dark:hover:bg-orange-900/50",
+                              pastMissed &&
+                                "bg-rose-50 font-semibold text-rose-900 ring-1 ring-rose-200/90 dark:bg-rose-950/45 dark:text-rose-100 dark:ring-rose-800/60",
+                              futurePlanned &&
+                                "bg-sky-50 font-semibold text-sky-950 ring-1 ring-sky-200/90 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-600/50",
+                              !isHoliday && !isSchoolVacation && isWeekend && !pastMissed && !futurePlanned && "text-ink-400 dark:text-ink-600",
                               isToday &&
-                                "ring-2 ring-brand-500 ring-offset-1 dark:ring-brand-400 dark:ring-offset-ink-900",
+                                "ring-2 ring-brand-500 ring-offset-1 dark:ring-brand-400 dark:ring-offset-[#0a0a0a]",
                               isToday &&
                                 !on &&
+                                !pastMissed &&
+                                !futurePlanned &&
                                 (isHoliday
-                                  ? "bg-amber-50 font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                                  ? "bg-orange-50 font-bold text-orange-950 dark:bg-orange-950/60 dark:text-orange-100"
                                   : isSchoolVacation
-                                    ? "bg-sky-50 font-bold text-sky-900 dark:bg-sky-950/50 dark:text-sky-200"
+                                    ? "bg-orange-50 font-bold text-orange-950 dark:bg-orange-950/55 dark:text-orange-50"
                                     : "bg-brand-50 font-bold text-brand-700 dark:bg-brand-950/40 dark:text-brand-300")
                             )
                       )}
@@ -683,12 +736,30 @@ export function BillableDaysCalendarBlock({
                   . Survol d’un jour pour la période (Toussaint, Noël, hiver, printemps, été).
                 </span>
               </p>
+              <div className="mt-3 flex max-w-[260px] flex-wrap justify-center gap-x-3 gap-y-1 text-[9px] text-ink-500 dark:text-white/50 sm:justify-start">
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]" aria-hidden />
+                  Facturé
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded bg-sky-500" aria-hidden />
+                  Prévu
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded bg-orange-400" aria-hidden />
+                  Congé
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="h-2 w-2 rounded bg-rose-500" aria-hidden />
+                  Non rentable
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Mois sélectionné : brut TJM + IK — à droite du calendrier (sm+) */}
           <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
-            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-ink-700 dark:bg-ink-900/55 dark:shadow-none dark:ring-white/5 sm:p-3.5">
+            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-white/[0.08] dark:bg-white/[0.03] dark:shadow-none dark:ring-white/[0.05] sm:p-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
                 Mois sélectionné
               </p>
@@ -823,18 +894,18 @@ export function BillableDaysCalendarBlock({
 
           {/* Synthèse */}
           <div className="min-w-0 w-full flex-1 lg:min-w-[280px]">
-            <div className="flex h-full flex-col justify-center rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50/80 via-white to-analyze-50/30 p-3.5 dark:border-emerald-900/40 dark:from-emerald-950/35 dark:via-ink-900/50 dark:to-analyze-950/25 sm:p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-300/80">
+            <div className="flex h-full flex-col justify-center rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50/80 via-white to-analyze-50/30 p-3.5 dark:border-emerald-800/25 dark:bg-gradient-to-br dark:from-emerald-950/15 dark:via-[#0a0f0d] dark:to-[#060808] sm:p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-400/75">
                 Estimation CA HT
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-2">
-                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-ink-700/80 dark:bg-ink-900/70 dark:shadow-none">
+                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
                   <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM / jour</p>
                   <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
                     {formatEur(tjmHt)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-ink-700/80 dark:bg-ink-900/70 dark:shadow-none">
+                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
                   <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
                     Mois · {countInMonth} j.
                   </p>
@@ -842,7 +913,7 @@ export function BillableDaysCalendarBlock({
                     {formatEur(revenueMonthHt)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-emerald-100/90 bg-emerald-50/50 px-3 py-2.5 shadow-sm dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:shadow-none sm:col-span-1">
+                <div className="rounded-xl border border-emerald-100/90 bg-emerald-50/50 px-3 py-2.5 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-950/20 dark:shadow-none sm:col-span-1">
                   <p className="text-[10px] font-medium text-emerald-900/70 dark:text-emerald-300/80">
                     Année {viewYear} · {countInYear} j.
                   </p>
@@ -862,13 +933,13 @@ export function BillableDaysCalendarBlock({
         </div>
 
         {treasuryTransactions != null && treasuryScope != null ? (
-          <div className="mt-5 border-t border-ink-100/90 pt-5 dark:border-ink-800">
+          <div className="mt-5 border-t border-ink-100/90 pt-5 dark:border-white/[0.06]">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               {/* Sélecteur période — même style pill que "Fenêtre d'analyse" */}
               <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
                 Période (axe B)
               </span>
-              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-white/[0.1] dark:bg-white/[0.04]">
                 <button
                   type="button"
                   aria-pressed={workedDaysChartYear === "all"}
@@ -906,7 +977,7 @@ export function BillableDaysCalendarBlock({
                   <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
                     Trimestre
                   </span>
-                  <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+                  <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-white/[0.1] dark:bg-white/[0.04]">
                     {(["full", 1, 2, 3, 4] as const).map((q) => {
                       const label =
                         q === "full" ? "Année" : q === 1 ? "T1" : q === 2 ? "T2" : q === 3 ? "T3" : "T4";
@@ -944,7 +1015,35 @@ export function BillableDaysCalendarBlock({
             />
           </div>
         ) : null}
+
+          <div
+            className="sticky bottom-0 z-[8] mt-6 isolate rounded-2xl border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/[0.12] dark:bg-[#111111] dark:text-zinc-100 dark:shadow-[0_12px_48px_-10px_rgba(0,0,0,0.65)] dark:ring-1 dark:ring-white/[0.06]"
+          >
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {[
+                { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
+                { k: "CA estimé", v: formatEur(calendarStickyKpis.caEstime) },
+                { k: "Reste à facturer", v: formatEur(calendarStickyKpis.resteAFacturer) },
+                { k: "Projection fin de mois", v: formatEur(calendarStickyKpis.projectionFinMois) }
+              ].map((row) => (
+                <div key={`sticky-${row.k}`} className="min-w-0">
+                  <dt className="truncate text-[10px] font-medium text-ink-600 dark:text-zinc-400">{row.k}</dt>
+                  <dd className="mt-0.5 truncate font-display text-sm font-semibold tabular-nums text-ink-950 dark:text-white sm:text-base">
+                    {row.v}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <button
+              type="button"
+              onClick={() => setCalendarExpanded(false)}
+              className="mt-3 w-full rounded-full border border-ink-200/90 py-2.5 text-xs font-semibold text-ink-800 transition hover:bg-ink-50 dark:border-white/20 dark:bg-white/[0.06] dark:text-zinc-100 dark:hover:bg-white/[0.1]"
+            >
+              Replier le calendrier
+            </button>
+          </div>
       </CardBody>
+      )}
     </Card>
   );
 }

@@ -39,18 +39,18 @@ export function TreasuryVerserPanel({
   return (
     <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
       <div
-        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-violet-800/50 dark:from-violet-950/40 dark:to-ink-900/80 dark:shadow-none dark:ring-white/5 sm:p-3.5"
+        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#12101a] dark:via-violet-950/12 dark:to-[#060606] dark:shadow-none dark:ring-white/[0.05] sm:p-3.5"
         data-private
       >
         <div className="flex items-start gap-2">
           <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-violet-700/50 dark:bg-violet-950/50 dark:text-violet-300 dark:shadow-none"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-violet-200 dark:shadow-none"
             aria-hidden
           >
             <Scale className="h-4 w-4" strokeWidth={1.85} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-800/80 dark:text-violet-300/90">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-800/80 dark:text-violet-200/80">
               Disponible à verser (estim.)
             </p>
             <p className="mt-0.5 text-[11px] leading-snug text-ink-600 dark:text-ink-300">
@@ -63,7 +63,7 @@ export function TreasuryVerserPanel({
           </div>
         </div>
 
-        <div className="mt-3 space-y-2.5 border-t border-violet-100/90 pt-3 text-[11px] leading-snug text-ink-600 dark:border-violet-900/40 dark:text-ink-300">
+        <div className="mt-3 space-y-2.5 border-t border-violet-100/90 pt-3 text-[11px] leading-snug text-ink-600 dark:border-white/[0.06] dark:text-ink-300">
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">CA encaissé TTC</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
@@ -78,13 +78,13 @@ export function TreasuryVerserPanel({
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">CSG ({csgPct} % HT)</span>
-            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-300">
+            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-200/90">
               {formatEur(snap.csgDue)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">TVA théorique ({tvaPct} % HT)</span>
-            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-300">
+            <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-200/90">
               {formatEur(snap.tvaTheorique)}
             </span>
           </div>
@@ -106,7 +106,7 @@ export function TreasuryVerserPanel({
               {formatEur(snap.bncMois)}
             </span>
           </div>
-          <div className="flex justify-between gap-2 border-t border-violet-100/80 pt-2 dark:border-violet-900/40">
+          <div className="flex justify-between gap-2 border-t border-violet-100/80 pt-2 dark:border-white/[0.06]">
             <span className="font-medium text-ink-700 dark:text-ink-200">Versé ce mois</span>
             <span className="shrink-0 font-bold tabular-nums text-ink-900 dark:text-ink-50">
               {formatEur(snap.verseCeMois)}

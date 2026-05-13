@@ -10,18 +10,21 @@ type Variant = "solid" | "glass" | "ghost";
 export function Card({
   className,
   children,
-  variant = "solid"
+  variant = "solid",
+  id
 }: {
   className?: string;
   children: React.ReactNode;
   variant?: Variant;
+  id?: string;
 }) {
   return (
     <div
+      id={id}
       className={clsx(
         "animate-floatIn",
         variant === "solid" &&
-          "rounded-3xl border border-ink-200 bg-white shadow-[0_8px_32px_-12px_rgba(0,0,0,0.08)] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-white/[0.07] dark:to-white/[0.02] dark:shadow-[0_12px_48px_-8px_rgba(0,0,0,0.55)]",
+          "rounded-3xl border border-ink-200 bg-white shadow-[0_8px_32px_-12px_rgba(0,0,0,0.08)] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#101412] dark:via-[#080a09] dark:to-[#050505] dark:shadow-[0_32px_100px_-24px_rgba(0,0,0,0.65)]",
         variant === "glass" &&
           "rounded-3xl border border-ink-200 bg-white shadow-card dark:border-white/[0.08] dark:bg-[#0c0c0c]/90 dark:shadow-[0_12px_48px_-8px_rgba(0,0,0,0.55)] dark:backdrop-blur-xl",
         variant === "ghost" && "rounded-3xl bg-ink-100 dark:bg-white/[0.03]",
