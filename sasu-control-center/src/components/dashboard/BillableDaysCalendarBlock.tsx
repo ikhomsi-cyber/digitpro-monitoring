@@ -161,6 +161,28 @@ function persistSignature(sortedDates: string[], tjm: number): string {
   return sortedDates.join(",") + "|" + tjm;
 }
 
+function foldTxBlob(raw: string): string {
+  return (raw ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Dépenses privées « NDF DigitPro » (Bankin : sous-cat. DigitPro consulting NDF → catégorie stockée
+ * `NDF DigitPro`, ou anciennes lignes `Notes de frais` + mention DigitPro dans libellé / société).
+ */
+function isPersonalNdfDigitProInMonth(tx: DashboardTx, monthKey: string): boolean {
+  if ((tx.scope ?? "pro") !== "personal" || tx.amount >= 0) return false;
+  if (tx.date.slice(0, 7) !== monthKey) return false;
+  if (tx.category === "NDF DigitPro") return true;
+  const blob = foldTxBlob(`${tx.label} ${tx.company} ${tx.category}`);
+  if (!blob.includes("digitpro")) return false;
+  return deriveExpenseBucket(tx) === "NDF";
+}
+
 export function BillableDaysCalendarBlock({
   tjmHt,
   persistToSupabase,
@@ -363,6 +385,10 @@ export function BillableDaysCalendarBlock({
     nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
     const nextMonthKey = `${nextMonthStart.getFullYear()}-${String(nextMonthStart.getMonth() + 1).padStart(2, "0")}`;
 
+    const cal = new Date();
+    const isViewedCalendarMonthCurrent =
+      viewYear === cal.getFullYear() && viewMonth0 === cal.getMonth();
+
     let dirigeant = 0;
     let ndfMoisSuivant = 0;
     for (const tx of treasuryTransactions) {
@@ -374,13 +400,26 @@ export function BillableDaysCalendarBlock({
       if (d === monthKey && bucket === "Repas dirigeant") dirigeant += amt;
       if (d === nextMonthKey && bucket === "NDF") ndfMoisSuivant += amt;
     }
+
+    /** Notes DigitPro avancées sur compte perso (même mois civil que le calendrier), uniquement mois en cours. */
+    let ndfPersoDigitProMoisCourant = 0;
+    if (isViewedCalendarMonthCurrent) {
+      for (const tx of treasuryTransactions) {
+        if (!isPersonalNdfDigitProInMonth(tx, monthKey)) continue;
+        ndfPersoDigitProMoisCourant += Math.abs(tx.amount);
+      }
+    }
+
+    const ndfAffiche = ndfMoisSuivant + ndfPersoDigitProMoisCourant;
     const repasTotal = dirigeant;
     return {
       dirigeant,
       repasTotal,
       ndfMoisSuivant,
-      /** Repas dirigeant du mois affiché + NDF du mois civil suivant. */
-      total: repasTotal + ndfMoisSuivant
+      ndfPersoDigitProMoisCourant,
+      ndfAffiche,
+      /** Repas dirigeant du mois affiché + NDF (mois suivant côté périmètre trésorerie + NDF DigitPro privé du mois en cours). */
+      total: repasTotal + ndfAffiche
     };
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
 
@@ -756,7 +795,8 @@ export function BillableDaysCalendarBlock({
                     </p>
                     {mealFeesForViewedMonth ? (
                       <p className="text-[10px] text-ink-400 dark:text-ink-500">
-                        Dirigeant {formatEur(mealFeesForViewedMonth.dirigeant)} · NDF {formatEur(mealFeesForViewedMonth.ndfMoisSuivant)}
+                        Dirigeant {formatEur(mealFeesForViewedMonth.dirigeant)} · NDF{" "}
+                        {formatEur(mealFeesForViewedMonth.ndfAffiche)}
                       </p>
                     ) : null}
                     <BudgetGauge

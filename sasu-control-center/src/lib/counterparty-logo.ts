@@ -16,7 +16,13 @@ export function normalizeCounterpartyKey(name: string): string {
  * Domaine dont on affiche le favicon (icône marque), clé = `normalizeCounterpartyKey(nom affiché)`.
  * Étendre cette liste au fil des clients récurrents.
  */
-const COUNTERPARTY_BRAND_DOMAINS: Readonly<Record<string, string>> = {};
+const COUNTERPARTY_BRAND_DOMAINS: Readonly<Record<string, string>> = {
+  "mercedes-benz": "mercedes-benz.com",
+  mercedes: "mercedes-benz.com",
+  carrefour: "carrefour.com",
+  /** Libellés tronqués type « Carref » dans l’UI. */
+  carref: "carrefour.com"
+};
 
 const UNRESOLVED_KEYS = new Set(["contrepartie non renseignee", ""]);
 

@@ -16,14 +16,8 @@ import {
 import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
-import { powensListAccounts, powensListTransactionsForAccounts } from "@/lib/powens/client";
-import {
-  isRevolutPersonalPowensAccount,
-  pickPowensAccountLabel
-} from "@/lib/powens/revolut-account-filter";
-import type { Json } from "@/lib/supabase/types";
-import { REVOLUT_PERSONAL_COMPANY } from "@/lib/revolut-personal";
-
+import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
+import { createHash } from "crypto";
 type ImportTx = {
   date: string;
   label: string;
@@ -32,7 +26,7 @@ type ImportTx = {
   balance?: number | null;
   company: string;
   scope?: "pro" | "personal";
-  /** Clé optionnelle pour le content_hash (ex. id transaction Powens). */
+  /** Clé optionnelle pour le content_hash (ex. id transaction import). */
   dedupeKey?: string;
 };
 
@@ -233,7 +227,7 @@ export async function createTransaction(formData: FormData) {
 
 export async function importTransactions(
   transactions: ImportTx[],
-  meta: { sourceFilename: string | null; format: "qonto" | "generic"; fileHash: string | null }
+  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin"; fileHash: string | null }
 ): Promise<{
   inserted: Array<{
     id: string;
@@ -304,7 +298,7 @@ export async function importTransactions(
 
   type SessionInsertBase = {
     source_filename: string | null;
-    format: "qonto" | "generic";
+    format: "qonto" | "generic" | "bankin";
     row_count: number;
     inserted_count: number;
     skipped_duplicate_count: number;
@@ -491,123 +485,6 @@ export async function importTransactions(
 }
 
 /**
- * Synchronise Revolut **personnel** via Powens Connect : comptes + transactions en tables
- * `revolut_personal_*`, puis import dans `transactions` (scope `personal`, société
- * `Revolut (personnel)`). Les anciennes lignes dashboard pour ce périmètre sont remplacées
- * à chaque sync pour refléter l’état Powens.
- */
-export async function syncRevolutPersonalPowensFromApi(): Promise<{
-  accounts: { total: number; kept: number };
-  transactions: { total: number; kept: number; upserted: number };
-  dashboardImported: number;
-  /** Message UX si comptes OK mais 0 mouvement côté Powens. */
-  hint?: string;
-}> {
-  await assertSupabaseWritesEnabled();
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) throw new Error("Supabase not configured (demo mode).");
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const tokenRes = await supabase.from("powens_users").select("auth_token").maybeSingle();
-  if (tokenRes.error) throw new Error(tokenRes.error.message);
-  const token = String(tokenRes.data?.auth_token ?? "").trim();
-  if (!token) throw new Error("Powens non initialisé : clique d’abord sur « Connecter Revolut ».");
-
-  const accounts = await powensListAccounts(token);
-  const revolutAccounts = accounts.filter((a) => isRevolutPersonalPowensAccount(a));
-  if (!revolutAccounts.length) {
-    throw new Error(
-      "Aucun compte Revolut personnel détecté dans Powens. Connecte Revolut dans la webview (pas une autre banque) ou vérifie le libellé / IBAN du compte."
-    );
-  }
-
-  const accountRows = revolutAccounts.map((a) => ({
-    powens_account_id: String(a.id),
-    connection_id: a.id_connection == null ? null : String(a.id_connection),
-    label: pickPowensAccountLabel(a),
-    iban: a.iban ?? null,
-    balance: a.balance == null ? null : Number(a.balance),
-    currency: (a.currency as { code?: string } | null)?.code ?? "EUR",
-    raw: a as unknown as Json
-  }));
-
-  const upAcc = await supabase
-    .from("revolut_personal_accounts")
-    .upsert(accountRows, { onConflict: "user_id,powens_account_id" });
-  if (upAcc.error) throw new Error(upAcc.error.message);
-
-  const accountIds = revolutAccounts.map((a) => a.id);
-  const txs = await powensListTransactionsForAccounts(token, accountIds, { limit: 1000 });
-  const allowed = new Set(accountIds.map(String));
-  const filtered = txs.filter((t) => allowed.has(String(t.id_account)));
-
-  const txRows = filtered.map((t) => ({
-    powens_transaction_id: String(t.id),
-    powens_account_id: String(t.id_account),
-    connection_id: t.id_connection == null ? null : String(t.id_connection),
-    date: String(t.date).slice(0, 10),
-    rdate: t.rdate ? String(t.rdate).slice(0, 10) : null,
-    label: String(t.wording ?? t.simplified_wording ?? t.original_wording ?? "").trim(),
-    amount: Number(t.value ?? 0),
-    category: Array.isArray(t.categories) ? String(t.categories[0]?.code ?? "") || null : null,
-    raw: t as unknown as Json
-  }));
-
-  if (txRows.length) {
-    const upTx = await supabase
-      .from("revolut_personal_transactions")
-      .upsert(txRows, { onConflict: "user_id,powens_transaction_id" });
-    if (upTx.error) throw new Error(upTx.error.message);
-  }
-
-  const { error: delErr } = await supabase
-    .from("transactions")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("company", REVOLUT_PERSONAL_COMPANY);
-  if (delErr) throw new Error(delErr.message);
-
-  const importRows: ImportTx[] = filtered.map((t) => {
-    const catRaw = Array.isArray(t.categories) ? String(t.categories[0]?.code ?? "").trim() : "";
-    const mapped = mapExpenseCategoryLabel(catRaw);
-    const category = mapped || "Banque";
-    return {
-      date: String(t.date).slice(0, 10),
-      label: String(t.wording ?? t.simplified_wording ?? t.original_wording ?? "").trim() || "—",
-      category,
-      amount: Number(t.value ?? 0),
-      company: REVOLUT_PERSONAL_COMPANY,
-      scope: "personal" as const,
-      dedupeKey: `powens_tx:${t.id}`
-    };
-  });
-
-  const imp = await importTransactions(importRows, {
-    sourceFilename: `Powens Revolut personnel · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
-    format: "generic",
-    fileHash: null
-  });
-
-  let hint: string | undefined;
-  if (filtered.length === 0 && revolutAccounts.length > 0) {
-    hint =
-      "Powens ne renvoie aucune transaction pour ces comptes (fenêtre ~36 mois). Attends la synchro agrégée, ou vérifie l’historique dans l’espace Powens. Comptes UK : IBAN GB…REVO… pris en charge ; sinon le libellé doit contenir « Revolut ».";
-  } else if (imp.inserted.length > 0) {
-    hint = "Les lignes Revolut sont en périmètre « Privé » : passe l’interrupteur SASU / Privé en haut du tableau pour les voir.";
-  }
-
-  return {
-    accounts: { total: accounts.length, kept: revolutAccounts.length },
-    transactions: { total: txs.length, kept: filtered.length, upserted: txRows.length },
-    dashboardImported: imp.inserted.length,
-    hint
-  };
-}
-
-/**
  * Récupère les transactions via l’API Qonto (clé secrète serveur) et les enregistre
  * comme un import CSV (même dédoublonnage `content_hash`).
  */
@@ -633,6 +510,44 @@ export async function syncQontoTransactionsFromApi(): Promise<{
     totalFromApi: rows.length,
     bankAccountSummary
   };
+}
+
+/**
+ * Import d’un export Bankin (.xls / .xlsx) dans les transactions **perso** (`scope: personal`).
+ * Catégories : hiérarchie Bankin + inférences sur le libellé si « A catégoriser ».
+ * Dédoublonnage : même fichier (hash) ignoré si déjà importé ; lignes = empreinte date + libellé + montant.
+ */
+export async function importBankinPersonalXlsx(formData: FormData) {
+  await assertSupabaseWritesEnabled();
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    throw new Error("Fichier manquant : sélectionnez un export Bankin (.xls ou .xlsx).");
+  }
+  const nameLower = file.name.toLowerCase();
+  if (!nameLower.endsWith(".xls") && !nameLower.endsWith(".xlsx")) {
+    throw new Error("Extension non reconnue : attendu .xls ou .xlsx (export Bankin).");
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const fileHash = createHash("sha256").update(Buffer.from(arrayBuffer)).digest("hex");
+
+  let rows;
+  try {
+    rows = parseBankinTransactionsWorkbook(arrayBuffer);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Impossible de lire le fichier Excel.";
+    throw new Error(msg);
+  }
+
+  if (!rows.length) {
+    throw new Error("Aucune transaction valide (date + montant) dans ce fichier.");
+  }
+
+  return importTransactions(rows, {
+    sourceFilename: file.name,
+    format: "bankin",
+    fileHash
+  });
 }
 
 export async function deleteTransaction(id: string) {

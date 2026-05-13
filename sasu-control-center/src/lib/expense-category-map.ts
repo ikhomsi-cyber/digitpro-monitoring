@@ -15,6 +15,8 @@ export const IMPOT_CATEGORY_LABEL = "Impôt";
 export const COMPTA_ADMIN_BUCKET_LABEL = "Compta & admin.";
 
 const RAW_ENTRIES: [string, string][] = [
+  /** Notes DigitPro (Bankin) : libellé métier distinct, mêmes règles analytiques que NDF. */
+  ["NDF DigitPro", "NDF DigitPro"],
   ["Notes de frais", "NDF"],
   ["Note de frais", "NDF"],
   ["Frais de personnel", "BNC"],

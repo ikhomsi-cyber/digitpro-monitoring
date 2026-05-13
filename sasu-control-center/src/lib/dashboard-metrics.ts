@@ -1,4 +1,5 @@
 import { importDedupePayload } from "./import-dedupe-payload";
+import { bankinSubcategoryLabel } from "./bankin/categorize";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
 import { getFrenchPublicHolidaysForYear } from "./fr-public-holidays";
 import { isRevenueCategory } from "./revenue-category";
@@ -256,6 +257,50 @@ export function computeRevenueYearToDateProjection(
   };
 }
 
+/**
+ * Projection fin d’année pour les **encaissements perso** (hors virements internes Bankin).
+ * Pas de TVA : les champs *Ht* sont alignés sur le TTC bancaire pour compatibilité avec `RevenueYearProjection`.
+ */
+export function computePersonalRevenueYearProjection(
+  transactions: DashboardTx[],
+  options: { now?: Date } = {}
+): RevenueYearProjection {
+  const now = options.now ?? new Date();
+  const calendarYear = now.getFullYear();
+  const todayIso = localCalendarYmd(now);
+  const yearPrefix = `${calendarYear}-`;
+
+  let ytdTtc = 0;
+  for (const tx of transactions) {
+    if (!countsTowardPersonalRevenueKpi(tx)) continue;
+    if (!tx.date.startsWith(yearPrefix)) continue;
+    if (tx.date > todayIso) continue;
+    ytdTtc += tx.amount;
+  }
+
+  const daysInYear = daysInCalendarYear(calendarYear);
+  const dayOfYear = dayOfCalendarYearLocal(now);
+  const fraction = Math.min(1, Math.max(1 / daysInYear, dayOfYear / daysInYear));
+
+  const ytdHt = ytdTtc;
+  const projectedYearEndTtc = ytdTtc / fraction;
+  const projectedYearEndHt = projectedYearEndTtc;
+
+  return {
+    calendarYear,
+    ytdTtc,
+    ytdHt,
+    projectedYearEndTtc,
+    projectedYearEndHt,
+    fractionOfYearElapsed: fraction,
+    dayOfYear,
+    daysInYear,
+    projectionBasis: "calendar",
+    capacityDaysElapsed: dayOfYear,
+    capacityDaysTotal: daysInYear
+  };
+}
+
 export type MonthlyFinanceMetric = {
   month: string; // YYYY-MM
   revenue: number;
@@ -370,6 +415,47 @@ export function countsTowardDashboardExpenseTotal(tx: DashboardTx): boolean {
   return !isDerivedBucketExcludedFromExpenseKpis(deriveExpenseBucket(tx));
 }
 
+function foldKpiText(raw: string): string {
+  return (raw ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[''`´]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Virements internes Bankin : à exclure des agrégats « revenus » et « dépenses » (double comptage).
+ */
+export function isPersonalInternalTransferMovement(tx: DashboardTx): boolean {
+  const c = foldKpiText(tx.category);
+  return c.includes("virements internes") || c.includes("virement interne");
+}
+
+/** Revenus perso (KPI) : encaissements positifs hors virements internes. */
+export function countsTowardPersonalRevenueKpi(tx: DashboardTx): boolean {
+  return tx.amount > 0 && !isPersonalInternalTransferMovement(tx);
+}
+
+/** Dépenses perso (KPI) : débits, catégorie Bankin telle quelle, hors virements internes. */
+export function countsTowardPersonalExpenseKpi(tx: DashboardTx): boolean {
+  return tx.amount < 0 && !isPersonalInternalTransferMovement(tx);
+}
+
+/** Libellé de regroupement des dépenses dans l’UI (SASU = bucket dérivé, perso = sous-catégorie Bankin). */
+export function expenseDashboardGroupingLabel(tx: DashboardTx, kpiMode: "sasu" | "personal"): string {
+  if (kpiMode === "personal") {
+    return bankinSubcategoryLabel(tx.category);
+  }
+  return deriveExpenseBucket(tx);
+}
+
+export function countsTowardDashboardExpenseKpi(tx: DashboardTx, kpiMode: "sasu" | "personal"): boolean {
+  if (kpiMode === "personal") return countsTowardPersonalExpenseKpi(tx);
+  return countsTowardDashboardExpenseTotal(tx);
+}
+
 /** Retire des catégories du breakdown (ex. pour le graphique « dépenses hors BNC »). */
 export function omitExpenseCategoriesFromBreakdown(
   breakdown: ExpenseCategoryMonthlyBreakdown,
@@ -402,25 +488,37 @@ export function singleCategoryExpenseBreakdown(
 /**
  * Per-month expense totals by `tx.category` for outgoing flows only (`amount < 0`).
  * Same transaction window as dashboard charts (`filteredTx` + year vs trailing 12).
+ * `expenseInclude` permet d’aligner le breakdown sur les KPI (ex. perso hors virements internes).
  */
 export function computeExpenseCategoryMonthlyBreakdown(
   filteredTxs: DashboardTx[],
-  opts: { years: number[] | null },
+  opts: {
+    years: number[] | null;
+    expenseInclude?: (tx: DashboardTx) => boolean;
+    /** Perso : agrège par sous-catégorie Bankin (après ` › `). */
+    expenseGroup?: "raw" | "personal";
+  },
   now = new Date()
 ): ExpenseCategoryMonthlyBreakdown {
   const monthKeys = analyticsMonthKeysForDashboard(opts.years, now);
+  const include = opts.expenseInclude ?? ((tx: DashboardTx) => tx.amount < 0);
   const perMonth = new Map<string, Map<string, number>>();
   for (const m of monthKeys) perMonth.set(m, new Map());
 
   const catTotals = new Map<string, number>();
 
   for (const tx of filteredTxs) {
-    if (tx.amount >= 0) continue;
+    if (!include(tx)) continue;
     const mk = tx.date.slice(0, 7);
     const bucket = perMonth.get(mk);
     if (!bucket) continue;
-    const raw = (tx.category ?? "").trim();
-    const cat = raw.length ? raw : "Sans catégorie";
+    const cat =
+      opts.expenseGroup === "personal"
+        ? expenseDashboardGroupingLabel(tx, "personal")
+        : (() => {
+            const raw = (tx.category ?? "").trim();
+            return raw.length ? raw : "Sans catégorie";
+          })();
     const amt = Math.abs(tx.amount);
     bucket.set(cat, (bucket.get(cat) ?? 0) + amt);
     catTotals.set(cat, (catTotals.get(cat) ?? 0) + amt);
@@ -448,17 +546,18 @@ export function computeExpenseCategoryMonthlyBreakdown(
  */
 export function computeDerivedExpenseCategoryMonthlyBreakdown(
   filteredTxs: DashboardTx[],
-  opts: { years: number[] | null },
+  opts: { years: number[] | null; expenseInclude?: (tx: DashboardTx) => boolean },
   now = new Date()
 ): ExpenseCategoryMonthlyBreakdown {
   const monthKeys = analyticsMonthKeysForDashboard(opts.years, now);
+  const include = opts.expenseInclude ?? countsTowardDashboardExpenseTotal;
   const perMonth = new Map<string, Map<string, number>>();
   for (const m of monthKeys) perMonth.set(m, new Map());
 
   const catTotals = new Map<string, number>();
 
   for (const tx of filteredTxs) {
-    if (tx.amount >= 0) continue;
+    if (!include(tx)) continue;
     const mk = tx.date.slice(0, 7);
     const bucket = perMonth.get(mk);
     if (!bucket) continue;
@@ -561,6 +660,26 @@ export function computeMetricsFromTransactions(
       if (!bucket) continue;
       bucket.expenses += Math.abs(tx.amount);
     }
+  }
+
+  return months.map((m) => ({ month: m, ...map.get(m)! }));
+}
+
+function computePersonalMetricsFromTransactions(
+  transactions: DashboardTx[],
+  months: string[]
+): MonthlyFinanceMetric[] {
+  const monthSet = new Set(months);
+  const map = new Map<string, { revenue: number; expenses: number }>();
+  for (const m of months) map.set(m, { revenue: 0, expenses: 0 });
+
+  for (const tx of transactions) {
+    const mk = tx.date.slice(0, 7);
+    if (!monthSet.has(mk)) continue;
+    const bucket = map.get(mk);
+    if (!bucket) continue;
+    if (countsTowardPersonalRevenueKpi(tx)) bucket.revenue += tx.amount;
+    if (countsTowardPersonalExpenseKpi(tx)) bucket.expenses += Math.abs(tx.amount);
   }
 
   return months.map((m) => ({ month: m, ...map.get(m)! }));
@@ -685,29 +804,50 @@ export function filterDashboardTransactions(
 /**
  * Monthly series : 12 mois glissants, ou mois civils pour une ou plusieurs années.
  * Uses the same revenue/expense definitions as the KPI cards (see file header).
+ *
+ * `kpiMode: "personal"` : encaissements / dépenses perso (Bankin), hors virements internes ;
+ * mois de regroupement = date du mouvement (pas de règle jour 26 ni catégorie « Chiffre d’affaires »).
  */
 export function computeDashboardMonthlyMetrics(
   filteredTxs: DashboardTx[],
-  opts: { years: number[] | null },
+  opts: { years: number[] | null; kpiMode?: "sasu" | "personal" },
   now = new Date()
 ): MonthlyFinanceMetric[] {
+  const kpiMode = opts.kpiMode ?? "sasu";
   if (opts.years != null && opts.years.length > 0) {
     const months = analyticsMonthKeysForDashboard(opts.years, now);
     const revenueExpenses = new Map<string, { revenue: number; expenses: number }>();
     for (const m of months) revenueExpenses.set(m, { revenue: 0, expenses: 0 });
     for (const tx of filteredTxs) {
-      if (isRevenueCategory(tx.category)) {
-        const key = effectiveRevenueAnalyticsDateIso(tx).slice(0, 7);
-        const bucket = revenueExpenses.get(key);
-        if (bucket) bucket.revenue += tx.amount;
-      }
-      if (countsTowardDashboardExpenseTotal(tx)) {
-        const key = tx.date.slice(0, 7);
-        const bucket = revenueExpenses.get(key);
-        if (bucket) bucket.expenses += Math.abs(tx.amount);
+      if (kpiMode === "personal") {
+        if (countsTowardPersonalRevenueKpi(tx)) {
+          const key = tx.date.slice(0, 7);
+          const bucket = revenueExpenses.get(key);
+          if (bucket) bucket.revenue += tx.amount;
+        }
+        if (countsTowardPersonalExpenseKpi(tx)) {
+          const key = tx.date.slice(0, 7);
+          const bucket = revenueExpenses.get(key);
+          if (bucket) bucket.expenses += Math.abs(tx.amount);
+        }
+      } else {
+        if (isRevenueCategory(tx.category)) {
+          const key = effectiveRevenueAnalyticsDateIso(tx).slice(0, 7);
+          const bucket = revenueExpenses.get(key);
+          if (bucket) bucket.revenue += tx.amount;
+        }
+        if (countsTowardDashboardExpenseTotal(tx)) {
+          const key = tx.date.slice(0, 7);
+          const bucket = revenueExpenses.get(key);
+          if (bucket) bucket.expenses += Math.abs(tx.amount);
+        }
       }
     }
     return months.map((m) => ({ month: m, ...revenueExpenses.get(m)! }));
+  }
+  if (kpiMode === "personal") {
+    const months = last12MonthsKeys(now);
+    return computePersonalMetricsFromTransactions(filteredTxs, months);
   }
   return computeMetricsFromTransactions(filteredTxs, now);
 }

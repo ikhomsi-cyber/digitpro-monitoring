@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
 import type { LucideIcon } from "lucide-react";
@@ -12,20 +12,23 @@ import {
   CalendarRange,
   ChevronDown,
   CloudDownload,
-  Landmark,
   Receipt,
   TrendingDown,
   TrendingUp,
+  Upload,
   User,
 } from "lucide-react";
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
+import { PersonalMonitoringBlock } from "@/components/dashboard/PersonalMonitoringBlock";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { Chatbot } from "@/components/Chatbot";
+import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
 import { formatEur } from "@/lib/format";
 import { categoryGlyph } from "@/lib/category-glyph";
+import { counterpartyLogoHref } from "@/lib/counterparty-logo";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
@@ -36,18 +39,21 @@ import {
   BNC_PAYROLL_EXPENSE_CATEGORY,
   computeDashboardMonthlyMetrics,
   computeDerivedExpenseCategoryMonthlyBreakdown,
+  computeExpenseCategoryMonthlyBreakdown,
+  computePersonalRevenueYearProjection,
   computeRevenueYearToDateProjection,
-  countsTowardDashboardExpenseTotal,
+  countsTowardDashboardExpenseKpi,
+  countsTowardPersonalRevenueKpi,
   expenseCategoryColor,
+  expenseDashboardGroupingLabel,
   filterDashboardTransactions,
   omitExpenseCategoriesFromBreakdown,
   transactionAnalyticsDayIso,
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
-import { syncQontoTransactionsFromApi, syncRevolutPersonalPowensFromApi } from "./actions";
+import { syncQontoTransactionsFromApi, importBankinPersonalXlsx } from "./actions";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
-import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 
 export type { DashboardTx };
 
@@ -120,19 +126,29 @@ export function DashboardClient({
   canWrite,
   syncKey,
   initialTransactions,
+  transactionYearBounds,
   initialBillableWorkDays,
-  initialBillableTjmHt
+  initialBillableTjmHt,
+  initialDashboardScope
 }: {
   runtimeMode: SupabaseRuntimeMode;
   canWrite: boolean;
   syncKey: string;
   initialTransactions: DashboardTx[];
+  /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
+  transactionYearBounds: { minYear: number; maxYear: number } | null;
   initialBillableWorkDays: string[];
   initialBillableTjmHt: number | null;
+  /** Dérivé de `?scope=` sur `/dashboard` (pro | personal), sinon défaut SASU. */
+  initialDashboardScope?: "pro" | "personal" | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
-  const [scope, setScope] = useState<"pro" | "personal">("pro");
+  const [scope, setScope] = useState<"pro" | "personal">(() =>
+    initialDashboardScope === "personal" ? "personal" : "pro"
+  );
   /** null = fenêtre glissante 12 mois ; sinon une ou plusieurs années civiles */
   const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) pour la carte Total expenses. */
@@ -158,16 +174,17 @@ export function DashboardClient({
     setExpenseCategoryDetail(null);
   }, [totalExpensesMonthFilter, selectedExpenseCategoryFilters]);
 
-  // If the dataset contains personal transactions, default the toggle based on what exists.
-  // Otherwise stay on "pro" for backwards-compat.
   useEffect(() => {
-    const hasPersonal = initialTransactions.some((t) => t.scope === "personal");
-    if (!hasPersonal) setScope("pro");
-  }, [initialTransactions]);
+    if (!pathname.startsWith("/dashboard")) return;
+    const q = searchParams.get("scope");
+    if (q === "personal") setScope("personal");
+    else if (q === "pro") setScope("pro");
+    else setScope("pro");
+  }, [pathname, searchParams]);
 
   const [isPending, startTransition] = useTransition();
 
-  const canUsePowens = canWrite && runtimeMode === "SUPABASE";
+  const bankinFileInputRef = useRef<HTMLInputElement>(null);
 
   const billableTjmEffective = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
   const persistBillableToSupabase = canWrite && runtimeMode === "SUPABASE";
@@ -191,60 +208,20 @@ export function DashboardClient({
     });
   }, []);
 
-  const onClickConnectRevolutPowens = useCallback(async () => {
-    if (!canUsePowens) return;
-    try {
-      const initRes = await fetch("/api/powens/init", { method: "POST" });
-      const initJson = (await initRes.json().catch(() => null)) as null | { ok?: boolean; error?: string };
-      if (!initRes.ok || !initJson?.ok) {
-        throw new Error(initJson?.error || `Powens init failed (${initRes.status})`);
-      }
-
-      const urlRes = await fetch("/api/powens/connect-url", { method: "GET" });
-      const urlJson = (await urlRes.json().catch(() => null)) as null | { ok?: boolean; url?: string; error?: string };
-      if (!urlRes.ok || !urlJson?.ok || !urlJson.url) {
-        throw new Error(urlJson?.error || `Powens connect-url failed (${urlRes.status})`);
-      }
-
-      window.open(urlJson.url, "_blank", "noopener,noreferrer");
-      toast.success("Powens Connect : choisis Revolut (compte personnel), puis reviens synchroniser.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Impossible de démarrer Powens Connect.");
-    }
-  }, [canUsePowens]);
-
-  function onClickSyncRevolutPowens() {
-    if (!canUsePowens) return;
-    const toastId = toast.loading("Synchronisation Revolut (Powens)…");
-    startTransition(async () => {
-      try {
-        const json = await syncRevolutPersonalPowensFromApi();
-        toast.success("Revolut synchronisé", {
-          id: toastId,
-          description: `Comptes: ${json.accounts.kept} · lignes Powens: ${json.transactions.upserted} · import dashboard: ${json.dashboardImported}${
-            json.hint ? ` · ${json.hint}` : ""
-          }`
-        });
-        try {
-          await router.refresh();
-        } catch {
-          toast.message("Si les chiffres ne se mettent pas à jour, rechargez la page (F5).", { duration: 8000 });
-        }
-      } catch (e) {
-        toast.error("Synchronisation Revolut impossible", {
-          id: toastId,
-          description: e instanceof Error ? e.message : undefined
-        });
-      }
-    });
-  }
-
   const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),
     [transactions, scope]
   );
+
+  /** Toutes les lignes perso (pour YTD / mois en cours hors fenêtre glissante). */
+  const personalTransactionsFull = useMemo(
+    () => transactions.filter((t) => (t.scope ?? "pro") === "personal"),
+    [transactions]
+  );
+
+  const kpiMode = useMemo(() => (scope === "personal" ? "personal" : "sasu"), [scope]);
 
   const periodFilteredTx = useMemo(
     () => filterDashboardTransactions(scopedTx, analyticsFilter),
@@ -256,22 +233,22 @@ export function DashboardClient({
     const allow = new Set(selectedExpenseCategoryFilters);
     return periodFilteredTx.filter((tx) => {
       if (tx.amount >= 0) return true;
-      return allow.has(deriveExpenseBucket(tx));
+      return allow.has(expenseDashboardGroupingLabel(tx, kpiMode));
     });
-  }, [periodFilteredTx, selectedExpenseCategoryFilters]);
+  }, [periodFilteredTx, selectedExpenseCategoryFilters, kpiMode]);
 
   const expenseCategoryFilterOptions = useMemo(() => {
     const set = new Set<string>();
     for (const tx of periodFilteredTx) {
-      if (!countsTowardDashboardExpenseTotal(tx)) continue;
-      set.add(deriveExpenseBucket(tx));
+      if (!countsTowardDashboardExpenseKpi(tx, kpiMode)) continue;
+      set.add(expenseDashboardGroupingLabel(tx, kpiMode));
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "fr"));
-  }, [periodFilteredTx]);
+  }, [periodFilteredTx, kpiMode]);
 
   const metrics = useMemo(
-    () => computeDashboardMonthlyMetrics(filteredTx, { years: selectedYears }),
-    [filteredTx, selectedYears]
+    () => computeDashboardMonthlyMetrics(filteredTx, { years: selectedYears, kpiMode }),
+    [filteredTx, selectedYears, kpiMode]
   );
 
   /** Mois de la fenêtre d’analyse déjà écoulés (≤ mois en cours), pour les moyennes. */
@@ -288,17 +265,26 @@ export function DashboardClient({
   }, [metrics, totalExpensesMonthFilter]);
 
   const expenseCategoryBreakdown = useMemo(
-    () => computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, { years: selectedYears }),
-    [filteredTx, selectedYears]
+    () =>
+      kpiMode === "personal"
+        ? computeExpenseCategoryMonthlyBreakdown(filteredTx, {
+            years: selectedYears,
+            expenseInclude: (tx) => countsTowardDashboardExpenseKpi(tx, "personal"),
+            expenseGroup: "personal"
+          })
+        : computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, { years: selectedYears }),
+    [filteredTx, selectedYears, kpiMode]
   );
 
   const expenseCategoryBreakdownMain = useMemo(
     () =>
-      omitExpenseCategoriesFromBreakdown(expenseCategoryBreakdown, [
-        BNC_PAYROLL_EXPENSE_CATEGORY,
-        TVA_DERIVED_EXPENSE_BUCKET
-      ]),
-    [expenseCategoryBreakdown]
+      kpiMode === "personal"
+        ? expenseCategoryBreakdown
+        : omitExpenseCategoriesFromBreakdown(expenseCategoryBreakdown, [
+            BNC_PAYROLL_EXPENSE_CATEGORY,
+            TVA_DERIVED_EXPENSE_BUCKET
+          ]),
+    [expenseCategoryBreakdown, kpiMode]
   );
 
   const totalExpensesCard = useMemo(() => {
@@ -342,60 +328,74 @@ export function DashboardClient({
 
   const revenueYearProjection = useMemo(
     () =>
-      computeRevenueYearToDateProjection(scopedTx, {
-        vatRate: VAT_RATE,
-        billableWorkDayIsos: billableWorkDayIsos
-      }),
-    [scopedTx, billableWorkDayIsos, VAT_RATE]
+      kpiMode === "personal"
+        ? computePersonalRevenueYearProjection(scopedTx, { now: new Date() })
+        : computeRevenueYearToDateProjection(scopedTx, {
+            vatRate: VAT_RATE,
+            billableWorkDayIsos: billableWorkDayIsos
+          }),
+    [scopedTx, billableWorkDayIsos, VAT_RATE, kpiMode]
   );
 
-  const monthlyRevenueHt = useMemo(
+  const monthlyRevenueChartSeries = useMemo(
     () =>
       metrics.map((m) => ({
         month: monthLabelFr(m.month),
         monthKey: m.month,
-        value: Math.round((m.revenue / (1 + VAT_RATE)) * 100) / 100
+        value:
+          Math.round((kpiMode === "personal" ? m.revenue : m.revenue / (1 + VAT_RATE)) * 100) / 100
       })),
-    [metrics, VAT_RATE]
+    [metrics, kpiMode, VAT_RATE]
   );
 
-  /** Contreparties / clients : libellé (contrepartie Qonto) en priorité, voir `revenueCounterpartyDisplayName`. */
+  /** Encaissements perso : regroupement par sous-catégorie Bankin ; SASU : par contrepartie (libellé). */
   const revenueCounterpartyTotals = useMemo(() => {
     const map = new Map<string, number>();
     for (const tx of filteredTx) {
-      if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
-      const name = revenueCounterpartyDisplayName(tx);
-      map.set(name, (map.get(name) ?? 0) + tx.amount);
+      if (kpiMode === "personal") {
+        if (!countsTowardPersonalRevenueKpi(tx)) continue;
+        const name = bankinSubcategoryLabel(tx.category);
+        map.set(name, (map.get(name) ?? 0) + tx.amount);
+      } else {
+        if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
+        const name = revenueCounterpartyDisplayName(tx);
+        map.set(name, (map.get(name) ?? 0) + tx.amount);
+      }
     }
     return Array.from(map.entries())
       .map(([name, total]) => ({ name, total }))
       .filter((x) => x.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [filteredTx]);
+  }, [filteredTx, kpiMode]);
 
   const revenueTransactionsForCounterparty = useMemo(() => {
     if (!revenueCounterpartyDetail) return [];
     return filteredTx
-      .filter(
-        (tx) =>
+      .filter((tx) => {
+        if (kpiMode === "personal") {
+          if (!countsTowardPersonalRevenueKpi(tx)) return false;
+          return bankinSubcategoryLabel(tx.category) === revenueCounterpartyDetail;
+        }
+        return (
           isRevenueCategory(tx.category) &&
           tx.amount > 0 &&
           revenueCounterpartyDisplayName(tx) === revenueCounterpartyDetail
-      )
+        );
+      })
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  }, [filteredTx, revenueCounterpartyDetail]);
+  }, [filteredTx, revenueCounterpartyDetail, kpiMode]);
 
   const expenseTransactionsForCategory = useMemo(() => {
     if (!expenseCategoryDetail) return [];
     return filteredTx
       .filter((tx) => {
         if (tx.amount >= 0) return false;
-        if (deriveExpenseBucket(tx) !== expenseCategoryDetail) return false;
+        if (expenseDashboardGroupingLabel(tx, kpiMode) !== expenseCategoryDetail) return false;
         if (totalExpensesMonthFilter && tx.date.slice(0, 7) !== totalExpensesMonthFilter) return false;
         return true;
       })
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  }, [filteredTx, expenseCategoryDetail, totalExpensesMonthFilter]);
+  }, [filteredTx, expenseCategoryDetail, totalExpensesMonthFilter, kpiMode]);
 
   const monthlyTotalExpensesSeries = useMemo(
     () =>
@@ -415,7 +415,12 @@ export function DashboardClient({
   }, [selectedYears]);
 
   const totalExpensesCardSubtitle = useMemo(() => {
-    const base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET}`;
+    let base: string;
+    if (kpiMode === "personal") {
+      base = "Dépenses perso (import Bankin), hors virements internes";
+    } else {
+      base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET}`;
+    }
     let s: string;
     if (totalExpensesMonthFilter) {
       s = `${base} · ${monthLabelFr(totalExpensesMonthFilter)} (mois sélectionné) · ${periodLabel}`;
@@ -427,9 +432,17 @@ export function DashboardClient({
       s += ` · Filtre : ${n} catégorie${n > 1 ? "s" : ""}`;
     }
     return s;
-  }, [totalExpensesMonthFilter, periodLabel, selectedExpenseCategoryFilters]);
+  }, [totalExpensesMonthFilter, periodLabel, selectedExpenseCategoryFilters, kpiMode]);
 
   const yearOptions = useMemo(() => {
+    if (transactionYearBounds) {
+      const { minYear, maxYear } = transactionYearBounds;
+      if (Number.isFinite(minYear) && Number.isFinite(maxYear) && minYear <= maxYear) {
+        const out: number[] = [];
+        for (let y = maxYear; y >= minYear; y--) out.push(y);
+        return out;
+      }
+    }
     const ys = new Set<number>();
     for (const t of transactions) {
       const y = Number(transactionAnalyticsDayIso(t).slice(0, 4));
@@ -437,7 +450,7 @@ export function DashboardClient({
     }
     const list = Array.from(ys).sort((a, b) => b - a);
     return list.length ? list : [new Date().getFullYear()];
-  }, [transactions]);
+  }, [transactions, transactionYearBounds]);
 
   function onClickSyncQontoApi() {
     if (runtimeMode === "DEMO") {
@@ -466,6 +479,46 @@ export function DashboardClient({
     });
   }
 
+  const onBankinFileSelected = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if (!file) return;
+      if (runtimeMode === "DEMO") {
+        toast.warning("Import Bankin indisponible en mode démo.");
+        return;
+      }
+      if (!canWrite) {
+        toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
+        return;
+      }
+      const toastId = toast.loading("Import Bankin en cours…");
+      startTransition(async () => {
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const result = await importBankinPersonalXlsx(fd);
+          if (result.fileAlreadyImported) {
+            toast.info("Ce fichier a déjà été importé", { id: toastId });
+            router.refresh();
+            return;
+          }
+          toast.success("Import Bankin terminé", {
+            id: toastId,
+            description: `${result.inserted.length} nouvelle(s) · ${result.merged} mise(s) à jour · ${result.skippedInFile} doublon(s) dans le fichier`
+          });
+          router.refresh();
+        } catch (err) {
+          toast.error("Import Bankin échoué", {
+            id: toastId,
+            description: err instanceof Error ? err.message : undefined
+          });
+        }
+      });
+    },
+    [canWrite, router, runtimeMode]
+  );
+
   function toggleYearInFilter(y: number) {
     setSelectedYears((prev) => {
       const base = prev ?? [yearOptions[0] ?? new Date().getFullYear()];
@@ -491,14 +544,22 @@ export function DashboardClient({
 
   return (
     <main className="mt-6 space-y-6 sm:mt-8 sm:space-y-8">
-      <BillableDaysCalendarBlock
-        tjmHt={billableTjmEffective}
-        persistToSupabase={persistBillableToSupabase}
-        initialWorkDayIsos={initialBillableWorkDays}
-        onWorkDaysChange={onBillableWorkDaysChange}
-        treasuryTransactions={transactions}
-        treasuryScope={scope}
-      />
+      {scope === "personal" ? (
+        <PersonalMonitoringBlock
+          transactionsWindow={periodFilteredTx}
+          personalTransactionsFull={personalTransactionsFull}
+          selectedYears={selectedYears}
+        />
+      ) : (
+        <BillableDaysCalendarBlock
+          tjmHt={billableTjmEffective}
+          persistToSupabase={persistBillableToSupabase}
+          initialWorkDayIsos={initialBillableWorkDays}
+          onWorkDaysChange={onBillableWorkDaysChange}
+          treasuryTransactions={transactions}
+          treasuryScope={scope}
+        />
+      )}
 
       <section className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
@@ -511,7 +572,7 @@ export function DashboardClient({
               <button
                 type="button"
                 aria-pressed={scope === "pro"}
-                onClick={() => setScope("pro")}
+                onClick={() => router.replace("/dashboard?scope=pro", { scroll: false })}
                 className={clsx(
                   "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial",
                   scope === "pro"
@@ -525,7 +586,7 @@ export function DashboardClient({
               <button
                 type="button"
                 aria-pressed={scope === "personal"}
-                onClick={() => setScope("personal")}
+                onClick={() => router.replace("/dashboard?scope=personal", { scroll: false })}
                 className={clsx(
                   "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial",
                   scope === "personal"
@@ -600,40 +661,41 @@ export function DashboardClient({
               ) : null}
             </div>
             {canWrite ? (
-              <button
-                type="button"
-                onClick={onClickSyncQontoApi}
-                disabled={isPending}
-                className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                title="Récupère les transactions via l’API Qonto (variables QONTO_LOGIN et QONTO_SECRET_KEY côté serveur)."
-              >
-                <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                Synchroniser Qonto (API)
-              </button>
-            ) : null}
-            {canUsePowens ? (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={onClickConnectRevolutPowens}
+                  onClick={onClickSyncQontoApi}
                   disabled={isPending}
                   className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                  title="Powens Connect : variables POWENS_* côté serveur. Choisis Revolut personnel dans la webview."
-                >
-                  <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
-                  Connecter Revolut
-                </button>
-                <button
-                  type="button"
-                  onClick={onClickSyncRevolutPowens}
-                  disabled={isPending}
-                  className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                  title="Importe les transactions Revolut personnel dans le dashboard (périmètre privé)."
+                  title="Récupère les transactions via l’API Qonto (variables QONTO_LOGIN et QONTO_SECRET_KEY côté serveur)."
                 >
                   <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                  Synchroniser Revolut
+                  Synchroniser Qonto (API)
                 </button>
-              </>
+                {scope === "personal" ? (
+                  <>
+                    <input
+                      ref={bankinFileInputRef}
+                      type="file"
+                      accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      className="hidden"
+                      aria-hidden
+                      tabIndex={-1}
+                      onChange={onBankinFileSelected}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => bankinFileInputRef.current?.click()}
+                      disabled={isPending}
+                      className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
+                      title="Importe l’export « Liste des transactions » Bankin (.xls / .xlsx) dans l’onglet Privé."
+                    >
+                      <Upload className="h-4 w-4 text-ink-500" aria-hidden />
+                      Importer Bankin (.xls)
+                    </button>
+                  </>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <p className="max-w-xl text-sm leading-relaxed text-ink-500 dark:text-ink-400 lg:text-right">
@@ -652,8 +714,12 @@ export function DashboardClient({
             </CardHeader>
             <CardBody className="flex flex-1 flex-col pt-0">
               <CardValue>
-                <span data-private>{formatEur(totalRevenuesHt)}</span>
-                <span className="ml-2 align-middle text-xs font-medium text-ink-500">HT</span>
+                <span data-private>
+                  {formatEur(kpiMode === "personal" ? totalRevenues : totalRevenuesHt)}
+                </span>
+                <span className="ml-2 align-middle text-xs font-medium text-ink-500">
+                  {kpiMode === "personal" ? "TTC (perso)" : "HT"}
+                </span>
               </CardValue>
               <div className="mt-3 flex items-start gap-2.5 text-sm text-ink-500 dark:text-ink-400">
                 <span
@@ -663,81 +729,145 @@ export function DashboardClient({
                   <TrendingUp className="h-4 w-4" strokeWidth={2.2} />
                 </span>
                 <span className="leading-snug">
-                  <span className="font-medium text-ink-700 dark:text-ink-200">Chiffre d’affaires HT</span>
+                  <span className="font-medium text-ink-700 dark:text-ink-200">
+                    {kpiMode === "personal" ? "Encaissements cumulés" : "Chiffre d’affaires HT"}
+                  </span>
                   <span className="block text-xs font-normal text-ink-500 dark:text-ink-400">
-                    Équivalent TTC <span data-private>{formatEur(totalRevenues)}</span> · {periodLabel}
+                    {kpiMode === "personal" ? (
+                      <>Somme des crédits sur la période, hors virements internes Bankin · {periodLabel}</>
+                    ) : (
+                      <>
+                        Équivalent TTC <span data-private>{formatEur(totalRevenues)}</span> · {periodLabel}
+                      </>
+                    )}
                   </span>
                 </span>
               </div>
               <RevenueMiniChart
-                data={monthlyRevenueHt}
-                ariaLabel={`Évolution du chiffre d’affaires HT par mois — ${periodLabel}`}
+                data={monthlyRevenueChartSeries}
+                ariaLabel={
+                  kpiMode === "personal"
+                    ? `Évolution des encaissements TTC par mois (perso) — ${periodLabel}`
+                    : `Évolution du chiffre d’affaires HT par mois — ${periodLabel}`
+                }
               />
-              <div
-                className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
-                aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}
-              >
-                <div className="flex items-start gap-2.5">
-                  <span
-                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
-                    aria-hidden
-                  >
-                    <CalendarClock className="h-4 w-4" strokeWidth={2} />
-                  </span>
-                  <div className="min-w-0 flex-1 space-y-1.5 text-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
-                      Projection fin {revenueYearProjection.calendarYear}
-                    </p>
-                    <p className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100" data-private>
-                      {formatEur(revenueYearProjection.projectedYearEndHt)}{" "}
-                      <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">HT</span>
-                    </p>
-                    <p className="text-xs text-emerald-900/75 dark:text-emerald-300/80" data-private>
-                      Équivalent TTC estimé{" "}
-                      <span className="font-medium">{formatEur(revenueYearProjection.projectedYearEndTtc)}</span>
-                    </p>
-                    <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
-                      Réalisé YTD HT :{" "}
-                      <span className="font-medium text-emerald-950 dark:text-emerald-200">{formatEur(revenueYearProjection.ytdHt)}</span>
-                      <span className="text-emerald-800/80 dark:text-emerald-400/80">
-                        {" "}
-                        ·{" "}
+              {kpiMode === "personal" ? (
+                <div
+                  className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
+                  aria-label={`Projection encaissements perso fin ${revenueYearProjection.calendarYear}`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      aria-hidden
+                    >
+                      <CalendarClock className="h-4 w-4" strokeWidth={2} />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
+                        Projection fin {revenueYearProjection.calendarYear}
+                      </p>
+                      <p
+                        className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
+                        data-private
+                      >
+                        {formatEur(revenueYearProjection.projectedYearEndTtc)}{" "}
+                        <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">TTC</span>
+                      </p>
+                      <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
+                        Réalisé depuis le 1er janv. :{" "}
+                        <span className="font-medium text-emerald-950 dark:text-emerald-200">
+                          {formatEur(revenueYearProjection.ytdTtc)}
+                        </span>
+                        <span className="text-emerald-800/80 dark:text-emerald-400/80">
+                          {" "}
+                          · jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
+                          {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                        </span>
+                      </p>
+                      <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
+                        Encaissements cumulés (hors virements internes Bankin), extrapolation linéaire au prorata
+                        calendaire. Indépendant de la fenêtre graphique ci-dessus.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
+                  aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      aria-hidden
+                    >
+                      <CalendarClock className="h-4 w-4" strokeWidth={2} />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
+                        Projection fin {revenueYearProjection.calendarYear}
+                      </p>
+                      <p
+                        className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
+                        data-private
+                      >
+                        {formatEur(revenueYearProjection.projectedYearEndHt)}{" "}
+                        <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">HT</span>
+                      </p>
+                      <p className="text-xs text-emerald-900/75 dark:text-emerald-300/80" data-private>
+                        Équivalent TTC estimé{" "}
+                        <span className="font-medium">{formatEur(revenueYearProjection.projectedYearEndTtc)}</span>
+                      </p>
+                      <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
+                        Réalisé YTD HT :{" "}
+                        <span className="font-medium text-emerald-950 dark:text-emerald-200">
+                          {formatEur(revenueYearProjection.ytdHt)}
+                        </span>
+                        <span className="text-emerald-800/80 dark:text-emerald-400/80">
+                          {" "}
+                          ·{" "}
+                          {revenueYearProjection.projectionBasis === "workdays" ? (
+                            <>
+                              {revenueYearProjection.capacityDaysElapsed} /{" "}
+                              {revenueYearProjection.capacityDaysTotal} jours prévus (
+                              {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % écoulés)
+                            </>
+                          ) : (
+                            <>
+                              jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
+                              {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                            </>
+                          )}
+                        </span>
+                      </p>
+                      <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
                         {revenueYearProjection.projectionBasis === "workdays" ? (
                           <>
-                            {revenueYearProjection.capacityDaysElapsed} /{" "}
-                            {revenueYearProjection.capacityDaysTotal} jours prévus (
-                            {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % écoulés)
+                            Extrapolation au prorata des{" "}
+                            <span className="font-medium text-emerald-900 dark:text-emerald-300">
+                              jours ouvrés (lun–ven, fériés FR exclus) et de vos coches calendrier
+                            </span>{" "}
+                            sur {revenueYearProjection.calendarYear}, et non sur 365 jours civils. Périmètre :{" "}
+                            <span className="font-medium text-emerald-900 dark:text-emerald-300">
+                              {scope === "pro" ? "SASU" : "Privé"}
+                            </span>
+                            , hors fenêtre graphique.
                           </>
                         ) : (
                           <>
-                            jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
-                            {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                            Extrapolation au prorata calendaire (CA réalisé ÷ part d’année écoulée). Périmètre :{" "}
+                            <span className="font-medium text-emerald-900">
+                              {scope === "pro" ? "SASU" : "Privé"}
+                            </span>
+                            , indépendamment de la fenêtre graphique ci-dessus.
                           </>
                         )}
-                      </span>
-                    </p>
-                    <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
-                      {revenueYearProjection.projectionBasis === "workdays" ? (
-                        <>
-                          Extrapolation au prorata des{" "}
-                          <span className="font-medium text-emerald-900 dark:text-emerald-300">
-                            jours ouvrés (lun–ven, fériés FR exclus) et de vos coches calendrier
-                          </span>{" "}
-                          sur {revenueYearProjection.calendarYear}, et non sur 365 jours civils. Périmètre :{" "}
-                          <span className="font-medium text-emerald-900 dark:text-emerald-300">{scope === "pro" ? "SASU" : "Privé"}</span>
-                          , hors fenêtre graphique.
-                        </>
-                      ) : (
-                        <>
-                          Extrapolation au prorata calendaire (CA réalisé ÷ part d’année écoulée). Périmètre :{" "}
-                          <span className="font-medium text-emerald-900">{scope === "pro" ? "SASU" : "Privé"}</span>
-                          , indépendamment de la fenêtre graphique ci-dessus.
-                        </>
-                      )}
-                    </p>
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               <div
                 className="mt-3 flex min-h-0 flex-1 flex-col space-y-2 border-t border-ink-200 pt-3 dark:border-ink-800"
                 data-private
@@ -745,22 +875,31 @@ export function DashboardClient({
                 {revenueCounterpartyTotals.length ? (
                   <>
                     <p className="text-[10px] font-medium uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                      Contreparties / clients · HT
+                      {kpiMode === "personal"
+                        ? "Sous-catégories Bankin · TTC"
+                        : "Contreparties / clients · HT"}
                     </p>
                     <p className="text-[10px] leading-snug text-ink-500 dark:text-ink-400">
-                      Cliquez une ligne pour afficher les encaissements de cette contrepartie.
+                      {kpiMode === "personal"
+                        ? "Cliquez une ligne pour afficher les encaissements de cette sous-catégorie."
+                        : "Cliquez une ligne pour afficher les encaissements de cette contrepartie."}
                     </p>
                     <ul
                       className="max-h-36 space-y-1 overflow-y-auto pr-0.5 text-xs"
-                      aria-label="Montants encaissés par contrepartie"
+                      aria-label={
+                        kpiMode === "personal"
+                          ? "Montants encaissés par sous-catégorie Bankin"
+                          : "Montants encaissés par contrepartie"
+                      }
                     >
                       {revenueCounterpartyTotals.map(({ name, total }) => {
                         const totalHt = total / (1 + VAT_RATE);
+                        const displayAmount = kpiMode === "personal" ? total : totalHt;
+                        const denom = kpiMode === "personal" ? totalRevenues : totalRevenuesHt;
                         const pct =
-                          totalRevenuesHt > 0
-                            ? Math.min(100, Math.round((totalHt / totalRevenuesHt) * 100))
-                            : 0;
-                        const showBillableDays = isCounterpartyBillableDaysAtTjm(name);
+                          denom > 0 ? Math.min(100, Math.round((displayAmount / denom) * 100)) : 0;
+                        const showBillableDays =
+                          kpiMode !== "personal" && isCounterpartyBillableDaysAtTjm(name);
                         const htForClient = totalHt;
                         const workedDays = showBillableDays ? htForClient / BILLABLE_CLIENT_TJM_HT : 0;
                         const open = revenueCounterpartyDetail === name;
@@ -803,7 +942,7 @@ export function DashboardClient({
                               </span>
                               <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                                 <span className="font-medium text-emerald-800 dark:text-emerald-300">
-                                  {formatEur(totalHt)}
+                                  {formatEur(displayAmount)}
                                 </span>
                                 <span className="w-8 text-right text-[10px] text-ink-400 dark:text-ink-500">
                                   {pct}%
@@ -818,7 +957,8 @@ export function DashboardClient({
                       <div className="mt-2 rounded-lg border border-emerald-200/70 bg-white px-2 py-2 shadow-sm dark:border-emerald-800/60 dark:bg-ink-900 dark:shadow-none">
                         <div className="mb-1.5 flex items-start justify-between gap-2">
                           <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-900/80 dark:text-emerald-200/90">
-                            Encaissements · {revenueCounterpartyDetail}
+                            {kpiMode === "personal" ? "Sous-catégorie" : "Encaissements"} ·{" "}
+                            {revenueCounterpartyDetail}
                           </p>
                           <button
                             type="button"
@@ -850,7 +990,11 @@ export function DashboardClient({
                                   </span>
                                   <span className="flex shrink-0 flex-col items-end tabular-nums">
                                     <span className="font-medium text-emerald-800">{formatEur(tx.amount)}</span>
-                                    <span className="text-[10px] text-ink-400">TTC · {formatEur(ht)} HT</span>
+                                    {kpiMode === "personal" ? (
+                                      <span className="text-[10px] text-ink-400">TTC</span>
+                                    ) : (
+                                      <span className="text-[10px] text-ink-400">TTC · {formatEur(ht)} HT</span>
+                                    )}
                                   </span>
                                 </li>
                               );
@@ -864,7 +1008,9 @@ export function DashboardClient({
                   </>
                 ) : (
                   <p className="text-xs text-ink-500 dark:text-ink-400">
-                    Aucun encaissement « Chiffre d’affaires » sur cette période.
+                    {kpiMode === "personal"
+                      ? "Aucun encaissement (hors virements internes) sur cette période."
+                      : "Aucun encaissement « Chiffre d’affaires » sur cette période."}
                   </p>
                 )}
               </div>
@@ -949,7 +1095,11 @@ export function DashboardClient({
                 onMonthClick={(monthKey) =>
                   setTotalExpensesMonthFilter((prev) => (prev === monthKey ? null : monthKey))
                 }
-                ariaLabel={`Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique applique le même filtre que la liste déroulante.`}
+                ariaLabel={
+                  kpiMode === "personal"
+                    ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique applique le même filtre que la liste déroulante.`
+                    : `Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique applique le même filtre que la liste déroulante.`
+                }
               />
               <div
                 className="mt-4 flex min-h-0 flex-1 flex-col space-y-2 border-t border-ink-200 pt-4 dark:border-ink-800"
@@ -957,16 +1107,31 @@ export function DashboardClient({
               >
                 <div className="rounded-xl border border-rose-100/90 bg-rose-50/40 px-2.5 py-2.5 dark:border-rose-900/40 dark:bg-rose-950/25">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-900/75 dark:text-rose-200/90">
-                    Catégories (dépenses) · filtre
+                    {kpiMode === "personal"
+                      ? "Sous-catégories (dépenses) · filtre"
+                      : "Catégories (dépenses) · filtre"}
                   </p>
                   <p className="mt-1 text-[10px] leading-snug text-ink-600 dark:text-ink-400">
-                    Sélectionnez une ou plusieurs catégories pour restreindre les dépenses ci-dessous (totaux et
-                    graphique). Le CA du dashboard reste inchangé.
+                    {kpiMode === "personal" ? (
+                      <>
+                        Sélectionnez une ou plusieurs sous-catégories Bankin pour restreindre les dépenses ci-dessous
+                        (totaux et graphique). Les encaissements du bloc revenus restent inchangés.
+                      </>
+                    ) : (
+                      <>
+                        Sélectionnez une ou plusieurs catégories pour restreindre les dépenses ci-dessous (totaux et
+                        graphique). Le CA du dashboard reste inchangé.
+                      </>
+                    )}
                   </p>
                   <div
                     className="mt-2 flex max-h-36 flex-wrap items-center gap-2 overflow-y-auto pr-0.5"
                     role="group"
-                    aria-label="Filtrer les dépenses par catégorie dérivée"
+                    aria-label={
+                      kpiMode === "personal"
+                        ? "Filtrer les dépenses par sous-catégorie Bankin"
+                        : "Filtrer les dépenses par catégorie dérivée"
+                    }
                   >
                     {selectedExpenseCategoryFilters.length ? (
                       <button
@@ -1007,7 +1172,9 @@ export function DashboardClient({
                         : `Top ${TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES} catégories · total période et moy. / mois (période écoulée)`}
                     </p>
                     <p className="text-[10px] leading-snug text-ink-500 dark:text-ink-400">
-                      Les {TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES} buckets les plus élevés pour la vue en cours.
+                      Les {TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES}{" "}
+                      {kpiMode === "personal" ? "catégories Bankin les plus élevées" : "buckets les plus élevés"}{" "}
+                      pour la vue en cours.
                       Cliquez une ligne pour afficher les opérations (même logique que la répartition).
                     </p>
                     <ul
@@ -1019,6 +1186,7 @@ export function DashboardClient({
                           totalExpensesCard > 0 ? Math.min(100, Math.round((total / totalExpensesCard) * 100)) : 0;
                         const color = expenseCategoryColor(name);
                         const CatIcon = categoryGlyph(name);
+                        const expenseBrandLogo = counterpartyLogoHref(name, 64);
                         const avgMonthly =
                           monthsElapsedInDashboardPeriod > 0
                             ? total / monthsElapsedInDashboardPeriod
@@ -1051,11 +1219,19 @@ export function DashboardClient({
                                   aria-hidden
                                 />
                                 <span
-                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border bg-white text-ink-700 shadow-sm dark:bg-ink-900"
-                                  style={{ borderColor: color, color }}
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white text-ink-700 shadow-sm dark:bg-ink-900"
+                                  style={{ borderColor: color, color: expenseBrandLogo ? undefined : color }}
                                   aria-hidden
                                 >
-                                  <CatIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                                  {expenseBrandLogo ? (
+                                    <CounterpartyLogo
+                                      name={name}
+                                      size={20}
+                                      className="border-0 bg-transparent shadow-none"
+                                    />
+                                  ) : (
+                                    <CatIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                                  )}
                                 </span>
                                 <span className="truncate text-sm font-medium text-ink-800 dark:text-ink-100">
                                   {name}

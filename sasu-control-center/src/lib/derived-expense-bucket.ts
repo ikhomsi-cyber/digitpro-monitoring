@@ -184,7 +184,9 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
 
   const mapped = mapExpenseCategoryLabel(tx.category);
   const mk = fold(mapped);
-  if (mapped === "NDF" || mk.includes("note de frais") || mk === "ndf") return "NDF";
+  if (mapped === "NDF DigitPro" || mapped === "NDF" || mk.includes("note de frais") || mk === "ndf") {
+    return "NDF";
+  }
   if (mk === "bnc" || mapped === "BNC") return "BNC";
   if (mk === "tva" || mapped === "TVA") return "TVA";
   if (

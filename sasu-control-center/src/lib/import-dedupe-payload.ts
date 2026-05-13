@@ -2,7 +2,7 @@ export type ImportDedupeInput = {
   date: string;
   label: string;
   amount: number;
-  /** Suffixe stable (ex. id Powens) pour éviter les collisions inter-sources. */
+  /** Suffixe stable (ex. id transaction) pour éviter les collisions inter-sources. */
   dedupeKey?: string;
 };
 
