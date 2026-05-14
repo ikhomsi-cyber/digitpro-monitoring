@@ -15,7 +15,8 @@ import {
 import { Scale } from "lucide-react";
 import { clsx } from "clsx";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { maskMoneyAmount } from "@/lib/dummy-display-numbers";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
 import {
   computeDashboardMonthlyMetrics,
@@ -90,6 +91,7 @@ function PersonalFlowTooltip({
   label?: string;
 }) {
   const isDark = useRootIsDark();
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   return (
     <div
@@ -105,7 +107,7 @@ function PersonalFlowTooltip({
         {payload.map((p) => (
           <li key={String(p.name)} className="flex justify-between gap-4">
             <span className="text-ink-500 dark:text-ink-400">{p.name}</span>
-            <span>{formatEur(typeof p.value === "number" ? p.value : 0)}</span>
+            <span>{fmt.euro(typeof p.value === "number" ? p.value : 0)}</span>
           </li>
         ))}
       </ul>
@@ -113,34 +115,42 @@ function PersonalFlowTooltip({
   );
 }
 
-function buildNarrative(params: {
-  monthRev: number;
-  monthExp: number;
-  avgHistExp: number | null;
-  histMonthCount: number;
-}): string {
+function buildNarrative(
+  params: {
+    monthRev: number;
+    monthExp: number;
+    avgHistExp: number | null;
+    histMonthCount: number;
+  },
+  fmt: {
+    euro: (n: number) => string;
+    int: (n: number) => number;
+    percent0to100: (n: number) => number;
+  }
+): string {
   const { monthRev, monthExp, avgHistExp, histMonthCount } = params;
   const net = monthRev - monthExp;
   const sentences: string[] = [];
 
   if (histMonthCount >= 2 && avgHistExp != null && avgHistExp > 0) {
     const deltaPct = ((monthExp - avgHistExp) / avgHistExp) * 100;
+    const nDisp = fmt.int(histMonthCount);
     if (deltaPct >= 5) {
       sentences.push(
-        `Les sorties du mois en cours dépassent d’environ ${Math.round(deltaPct)} % la moyenne des ${histMonthCount} mois civils précédents (${formatEur(avgHistExp)} / mois en moyenne).`
+        `Les sorties du mois en cours dépassent d’environ ${fmt.percent0to100(Math.min(100, Math.round(deltaPct)))} % la moyenne des ${nDisp} mois civils précédents (${fmt.euro(avgHistExp)} / mois en moyenne).`
       );
     } else if (deltaPct <= -5) {
       sentences.push(
-        `Les sorties du mois en cours restent d’environ ${Math.round(-deltaPct)} % sous la moyenne des ${histMonthCount} mois précédents (${formatEur(avgHistExp)} / mois).`
+        `Les sorties du mois en cours restent d’environ ${fmt.percent0to100(Math.min(100, Math.round(-deltaPct)))} % sous la moyenne des ${nDisp} mois précédents (${fmt.euro(avgHistExp)} / mois).`
       );
     } else {
       sentences.push(
-        `Les sorties du mois sont proches de votre moyenne récente (${formatEur(avgHistExp)} sur ${histMonthCount} mois).`
+        `Les sorties du mois sont proches de votre moyenne récente (${fmt.euro(avgHistExp)} sur ${nDisp} mois).`
       );
     }
   } else if (histMonthCount === 1 && avgHistExp != null) {
     sentences.push(
-      `Avec un seul mois d’historique complet avant le mois en cours (${formatEur(avgHistExp)}), la comparaison sera plus fiable au fil des mois.`
+      `Avec un seul mois d’historique complet avant le mois en cours (${fmt.euro(avgHistExp)}), la comparaison sera plus fiable au fil des mois.`
     );
   } else {
     sentences.push(
@@ -149,10 +159,10 @@ function buildNarrative(params: {
   }
 
   if (net >= 0) {
-    sentences.push(`Flux net du mois (entrées − sorties) : +${formatEur(net)}.`);
+    sentences.push(`Flux net du mois (entrées − sorties) : +${fmt.euro(net)}.`);
   } else {
     sentences.push(
-      `Flux net du mois (entrées − sorties) : ${formatEur(net)} — les sorties dépassent les entrées sur la période.`
+      `Flux net du mois (entrées − sorties) : ${fmt.euro(net)} — les sorties dépassent les entrées sur la période.`
     );
   }
 
@@ -170,6 +180,7 @@ export function PersonalMonitoringBlock({
   personalTransactionsFull: DashboardTx[];
   selectedYears: number[] | null;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const monthKeyNow = dashboardMonthKeyNowLocal();
   const calendarYear = Number(monthKeyNow.slice(0, 4));
   const todayLabel = localYmd(new Date());
@@ -215,13 +226,16 @@ export function PersonalMonitoringBlock({
 
   const narrative = useMemo(
     () =>
-      buildNarrative({
-        monthRev: monthNowTotals.revenue,
-        monthExp: monthNowTotals.expenses,
-        avgHistExp: historicalStats.avgExp,
-        histMonthCount: historicalStats.n
-      }),
-    [monthNowTotals, historicalStats]
+      buildNarrative(
+        {
+          monthRev: monthNowTotals.revenue,
+          monthExp: monthNowTotals.expenses,
+          avgHistExp: historicalStats.avgExp,
+          histMonthCount: historicalStats.n
+        },
+        fmt
+      ),
+    [monthNowTotals, historicalStats, fmt]
   );
 
   const chartData = useMemo(
@@ -280,7 +294,7 @@ export function PersonalMonitoringBlock({
                   Entrées
                 </p>
                 <p className="mt-1 font-display text-sm font-bold tabular-nums text-emerald-900 dark:text-emerald-200">
-                  {formatEur(monthNowTotals.revenue)}
+                  {fmt.euro(monthNowTotals.revenue)}
                 </p>
               </div>
               <div className="rounded-xl border border-rose-200/70 bg-rose-50/50 px-2.5 py-2 dark:border-rose-900/50 dark:bg-rose-950/30">
@@ -288,7 +302,7 @@ export function PersonalMonitoringBlock({
                   Sorties
                 </p>
                 <p className="mt-1 font-display text-sm font-bold tabular-nums text-rose-900 dark:text-rose-200">
-                  {formatEur(monthNowTotals.expenses)}
+                  {fmt.euro(monthNowTotals.expenses)}
                 </p>
               </div>
               <div
@@ -311,7 +325,7 @@ export function PersonalMonitoringBlock({
                   )}
                 >
                   {monthNet >= 0 ? "+" : ""}
-                  {formatEur(monthNet)}
+                  {fmt.euro(monthNet)}
                 </p>
               </div>
             </div>
@@ -327,7 +341,7 @@ export function PersonalMonitoringBlock({
                   Entrées YTD
                 </p>
                 <p className="mt-1 font-display text-sm font-bold tabular-nums text-emerald-900 dark:text-emerald-200">
-                  {formatEur(ytdTotals.revenue)}
+                  {fmt.euro(ytdTotals.revenue)}
                 </p>
               </div>
               <div className="rounded-xl border border-rose-200/70 bg-rose-50/40 px-2.5 py-2 dark:border-rose-900/45 dark:bg-rose-950/25">
@@ -335,7 +349,7 @@ export function PersonalMonitoringBlock({
                   Sorties YTD
                 </p>
                 <p className="mt-1 font-display text-sm font-bold tabular-nums text-rose-900 dark:text-rose-200">
-                  {formatEur(ytdTotals.expenses)}
+                  {fmt.euro(ytdTotals.expenses)}
                 </p>
               </div>
               <div
@@ -356,7 +370,7 @@ export function PersonalMonitoringBlock({
                   )}
                 >
                   {ytdNet >= 0 ? "+" : ""}
-                  {formatEur(ytdNet)}
+                  {fmt.euro(ytdNet)}
                 </p>
               </div>
             </div>
@@ -385,7 +399,9 @@ export function PersonalMonitoringBlock({
                   <YAxis
                     tick={{ fill: tickFill, fontSize: 10 }}
                     width={40}
-                    tickFormatter={formatCompactAxisEur}
+                    tickFormatter={(v) =>
+                      formatCompactAxisEur(typeof v === "number" && fmt.dummy ? maskMoneyAmount(v) : Number(v))
+                    }
                   />
                   <Tooltip
                     content={<PersonalFlowTooltip />}
@@ -420,7 +436,7 @@ export function PersonalMonitoringBlock({
           <p className="mt-2 text-[13px]">{narrative}</p>
           {historicalStats.avgRev != null && historicalStats.n > 0 ? (
             <p className="mt-2 text-[12px] text-ink-500 dark:text-ink-400">
-              Moyenne des entrées sur les {historicalStats.n} mois précédents : {formatEur(historicalStats.avgRev)}{" "}
+              Moyenne des entrées sur les {fmt.int(historicalStats.n)} mois précédents : {fmt.euro(historicalStats.avgRev)}{" "}
               / mois (indicatif, même fenêtre que le graphique).
             </p>
           ) : null}

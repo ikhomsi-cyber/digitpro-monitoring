@@ -7,6 +7,7 @@ import {
   DASHBOARD_DEMO_COOKIE,
   getDashboardEffectiveDataMode
 } from "@/lib/dashboard-demo-preference";
+import { DASHBOARD_DUMMY_DATA_COOKIE } from "@/lib/dashboard-dummy-data-preference";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
 import {
   computeMetricsFromTransactions,
@@ -17,6 +18,23 @@ import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
+import {
+  isPowensCloudConfigured,
+  powensCloudCreateUser,
+  powensCloudFetchTransactions,
+  type PowensImportRow
+} from "@/lib/powens/cloud-api";
+import {
+  buildPowensConnectWebviewUrl,
+  powensFetchTemporaryConnectCode,
+  powensWebviewDomainHostname
+} from "@/lib/powens/webview-connect";
+import {
+  powensAccountFilterForAxis,
+  powensDefaultCompanyLabel,
+  powensPrimaryImportAxis,
+  type PowensImportAxis
+} from "@/lib/powens/config";
 import { createHash } from "crypto";
 type ImportTx = {
   date: string;
@@ -29,6 +47,19 @@ type ImportTx = {
   /** Clé optionnelle pour le content_hash (ex. id transaction import). */
   dedupeKey?: string;
 };
+
+function mapPowensRowsToImportTx(rows: PowensImportRow[]): ImportTx[] {
+  return rows.map((r) => ({
+    date: r.date,
+    label: r.label,
+    category: r.category,
+    amount: r.amount,
+    balance: r.balance ?? undefined,
+    company: r.company,
+    scope: r.scope,
+    dedupeKey: r.dedupeKey
+  }));
+}
 
 type SupabaseServer = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
@@ -75,6 +106,26 @@ export async function setDashboardDemoMode(enabled: boolean) {
     });
   } else {
     cookieStore.delete(DASHBOARD_DEMO_COOKIE);
+  }
+
+  revalidatePath("/dashboard");
+}
+
+export async function setDashboardDummyDataMode(enabled: boolean) {
+  const cookieStore = await cookies();
+  const envMode = getSupabaseRuntimeMode();
+  if (envMode !== "SUPABASE") return;
+
+  if (enabled) {
+    cookieStore.set(DASHBOARD_DUMMY_DATA_COOKIE, "1", {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true
+    });
+  } else {
+    cookieStore.delete(DASHBOARD_DUMMY_DATA_COOKIE);
   }
 
   revalidatePath("/dashboard");
@@ -227,7 +278,7 @@ export async function createTransaction(formData: FormData) {
 
 export async function importTransactions(
   transactions: ImportTx[],
-  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin"; fileHash: string | null }
+  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin" | "powens"; fileHash: string | null }
 ): Promise<{
   inserted: Array<{
     id: string;
@@ -298,7 +349,7 @@ export async function importTransactions(
 
   type SessionInsertBase = {
     source_filename: string | null;
-    format: "qonto" | "generic" | "bankin";
+    format: "qonto" | "generic" | "bankin" | "powens";
     row_count: number;
     inserted_count: number;
     skipped_duplicate_count: number;
@@ -510,6 +561,246 @@ export async function syncQontoTransactionsFromApi(): Promise<{
     totalFromApi: rows.length,
     bankAccountSummary
   };
+}
+
+/**
+ * Crée ou réutilise l’utilisateur Powens (Budget Insight : POST /auth/init uniquement si aucune ligne
+ * `powens_users` ; sinon réutilise `powens_user_id` + `auth_token`) et met à jour Supabase si création.
+ */
+export async function preparePowensConnectSession(): Promise<{ userId: string; token: string }> {
+  await assertSupabaseWritesEnabled();
+  if (!isPowensCloudConfigured()) {
+    throw new Error(
+      "Powens non configuré : POWENS_DOMAIN (ou POWENS_API_BASE_URL) et POWENS_CLIENT_ID + POWENS_CLIENT_SECRET (Budget Insight), ou POWENS_PLATFORM_BEARER_TOKEN + email (flux legacy). Voir .env.example."
+    );
+  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const usesBiapiInit =
+    Boolean(process.env.POWENS_CLIENT_ID?.trim()) && Boolean(process.env.POWENS_CLIENT_SECRET?.trim());
+  const email = (user.email ?? "").trim();
+  if (!usesBiapiInit && !email) {
+    throw new Error("Votre compte Supabase n’a pas d’email : requis pour le flux Powens POST /users (hors Budget Insight /auth/init).");
+  }
+
+  const existingRes = await supabase
+    .from("powens_users")
+    .select("powens_user_id, auth_token")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingRes.error) {
+    const msg = existingRes.error.message ?? "";
+    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  const existingRow = existingRes.data as { powens_user_id?: unknown; auth_token?: unknown } | null;
+  const existingUserId = existingRow?.powens_user_id != null ? String(existingRow.powens_user_id).trim() : "";
+  const existingToken =
+    typeof existingRow?.auth_token === "string" ? existingRow.auth_token.trim() : "";
+  if (existingUserId && existingToken) {
+    return { userId: existingUserId, token: existingToken };
+  }
+
+  const { userId, userToken } = await powensCloudCreateUser(email);
+
+  const upsert = await supabase.from("powens_users").upsert(
+    {
+      user_id: user.id,
+      powens_user_id: userId,
+      auth_token: userToken
+    },
+    { onConflict: "user_id" }
+  );
+
+  if (upsert.error) {
+    const msg = upsert.error.message ?? "";
+    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  return { userId, token: userToken };
+}
+
+/**
+ * URL de la webview Powens (`https://webview.powens.com/connect?…`) à ouvrir après
+ * `preparePowensConnectSession`. Exige POWENS_REDIRECT_URI autorisée dans la console Powens.
+ */
+export async function getPowensWebviewConnectUrl(): Promise<{ url: string }> {
+  await assertSupabaseWritesEnabled();
+  if (!isPowensCloudConfigured()) {
+    throw new Error(
+      "Powens non configuré : POWENS_DOMAIN + CLIENT_ID + CLIENT_SECRET (ou token plateforme). Voir .env.example."
+    );
+  }
+  const clientId = process.env.POWENS_CLIENT_ID?.trim();
+  const redirectUri = process.env.POWENS_REDIRECT_URI?.trim();
+  if (!clientId || !redirectUri) {
+    throw new Error(
+      "Webview Powens : définissez POWENS_CLIENT_ID et POWENS_REDIRECT_URI (URL exacte autorisée dans la console Powens, ex. http://localhost:3000/api/powens/callback)."
+    );
+  }
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const rowRes = await supabase
+    .from("powens_users")
+    .select("auth_token")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (rowRes.error) {
+    const msg = rowRes.error.message ?? "";
+    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  const token = (rowRes.data as { auth_token?: string } | null)?.auth_token?.trim();
+  if (!token) {
+    throw new Error(
+      "Aucun token Powens enregistré : utilisez d’abord « Connecter Powens » (création utilisateur)."
+    );
+  }
+
+  const temporaryCode = await powensFetchTemporaryConnectCode(token);
+  const domainHostname = powensWebviewDomainHostname();
+  const webviewLang = process.env.POWENS_WEBVIEW_LANG?.trim().toLowerCase();
+  const url = buildPowensConnectWebviewUrl({
+    domainHostname,
+    clientId,
+    redirectUri,
+    temporaryCode,
+    lang: webviewLang || undefined
+  });
+  return { url };
+}
+
+/**
+ * Récupère les transactions Powens puis importe (`format: powens`) pour l’axe demandé (SASU ou perso).
+ */
+async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promise<{
+  inserted: number;
+  merged: number;
+  skippedInFile: number;
+  totalFromApi: number;
+  summary: string;
+}> {
+  await assertSupabaseWritesEnabled();
+  if (!isPowensCloudConfigured()) {
+    throw new Error(
+      "Powens non configuré : POWENS_DOMAIN + CLIENT_ID + CLIENT_SECRET (ou token plateforme). Utilisez d’abord « Connecter Powens »."
+    );
+  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const rowRes = await supabase
+    .from("powens_users")
+    .select("auth_token, powens_user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (rowRes.error) {
+    const msg = rowRes.error.message ?? "";
+    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  const token = (rowRes.data as { auth_token?: string; powens_user_id?: unknown } | null)?.auth_token?.trim();
+  if (!token) {
+    throw new Error("Aucun token Powens enregistré : utilisez d’abord « Connecter Powens » (création utilisateur + liaison bancaire).");
+  }
+
+  const powensUserIdRaw = (rowRes.data as { powens_user_id?: unknown } | null)?.powens_user_id;
+  const powensUserId =
+    powensUserIdRaw != null && String(powensUserIdRaw).trim() !== ""
+      ? String(powensUserIdRaw).trim()
+      : null;
+
+  const scope = axis;
+  const company = powensDefaultCompanyLabel(axis);
+  const filterAccountIds = powensAccountFilterForAxis(axis);
+
+  const rows = await powensCloudFetchTransactions(token, {
+    company,
+    scope,
+    powensUserId,
+    filterAccountIds
+  });
+  const txs = mapPowensRowsToImportTx(rows);
+
+  const axisLabel = axis === "personal" ? "perso" : "SASU";
+  const result = await importTransactions(txs, {
+    sourceFilename: `Powens API (${axisLabel}) · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
+    format: "powens",
+    fileHash: null
+  });
+
+  return {
+    inserted: result.inserted.length,
+    merged: result.merged,
+    skippedInFile: result.skippedInFile,
+    totalFromApi: txs.length,
+    summary: `${company} · ${axisLabel}`
+  };
+}
+
+/**
+ * Synchro Powens selon `POWENS_IMPORT_SCOPE` (**personal** par défaut ; `pro` uniquement si la variable vaut `pro`) et les labels / filtres d’axe correspondants.
+ */
+export async function syncPowensCloudTransactions(): Promise<{
+  inserted: number;
+  merged: number;
+  skippedInFile: number;
+  totalFromApi: number;
+  summary: string;
+}> {
+  return syncPowensCloudTransactionsForAxis(powensPrimaryImportAxis());
+}
+
+/**
+ * Import explicite en **perso** (`scope: personal`), même si le bouton principal est en SASU.
+ * Activez via `POWENS_SYNC_PERSONAL` ou `POWENS_PERSONAL_COMPANY_LABEL` (+ bouton dashboard).
+ */
+export async function syncPowensCloudTransactionsPersonal(): Promise<{
+  inserted: number;
+  merged: number;
+  skippedInFile: number;
+  totalFromApi: number;
+  summary: string;
+}> {
+  return syncPowensCloudTransactionsForAxis("personal");
 }
 
 /**

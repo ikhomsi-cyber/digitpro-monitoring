@@ -24,6 +24,7 @@ import {
   CalendarRange,
   ChevronDown,
   CloudDownload,
+  Landmark,
   Receipt,
   TrendingDown,
   TrendingUp,
@@ -38,7 +39,7 @@ import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { Chatbot } from "@/components/Chatbot";
 import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { categoryGlyph } from "@/lib/category-glyph";
 import { counterpartyLogoHref } from "@/lib/counterparty-logo";
 import {
@@ -64,7 +65,15 @@ import {
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
-import { syncQontoTransactionsFromApi, importBankinPersonalXlsx } from "./actions";
+import {
+  syncQontoTransactionsFromApi,
+  importBankinPersonalXlsx,
+  preparePowensConnectSession,
+  getPowensWebviewConnectUrl,
+  syncPowensCloudTransactions,
+  syncPowensCloudTransactionsPersonal
+} from "./actions";
+import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
 export type { DashboardTx };
@@ -228,6 +237,9 @@ function dashboardMonthKeyNowLocal(): string {
 export function DashboardClient({
   runtimeMode,
   canWrite,
+  powensCloudEnabled,
+  powensPersonalSyncEnabled,
+  powensPrimaryImportAxis,
   syncKey,
   initialTransactions,
   transactionYearBounds,
@@ -237,6 +249,12 @@ export function DashboardClient({
 }: {
   runtimeMode: SupabaseRuntimeMode;
   canWrite: boolean;
+  /** Variables serveur Powens (API cloud) présentes : affiche connect + sync. */
+  powensCloudEnabled: boolean;
+  /** Second import perso (double synchro SASU + perso). */
+  powensPersonalSyncEnabled: boolean;
+  /** Axe du bouton principal (`POWENS_IMPORT_SCOPE`). */
+  powensPrimaryImportAxis: "pro" | "personal";
   syncKey: string;
   initialTransactions: DashboardTx[];
   /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
@@ -321,7 +339,46 @@ export function DashboardClient({
     }
   }, [pathname, searchParams]);
 
+  /** Retour webview Powens : query après redirection depuis /api/powens/callback */
+  useEffect(() => {
+    if (!pathname.startsWith("/dashboard")) return;
+    const connect = searchParams.get("powens_connect");
+    if (!connect) return;
+
+    if (connect === "ok") {
+      const cid = searchParams.get("powens_connection_id");
+      toast.success("Powens — liaison terminée", {
+        description: cid
+          ? `Connexion ${cid}. Vous pouvez lancer la synchronisation des transactions.`
+          : "Vous pouvez lancer la synchronisation des transactions."
+      });
+    } else {
+      const code = searchParams.get("powens_error") ?? "erreur";
+      const desc = searchParams.get("powens_error_description");
+      toast.error("Powens — échec après la webview", {
+        description:
+          desc && desc !== code
+            ? `${code}${desc ? ` — ${desc}` : ""}`
+            : code,
+        duration: 14_000
+      });
+    }
+
+    const next = new URLSearchParams(searchParams.toString());
+    for (const k of [
+      "powens_connect",
+      "powens_connection_id",
+      "powens_error",
+      "powens_error_description"
+    ]) {
+      next.delete(k);
+    }
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
   const [isPending, startTransition] = useTransition();
+  const fmt = useDashboardDisplayFormat();
 
   const bankinFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -618,6 +675,132 @@ export function DashboardClient({
     });
   }
 
+  function onClickPowensConnect() {
+    if (runtimeMode === "DEMO") {
+      toast.warning("Powens indisponible en mode démo.");
+      return;
+    }
+    if (!canWrite) {
+      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
+      return;
+    }
+    const toastId = toast.loading("Préparation Powens…");
+    startTransition(async () => {
+      try {
+        const session = await preparePowensConnectSession();
+        try {
+          const { url } = await getPowensWebviewConnectUrl();
+          /** Pop-up : souvent bloquée ou incompatible OAuth banque (Revolut, etc.). Pleine page : recommandé Powens PSD2. */
+          const tabPref = process.env.NEXT_PUBLIC_POWENS_WEBVIEW_NEW_TAB?.trim().toLowerCase();
+          const preferNewTab = tabPref === "true" || tabPref === "1";
+
+          if (preferNewTab) {
+            const w = window.open(url, "_blank", "noopener,noreferrer");
+            toast.dismiss(toastId);
+            if (w) {
+              toast.success("Connexion bancaire Powens", {
+                description:
+                  "Un nouvel onglet s’est ouvert. Après la liaison, revenez ici et lancez la synchro."
+              });
+            } else {
+              toast.message("Pop-up bloquée", {
+                description:
+                  "Autorisez les fenêtres pour ce site, ou retirez NEXT_PUBLIC_POWENS_WEBVIEW_NEW_TAB pour une redirection dans cet onglet (recommandé)."
+              });
+            }
+          } else {
+            toast.dismiss(toastId);
+            window.location.assign(url);
+          }
+        } catch (webviewErr) {
+          const opened = await openPowensConnectWidget({
+            userId: session.userId,
+            token: session.token
+          });
+          if (opened.ok) {
+            toast.success("Widget Powens", {
+              id: toastId,
+              description: "Si la fenêtre ne s’affiche pas, vérifiez le bloqueur de pop-ups."
+            });
+          } else {
+            const wvMsg =
+              webviewErr instanceof Error ? webviewErr.message : String(webviewErr);
+            toast.message("Compte Powens prêt", {
+              id: toastId,
+              description: `${wvMsg} · ${opened.message} Vous pouvez lancer la synchro une fois la banque liée côté Powens.`
+            });
+          }
+        }
+      } catch (e) {
+        toast.error("Powens — préparation échouée", {
+          id: toastId,
+          description: e instanceof Error ? e.message : undefined
+        });
+      }
+    });
+  }
+
+  const powensPrimarySyncLabel =
+    powensPrimaryImportAxis === "personal" ? "Synchroniser Powens (perso)" : "Synchroniser Powens (SASU)";
+  const powensPrimarySyncTitle =
+    powensPrimaryImportAxis === "personal"
+      ? "Import principal en perso (défaut Powens ; filtre optionnel POWENS_PERSONAL_ACCOUNT_IDS). Définissez POWENS_IMPORT_SCOPE=pro pour la SASU."
+      : "Import principal en SASU (POWENS_IMPORT_SCOPE=pro ; filtre optionnel POWENS_PRO_ACCOUNT_IDS).";
+
+  function onClickSyncPowensApi() {
+    if (runtimeMode === "DEMO") {
+      toast.warning("Powens indisponible en mode démo.");
+      return;
+    }
+    if (!canWrite) {
+      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
+      return;
+    }
+    const toastId = toast.loading("Synchronisation Powens en cours…");
+    startTransition(async () => {
+      try {
+        const result = await syncPowensCloudTransactions();
+        toast.success("Powens synchronisé", {
+          id: toastId,
+          description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
+        });
+        router.refresh();
+      } catch (e) {
+        toast.error("Synchronisation Powens échouée", {
+          id: toastId,
+          description: e instanceof Error ? e.message : undefined
+        });
+      }
+    });
+  }
+
+  function onClickSyncPowensPersonalApi() {
+    if (runtimeMode === "DEMO") {
+      toast.warning("Powens indisponible en mode démo.");
+      return;
+    }
+    if (!canWrite) {
+      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
+      return;
+    }
+    const toastId = toast.loading("Synchronisation Powens (perso)…");
+    startTransition(async () => {
+      try {
+        const result = await syncPowensCloudTransactionsPersonal();
+        toast.success("Powens perso synchronisé", {
+          id: toastId,
+          description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
+        });
+        router.refresh();
+      } catch (e) {
+        toast.error("Synchronisation Powens perso échouée", {
+          id: toastId,
+          description: e instanceof Error ? e.message : undefined
+        });
+      }
+    });
+  }
+
   const onBankinFileSelected = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -795,6 +978,42 @@ export function DashboardClient({
                   <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
                   Synchroniser Qonto (API)
                 </button>
+                {powensCloudEnabled ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={onClickPowensConnect}
+                      disabled={isPending}
+                      className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
+                      title="Crée l’utilisateur Powens côté serveur puis ouvre PowensConnect (script optionnel NEXT_PUBLIC_POWENS_CONNECT_SCRIPT_URL)."
+                    >
+                      <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
+                      Connecter Powens
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClickSyncPowensApi}
+                      disabled={isPending}
+                      className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
+                      title={powensPrimarySyncTitle}
+                    >
+                      <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+                      {powensPrimarySyncLabel}
+                    </button>
+                    {powensPersonalSyncEnabled ? (
+                      <button
+                        type="button"
+                        onClick={onClickSyncPowensPersonalApi}
+                        disabled={isPending}
+                        className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
+                        title="Second import : scope personal, libellé POWENS_PERSONAL_COMPANY_LABEL et filtre POWENS_PERSONAL_ACCOUNT_IDS si défini."
+                      >
+                        <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+                        Import Powens perso
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
                 {scope === "personal" ? (
                   <>
                     <button
@@ -852,7 +1071,7 @@ export function DashboardClient({
             <CardBody className="flex flex-1 flex-col pt-0">
               <CardValue>
                 <span data-private>
-                  {formatEur(kpiMode === "personal" ? totalRevenues : totalRevenuesHt)}
+                  {fmt.euro(kpiMode === "personal" ? totalRevenues : totalRevenuesHt)}
                 </span>
                 <span className="ml-2 align-middle text-xs font-medium text-ink-500">
                   {kpiMode === "personal" ? "TTC (perso)" : "HT"}
@@ -874,7 +1093,7 @@ export function DashboardClient({
                       <>Somme des crédits sur la période, hors virements internes Bankin · {periodLabel}</>
                     ) : (
                       <>
-                        Équivalent TTC <span data-private>{formatEur(totalRevenues)}</span> · {periodLabel}
+                        Équivalent TTC <span data-private>{fmt.euro(totalRevenues)}</span> · {periodLabel}
                       </>
                     )}
                   </span>
@@ -908,13 +1127,13 @@ export function DashboardClient({
                         className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
                         data-private
                       >
-                        {formatEur(revenueYearProjection.projectedYearEndTtc)}{" "}
+                        {fmt.euro(revenueYearProjection.projectedYearEndTtc)}{" "}
                         <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">TTC</span>
                       </p>
                       <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
                         Réalisé depuis le 1er janv. :{" "}
                         <span className="font-medium text-emerald-950 dark:text-emerald-200">
-                          {formatEur(revenueYearProjection.ytdTtc)}
+                          {fmt.euro(revenueYearProjection.ytdTtc)}
                         </span>
                         <span className="text-emerald-800/80 dark:text-emerald-400/80">
                           {" "}
@@ -949,17 +1168,17 @@ export function DashboardClient({
                         className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
                         data-private
                       >
-                        {formatEur(revenueYearProjection.projectedYearEndHt)}{" "}
+                        {fmt.euro(revenueYearProjection.projectedYearEndHt)}{" "}
                         <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">HT</span>
                       </p>
                       <p className="text-xs text-emerald-900/75 dark:text-emerald-300/80" data-private>
                         Équivalent TTC estimé{" "}
-                        <span className="font-medium">{formatEur(revenueYearProjection.projectedYearEndTtc)}</span>
+                        <span className="font-medium">{fmt.euro(revenueYearProjection.projectedYearEndTtc)}</span>
                       </p>
                       <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
                         Réalisé YTD HT :{" "}
                         <span className="font-medium text-emerald-950 dark:text-emerald-200">
-                          {formatEur(revenueYearProjection.ytdHt)}
+                          {fmt.euro(revenueYearProjection.ytdHt)}
                         </span>
                         <span className="text-emerald-800/80 dark:text-emerald-400/80">
                           {" "}
@@ -1072,14 +1291,14 @@ export function DashboardClient({
                                   {showBillableDays ? (
                                     <span className="mt-0.5 block text-[10px] font-normal leading-snug text-ink-500 dark:text-ink-400">
                                       ≈ {formatWorkedDaysFr(workedDays)} j · TJM{" "}
-                                      {formatEur(BILLABLE_CLIENT_TJM_HT)} HT
+                                      {fmt.euro(BILLABLE_CLIENT_TJM_HT)} HT
                                     </span>
                                   ) : null}
                                 </span>
                               </span>
                               <span className="flex shrink-0 items-baseline gap-2 tabular-nums">
                                 <span className="font-medium text-emerald-800 dark:text-emerald-300">
-                                  {formatEur(displayAmount)}
+                                  {fmt.euro(displayAmount)}
                                 </span>
                                 <span className="w-8 text-right text-[10px] text-ink-400 dark:text-ink-500">
                                   {pct}%
@@ -1126,11 +1345,11 @@ export function DashboardClient({
                                     </span>
                                   </span>
                                   <span className="flex shrink-0 flex-col items-end tabular-nums">
-                                    <span className="font-medium text-emerald-800">{formatEur(tx.amount)}</span>
+                                    <span className="font-medium text-emerald-800">{fmt.euro(tx.amount)}</span>
                                     {kpiMode === "personal" ? (
                                       <span className="text-[10px] text-ink-400">TTC</span>
                                     ) : (
-                                      <span className="text-[10px] text-ink-400">TTC · {formatEur(ht)} HT</span>
+                                      <span className="text-[10px] text-ink-400">TTC · {fmt.euro(ht)} HT</span>
                                     )}
                                   </span>
                                 </li>
@@ -1167,7 +1386,7 @@ export function DashboardClient({
             </CardHeader>
             <CardBody className="flex flex-1 flex-col pt-0">
               <CardValue>
-                <span data-private>{formatEur(totalExpensesCard)}</span>
+                <span data-private>{fmt.euro(totalExpensesCard)}</span>
               </CardValue>
               <div className="mt-3 flex items-start gap-2.5 text-sm text-ink-500 dark:text-ink-400">
                 <span
@@ -1334,7 +1553,7 @@ export function DashboardClient({
                               <span className="flex shrink-0 flex-col items-end gap-0.5 tabular-nums">
                                 <span className="flex items-baseline gap-2">
                                   <span className="text-sm font-semibold text-ink-900 dark:text-ink-50">
-                                    {formatEur(total)}
+                                    {fmt.euro(total)}
                                   </span>
                                   <span className="w-7 text-right text-[10px] font-medium text-ink-400 dark:text-ink-500">
                                     {pct}%
@@ -1342,7 +1561,7 @@ export function DashboardClient({
                                 </span>
                                 {!totalExpensesMonthFilter && monthsElapsedInDashboardPeriod > 0 ? (
                                   <span className="text-[11px] font-medium text-rose-700/90 dark:text-rose-300/90">
-                                    moy. {formatEur(avgMonthly)}{" "}
+                                    moy. {fmt.euro(avgMonthly)}{" "}
                                     <span className="font-normal text-ink-500 dark:text-ink-400">/ mois</span>
                                   </span>
                                 ) : null}
@@ -1386,7 +1605,7 @@ export function DashboardClient({
                                           ) : null}
                                         </span>
                                         <span className="shrink-0 font-medium tabular-nums text-rose-800 dark:text-rose-300">
-                                          {formatEur(Math.abs(tx.amount))}
+                                          {fmt.euro(Math.abs(tx.amount))}
                                         </span>
                                       </li>
                                     ))}
@@ -1413,7 +1632,7 @@ export function DashboardClient({
       </section>
 
       {canWrite && (dashboardSection === "full" || dashboardSection === "sasu") ? (
-        <div className="mt-8 border-t border-ink-200/80 pt-5 dark:border-ink-800 md:hidden">
+        <div className="mt-8 space-y-3 border-t border-ink-200/80 pt-5 dark:border-ink-800 md:hidden">
           <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
             Synchronisation Qonto
           </p>
@@ -1427,6 +1646,45 @@ export function DashboardClient({
             <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
             Synchroniser Qonto (API)
           </button>
+          {powensCloudEnabled ? (
+            <>
+              <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                Powens
+              </p>
+              <button
+                type="button"
+                onClick={onClickPowensConnect}
+                disabled={isPending}
+                className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
+                title="Connexion bancaire Powens."
+              >
+                <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
+                Connecter Powens
+              </button>
+              <button
+                type="button"
+                onClick={onClickSyncPowensApi}
+                disabled={isPending}
+                className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
+                title={powensPrimarySyncTitle}
+              >
+                <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+                {powensPrimarySyncLabel}
+              </button>
+              {powensPersonalSyncEnabled ? (
+                <button
+                  type="button"
+                  onClick={onClickSyncPowensPersonalApi}
+                  disabled={isPending}
+                  className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
+                  title="Second import perso (même utilisateur Powens ; séparez les comptes avec POWENS_PERSONAL_ACCOUNT_IDS si besoin)."
+                >
+                  <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+                  Import Powens perso
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
       ) : null}
         </>

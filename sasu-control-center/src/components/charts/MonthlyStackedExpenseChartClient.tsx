@@ -12,7 +12,8 @@ import {
   YAxis
 } from "recharts";
 import { expenseCategoryColor } from "@/lib/dashboard-metrics";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { maskMoneyAmount } from "@/lib/dummy-display-numbers";
 
 export type StackedExpenseChartRow = Record<string, string | number>;
 
@@ -27,6 +28,7 @@ function StackedTooltip({
   payload?: Array<{ dataKey?: string | number; value?: number; color?: string }>;
   label?: string;
 }) {
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   const items = payload
     .filter(
@@ -61,15 +63,15 @@ function StackedTooltip({
                 <span className="min-w-0 break-words">{String(p.dataKey)}</span>
               </span>
               <span className="shrink-0 tabular-nums text-ink-900">
-                {formatEur(v)}
-                <span className="ml-1.5 text-[10px] font-semibold text-ink-400">{pct}%</span>
+                {fmt.euro(v)}
+                <span className="ml-1.5 text-[10px] font-semibold text-ink-400">{fmt.percent0to100(pct)}%</span>
               </span>
             </li>
           );
         })}
       </ul>
       <div className="mt-2.5 border-t border-ink-100 pt-2 text-xs font-bold text-ink-900">
-        Total <span className="tabular-nums">{formatEur(total)}</span>
+        Total <span className="tabular-nums">{fmt.euro(total)}</span>
       </div>
     </div>
   );
@@ -84,6 +86,7 @@ export function MonthlyStackedExpenseChartClient({
   visibleCategories: string[];
   onMonthClick?: (monthKey: string) => void;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const chartData = useMemo(() => {
     if (!visibleCategories.length) return [];
     const clickable = Boolean(onMonthClick);
@@ -166,7 +169,11 @@ export function MonthlyStackedExpenseChartClient({
               axisLine={false}
               width={52}
               tick={{ fill: "#6b6578", fontSize: 11, fontWeight: 500 }}
-              tickFormatter={(v) => (typeof v === "number" ? `${Math.round(v / 1000)}k` : "")}
+              tickFormatter={(v) =>
+                typeof v === "number"
+                  ? `${Math.round((fmt.dummy ? maskMoneyAmount(v) : v) / 1000)}k`
+                  : ""
+              }
               domain={[0, () => maxMonthlyTotal * 1.12]}
             />
             {avgMonthlyTotal > 0 && maxMonthlyTotal > 0 ? (

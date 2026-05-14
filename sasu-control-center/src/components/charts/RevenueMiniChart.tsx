@@ -4,7 +4,8 @@ import { useId } from "react";
 import { clsx } from "clsx";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import type { MonthlyPoint } from "@/lib/mock-data";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { maskMoneyAmount } from "@/lib/dummy-display-numbers";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
 
 function formatCompactEur(value: number): string {
@@ -25,6 +26,7 @@ function MiniTooltip({
   label?: string;
 }) {
   const isDark = useRootIsDark();
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   const value = typeof payload[0]?.value === "number" ? payload[0].value : 0;
   return (
@@ -37,7 +39,7 @@ function MiniTooltip({
       )}
     >
       <div className="font-medium">{label}</div>
-      <div className={clsx("tabular-nums", isDark ? "text-ink-200" : "text-ink-700")}>{formatEur(value)}</div>
+      <div className={clsx("tabular-nums", isDark ? "text-ink-200" : "text-ink-700")}>{fmt.euro(value)}</div>
     </div>
   );
 }
@@ -56,6 +58,7 @@ export function RevenueMiniChart({
   ariaLabel: string;
 }) {
   const uid = useId().replace(/:/g, "");
+  const fmt = useDashboardDisplayFormat();
   const gradientId = `revenue-mini-${uid}`;
   const isDark = useRootIsDark();
   const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
@@ -103,7 +106,11 @@ export function RevenueMiniChart({
               width={34}
               tickMargin={6}
               tick={{ fill: tickFill, fontSize: 8 }}
-              tickFormatter={formatCompactEur}
+              tickFormatter={(v) =>
+                typeof v === "number"
+                  ? formatCompactEur(fmt.dummy ? maskMoneyAmount(v) : v)
+                  : ""
+              }
             />
             <Tooltip content={<MiniTooltip />} cursor={{ stroke: cursorStroke, strokeWidth: 1 }} />
             <Area

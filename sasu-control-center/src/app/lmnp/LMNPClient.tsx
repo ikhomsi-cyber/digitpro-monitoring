@@ -17,7 +17,8 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { clsx } from "clsx";
 import { AppSectionNav } from "@/components/AppSectionNav";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { maskMoneyAmount } from "@/lib/dummy-display-numbers";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
 import type { LmnpAnalysis } from "@/lib/lmnp-analyze";
 import { LMNP_LOYER_ANALYTIC_MONTH_AFTER_DAY } from "@/lib/lmnp-config";
@@ -43,6 +44,7 @@ function LmnpTooltip({
   label?: string;
 }) {
   const isDark = useRootIsDark();
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   return (
     <div
@@ -58,7 +60,7 @@ function LmnpTooltip({
         {payload.map((p) => (
           <li key={String(p.name)} className="flex justify-between gap-4">
             <span className="text-ink-500 dark:text-ink-400">{p.name}</span>
-            <span>{formatEur(typeof p.value === "number" ? p.value : 0)}</span>
+            <span>{fmt.euro(typeof p.value === "number" ? p.value : 0)}</span>
           </li>
         ))}
       </ul>
@@ -75,6 +77,7 @@ export function LMNPClient({
   demoMode: boolean;
   loadError: string | null;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const isDark = useRootIsDark();
   const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
@@ -139,13 +142,13 @@ export function LMNPClient({
               Loyers reçus (sous-cat. Loyers Reçus)
             </p>
             <p className="mt-1 font-display text-xl font-bold tabular-nums text-emerald-900 dark:text-emerald-200">
-              {formatEur(analysis.totalLoyers)}
+              {fmt.euro(analysis.totalLoyers)}
             </p>
             {analysis.totalAchatAbsolu > 0 ? (
               <p className="mt-1.5 text-[10px] leading-snug text-ink-500 dark:text-ink-400">
                 Achat constaté depuis la date d’achat (sous-cat. Appart Argenteuil) :{" "}
                 <span className="font-semibold tabular-nums text-ink-700 dark:text-ink-200">
-                  {formatEur(-analysis.totalAchatAbsolu)}
+                  {fmt.euro(-analysis.totalAchatAbsolu)}
                 </span>
               </p>
             ) : null}
@@ -157,7 +160,7 @@ export function LMNPClient({
               Dépenses LMNP
             </p>
             <p className="mt-1 font-display text-xl font-bold tabular-nums text-rose-900 dark:text-rose-200">
-              {formatEur(analysis.totalDepenses)}
+              {fmt.euro(analysis.totalDepenses)}
             </p>
           </CardBody>
         </Card>
@@ -167,7 +170,7 @@ export function LMNPClient({
               Revenu net (cash)
             </p>
             <p className="mt-1 font-display text-xl font-bold tabular-nums text-sky-900 dark:text-sky-200">
-              {formatEur(analysis.revenuNet)}
+              {fmt.euro(analysis.revenuNet)}
             </p>
           </CardBody>
         </Card>
@@ -190,10 +193,10 @@ export function LMNPClient({
           <p className="mt-1 text-xs text-ink-600 dark:text-ink-400">
             Achat le <span className="font-medium">{analysis.purchaseDateIso}</span> · Prix (somme débits « Appart
             Argenteuil », toutes périodes chargées) :{" "}
-            {analysis.purchasePriceEur > 0 ? formatEur(analysis.purchasePriceEur) : "aucune ligne (0 €)"} ·
+            {analysis.purchasePriceEur > 0 ? fmt.euro(analysis.purchasePriceEur) : "aucune ligne (0 €)"} ·
             Possession ≈ {analysis.anneesPossession.toFixed(2)} an(s) · Loyers annualisés :{" "}
-            {analysis.loyersAnnualises != null ? formatEur(analysis.loyersAnnualises) : "—"} · Net annualisé :{" "}
-            {analysis.netAnnualise != null ? formatEur(analysis.netAnnualise) : "—"}
+            {analysis.loyersAnnualises != null ? fmt.euro(analysis.loyersAnnualises) : "—"} · Net annualisé :{" "}
+            {analysis.netAnnualise != null ? fmt.euro(analysis.netAnnualise) : "—"}
           </p>
         </CardHeader>
         <CardBody className="pt-4 text-sm leading-relaxed text-ink-600 dark:text-ink-300">
@@ -235,7 +238,13 @@ export function LMNPClient({
                 <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
                   <XAxis dataKey="mois" tick={{ fill: tickFill, fontSize: 10 }} minTickGap={8} />
-                  <YAxis tick={{ fill: tickFill, fontSize: 10 }} width={44} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <YAxis
+                    tick={{ fill: tickFill, fontSize: 10 }}
+                    width={44}
+                    tickFormatter={(v) =>
+                      `${Math.round((typeof v === "number" && fmt.dummy ? maskMoneyAmount(v) : Number(v)) / 1000)}k`
+                    }
+                  />
                   <Tooltip content={<LmnpTooltip />} cursor={{ fill: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)" }} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="Loyers" fill="#059669" maxBarSize={32} radius={[4, 4, 0, 0]} />
@@ -300,7 +309,7 @@ export function LMNPClient({
                               {t.category}
                             </td>
                             <td className="py-1.5 text-right font-medium tabular-nums text-emerald-700 dark:text-emerald-300">
-                              {formatEur(t.amount)}
+                              {fmt.euro(t.amount)}
                             </td>
                           </tr>
                         ))}
@@ -333,7 +342,7 @@ export function LMNPClient({
                               {t.category}
                             </td>
                             <td className="py-1.5 text-right font-medium tabular-nums text-amber-800 dark:text-amber-200">
-                              {formatEur(t.amount)}
+                              {fmt.euro(t.amount)}
                             </td>
                           </tr>
                         ))}
@@ -370,7 +379,7 @@ export function LMNPClient({
                         {t.label}
                       </td>
                       <td className="py-1.5 text-right font-medium tabular-nums text-rose-700 dark:text-rose-300">
-                        {formatEur(t.amount)}
+                        {fmt.euro(t.amount)}
                       </td>
                     </tr>
                   ))}

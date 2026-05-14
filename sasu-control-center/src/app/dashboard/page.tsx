@@ -25,6 +25,13 @@ import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
+import { isPowensCloudConfigured } from "@/lib/powens/cloud-api";
+import {
+  powensPersonalSyncUiEnabled,
+  powensPrimaryImportAxis
+} from "@/lib/powens/config";
+import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
 
 function parseDashboardScopeParam(
   sp: Record<string, string | string[] | undefined> | undefined
@@ -159,6 +166,9 @@ export default async function DashboardPage({
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
   const showDarkModeToggle = isDarkModeUiEnabled();
   const demoMode = dataMode === "DEMO" || demoPreferenceOn;
+  const powensCloudEnabled = isPowensCloudConfigured();
+  const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
+  const powensPrimaryAxis = powensPrimaryImportAxis();
   const heroStats = computeDashboardHeroStats(transactions);
   const heroContextMessage =
     envMode === "DEMO"
@@ -167,13 +177,17 @@ export default async function DashboardPage({
         ? "Prévisualisation hors base. Utilisez le commutateur pour revenir aux données Supabase."
         : "";
   const showContextBanner = envMode === "DEMO" || demoPreferenceOn;
+  const dummyDataActive = isDashboardDummyDataActive(cookieStore);
 
   return (
+    <DashboardDummyDataProvider active={dummyDataActive}>
     <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}
         demoPreferenceOn={demoPreferenceOn}
+        dummyDataActive={dummyDataActive}
+        showDummyDataToggle={envMode === "SUPABASE"}
         userEmail={user?.email}
         showDarkModeToggle={showDarkModeToggle}
         showLogout={envMode !== "DEMO"}
@@ -207,6 +221,9 @@ export default async function DashboardPage({
           <DashboardClient
             runtimeMode={dataMode}
             canWrite={dataMode === "SUPABASE"}
+            powensCloudEnabled={powensCloudEnabled}
+            powensPersonalSyncEnabled={powensPersonalSyncEnabled}
+            powensPrimaryImportAxis={powensPrimaryAxis}
             syncKey={syncKey}
             initialTransactions={transactions}
             transactionYearBounds={transactionYearBounds}
@@ -225,7 +242,9 @@ export default async function DashboardPage({
               ? "Mode démo (mock) · ne remplace pas un conseil comptable."
               : demoPreferenceOn
                 ? "Mode démo volontaire · données fictives."
-                : "Données Supabase."}
+                : dummyDataActive
+                  ? "Données Supabase · affichage masqué (montants fictifs)."
+                  : "Données Supabase."}
           </span>
         </div>
         <span>Copyright © {new Date().getFullYear()} DigitPro · Iliass KHOMSI.</span>
@@ -235,5 +254,6 @@ export default async function DashboardPage({
         <DashboardFloatingDock />
       </Suspense>
     </div>
+    </DashboardDummyDataProvider>
   );
 }

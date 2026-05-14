@@ -4,6 +4,8 @@
  */
 
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import { fetchWithNetworkDiagnostics } from "@/lib/fetch-network-error";
+import { sanitizeLatin1HttpValue } from "@/lib/http-latin1";
 
 export type QontoImportRow = {
   date: string;
@@ -36,11 +38,12 @@ function qontoAuthHeader(): string {
       "Variables QONTO_LOGIN et QONTO_SECRET_KEY requises (Intégrations → Clé API Qonto). Voir .env.example."
     );
   }
-  return `${login}:${secret}`;
+  return sanitizeLatin1HttpValue(`${login}:${secret}`, "Qonto Authorization (login + secret)");
 }
 
 function qontoBaseUrl(): string {
-  return (getEnv("QONTO_API_BASE_URL") || "https://thirdparty.qonto.com").replace(/\/$/, "");
+  const raw = (getEnv("QONTO_API_BASE_URL") || "https://thirdparty.qonto.com").replace(/\/$/, "");
+  return sanitizeLatin1HttpValue(raw, "QONTO_API_BASE_URL");
 }
 
 async function qontoFetchJson<T>(path: string, searchParams?: Record<string, string | undefined>): Promise<T> {
@@ -58,7 +61,7 @@ async function qontoFetchJson<T>(path: string, searchParams?: Record<string, str
   const staging = getEnv("QONTO_STAGING_TOKEN");
   if (staging) headers["X-Qonto-Staging-Token"] = staging;
 
-  const res = await fetch(url.toString(), { headers, cache: "no-store" });
+  const res = await fetchWithNetworkDiagnostics(url.toString(), { headers, cache: "no-store" }, "Qonto API");
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Qonto ${res.status} — ${body.slice(0, 400)}`);

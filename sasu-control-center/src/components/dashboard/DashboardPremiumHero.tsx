@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { formatEur } from "@/lib/format";
+import { useMemo } from "react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -10,17 +13,22 @@ type Props = {
 };
 
 export function DashboardPremiumHero({ stats, contextMessage, showContextBanner }: Props) {
-  const chips = "SASU · LMNP · Cashflow · Fiscalité";
+  const fmt = useDashboardDisplayFormat();
 
-  const tiles: { label: string; value: string; suffix?: string }[] = [
-    { label: "Encaissé ce mois", value: formatEur(stats.caMensuelEur), suffix: "TTC" },
-    {
-      label: "Cash disponible",
-      value: stats.soldeQontoEur != null ? formatEur(stats.soldeQontoEur) : "—"
-    },
-    { label: "Dépenses du mois (SASU)", value: formatEur(stats.depensesQontoSasuMoisEur), suffix: "TTC" },
-    { label: "TJM (indicatif)", value: formatEur(stats.tjmAfficheEur) }
-  ];
+  const tiles: { label: string; value: string; suffix?: string }[] = useMemo(
+    () => [
+      { label: "Encaissé ce mois", value: fmt.euro(stats.caMensuelEur), suffix: "TTC" },
+      {
+        label: "Cash disponible",
+        value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—"
+      },
+      { label: "Dépenses du mois (SASU)", value: fmt.euro(stats.depensesQontoSasuMoisEur), suffix: "TTC" },
+      { label: "TJM (indicatif)", value: fmt.euro(stats.tjmAfficheEur) }
+    ],
+    [fmt, stats]
+  );
+
+  const chips = "SASU · LMNP · Cashflow · Fiscalité";
 
   return (
     <header className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-3xl border border-ink-200/80 bg-gradient-to-b from-white via-white to-ink-50/80 px-5 py-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.15)] dark:border-white/[0.07] dark:from-[#0f1412] dark:via-[#0a0d0c] dark:to-[#050505] dark:shadow-[0_32px_100px_-20px_rgba(0,0,0,0.75)] sm:px-8 sm:py-10">

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { CalendarDays, ChevronLeft, ChevronRight, BriefcaseBusiness, CarFront, Utensils } from "lucide-react";
 import { clsx } from "clsx";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { replaceBillableWorkDays } from "@/app/dashboard/actions";
 import { indemniteKmPerWorkDayEur } from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
@@ -50,26 +50,27 @@ function WorkdaysMonthGauge({
   remainingBillable: number;
   totalBillableMonth: number;
 }) {
+  const fmt = useDashboardDisplayFormat();
   let pct = 0;
   let denomLabel: string;
   if (isCurrent) {
     const d = countedBillable + remainingBillable;
     if (d > 0) {
       pct = clamp01(countedBillable / d);
-      denomLabel = `${countedBillable} cochés / ${remainingBillable} rest.`;
+      denomLabel = `${fmt.int(countedBillable)} cochés / ${fmt.int(remainingBillable)} rest.`;
     } else if (totalBillableMonth > 0) {
       pct = clamp01(countedBillable / totalBillableMonth);
-      denomLabel = `${countedBillable} / ${totalBillableMonth} j. ouvrés`;
+      denomLabel = `${fmt.int(countedBillable)} / ${fmt.int(totalBillableMonth)} j. ouvrés`;
     } else {
       denomLabel = "0 j.";
     }
   } else if (totalBillableMonth > 0) {
     pct = clamp01(countedBillable / totalBillableMonth);
-    denomLabel = `${countedBillable} / ${totalBillableMonth} j. ouvrés`;
+    denomLabel = `${fmt.int(countedBillable)} / ${fmt.int(totalBillableMonth)} j. ouvrés`;
   } else {
     denomLabel = "0 j.";
   }
-  const pctLabel = Math.round(pct * 100);
+  const pctLabel = fmt.percent0to100(pct * 100);
 
   return (
     <div className="mt-2">
@@ -97,8 +98,9 @@ function BudgetGauge({
   tone?: "emerald" | "analyze" | "rose";
   label: string;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const pct = clamp01(referenceEur > 0 ? valueEur / referenceEur : 0);
-  const pctLabel = Math.round(pct * 100);
+  const pctLabel = fmt.percent0to100(pct * 100);
 
   const fillClass =
     tone === "analyze"
@@ -112,7 +114,7 @@ function BudgetGauge({
       <div className="flex items-baseline justify-between gap-2 text-[10px] text-ink-500 dark:text-ink-400">
         <span className="font-medium text-ink-600 dark:text-ink-300">{label}</span>
         <span className="tabular-nums">
-          {formatEur(valueEur)} / {formatEur(referenceEur)} · {pctLabel}%
+          {fmt.euro(valueEur)} / {fmt.euro(referenceEur)} · {pctLabel}%
         </span>
       </div>
       <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-black/[0.04] dark:bg-ink-800 dark:ring-white/10">
@@ -208,6 +210,7 @@ export function BillableDaysCalendarBlock({
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [hydrated, setHydrated] = useState(false);
   const [, startTransition] = useTransition();
+  const fmt = useDashboardDisplayFormat();
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const lastPersistedRef = useRef<string | null>(null);
@@ -546,9 +549,9 @@ export function BillableDaysCalendarBlock({
             <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {[
                 { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
-                { k: "CA estimé", v: formatEur(calendarStickyKpis.caEstime) },
-                { k: "Reste à facturer", v: formatEur(calendarStickyKpis.resteAFacturer) },
-                { k: "Projection fin de mois", v: formatEur(calendarStickyKpis.projectionFinMois) }
+                { k: "CA estimé", v: fmt.euro(calendarStickyKpis.caEstime) },
+                { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
+                { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
               ].map((row) => (
                 <div
                   key={row.k}
@@ -840,10 +843,10 @@ export function BillableDaysCalendarBlock({
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM (HT)</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                      {formatEur(brutTjmMoisEncoursHt)}
+                      {fmt.euro(brutTjmMoisEncoursHt)}
                     </p>
                     <p className="text-[10px] text-ink-400 dark:text-ink-500">
-                      {selectedViewMonthStats.countedDays} j. × {formatEur(tjmHt)}
+                      {fmt.int(selectedViewMonthStats.countedDays)} j. × {fmt.euro(tjmHt)}
                     </p>
                     <WorkdaysMonthGauge
                       isCurrent={tjmWorkdayGauge.isCurrent}
@@ -862,10 +865,10 @@ export function BillableDaysCalendarBlock({
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">IK aller-retour</p>
                     <p className="font-display text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">
-                      {formatEur(ikMoisEncours)}
+                      {fmt.euro(ikMoisEncours)}
                     </p>
                     <p className="text-[10px] text-ink-400 dark:text-ink-500">
-                      {selectedViewMonthStats.countedDays} j. × {formatEur(ikPerDay)}
+                      {fmt.int(selectedViewMonthStats.countedDays)} j. × {fmt.euro(ikPerDay)}
                     </p>
                     <BudgetGauge
                       label="Jauge IK"
@@ -884,12 +887,12 @@ export function BillableDaysCalendarBlock({
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">Repas &amp; NDF</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                      {formatEur(mealFeesForViewedMonth?.total ?? 0)}
+                      {fmt.euro(mealFeesForViewedMonth?.total ?? 0)}
                     </p>
                     {mealFeesForViewedMonth ? (
                       <p className="text-[10px] text-ink-400 dark:text-ink-500">
-                        Dirigeant {formatEur(mealFeesForViewedMonth.dirigeant)} · NDF{" "}
-                        {formatEur(mealFeesForViewedMonth.ndfAffiche)}
+                        Dirigeant {fmt.euro(mealFeesForViewedMonth.dirigeant)} · NDF{" "}
+                        {fmt.euro(mealFeesForViewedMonth.ndfAffiche)}
                       </p>
                     ) : null}
                     <BudgetGauge
@@ -924,7 +927,7 @@ export function BillableDaysCalendarBlock({
                 <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
                   <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM / jour</p>
                   <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                    {formatEur(tjmHt)}
+                    {fmt.euro(tjmHt)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
@@ -932,7 +935,7 @@ export function BillableDaysCalendarBlock({
                     Mois · {countInMonth} j.
                   </p>
                   <p className="mt-0.5 font-display text-base font-bold tabular-nums text-emerald-800 dark:text-emerald-300">
-                    {formatEur(revenueMonthHt)}
+                    {fmt.euro(revenueMonthHt)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-emerald-100/90 bg-emerald-50/50 px-3 py-2.5 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-950/20 dark:shadow-none sm:col-span-1">
@@ -940,7 +943,7 @@ export function BillableDaysCalendarBlock({
                     Année {viewYear} · {countInYear} j.
                   </p>
                   <p className="mt-0.5 font-display text-base font-bold tabular-nums text-emerald-900 dark:text-emerald-200">
-                    {formatEur(revenueYearHt)}
+                    {fmt.euro(revenueYearHt)}
                   </p>
                 </div>
               </div>
@@ -1044,9 +1047,9 @@ export function BillableDaysCalendarBlock({
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {[
                 { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
-                { k: "CA estimé", v: formatEur(calendarStickyKpis.caEstime) },
-                { k: "Reste à facturer", v: formatEur(calendarStickyKpis.resteAFacturer) },
-                { k: "Projection fin de mois", v: formatEur(calendarStickyKpis.projectionFinMois) }
+                { k: "CA estimé", v: fmt.euro(calendarStickyKpis.caEstime) },
+                { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
+                { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
               ].map((row) => (
                 <div key={`sticky-${row.k}`} className="min-w-0">
                   <dt className="truncate text-[10px] font-medium text-ink-600 dark:text-zinc-400">{row.k}</dt>

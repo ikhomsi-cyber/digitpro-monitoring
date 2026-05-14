@@ -12,7 +12,7 @@ import {
   YAxis
 } from "recharts";
 import type { MonthlyPoint } from "@/lib/mock-data";
-import { formatEur, formatEurChartAxis } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 
 const CHART_H = 304;
 
@@ -28,12 +28,13 @@ function ChartTooltip({
   payload?: Array<{ value?: number }>;
   label?: string;
 }) {
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   const value = typeof payload[0]?.value === "number" ? payload[0].value : 0;
   return (
     <div className="rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-sm shadow-card ring-1 ring-black/[0.04]">
       <div className="font-semibold tracking-tight text-ink-900">{label}</div>
-      <div className="mt-0.5 tabular-nums text-base font-medium text-ink-700">{formatEur(value)}</div>
+      <div className="mt-0.5 tabular-nums text-base font-medium text-ink-700">{fmt.euro(value)}</div>
     </div>
   );
 }
@@ -48,6 +49,7 @@ export function MonthlyAreaChartClient({
   /** Clic sur un mois (surface invisible au-dessus des colonnes). */
   onMonthClick?: (monthKey: string) => void;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const clickable = Boolean(onMonthClick && data.some((d) => d.monthKey));
   const gradientId = `area-fill-${color.stroke.replace(/[^a-z0-9]/gi, "")}`;
   const maxVal = Math.max(0, ...data.map((d) => d.value));
@@ -85,7 +87,7 @@ export function MonthlyAreaChartClient({
               axisLine={false}
               width={58}
               tick={AXIS_TICK}
-              tickFormatter={(v) => (typeof v === "number" ? formatEurChartAxis(v) : "")}
+              tickFormatter={(v) => (typeof v === "number" ? fmt.chartAxisEuro(v) : "")}
               domain={[0, () => (maxVal > 0 ? maxVal * 1.1 : 1)]}
             />
             {avgVal > 0 && maxVal > 0 ? (

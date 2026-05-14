@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import type { InvoiceWorkedDayMonth } from "@/lib/invoice-worked-days-series";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
@@ -30,6 +30,7 @@ function ChartTooltip({
   active?: boolean;
   payload?: Array<{ payload: InvoiceWorkedDayMonth }>;
 }) {
+  const fmt = useDashboardDisplayFormat();
   if (!active || !payload?.length) return null;
   const p = payload[0]?.payload;
   if (!p) return null;
@@ -37,11 +38,11 @@ function ChartTooltip({
     <div className="rounded-lg border border-ink-200 bg-white px-2.5 py-2 text-xs shadow-md dark:border-ink-600 dark:bg-ink-900 dark:shadow-none">
       <div className="font-medium capitalize text-ink-900 dark:text-ink-50">{p.label}</div>
       <div className="mt-1 tabular-nums text-ink-700 dark:text-ink-300">
-        <span className="font-semibold text-emerald-800 dark:text-emerald-300">{p.days} j.</span>
+        <span className="font-semibold text-emerald-800 dark:text-emerald-300">{fmt.int(p.days)} j.</span>
         <span className="text-ink-500 dark:text-ink-400"> facturés</span>
       </div>
       <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
-        CA HT ({sourceLabel(p.sourceMonthKey)}) : {formatEur(p.caHt)}
+        CA HT ({sourceLabel(p.sourceMonthKey)}) : {fmt.euro(p.caHt)}
       </div>
     </div>
   );
@@ -60,6 +61,7 @@ export function BillableInvoiceWorkedDaysChart({
   /** Message vide si le filtre année/trimestre exclut toutes les barres. */
   emptyHint?: "default" | "filter";
 }) {
+  const fmt = useDashboardDisplayFormat();
   const uid = useId().replace(/:/g, "");
   const gradId = `inv-days-${uid}`;
   const isDark = useRootIsDark();
@@ -83,16 +85,16 @@ export function BillableInvoiceWorkedDaysChart({
       </p>
       {averageDaysPerMonth != null && monthsInView > 0 ? (
         <p className="mb-1.5 text-[11px] font-medium tabular-nums text-emerald-900/90 dark:text-emerald-200/90">
-          Moyenne : {averageDaysPerMonth} j. / mois{" "}
+          Moyenne : {averageDaysPerMonth != null ? fmt.int(averageDaysPerMonth) : "—"} j. / mois{" "}
           <span className="font-normal text-ink-500 dark:text-ink-400">
-            ({monthsInView} mois affiché{monthsInView > 1 ? "s" : ""})
+            ({fmt.int(monthsInView)} mois affiché{monthsInView > 1 ? "s" : ""})
           </span>
         </p>
       ) : null}
       <p className="mb-3 text-[10px] leading-snug text-ink-500 dark:text-ink-400">
         Chaque barre = mois <span className="font-medium">B</span> sur l’axe · jours = CA HT encaissé en{" "}
         <span className="font-medium">B + 2</span> (ex. encaissement avril → barre février) ÷{" "}
-        {formatEur(BILLABLE_CLIENT_TJM_HT)} · TVA 20 % · mois en cours inclus (partiel)
+        {fmt.euro(BILLABLE_CLIENT_TJM_HT)} · TVA 20 % · mois en cours inclus (partiel)
       </p>
       <div className="h-[11.5rem] w-full sm:h-52">
         <ResponsiveContainer width="100%" height="100%">

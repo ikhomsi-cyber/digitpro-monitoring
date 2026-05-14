@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Landmark, Scale } from "lucide-react";
-import { formatEur } from "@/lib/format";
+import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   computeTreasuryVerserSnapshot,
@@ -27,6 +27,7 @@ export function TreasuryVerserPanel({
   viewYear: number;
   viewMonth0: number;
 }) {
+  const fmt = useDashboardDisplayFormat();
   const snap = useMemo(
     () => computeTreasuryVerserSnapshot(transactions, scope, viewYear, viewMonth0),
     [transactions, scope, viewYear, viewMonth0]
@@ -67,49 +68,49 @@ export function TreasuryVerserPanel({
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">CA encaissé TTC</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
-              {formatEur(snap.caEncaisseTtc)}
+              {fmt.euro(snap.caEncaisseTtc)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">CA encaissé HT</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
-              {formatEur(snap.caEncaisseHt)}
+              {fmt.euro(snap.caEncaisseHt)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">CSG ({csgPct} % HT)</span>
             <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-200/90">
-              {formatEur(snap.csgDue)}
+              {fmt.euro(snap.csgDue)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">TVA théorique ({tvaPct} % HT)</span>
             <span className="shrink-0 font-semibold tabular-nums text-rose-800 dark:text-rose-200/90">
-              {formatEur(snap.tvaTheorique)}
+              {fmt.euro(snap.tvaTheorique)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">IK (mois)</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
-              {formatEur(snap.ikMois)}
+              {fmt.euro(snap.ikMois)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">NDF (mois)</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
-              {formatEur(snap.ndfMois)}
+              {fmt.euro(snap.ndfMois)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
             <span className="text-ink-500 dark:text-ink-400">BNC (mois)</span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-ink-200">
-              {formatEur(snap.bncMois)}
+              {fmt.euro(snap.bncMois)}
             </span>
           </div>
           <div className="flex justify-between gap-2 border-t border-violet-100/80 pt-2 dark:border-white/[0.06]">
             <span className="font-medium text-ink-700 dark:text-ink-200">Versé ce mois</span>
             <span className="shrink-0 font-bold tabular-nums text-ink-900 dark:text-ink-50">
-              {formatEur(snap.verseCeMois)}
+              {fmt.euro(snap.verseCeMois)}
             </span>
           </div>
           <div className="flex justify-between gap-2">
@@ -118,7 +119,7 @@ export function TreasuryVerserPanel({
               Solde Qonto (dernier connu)
             </span>
             <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-ink-50">
-              {snap.qontoSolde != null ? formatEur(snap.qontoSolde) : "—"}
+              {snap.qontoSolde != null ? fmt.euro(snap.qontoSolde) : "—"}
             </span>
           </div>
         </div>

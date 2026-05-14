@@ -102,6 +102,28 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      powens_users: {
+        Row: {
+          id: string;
+          user_id: string;
+          powens_user_id: string;
+          auth_token: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          powens_user_id: string;
+          auth_token: string;
+        };
+        Update: Partial<{
+          powens_user_id: string;
+          auth_token: string;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       salary_simulations: {
         Row: {
           id: string;

@@ -2,6 +2,7 @@
 
 import { Bell, LogOut, Settings2 } from "lucide-react";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { DashboardDummyDataToggle } from "@/components/dashboard/DashboardDummyDataToggle";
 import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderProfile";
 import { Logo } from "@/components/ui/Logo";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -10,6 +11,10 @@ type Props = {
   envMode: SupabaseRuntimeMode;
   dataMode: "DEMO" | "SUPABASE";
   demoPreferenceOn: boolean;
+  /** Affichage masqué : montants / chiffres fictifs (cookie). */
+  dummyDataActive: boolean;
+  /** Affiche le toggle (session Supabase réelle). */
+  showDummyDataToggle: boolean;
   userEmail: string | null | undefined;
   showDarkModeToggle: boolean;
   showLogout: boolean;
@@ -19,6 +24,8 @@ export function DashboardTopNav({
   envMode,
   dataMode,
   demoPreferenceOn,
+  dummyDataActive,
+  showDummyDataToggle,
   userEmail,
   showDarkModeToggle,
   showLogout
@@ -26,11 +33,13 @@ export function DashboardTopNav({
   const statusLabel =
     envMode === "DEMO"
       ? "Mode démo"
-      : demoPreferenceOn
-        ? "Mode démo activé"
-        : userEmail
-          ? `Connecté · ${userEmail}`
-          : "Connecté";
+      : dummyDataActive
+        ? "Données fictives (affichage)"
+        : demoPreferenceOn
+          ? "Mode démo activé"
+          : userEmail
+            ? `Connecté · ${userEmail}`
+            : "Connecté";
 
   return (
     <nav
@@ -51,7 +60,7 @@ export function DashboardTopNav({
           <span className="ml-1 hidden min-w-0 items-center gap-1.5 rounded-full border border-ink-200/90 bg-ink-50/90 px-2.5 py-1 text-[11px] font-medium text-ink-700 dark:border-white/10 dark:bg-white/5 dark:text-white/70 lg:inline-flex">
             <span
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                dataMode === "DEMO" ? "bg-amber-400" : "bg-emerald-400"
+                dataMode === "DEMO" ? "bg-amber-400" : dummyDataActive ? "bg-sky-400" : "bg-emerald-400"
               }`}
             />
             <span className="max-w-[14rem] truncate">{statusLabel}</span>
@@ -72,6 +81,7 @@ export function DashboardTopNav({
         </div>
 
         <div className="flex items-center justify-end gap-1 sm:gap-1.5">
+          {showDummyDataToggle ? <DashboardDummyDataToggle active={dummyDataActive} /> : null}
           <button
             type="button"
             className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-ink-200/90 bg-white/90 text-ink-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"

@@ -155,7 +155,7 @@ create table if not exists public.import_sessions (
   user_id uuid not null references auth.users (id) on delete cascade default auth.uid(),
   source_filename text,
   file_hash text,
-  format text not null check (format in ('qonto', 'generic', 'bankin')),
+  format text not null check (format in ('qonto', 'generic', 'bankin', 'powens')),
   row_count int not null default 0,
   inserted_count int not null default 0,
   skipped_duplicate_count int not null default 0,
