@@ -665,6 +665,8 @@ export function BillableDaysCalendarBlock({
                         on
                           ? clsx(
                               "bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)] dark:from-emerald-500 dark:to-emerald-700",
+                              isToday &&
+                                "ring-2 ring-brand-400 ring-offset-2 ring-offset-white/90 dark:ring-brand-300 dark:ring-offset-emerald-900/80",
                               isHoliday &&
                                 "ring-2 ring-orange-300/90 ring-offset-0 ring-offset-transparent dark:ring-orange-400/70",
                               !isHoliday &&
@@ -684,9 +686,8 @@ export function BillableDaysCalendarBlock({
                                 "bg-sky-50 font-semibold text-sky-950 ring-1 ring-sky-200/90 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-600/50",
                               !isHoliday && !isSchoolVacation && isWeekend && !pastMissed && !futurePlanned && "text-ink-400 dark:text-ink-600",
                               isToday &&
-                                "ring-2 ring-brand-500 ring-offset-1 dark:ring-brand-400 dark:ring-offset-[#0a0a0a]",
+                                "z-[1] ring-2 ring-brand-500 ring-offset-1 dark:ring-brand-400 dark:ring-offset-[#0a0a0a]",
                               isToday &&
-                                !on &&
                                 !pastMissed &&
                                 !futurePlanned &&
                                 (isHoliday
@@ -698,6 +699,17 @@ export function BillableDaysCalendarBlock({
                       )}
                     >
                       {cell.day}
+                      {isToday ? (
+                        <span
+                          className={clsx(
+                            "pointer-events-none absolute bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full",
+                            on
+                              ? "bg-white shadow-[0_0_10px_rgba(255,255,255,0.95)] ring-1 ring-white/50"
+                              : "bg-brand-500 shadow-[0_0_8px_rgba(59,130,246,0.7)] ring-1 ring-brand-400/60 dark:bg-brand-400 dark:shadow-[0_0_10px_rgba(96,165,250,0.55)] dark:ring-brand-300/50"
+                          )}
+                          aria-hidden
+                        />
+                      ) : null}
                     </button>
                   );
                 })}
@@ -712,6 +724,16 @@ export function BillableDaysCalendarBlock({
               Effacer ce mois
             </button>
             <div className="mt-1.5 max-w-[238px] space-y-1 text-center text-[9px] leading-snug text-ink-400 dark:text-ink-500 sm:text-left">
+              <p className="inline-flex items-center gap-1">
+                <span
+                  className="relative inline-block h-2 w-2 shrink-0 rounded-full bg-brand-500 shadow-[0_0_6px_rgba(59,130,246,0.55)] ring-2 ring-brand-500/35 dark:bg-brand-400 dark:shadow-[0_0_8px_rgba(96,165,250,0.45)] dark:ring-brand-400/40"
+                  aria-hidden
+                />
+                <span>
+                  <span className="font-medium text-ink-500 dark:text-ink-400">Aujourd’hui</span> — bordure bleue +
+                  point sous la date.
+                </span>
+              </p>
               <p className="inline-flex items-center gap-1">
                 <span
                   className="inline-block h-2 w-2 shrink-0 rounded-sm bg-amber-100 ring-1 ring-amber-200/80 dark:bg-amber-900/60 dark:ring-amber-700/60"

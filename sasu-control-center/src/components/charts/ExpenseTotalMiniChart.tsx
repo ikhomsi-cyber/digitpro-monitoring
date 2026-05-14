@@ -66,7 +66,7 @@ export function ExpenseTotalMiniChart({
 }: {
   data: MonthlyPoint[];
   ariaLabel: string;
-  /** YYYY-MM — affiche un repère vertical sur le mois choisi (liste déroulante ou clic graphique). */
+  /** YYYY-MM — affiche un repère vertical sur le mois choisi (clic sur le graphique). */
   selectedMonthKey?: string | null;
   /** Filtre carte Total expenses sur le mois (YYYY-MM). Re-clic sur le même mois : à gérer côté parent si besoin. */
   onMonthClick?: (monthKey: string) => void;
@@ -100,7 +100,7 @@ export function ExpenseTotalMiniChart({
         </p>
         {clickable ? (
           <p className="text-[9px] font-medium normal-case tracking-normal text-ink-500 dark:text-ink-400">
-            Clic sur un mois pour filtrer
+            Clic sur un mois pour filtrer ou désactiver
           </p>
         ) : null}
       </div>

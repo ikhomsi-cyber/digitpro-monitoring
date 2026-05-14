@@ -1,7 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
-import Link from "next/link";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction
+} from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
@@ -117,6 +127,84 @@ function DashboardBlockTitle({
       <CardTitle className={clsx("min-w-0 flex-1 !mt-0 leading-snug", titleClassName)}>
         {children}
       </CardTitle>
+    </div>
+  );
+}
+
+/** 12 mois glissants vs années civiles — même logique que la section analytics (`selectedYears` → revenus & dépenses). */
+function DashboardPeriodFilterControls({
+  selectedYears,
+  setSelectedYears,
+  yearOptions,
+  onToggleYear
+}: {
+  selectedYears: number[] | null;
+  setSelectedYears: Dispatch<SetStateAction<number[] | null>>;
+  yearOptions: number[];
+  onToggleYear: (y: number) => void;
+}) {
+  return (
+    <div className="inline-flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+        <button
+          type="button"
+          aria-pressed={selectedYears === null}
+          onClick={() => setSelectedYears(null)}
+          className={clsx(
+            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
+            selectedYears === null
+              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+              : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
+          )}
+        >
+          <CalendarRange className="h-3.5 w-3.5 opacity-80" aria-hidden />
+          12 mois glissants
+        </button>
+        <button
+          type="button"
+          aria-pressed={selectedYears !== null}
+          onClick={() =>
+            setSelectedYears((prev) => prev ?? [yearOptions[0] ?? new Date().getFullYear()])
+          }
+          className={clsx(
+            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
+            selectedYears !== null
+              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+              : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
+          )}
+        >
+          <Calendar className="h-3.5 w-3.5 opacity-80" aria-hidden />
+          Année(s) civile(s)
+        </button>
+      </div>
+      {selectedYears != null ? (
+        <div
+          className="flex max-w-full flex-wrap items-center gap-2 sm:pl-1"
+          role="group"
+          aria-label="Sélection des années à inclure"
+        >
+          <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Inclure :</span>
+          {yearOptions.map((y) => {
+            const on = selectedYears.includes(y);
+            return (
+              <button
+                key={y}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onToggleYear(y)}
+                className={clsx(
+                  "min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:py-1",
+                  on
+                    ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-900/60 dark:text-white dark:shadow-brand-950/40"
+                    : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
+                )}
+              >
+                {y}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -689,75 +777,19 @@ export function DashboardClient({
                 Privé
               </button>
             </div>
-            <div className="inline-flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
-                <button
-                  type="button"
-                  aria-pressed={selectedYears === null}
-                  onClick={() => setSelectedYears(null)}
-                  className={clsx(
-                    "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
-                    selectedYears === null
-                      ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
-                      : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
-                  )}
-                >
-                  <CalendarRange className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                  12 mois glissants
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={selectedYears !== null}
-                  onClick={() =>
-                    setSelectedYears((prev) => prev ?? [yearOptions[0] ?? new Date().getFullYear()])
-                  }
-                  className={clsx(
-                    "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
-                    selectedYears !== null
-                      ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
-                      : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
-                  )}
-                >
-                  <Calendar className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                  Année(s) civile(s)
-                </button>
-              </div>
-              {selectedYears != null ? (
-                <div
-                  className="flex max-w-full flex-wrap items-center gap-2 sm:pl-1"
-                  role="group"
-                  aria-label="Sélection des années à inclure"
-                >
-                  <span className="text-xs font-medium text-ink-500 dark:text-ink-400">Inclure :</span>
-                  {yearOptions.map((y) => {
-                    const on = selectedYears.includes(y);
-                    return (
-                      <button
-                        key={y}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleYearInFilter(y)}
-                        className={clsx(
-                          "min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:py-1",
-                          on
-                            ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-900/60 dark:text-white dark:shadow-brand-950/40"
-                            : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
-                        )}
-                      >
-                        {y}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
+            <DashboardPeriodFilterControls
+              selectedYears={selectedYears}
+              setSelectedYears={setSelectedYears}
+              yearOptions={yearOptions}
+              onToggleYear={toggleYearInFilter}
+            />
             {canWrite ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={onClickSyncQontoApi}
                   disabled={isPending}
-                  className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
+                  className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
                   title="Récupère les transactions via l’API Qonto (variables QONTO_LOGIN et QONTO_SECRET_KEY côté serveur)."
                 >
                   <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
@@ -790,50 +822,22 @@ export function DashboardClient({
       {(dashboardSection === "full" || dashboardSection === "sasu" || dashboardSection === "private") && (
         <>
           {(dashboardSection === "sasu" || dashboardSection === "private") && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-ink-200/90 bg-white/90 p-4 dark:border-white/[0.08] dark:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
-                  Vue ciblée
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-ink-900 dark:text-white">
-                  {dashboardSection === "sasu" ? "SASU — revenus & dépenses" : "Privé — revenus & dépenses"}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">
-                  Période : <span className="font-medium text-ink-700 dark:text-ink-200">{periodLabel}</span>
-                </p>
+            <div className="flex min-w-0 flex-col gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <span className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+                  <CalendarRange className="h-4 w-4 text-ink-400" aria-hidden />
+                  Fenêtre d’analyse
+                </span>
+                <DashboardPeriodFilterControls
+                  selectedYears={selectedYears}
+                  setSelectedYears={setSelectedYears}
+                  yearOptions={yearOptions}
+                  onToggleYear={toggleYearInFilter}
+                />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {canWrite && dashboardSection === "sasu" ? (
-                  <button
-                    type="button"
-                    onClick={onClickSyncQontoApi}
-                    disabled={isPending}
-                    className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                    title="Récupère les transactions via l’API Qonto."
-                  >
-                    <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                    Synchroniser Qonto
-                  </button>
-                ) : null}
-                {canWrite && dashboardSection === "private" ? (
-                  <button
-                    type="button"
-                    onClick={() => bankinFileInputRef.current?.click()}
-                    disabled={isPending}
-                    className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                    title="Import Bankin (.xls / .xlsx) — onglet Privé."
-                  >
-                    <Upload className="h-4 w-4 text-ink-500" aria-hidden />
-                    Importer Bankin
-                  </button>
-                ) : null}
-                <Link
-                  href="/dashboard"
-                  className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-ink-300 bg-ink-50 px-4 text-sm font-semibold text-ink-800 transition hover:bg-ink-100 dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/15 sm:min-h-0"
-                >
-                  Tableau de bord complet
-                </Link>
-              </div>
+              <p className="text-sm leading-relaxed text-ink-500 dark:text-ink-400">
+                Vue active : <span className="font-medium text-ink-700 dark:text-ink-200">{periodLabel}</span>.
+              </p>
             </div>
           )}
 
@@ -1150,68 +1154,22 @@ export function DashboardClient({
             </CardBody>
           </Card>
 
-          <Card
-            id="dashboard-fiscal"
-            className="flex h-full min-h-0 flex-col border-ink-200/90 bg-gradient-to-b from-ink-50/40 to-white dark:border-ink-800 dark:from-ink-900/80 dark:to-ink-950"
-          >
-            <CardHeader className="flex flex-col gap-4 border-b border-ink-100/80 pb-4 dark:border-ink-800 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
-                <span
-                  className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-rose-200/60 bg-rose-50/80 text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-300"
-                  aria-hidden
-                >
-                  <TrendingDown className="h-[19px] w-[19px]" strokeWidth={1.85} />
-                </span>
-                <div className="min-w-0">
-                  <CardTitle className="!mt-0 text-base font-semibold tracking-tight text-ink-900 dark:text-ink-50">
-                    Total expenses
-                  </CardTitle>
-                  <div className="mt-1 text-xs leading-relaxed text-ink-500 dark:text-ink-400">
-                    {totalExpensesCardSubtitle}
-                  </div>
-                  <CardValue className="mt-2">
-                    <span data-private>{formatEur(totalExpensesCard)}</span>
-                  </CardValue>
-                </div>
-              </div>
-              <div className="flex w-full min-w-0 shrink-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-                <label htmlFor="total-expenses-month-filter" className="sr-only">
-                  Filtrer Total expenses par mois
-                </label>
-                <select
-                  id="total-expenses-month-filter"
-                  value={totalExpensesMonthFilter ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setTotalExpensesMonthFilter(v === "" ? null : v);
-                  }}
-                  className="min-h-[48px] w-full min-w-0 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-base font-medium text-ink-800 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:min-w-[11.5rem] sm:text-sm"
-                  aria-label="Filtrer les totaux et catégories par mois civil"
-                >
-                  <option value="">Toute la période</option>
-                  {metrics.map((m) => (
-                    <option key={m.month} value={m.month}>
-                      {monthLabelFr(m.month)}
-                    </option>
-                  ))}
-                </select>
-                <div
-                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm font-medium text-ink-800 shadow-sm dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100 dark:shadow-none sm:w-auto sm:justify-end"
-                  title={
-                    totalExpensesMonthFilter
-                      ? undefined
-                      : "Nombre de mois écoulés dans la fenêtre (jusqu’au mois en cours), utilisé pour les moyennes"
-                  }
-                >
-                  <Calendar className="h-3.5 w-3.5 text-ink-500 dark:text-ink-400" aria-hidden />
-                  {totalExpensesMonthFilter
-                    ? monthLabelFr(totalExpensesMonthFilter)
-                    : `${monthsElapsedInDashboardPeriod || 0} mois`}
+          <Card id="dashboard-fiscal" variant="solid" className="flex h-full min-h-0 flex-col">
+            <CardHeader className="pb-3">
+              <div className="min-w-0">
+                <DashboardBlockTitle icon={TrendingDown} iconTone="expense">
+                  Total expenses
+                </DashboardBlockTitle>
+                <div className="mt-1 text-xs leading-relaxed text-ink-500 dark:text-ink-400">
+                  {totalExpensesCardSubtitle}
                 </div>
               </div>
             </CardHeader>
-            <CardBody className="flex flex-1 flex-col pt-6">
-              <div className="mb-1 flex items-start gap-2.5 text-sm text-ink-500 dark:text-ink-400">
+            <CardBody className="flex flex-1 flex-col pt-0">
+              <CardValue>
+                <span data-private>{formatEur(totalExpensesCard)}</span>
+              </CardValue>
+              <div className="mt-3 flex items-start gap-2.5 text-sm text-ink-500 dark:text-ink-400">
                 <span
                   className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-50/90 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
                   aria-hidden
@@ -1233,8 +1191,8 @@ export function DashboardClient({
                 }
                 ariaLabel={
                   kpiMode === "personal"
-                    ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique applique le même filtre que la liste déroulante.`
-                    : `Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique applique le même filtre que la liste déroulante.`
+                    ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
+                    : `Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
                 }
               />
               <div
@@ -1453,6 +1411,24 @@ export function DashboardClient({
           </Card>
         </div>
       </section>
+
+      {canWrite && (dashboardSection === "full" || dashboardSection === "sasu") ? (
+        <div className="mt-8 border-t border-ink-200/80 pt-5 dark:border-ink-800 md:hidden">
+          <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
+            Synchronisation Qonto
+          </p>
+          <button
+            type="button"
+            onClick={onClickSyncQontoApi}
+            disabled={isPending}
+            className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
+            title="Récupère les transactions via l’API Qonto."
+          >
+            <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
+            Synchroniser Qonto (API)
+          </button>
+        </div>
+      ) : null}
         </>
       )}
 

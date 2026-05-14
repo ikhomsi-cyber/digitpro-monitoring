@@ -93,6 +93,7 @@ export function DashboardFloatingDock() {
               key={tab.label}
               href={tab.href}
               prefetch={!tab.href.includes("#")}
+              scroll={false}
               className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5"
             >
               {active ? (

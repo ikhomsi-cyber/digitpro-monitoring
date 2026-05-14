@@ -1,29 +1,41 @@
-import { computeLatestQontoBalanceEur, isPrimaryBankCompany } from "@/lib/bank";
-import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { computeLatestQontoBalanceEur } from "@/lib/bank";
+import {
+  computeMetricsFromTransactions,
+  filterDashboardTransactions,
+  type DashboardTx
+} from "@/lib/dashboard-metrics";
 
 export type DashboardHeroStats = {
+  /**
+   * Encaissements « Chiffre d’affaires » TTC sur le **dernier mois** de la fenêtre 12 mois glissants
+   * (même clé mois et mêmes règles de date analytique que le graphique / carte revenus du dashboard).
+   */
   caMensuelEur: number;
   /** Dernier solde compte (colonne balance import Qonto), périmètre pro. */
   soldeQontoEur: number | null;
-  /** Somme des dépenses du mois civil courant, transactions SASU dont le compte est Qonto. */
+  /**
+   * Dépenses TTC du **même mois** : même agrégation que la carte « Total expenses » (sorties hors BNC et TVA),
+   * périmètre SASU, sur les transactions incluses dans la fenêtre 12 mois glissants.
+   */
   depensesQontoSasuMoisEur: number;
   /** Affichage indicatif — le TJM réel des jours facturables vient des réglages / Supabase. */
   tjmAfficheEur: number;
 };
 
-/** KPIs rapides mois civil courant (scope SASU / pro uniquement). */
-export function computeDashboardHeroStats(transactions: DashboardTx[]): DashboardHeroStats {
-  const d = new Date();
-  const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const slice = transactions.filter((t) => (t.scope ?? "pro") === "pro" && t.date.startsWith(ym));
-  const revenue = slice.filter((t) => t.amount > 0).reduce((a, t) => a + t.amount, 0);
-  const depensesQontoSasuMois = slice
-    .filter((t) => t.amount < 0 && isPrimaryBankCompany(t.company))
-    .reduce((a, t) => a + Math.abs(t.amount), 0);
+/**
+ * KPIs du hero : dernier mois de la série « 12 mois glissants » (aligné `last12MonthsKeys` + `computeMetricsFromTransactions`),
+ * périmètre SASU (`scope` pro) après le même filtre fenêtre que le tableau de bord.
+ */
+export function computeDashboardHeroStats(transactions: DashboardTx[], now = new Date()): DashboardHeroStats {
+  const proTxs = transactions.filter((t) => (t.scope ?? "pro") === "pro");
+  const windowed = filterDashboardTransactions(proTxs, { years: null }, now);
+  const monthly = computeMetricsFromTransactions(windowed, now);
+  const last = monthly.length ? monthly[monthly.length - 1]! : { month: "", revenue: 0, expenses: 0 };
+
   return {
-    caMensuelEur: revenue,
+    caMensuelEur: last.revenue,
     soldeQontoEur: computeLatestQontoBalanceEur(transactions, "pro"),
-    depensesQontoSasuMoisEur: depensesQontoSasuMois,
+    depensesQontoSasuMoisEur: last.expenses,
     tjmAfficheEur: 620
   };
 }

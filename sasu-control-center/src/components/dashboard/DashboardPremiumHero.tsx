@@ -12,13 +12,13 @@ type Props = {
 export function DashboardPremiumHero({ stats, contextMessage, showContextBanner }: Props) {
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
 
-  const tiles = [
-    { label: "CA mensuel", value: formatEur(stats.caMensuelEur) },
+  const tiles: { label: string; value: string; suffix?: string }[] = [
+    { label: "Encaissé ce mois", value: formatEur(stats.caMensuelEur), suffix: "TTC" },
     {
-      label: "Solde Qonto",
+      label: "Cash disponible",
       value: stats.soldeQontoEur != null ? formatEur(stats.soldeQontoEur) : "—"
     },
-    { label: "Dépenses du mois (Qonto)", value: formatEur(stats.depensesQontoSasuMoisEur) },
+    { label: "Dépenses du mois (SASU)", value: formatEur(stats.depensesQontoSasuMoisEur), suffix: "TTC" },
     { label: "TJM (indicatif)", value: formatEur(stats.tjmAfficheEur) }
   ];
 
@@ -65,6 +65,11 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
               <dt className="text-[11px] font-medium text-ink-500 dark:text-white/45">{t.label}</dt>
               <dd className="mt-1.5 font-display text-lg font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-xl">
                 {t.value}
+                {t.suffix ? (
+                  <span className="ml-1.5 align-baseline text-xs font-semibold tracking-normal text-ink-500 dark:text-white/45">
+                    {t.suffix}
+                  </span>
+                ) : null}
               </dd>
             </div>
           ))}
