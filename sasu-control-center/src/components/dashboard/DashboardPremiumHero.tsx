@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
+import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
 
 export function DashboardPremiumHero({ stats, contextMessage, showContextBanner }: Props) {
   const fmt = useDashboardDisplayFormat();
+  const billable = useBillableActivity();
 
   const tiles: { label: string; value: string; suffix?: string }[] = useMemo(
     () => [
@@ -82,6 +85,16 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
             </div>
           ))}
         </dl>
+
+        <div className="mx-auto mt-8 max-w-3xl text-left">
+          <ActivityOverviewPremium
+            monthTitle={billable.overviewMonthTitle}
+            kpis={billable.overviewKpis}
+            workdayGauge={billable.overviewWorkdayGauge}
+            ctaMode="navigate"
+          />
+        </div>
+
         <p className="mt-8 text-xs text-ink-400 dark:text-white/30">by Iliass KHOMSI</p>
       </div>
     </header>

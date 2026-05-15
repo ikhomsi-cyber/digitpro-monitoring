@@ -1,12 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
-import { CalendarDays, ChevronLeft, ChevronRight, BriefcaseBusiness, CarFront, Utensils } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  BriefcaseBusiness,
+  CarFront,
+  Utensils
+} from "lucide-react";
 import { clsx } from "clsx";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
-import { replaceBillableWorkDays } from "@/app/dashboard/actions";
+import {
+  computeCalendarStickyKpis,
+  computeTjmWorkdayGauge,
+  isBillableWorkdayIso,
+  monthTitleFr,
+  toBillableIso
+} from "@/lib/billable-calendar-metrics";
 import { indemniteKmPerWorkDayEur } from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
@@ -16,10 +29,19 @@ import { TreasuryVerserPanel } from "@/components/dashboard/TreasuryVerserPanel"
 import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
 import { buildInvoiceWorkedDaysPastMonthsSeries } from "@/lib/invoice-worked-days-series";
 
-const STORAGE_KEY = "digitpro:billable-work-days-iso";
-
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
+
+function monthMatrix(year: number, month0: number): ({ day: number } | null)[] {
+  const first = new Date(year, month0, 1);
+  const last = new Date(year, month0 + 1, 0);
+  const startPad = (first.getDay() + 6) % 7;
+  const daysInMonth = last.getDate();
+  const cells: ({ day: number } | null)[] = [];
+  for (let i = 0; i < startPad; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d });
+  return cells;
+}
 
 const IK_REFERENCE_EUR = 550;
 const MEALS_REFERENCE_EUR = 650;
@@ -27,15 +49,6 @@ const MEALS_REFERENCE_EUR = 650;
 function clamp01(x: number): number {
   if (!Number.isFinite(x)) return 0;
   return Math.max(0, Math.min(1, x));
-}
-
-/** Lun–ven, hors jours fériés France métropolitaine (même périmètre que le calendrier). */
-function isBillableWorkdayIso(iso: string, holidays: ReadonlyMap<string, string>): boolean {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  const dow = dt.getDay();
-  if (dow === 0 || dow === 6) return false;
-  return !holidays.has(iso);
 }
 
 /** Jauge : jours ouvrés cochés vs reste jusqu’à fin de mois (TJM / même logique que le bloc). */
@@ -124,45 +137,6 @@ function BudgetGauge({
   );
 }
 
-function parseStored(raw: string | null): Set<string> {
-  if (!raw) return new Set();
-  try {
-    const a = JSON.parse(raw) as unknown;
-    if (!Array.isArray(a)) return new Set();
-    return new Set(
-      a.filter((x): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x))
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-function toIso(y: number, month0: number, day: number): string {
-  return `${y}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function monthMatrix(year: number, month0: number): ({ day: number } | null)[] {
-  const first = new Date(year, month0, 1);
-  const last = new Date(year, month0 + 1, 0);
-  const startPad = (first.getDay() + 6) % 7;
-  const daysInMonth = last.getDate();
-  const cells: ({ day: number } | null)[] = [];
-  for (let i = 0; i < startPad; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d });
-  return cells;
-}
-
-function monthTitleFr(year: number, month0: number): string {
-  const raw = new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
-    new Date(year, month0, 1)
-  );
-  return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
-function persistSignature(sortedDates: string[], tjm: number): string {
-  return sortedDates.join(",") + "|" + tjm;
-}
-
 function foldTxBlob(raw: string): string {
   return (raw ?? "")
     .normalize("NFD")
@@ -186,85 +160,18 @@ function isPersonalNdfDigitProInMonth(tx: DashboardTx, monthKey: string): boolea
 }
 
 export function BillableDaysCalendarBlock({
-  tjmHt,
-  persistToSupabase,
-  initialWorkDayIsos,
-  onWorkDaysChange,
   treasuryTransactions,
   treasuryScope
 }: {
-  tjmHt: number;
-  persistToSupabase: boolean;
-  initialWorkDayIsos: string[];
-  /** Notifié après hydratation et à chaque changement de sélection (liste triée ISO). */
-  onWorkDaysChange?: (sortedIsos: readonly string[]) => void;
   /** Mouvements pour le bloc trésorerie (solde, CA, TVA). */
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
 }) {
+  const { selected, setSelected, hydrated, tjmHt, persistToSupabase } = useBillableActivity();
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth0, setViewMonth0] = useState(now.getMonth());
-  /** Calendrier détaillé masqué jusqu’au clic (UX type fintech). */
-  const [calendarExpanded, setCalendarExpanded] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [hydrated, setHydrated] = useState(false);
-  const [, startTransition] = useTransition();
   const fmt = useDashboardDisplayFormat();
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
-  const lastPersistedRef = useRef<string | null>(null);
-
-  const serverDaysKey = useMemo(
-    () => [...initialWorkDayIsos].sort().join("|"),
-    [initialWorkDayIsos]
-  );
-
-  useEffect(() => {
-    if (persistToSupabase) {
-      setSelected(new Set(initialWorkDayIsos));
-      lastPersistedRef.current = persistSignature([...initialWorkDayIsos].sort(), tjmHt);
-    } else if (typeof window !== "undefined") {
-      setSelected(parseStored(localStorage.getItem(STORAGE_KEY)));
-      lastPersistedRef.current = null;
-    }
-    setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `serverDaysKey` résume `initialWorkDayIsos` (réf. tableau instable).
-  }, [persistToSupabase, serverDaysKey, tjmHt]);
-
-  useEffect(() => {
-    if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected].sort()));
-  }, [selected, hydrated, persistToSupabase]);
-
-  useEffect(() => {
-    if (!hydrated || !persistToSupabase) return;
-    const sortedDates = [...selectedRef.current].sort();
-    const sig = persistSignature(sortedDates, tjmHt);
-    if (sig === lastPersistedRef.current) return;
-    const t = setTimeout(() => {
-      const toSave = [...selectedRef.current].sort();
-      const sigNow = persistSignature(toSave, tjmHt);
-      startTransition(() => {
-        void replaceBillableWorkDays(toSave, tjmHt)
-          .then(() => {
-            lastPersistedRef.current = sigNow;
-          })
-          .catch((e) => {
-            toast.error("Enregistrement des jours travaillés impossible", {
-              description: e instanceof Error ? e.message : undefined
-            });
-          });
-      });
-    }, 500);
-    return () => clearTimeout(t);
-  }, [selected, hydrated, persistToSupabase, tjmHt]);
-
-  useEffect(() => {
-    if (!hydrated || !onWorkDaysChange) return;
-    onWorkDaysChange([...selected].sort());
-  }, [selected, hydrated, onWorkDaysChange]);
-
   const matrix = useMemo(() => monthMatrix(viewYear, viewMonth0), [viewYear, viewMonth0]);
 
   const publicHolidays = useMemo(() => getFrenchPublicHolidaysForYear(viewYear), [viewYear]);
@@ -300,7 +207,7 @@ export function BillableDaysCalendarBlock({
     const d = new Date();
     const nowY = d.getFullYear();
     const nowM0 = d.getMonth();
-    const todayIso = toIso(nowY, nowM0, d.getDate());
+    const todayIso = toBillableIso(nowY, nowM0, d.getDate());
     const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
     const monthTitle = monthTitleFr(viewYear, viewMonth0);
 
@@ -329,55 +236,10 @@ export function BillableDaysCalendarBlock({
     return { countedDays, monthTitle, isPast, isCurrent, todayLongFr };
   }, [selected, viewYear, viewMonth0]);
 
-  /** Lun–ven hors fériés métro. : cochés (même fenêtre que le brut TJM) vs reste jusqu’à fin de mois. */
-  const tjmWorkdayGauge = useMemo(() => {
-    const d = new Date();
-    const nowY = d.getFullYear();
-    const nowM0 = d.getMonth();
-    const todayD = d.getDate();
-    const todayIso = toIso(nowY, nowM0, todayD);
-    const lastDate = new Date(viewYear, viewMonth0 + 1, 0);
-    const lastDay = lastDate.getDate();
-    const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
-
-    const isPast =
-      viewYear < nowY || (viewYear === nowY && viewMonth0 < nowM0);
-    const isCurrent = viewYear === nowY && viewMonth0 === nowM0;
-
-    const billableIsos: string[] = [];
-    for (let day = 1; day <= lastDay; day++) {
-      const iso = toIso(viewYear, viewMonth0, day);
-      if (isBillableWorkdayIso(iso, publicHolidays)) billableIsos.push(iso);
-    }
-    const totalBillableMonth = billableIsos.length;
-
-    let countedBillable = 0;
-    for (const iso of selected) {
-      if (!iso.startsWith(prefix)) continue;
-      if (!isBillableWorkdayIso(iso, publicHolidays)) continue;
-      if (isPast) countedBillable++;
-      else if (isCurrent) {
-        if (iso <= todayIso) countedBillable++;
-      } else {
-        countedBillable++;
-      }
-    }
-
-    let remainingBillable = 0;
-    if (isPast) {
-      remainingBillable = 0;
-    } else if (isCurrent) {
-      for (const iso of billableIsos) {
-        if (iso > todayIso) remainingBillable++;
-      }
-    } else {
-      for (const iso of billableIsos) {
-        if (!selected.has(iso)) remainingBillable++;
-      }
-    }
-
-    return { countedBillable, remainingBillable, totalBillableMonth, isCurrent };
-  }, [selected, viewYear, viewMonth0, publicHolidays]);
+  const tjmWorkdayGauge = useMemo(
+    () => computeTjmWorkdayGauge(selected, viewYear, viewMonth0),
+    [selected, viewYear, viewMonth0]
+  );
 
   const brutTjmMoisEncoursHt = selectedViewMonthStats.countedDays * tjmHt;
   const ikPerDay = indemniteKmPerWorkDayEur();
@@ -428,13 +290,10 @@ export function BillableDaysCalendarBlock({
     };
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
 
-  const calendarStickyKpis = useMemo(() => {
-    const jours = tjmWorkdayGauge.countedBillable;
-    const caEstime = brutTjmMoisEncoursHt;
-    const resteAFacturer = Math.max(0, tjmWorkdayGauge.totalBillableMonth - jours) * tjmHt;
-    const projectionFinMois = tjmWorkdayGauge.totalBillableMonth * tjmHt;
-    return { jours, caEstime, resteAFacturer, projectionFinMois };
-  }, [tjmWorkdayGauge, brutTjmMoisEncoursHt, tjmHt]);
+  const calendarStickyKpis = useMemo(
+    () => computeCalendarStickyKpis(selected, tjmHt, viewYear, viewMonth0),
+    [selected, tjmHt, viewYear, viewMonth0]
+  );
 
   const toggleDay = useCallback((iso: string) => {
     setSelected((prev) => {
@@ -477,7 +336,7 @@ export function BillableDaysCalendarBlock({
   };
 
   const clock = new Date();
-  const todayIsoLive = toIso(clock.getFullYear(), clock.getMonth(), clock.getDate());
+  const todayIsoLive = toBillableIso(clock.getFullYear(), clock.getMonth(), clock.getDate());
 
   const invoiceWorkedDaysSeries = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return [];
@@ -535,46 +394,12 @@ export function BillableDaysCalendarBlock({
               Jours travaillés & TJM
             </CardTitle>
             <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500 dark:text-white/50 sm:text-xs">
-              Vue calendrier type Linear — dépliez pour cocher les jours facturés.
+              Calendrier des jours facturés, TJM et indicateurs du mois.
             </p>
           </div>
         </div>
       </CardHeader>
-      {!calendarExpanded ? (
-        <CardBody className="px-4 pb-6 pt-2 sm:px-6">
-          <div className="rounded-2xl border border-ink-200/80 bg-gradient-to-b from-white to-ink-50/90 p-5 dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#0c0e0d] dark:to-[#050505]">
-            <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-ink-500 dark:text-emerald-300/80">
-              Aperçu
-            </p>
-            <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-              {[
-                { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
-                { k: "CA estimé", v: fmt.euro(calendarStickyKpis.caEstime) },
-                { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
-                { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
-              ].map((row) => (
-                <div
-                  key={row.k}
-                  className="rounded-2xl border border-ink-200/80 bg-white/80 px-3 py-3 text-left dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                >
-                  <dt className="text-[10px] font-medium text-ink-500 dark:text-white/45">{row.k}</dt>
-                  <dd className="mt-1 font-display text-base font-semibold tabular-nums text-ink-900 dark:text-white">
-                    {row.v}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <button
-              type="button"
-              onClick={() => setCalendarExpanded(true)}
-              className="premium-cta mt-5 w-full py-3.5 text-sm font-semibold"
-            >
-              Ouvrir le calendrier & TJM
-            </button>
-          </div>
-        </CardBody>
-      ) : (
-        <CardBody className="relative px-4 pb-28 pt-4 sm:px-6 md:pb-10">
+      <CardBody className="relative px-4 pb-28 pt-4 sm:px-6 md:pb-10">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4 lg:shrink-0">
@@ -629,7 +454,7 @@ export function BillableDaysCalendarBlock({
                   if (!cell) {
                     return <div key={`e-${i}`} className="h-8 w-8" aria-hidden />;
                   }
-                  const iso = toIso(viewYear, viewMonth0, cell.day);
+                  const iso = toBillableIso(viewYear, viewMonth0, cell.day);
                   const on = selected.has(iso);
                   const isToday = iso === todayIsoLive;
                   const dow = new Date(viewYear, viewMonth0, cell.day).getDay();
@@ -1059,16 +884,8 @@ export function BillableDaysCalendarBlock({
                 </div>
               ))}
             </dl>
-            <button
-              type="button"
-              onClick={() => setCalendarExpanded(false)}
-              className="mt-3 w-full rounded-full border border-ink-200/90 py-2.5 text-xs font-semibold text-ink-800 transition hover:bg-ink-50 dark:border-white/20 dark:bg-white/[0.06] dark:text-zinc-100 dark:hover:bg-white/[0.1]"
-            >
-              Replier le calendrier
-            </button>
           </div>
       </CardBody>
-      )}
     </Card>
   );
 }

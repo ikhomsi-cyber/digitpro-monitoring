@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
+import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
@@ -242,8 +243,6 @@ export function DashboardClient({
   syncKey,
   initialTransactions,
   transactionYearBounds,
-  initialBillableWorkDays,
-  initialBillableTjmHt,
   initialDashboardScope
 }: {
   runtimeMode: SupabaseRuntimeMode;
@@ -258,8 +257,6 @@ export function DashboardClient({
   initialTransactions: DashboardTx[];
   /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
   transactionYearBounds: { minYear: number; maxYear: number } | null;
-  initialBillableWorkDays: string[];
-  initialBillableTjmHt: number | null;
   /** Dérivé de `?scope=` sur `/dashboard` (pro | personal), sinon défaut SASU. */
   initialDashboardScope?: "pro" | "personal" | null;
 }) {
@@ -381,27 +378,7 @@ export function DashboardClient({
 
   const bankinFileInputRef = useRef<HTMLInputElement>(null);
 
-  const billableTjmEffective = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
-  const persistBillableToSupabase = canWrite && runtimeMode === "SUPABASE";
-
-  const serverBillableKey = useMemo(
-    () => [...initialBillableWorkDays].sort().join("|"),
-    [initialBillableWorkDays]
-  );
-  const [billableWorkDayIsos, setBillableWorkDayIsos] = useState<string[]>(() =>
-    [...initialBillableWorkDays].sort()
-  );
-  useEffect(() => {
-    setBillableWorkDayIsos([...initialBillableWorkDays].sort());
-  }, [serverBillableKey, initialBillableWorkDays]);
-
-  const onBillableWorkDaysChange = useCallback((isos: readonly string[]) => {
-    setBillableWorkDayIsos((prev) => {
-      const next = [...isos].sort();
-      if (prev.join("|") === next.join("|")) return prev;
-      return next;
-    });
-  }, []);
+  const { sortedIsos: billableWorkDayIsos } = useBillableActivity();
 
   const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
 
@@ -884,10 +861,6 @@ export function DashboardClient({
         >
       {dashboardSection === "activite" ? (
         <BillableDaysCalendarBlock
-          tjmHt={billableTjmEffective}
-          persistToSupabase={persistBillableToSupabase}
-          initialWorkDayIsos={initialBillableWorkDays}
-          onWorkDaysChange={onBillableWorkDaysChange}
           treasuryTransactions={transactions}
           treasuryScope="pro"
         />
@@ -1073,7 +1046,48 @@ export function DashboardClient({
                     : `Évolution du chiffre d’affaires HT par mois — ${periodLabel}`
                 }
               />
-              {kpiMode === "personal" ? null : (
+              {kpiMode === "personal" ? (
+                <div
+                  className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
+                  aria-label={`Projection encaissements perso fin ${revenueYearProjection.calendarYear}`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      aria-hidden
+                    >
+                      <CalendarClock className="h-4 w-4" strokeWidth={2} />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
+                        Projection fin {revenueYearProjection.calendarYear}
+                      </p>
+                      <p
+                        className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
+                        data-private
+                      >
+                        {fmt.euro(revenueYearProjection.projectedYearEndTtc)}{" "}
+                        <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">TTC</span>
+                      </p>
+                      <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
+                        Réalisé depuis le 1er janv. :{" "}
+                        <span className="font-medium text-emerald-950 dark:text-emerald-200">
+                          {fmt.euro(revenueYearProjection.ytdTtc)}
+                        </span>
+                        <span className="text-emerald-800/80 dark:text-emerald-400/80">
+                          {" "}
+                          · jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
+                          {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                        </span>
+                      </p>
+                      <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
+                        Encaissements cumulés (hors virements internes Bankin), extrapolation linéaire au prorata
+                        calendaire. Indépendant de la fenêtre graphique ci-dessus.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div
                   className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
                   aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}

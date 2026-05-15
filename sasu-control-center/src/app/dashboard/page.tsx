@@ -22,7 +22,9 @@ import { Logo } from "@/components/ui/Logo";
 import { AppSectionNav } from "@/components/AppSectionNav";
 import { DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
+import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
+import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 import { isPowensCloudConfigured } from "@/lib/powens/cloud-api";
@@ -178,9 +180,16 @@ export default async function DashboardPage({
         : "";
   const showContextBanner = envMode === "DEMO" || demoPreferenceOn;
   const dummyDataActive = isDashboardDummyDataActive(cookieStore);
+  const billableTjmHt = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
+  const persistBillableToSupabase = dataMode === "SUPABASE" && envMode === "SUPABASE";
 
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
+    <BillableActivityProvider
+      tjmHt={billableTjmHt}
+      persistToSupabase={persistBillableToSupabase}
+      initialWorkDayIsos={initialBillableWorkDays}
+    >
     <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
       <DashboardTopNav
         envMode={envMode}
@@ -227,8 +236,6 @@ export default async function DashboardPage({
             syncKey={syncKey}
             initialTransactions={transactions}
             transactionYearBounds={transactionYearBounds}
-            initialBillableWorkDays={initialBillableWorkDays}
-            initialBillableTjmHt={initialBillableTjmHt}
             initialDashboardScope={initialDashboardScope}
           />
         </Suspense>
@@ -254,6 +261,7 @@ export default async function DashboardPage({
         <DashboardFloatingDock />
       </Suspense>
     </div>
+    </BillableActivityProvider>
     </DashboardDummyDataProvider>
   );
 }
