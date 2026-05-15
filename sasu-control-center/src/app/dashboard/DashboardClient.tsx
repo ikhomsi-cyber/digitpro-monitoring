@@ -864,6 +864,8 @@ export function DashboardClient({
     });
   }, []);
 
+  if (dashboardSection === "full") return null;
+
   return (
     <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
       {canWrite ? (
@@ -897,25 +899,16 @@ export function DashboardClient({
           treasuryScope="pro"
         />
       ) : null}
-      {dashboardSection === "full" && scope === "personal" ? (
+      {dashboardSection === "private" ? (
         <PersonalMonitoringBlock
           transactionsWindow={periodFilteredTx}
           personalTransactionsFull={personalTransactionsFull}
           selectedYears={selectedYears}
         />
       ) : null}
-      {dashboardSection === "full" && scope !== "personal" ? (
-        <BillableDaysCalendarBlock
-          tjmHt={billableTjmEffective}
-          persistToSupabase={persistBillableToSupabase}
-          initialWorkDayIsos={initialBillableWorkDays}
-          onWorkDaysChange={onBillableWorkDaysChange}
-          treasuryTransactions={transactions}
-          treasuryScope={scope}
-        />
-      ) : null}
-      {dashboardSection === "full" ? (
-      <section id="dashboard-analytics" className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
+
+      {false ? (
+      <section id="dashboard-analytics-legacy" className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <span className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
@@ -1006,20 +999,16 @@ export function DashboardClient({
                     ) : null}
                   </>
                 ) : null}
-                {scope === "personal" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => bankinFileInputRef.current?.click()}
-                      disabled={isPending}
-                      className="btn-secondary inline-flex items-center gap-2 disabled:opacity-60"
-                      title="Importe l’export « Liste des transactions » Bankin (.xls / .xlsx) dans l’onglet Privé."
-                    >
-                      <Upload className="h-4 w-4 text-ink-500" aria-hidden />
-                      Importer Bankin (.xls)
-                    </button>
-                  </>
-                ) : null}
+                <button
+                  type="button"
+                  onClick={() => bankinFileInputRef.current?.click()}
+                  disabled={isPending}
+                  className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
+                  title="Importe l’export « Liste des transactions » Bankin (.xls / .xlsx) ; les lignes sont enregistrées en scope privé (comme l’import fichier habituel)."
+                >
+                  <Upload className="h-4 w-4 text-ink-500" aria-hidden />
+                  Importer Bankin (.xls)
+                </button>
               </div>
             ) : null}
           </div>
@@ -1030,7 +1019,7 @@ export function DashboardClient({
       </section>
       ) : null}
 
-      {(dashboardSection === "full" || dashboardSection === "sasu" || dashboardSection === "private") && (
+      {(dashboardSection === "sasu" || dashboardSection === "private") && (
         <>
           {(dashboardSection === "sasu" || dashboardSection === "private") && (
             <div className="flex min-w-0 flex-col gap-3">
@@ -1099,7 +1088,48 @@ export function DashboardClient({
                     : `Évolution du chiffre d’affaires HT par mois — ${periodLabel}`
                 }
               />
-              {kpiMode === "personal" ? null : (
+              {kpiMode === "personal" ? (
+                <div
+                  className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
+                  aria-label={`Projection encaissements perso fin ${revenueYearProjection.calendarYear}`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-white text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      aria-hidden
+                    >
+                      <CalendarClock className="h-4 w-4" strokeWidth={2} />
+                    </span>
+                    <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">
+                        Projection fin {revenueYearProjection.calendarYear}
+                      </p>
+                      <p
+                        className="font-display text-lg font-bold tabular-nums text-emerald-950 dark:text-emerald-100"
+                        data-private
+                      >
+                        {fmt.euro(revenueYearProjection.projectedYearEndTtc)}{" "}
+                        <span className="text-xs font-semibold text-emerald-800/80 dark:text-emerald-400">TTC</span>
+                      </p>
+                      <p className="text-xs leading-snug text-emerald-900/70 dark:text-emerald-300/70" data-private>
+                        Réalisé depuis le 1er janv. :{" "}
+                        <span className="font-medium text-emerald-950 dark:text-emerald-200">
+                          {fmt.euro(revenueYearProjection.ytdTtc)}
+                        </span>
+                        <span className="text-emerald-800/80 dark:text-emerald-400/80">
+                          {" "}
+                          · jour civil {revenueYearProjection.dayOfYear}/{revenueYearProjection.daysInYear} (
+                          {Math.round(revenueYearProjection.fractionOfYearElapsed * 100)} % de l’année)
+                        </span>
+                      </p>
+                      <p className="text-[11px] leading-snug text-emerald-800/70 dark:text-emerald-400/70">
+                        Encaissements cumulés (hors virements internes Bankin), extrapolation linéaire au prorata
+                        calendaire. Indépendant de la fenêtre graphique ci-dessus.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div
                   className="mt-3 rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3 py-3 dark:border-emerald-700/50 dark:bg-emerald-950/50"
                   aria-label={`Projection chiffre d’affaires fin ${revenueYearProjection.calendarYear}`}
@@ -1582,10 +1612,10 @@ export function DashboardClient({
         </div>
       </section>
 
-      {canWrite && (dashboardSection === "full" || dashboardSection === "sasu") ? (
+      {canWrite && (dashboardSection === "sasu" || dashboardSection === "private") ? (
         <div className="mt-8 space-y-3 border-t border-ink-200/80 pt-5 dark:border-ink-800 md:hidden">
           <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
-            Synchronisation Qonto
+            Synchronisations
           </p>
           <button
             type="button"
@@ -1599,9 +1629,6 @@ export function DashboardClient({
           </button>
           {powensCloudEnabled ? (
             <>
-              <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
-                Powens
-              </p>
               <button
                 type="button"
                 onClick={onClickPowensConnect}
@@ -1636,6 +1663,16 @@ export function DashboardClient({
               ) : null}
             </>
           ) : null}
+          <button
+            type="button"
+            onClick={() => bankinFileInputRef.current?.click()}
+            disabled={isPending}
+            className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
+            title="Importe l’export Bankin (.xls / .xlsx) en scope privé."
+          >
+            <Upload className="h-4 w-4 text-ink-500" aria-hidden />
+            Importer Bankin (.xls)
+          </button>
         </div>
       ) : null}
         </>
