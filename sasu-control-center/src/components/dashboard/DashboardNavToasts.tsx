@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Building2, Briefcase, User, type LucideIcon } from "lucide-react";
+import { Activity, Building2, Briefcase, Home, User, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
 const ITEMS: readonly {
@@ -11,6 +11,13 @@ const ITEMS: readonly {
   icon: LucideIcon;
   match: (ctx: { scope: string | null; panel: string | null; section: string | null }) => boolean;
 }[] = [
+  {
+    href: "/dashboard",
+    label: "Accueil",
+    icon: Home,
+    match: ({ panel, section }) =>
+      panel !== "lmnp" && (section == null || section === "")
+  },
   {
     href: "/dashboard?section=activite",
     label: "Activité",

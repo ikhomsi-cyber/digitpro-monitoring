@@ -3,6 +3,7 @@
  * les appels REST utilisent automatiquement …/2.0. Ou POWENS_API_BASE_URL complète si votre contrat l’exige.
  */
 
+import { categorizePowensApiTransaction } from "@/lib/bankin/categorize";
 import { fetchWithNetworkDiagnostics } from "@/lib/fetch-network-error";
 import { sanitizeLatin1HttpValue } from "@/lib/http-latin1";
 
@@ -327,17 +328,6 @@ export type PowensImportRow = {
   powensAccountId?: number;
 };
 
-function categoryFromRaw(raw: Record<string, unknown>): string {
-  const flat = str(raw.category ?? raw.category_name);
-  if (flat) return flat;
-  const cats = raw.categories;
-  if (Array.isArray(cats) && cats.length > 0) {
-    const first = cats[0] as Record<string, unknown>;
-    return str(first.code ?? first.parent_code);
-  }
-  return "";
-}
-
 function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | "personal"): PowensImportRow | null {
   const id = str(raw.id ?? raw.transaction_id ?? raw.uuid);
   const dateRaw = str(raw.date ?? raw.operation_date ?? raw.booking_date ?? raw.value_date).slice(0, 10);
@@ -351,13 +341,13 @@ function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | 
     str(raw.wording ?? raw.simplified_wording ?? raw.original_wording ?? raw.description ?? raw.title) ||
     str(raw.merchant_name) ||
     "Opération Powens";
-  const category = categoryFromRaw(raw);
+  const category = categorizePowensApiTransaction(raw, label, amount);
   const balance = num(raw.balance ?? raw.account_balance);
   const accountId = num(raw.id_account);
   return {
     date: dateRaw,
     label,
-    category: category || "Powens",
+    category: category.trim() ? category : "Powens",
     amount,
     balance: balance != null ? balance : null,
     company,

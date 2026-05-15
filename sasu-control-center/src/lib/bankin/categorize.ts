@@ -1,6 +1,7 @@
 /**
  * Catégorisation « style Bankin » : colonnes export Catégorie + Sous-catégorie,
  * avec repli sur le libellé lorsque Bankin laisse « A catégoriser » ou champs vides.
+ * Réutilisée aussi pour les transactions **Powens** (`categorizePowensApiTransaction`).
  *
  * Le libellé stocké en base reprend la hiérarchie Bankin : `Parent › Sous-catégorie`
  * (sans le point final typique des parents dans l’export).
@@ -116,4 +117,103 @@ export function categorizeBankinTransaction(input: BankinCategorizeInput): strin
   }
 
   return formatBankinHierarchy(parent, sub);
+}
+
+function strPowensField(v: unknown): string {
+  return typeof v === "string" ? v.trim() : v != null ? String(v).trim() : "";
+}
+
+function parentSubFromPowensCategoryEntry(first: Record<string, unknown>): { parent: string; sub: string } {
+  const parentObj = first.parent;
+  let parent = "";
+  if (parentObj && typeof parentObj === "object") {
+    const p = parentObj as Record<string, unknown>;
+    parent = strPowensField(p.name ?? p.label ?? p.code ?? p.title);
+  } else {
+    parent = strPowensField(
+      first.parent_name ??
+        first.parent_label ??
+        first.parent_code ??
+        (typeof parentObj === "string" || typeof parentObj === "number" ? parentObj : "")
+    );
+  }
+
+  const sub = strPowensField(
+    first.name ??
+      first.label ??
+      first.sub_name ??
+      first.subcategory ??
+      first.subcategory_name ??
+      first.child_name ??
+      first.code
+  );
+
+  return { parent, sub };
+}
+
+/** Buckets « non classé » typiques côté agrégateurs / Powens → même traitement que champs vides Bankin (inférences sur le libellé). */
+function isAggregatorGenericCategoryBucket(parent: string, sub: string): boolean {
+  const p = fold(parent);
+  const s = fold(sub);
+  if (!p && !s) return true;
+  const genericParent =
+    /^(autres|divers|other|uncategorized|uncategorised|sans categorie|non categorise|non classé|non classe|a categoriser|a categorise)$/.test(
+      p
+    );
+  if (!genericParent) return false;
+  return !s || s === p || /^(autres|divers|other|uncategorized|a categoriser|a categorise)$/.test(s);
+}
+
+/**
+ * Même logique que l’export Bankin (`categorizeBankinTransaction`) à partir du JSON transaction Powens / Budget Insight.
+ * Extrait parent + sous-catégorie depuis `categories[]`, champs plats ou libellés hiérarchiques (` › `, ` / `).
+ */
+export function categorizePowensApiTransaction(
+  raw: Record<string, unknown>,
+  label: string,
+  amount: number
+): string {
+  let parent = "";
+  let sub = "";
+
+  const cats = raw.categories;
+  if (Array.isArray(cats) && cats.length > 0) {
+    const first = cats[0] as Record<string, unknown>;
+    ({ parent, sub } = parentSubFromPowensCategoryEntry(first));
+  }
+
+  if (!parent && !sub) {
+    const flat = strPowensField(
+      raw.category ?? raw.category_name ?? raw.original_category ?? raw.category_label
+    );
+    if (flat) {
+      const sepHi = /\s[›>]\s/u.exec(flat);
+      if (sepHi?.index != null) {
+        parent = flat.slice(0, sepHi.index).trim();
+        sub = flat.slice(sepHi.index + sepHi[0].length).trim();
+      } else if (flat.includes(" / ")) {
+        const idx = flat.indexOf(" / ");
+        parent = flat.slice(0, idx).trim();
+        sub = flat.slice(idx + 3).trim();
+      } else if (flat.includes(" - ")) {
+        const idx = flat.indexOf(" - ");
+        parent = flat.slice(0, idx).trim();
+        sub = flat.slice(idx + 3).trim();
+      } else {
+        parent = flat;
+      }
+    }
+  }
+
+  if (isAggregatorGenericCategoryBucket(parent, sub)) {
+    parent = "";
+    sub = "";
+  }
+
+  return categorizeBankinTransaction({
+    parentCategory: parent,
+    subCategory: sub,
+    description: label.trim(),
+    amount
+  });
 }
