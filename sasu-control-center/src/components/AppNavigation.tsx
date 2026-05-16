@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Building2, Briefcase, LayoutDashboard, Menu, User, X } from "lucide-react";
+import { Building2, Briefcase, Gem, LayoutDashboard, Menu, User, X } from "lucide-react";
+import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
 
 type NavItem = {
@@ -21,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Vue d’ensemble du pilotage",
     icon: LayoutDashboard,
     isActive: (pathname, scope, panel) =>
-      pathname.startsWith("/dashboard") && scope == null && panel !== "lmnp"
+      pathname.startsWith("/dashboard") && scope == null && !isDashboardAnalyticsPanel(panel)
   },
   {
     href: "/dashboard?scope=pro",
@@ -29,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Activité société",
     icon: Briefcase,
     isActive: (pathname, scope, panel) =>
-      pathname.startsWith("/dashboard") && scope === "pro" && panel !== "lmnp"
+      pathname.startsWith("/dashboard") && scope === "pro" && !isDashboardAnalyticsPanel(panel)
   },
   {
     href: "/dashboard?scope=personal",
@@ -37,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Finances personnelles",
     icon: User,
     isActive: (pathname, scope, panel) =>
-      pathname.startsWith("/dashboard") && scope === "personal" && panel !== "lmnp"
+      pathname.startsWith("/dashboard") && scope === "personal" && !isDashboardAnalyticsPanel(panel)
   },
   {
     href: "/dashboard?panel=lmnp",
@@ -46,6 +47,14 @@ const NAV_ITEMS: NavItem[] = [
     icon: Building2,
     isActive: (pathname, _scope, panel) =>
       pathname.startsWith("/dashboard") && panel === "lmnp"
+  },
+  {
+    href: "/dashboard?panel=valeur-reelle",
+    label: "Valeur réelle",
+    description: "Analyse charges & avantages cachés",
+    icon: Gem,
+    isActive: (pathname, _scope, panel) =>
+      pathname.startsWith("/dashboard") && panel === "valeur-reelle"
   }
 ];
 

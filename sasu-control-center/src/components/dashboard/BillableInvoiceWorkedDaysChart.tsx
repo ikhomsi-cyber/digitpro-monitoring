@@ -5,15 +5,43 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
-import type { InvoiceWorkedDayMonth } from "@/lib/invoice-worked-days-series";
+import type {
+  InvoiceWorkedDayKind,
+  InvoiceWorkedDayMonth
+} from "@/lib/invoice-worked-days-series";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
+
+const KIND_META: Record<
+  InvoiceWorkedDayKind,
+  { label: string; fill: string; fillDark: string; tooltipHint: string }
+> = {
+  encaisse: {
+    label: "Encaissé",
+    fill: "",
+    fillDark: "",
+    tooltipHint: "CA HT encaissé (mois B+2) ÷ TJM"
+  },
+  deja_facture: {
+    label: "Déjà facturé",
+    fill: "#38bdf8",
+    fillDark: "#0ea5e9",
+    tooltipHint: "Jours cochés dans l’agenda (mois dernier)"
+  },
+  a_facturer: {
+    label: "À facturer",
+    fill: "#a78bfa",
+    fillDark: "#8b5cf6",
+    tooltipHint: "Jours cochés dans l’agenda (1er → aujourd’hui)"
+  }
+};
 
 function sourceLabel(mk: string): string {
   const y = Number(mk.slice(0, 4));
@@ -21,6 +49,20 @@ function sourceLabel(mk: string): string {
   return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
     new Date(y, m - 1, 1)
   );
+}
+
+function barFill(kind: InvoiceWorkedDayKind, gradId: string, isDark: boolean): string {
+  if (kind === "encaisse") return `url(#${gradId})`;
+  return isDark ? KIND_META[kind].fillDark : KIND_META[kind].fill;
+}
+
+/** Espacement des ticks X selon le nombre de mois (Recharts `interval` = step − 1). */
+function xAxisTickStep(count: number): number {
+  if (count <= 6) return 1;
+  if (count <= 12) return 2;
+  if (count <= 24) return 3;
+  if (count <= 36) return 4;
+  return 6;
 }
 
 function ChartTooltip({
@@ -34,17 +76,60 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const p = payload[0]?.payload;
   if (!p) return null;
+  const meta = KIND_META[p.kind];
+  const toneClass =
+    p.kind === "encaisse"
+      ? "text-emerald-800 dark:text-emerald-300"
+      : p.kind === "deja_facture"
+        ? "text-sky-800 dark:text-sky-300"
+        : "text-violet-800 dark:text-violet-300";
+
   return (
     <div className="rounded-lg border border-ink-200 bg-white px-2.5 py-2 text-xs shadow-md dark:border-ink-600 dark:bg-ink-900 dark:shadow-none">
       <div className="font-medium capitalize text-ink-900 dark:text-ink-50">{p.label}</div>
+      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
+        {meta.label}
+      </div>
       <div className="mt-1 tabular-nums text-ink-700 dark:text-ink-300">
-        <span className="font-semibold text-emerald-800 dark:text-emerald-300">{fmt.int(p.days)} j.</span>
-        <span className="text-ink-500 dark:text-ink-400"> facturés</span>
+        <span className={`font-semibold ${toneClass}`}>{fmt.int(p.days)} j.</span>
       </div>
-      <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
-        CA HT ({sourceLabel(p.sourceMonthKey)}) : {fmt.euro(p.caHt)}
-      </div>
+      <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">{meta.tooltipHint}</div>
+      {p.kind === "encaisse" ? (
+        <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
+          CA HT ({sourceLabel(p.sourceMonthKey)}) : {fmt.euro(p.caHt)}
+        </div>
+      ) : (
+        <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
+          CA HT estimé : {fmt.euro(p.caHt)}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ChartLegend({ isDark }: { isDark: boolean }) {
+  return (
+    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] text-ink-600 dark:text-ink-400">
+      {(Object.keys(KIND_META) as InvoiceWorkedDayKind[]).map((kind) => {
+        const meta = KIND_META[kind];
+        const swatch =
+          kind === "encaisse"
+            ? "bg-gradient-to-b from-emerald-400 to-emerald-600"
+            : kind === "deja_facture"
+              ? isDark
+                ? "bg-sky-500"
+                : "bg-sky-400"
+              : isDark
+                ? "bg-violet-500"
+                : "bg-violet-400";
+        return (
+          <li key={kind} className="inline-flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${swatch}`} aria-hidden />
+            <span>{meta.label}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -52,18 +137,24 @@ export function BillableInvoiceWorkedDaysChart({
   data,
   averageDaysPerMonth,
   monthsInView,
+  totalWorkedDaysInPeriod,
+  periodLabel,
   emptyHint = "default"
 }: {
   data: InvoiceWorkedDayMonth[];
-  /** Moyenne arithmétique des jours facturés sur les mois affichés (barres du filtre). */
+  /** Moyenne arithmétique des jours encaissés (barres « Encaissé » uniquement). */
   averageDaysPerMonth: number | null;
   monthsInView: number;
+  /** Somme des jours des barres affichées par le filtre axe B. */
+  totalWorkedDaysInPeriod: number;
+  /** Libellé de période (ex. « 2026 », « T1 2026 »). */
+  periodLabel: string;
   /** Message vide si le filtre année/trimestre exclut toutes les barres. */
   emptyHint?: "default" | "filter";
 }) {
   const fmt = useDashboardDisplayFormat();
   const uid = useId().replace(/:/g, "");
-  const gradId = `inv-days-${uid}`;
+  const gradId = `inv-grad-encaisse-${uid}`;
   const isDark = useRootIsDark();
   const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
@@ -78,27 +169,39 @@ export function BillableInvoiceWorkedDaysChart({
     );
   }
 
+  const xTickStep = xAxisTickStep(data.length);
+  const xTickInterval = xTickStep - 1;
+  const chartBottom = xTickStep === 1 ? 28 : xTickStep <= 3 ? 24 : 20;
+  const xAxisAngle = xTickStep === 1 ? -40 : xTickStep <= 2 ? -35 : -30;
+  const xAxisHeight = xTickStep === 1 ? 48 : xTickStep <= 3 ? 42 : 36;
+
   return (
     <div className="w-full" data-private>
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/85">
         Jours facturés
       </p>
+      <p className="mb-1.5 text-[11px] font-semibold tabular-nums text-ink-900 dark:text-ink-100">
+        Jours travaillés affichés : {fmt.int(totalWorkedDaysInPeriod)} j.{" "}
+        <span className="font-normal text-ink-500 dark:text-ink-400">({periodLabel})</span>
+      </p>
       {averageDaysPerMonth != null && monthsInView > 0 ? (
         <p className="mb-1.5 text-[11px] font-medium tabular-nums text-emerald-900/90 dark:text-emerald-200/90">
-          Moyenne : {averageDaysPerMonth != null ? fmt.int(averageDaysPerMonth) : "—"} j. / mois{" "}
+          Moyenne encaissé : {fmt.int(averageDaysPerMonth)} j. / mois{" "}
           <span className="font-normal text-ink-500 dark:text-ink-400">
-            ({fmt.int(monthsInView)} mois affiché{monthsInView > 1 ? "s" : ""})
+            ({fmt.int(monthsInView)} mois encaissé{monthsInView > 1 ? "s" : ""})
           </span>
         </p>
       ) : null}
       <p className="mb-3 text-[10px] leading-snug text-ink-500 dark:text-ink-400">
-        Chaque barre = mois <span className="font-medium">B</span> sur l’axe · jours = CA HT encaissé en{" "}
-        <span className="font-medium">B + 2</span> (ex. encaissement avril → barre février) ÷{" "}
-        {fmt.euro(BILLABLE_CLIENT_TJM_HT)} · TVA 20 % · mois en cours inclus (partiel)
+        <span className="font-medium text-emerald-700 dark:text-emerald-300">Encaissé</span> : mois B ·
+        jours = CA HT encaissé en B+2 ÷ {fmt.euro(BILLABLE_CLIENT_TJM_HT)} ·{" "}
+        <span className="font-medium text-sky-700 dark:text-sky-300">Déjà facturé</span> : agenda mois
+        dernier · <span className="font-medium text-violet-700 dark:text-violet-300">À facturer</span> :
+        agenda du 1er au jour J
       </p>
       <div className="h-[11.5rem] w-full sm:h-52">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: 28 }}>
+          <BarChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: chartBottom }}>
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#10b981" stopOpacity={0.95} />
@@ -110,10 +213,10 @@ export function BillableInvoiceWorkedDaysChart({
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              interval={0}
-              angle={-40}
+              interval={xTickInterval}
+              angle={xAxisAngle}
               textAnchor="end"
-              height={48}
+              height={xAxisHeight}
               tick={{ fill: tickFill, fontSize: 9 }}
             />
             <YAxis
@@ -125,20 +228,22 @@ export function BillableInvoiceWorkedDaysChart({
             />
             <Tooltip
               content={<ChartTooltip />}
-              cursor={{
-                fill: isDark ? "rgba(16, 185, 129, 0.12)" : "rgba(16, 185, 129, 0.08)"
-              }}
+              cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
             />
             <Bar
               dataKey="days"
-              fill={`url(#${gradId})`}
               radius={[6, 6, 0, 0]}
               maxBarSize={36}
               isAnimationActive={data.length < 30}
-            />
+            >
+              {data.map((entry) => (
+                <Cell key={entry.monthKey} fill={barFill(entry.kind, gradId, isDark)} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <ChartLegend isDark={isDark} />
     </div>
   );
 }

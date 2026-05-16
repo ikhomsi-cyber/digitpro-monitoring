@@ -18,7 +18,8 @@ import {
   computeTjmWorkdayGauge,
   isBillableWorkdayIso,
   monthTitleFr,
-  toBillableIso
+  toBillableIso,
+  workedDaysChartPeriodLabel
 } from "@/lib/billable-calendar-metrics";
 import { indemniteKmPerWorkDayEur } from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
@@ -27,7 +28,10 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { TreasuryVerserPanel } from "@/components/dashboard/TreasuryVerserPanel";
 import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
-import { buildInvoiceWorkedDaysPastMonthsSeries } from "@/lib/invoice-worked-days-series";
+import {
+  appendAgendaWorkedDayMonths,
+  buildInvoiceWorkedDaysPastMonthsSeries
+} from "@/lib/invoice-worked-days-series";
 
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
@@ -353,8 +357,11 @@ export function BillableDaysCalendarBlock({
   const workedDaysChartAvailableYears = useMemo(() => {
     const ys = new Set<number>();
     for (const row of invoiceWorkedDaysSeries) ys.add(Number(row.monthKey.slice(0, 4)));
+    ys.add(now.getFullYear());
+    const lastY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    ys.add(lastY);
     return Array.from(ys).sort((a, b) => b - a);
-  }, [invoiceWorkedDaysSeries]);
+  }, [invoiceWorkedDaysSeries, now]);
 
   const filteredInvoiceWorkedDaysSeries = useMemo(() => {
     let rows = invoiceWorkedDaysSeries;
@@ -372,12 +379,50 @@ export function BillableDaysCalendarBlock({
     return rows;
   }, [invoiceWorkedDaysSeries, workedDaysChartYear, workedDaysChartQuarter]);
 
+  const chartWorkedDaysData = useMemo(() => {
+    const withAgenda = appendAgendaWorkedDayMonths(filteredInvoiceWorkedDaysSeries, selected, tjmHt);
+    if (workedDaysChartYear === "all") return withAgenda;
+    let rows = withAgenda.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
+    if (workedDaysChartQuarter !== "full") {
+      const q = workedDaysChartQuarter;
+      const mStart = (q - 1) * 3 + 1;
+      const mEnd = mStart + 2;
+      rows = rows.filter((r) => {
+        const m = Number(r.monthKey.slice(5, 7));
+        return m >= mStart && m <= mEnd;
+      });
+    }
+    return rows;
+  }, [
+    filteredInvoiceWorkedDaysSeries,
+    selected,
+    tjmHt,
+    workedDaysChartYear,
+    workedDaysChartQuarter
+  ]);
+
   const invoiceWorkedDaysAvg = useMemo(() => {
-    const n = filteredInvoiceWorkedDaysSeries.length;
+    const encaisseOnly = chartWorkedDaysData.filter((r) => r.kind === "encaisse");
+    const n = encaisseOnly.length;
     if (!n) return null;
-    const sumDays = filteredInvoiceWorkedDaysSeries.reduce((s, x) => s + x.days, 0);
+    const sumDays = encaisseOnly.reduce((s, x) => s + x.days, 0);
     return Math.round((sumDays / n) * 10) / 10;
-  }, [filteredInvoiceWorkedDaysSeries]);
+  }, [chartWorkedDaysData]);
+
+  const encaisseMonthsInView = useMemo(
+    () => chartWorkedDaysData.filter((r) => r.kind === "encaisse").length,
+    [chartWorkedDaysData]
+  );
+
+  const totalWorkedDaysInPeriod = useMemo(() => {
+    const total = chartWorkedDaysData.reduce((sum, row) => sum + row.days, 0);
+    return Math.round(total * 10) / 10;
+  }, [chartWorkedDaysData]);
+
+  const workedDaysChartPeriodLabelText = useMemo(
+    () => workedDaysChartPeriodLabel(workedDaysChartYear, workedDaysChartQuarter),
+    [workedDaysChartYear, workedDaysChartQuarter]
+  );
 
   return (
     <Card variant="solid" className="overflow-hidden">
@@ -854,11 +899,13 @@ export function BillableDaysCalendarBlock({
               ) : null}
             </div>
             <BillableInvoiceWorkedDaysChart
-              data={filteredInvoiceWorkedDaysSeries}
+              data={chartWorkedDaysData}
               averageDaysPerMonth={invoiceWorkedDaysAvg}
-              monthsInView={filteredInvoiceWorkedDaysSeries.length}
+              monthsInView={encaisseMonthsInView}
+              totalWorkedDaysInPeriod={totalWorkedDaysInPeriod}
+              periodLabel={workedDaysChartPeriodLabelText}
               emptyHint={
-                filteredInvoiceWorkedDaysSeries.length === 0 && invoiceWorkedDaysSeries.length > 0
+                chartWorkedDaysData.length === 0 && invoiceWorkedDaysSeries.length > 0
                   ? "filter"
                   : "default"
               }

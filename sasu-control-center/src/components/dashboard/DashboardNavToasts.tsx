@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Building2, Briefcase, User, type LucideIcon } from "lucide-react";
+import { Activity, Building2, Briefcase, Gem, User, type LucideIcon } from "lucide-react";
+import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
 
 const ITEMS: readonly {
@@ -15,25 +16,31 @@ const ITEMS: readonly {
     href: "/dashboard?section=activite",
     label: "Activité",
     icon: Activity,
-    match: ({ panel, section }) => panel !== "lmnp" && section === "activite"
+    match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "activite"
   },
   {
     href: "/dashboard?section=sasu&scope=pro",
     label: "SASU",
     icon: Briefcase,
-    match: ({ panel, section }) => panel !== "lmnp" && section === "sasu"
+    match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
   },
   {
     href: "/dashboard?section=private&scope=personal",
     label: "Privé",
     icon: User,
-    match: ({ panel, section }) => panel !== "lmnp" && section === "private"
+    match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "private"
   },
   {
     href: "/dashboard?panel=lmnp",
     label: "LMNP",
     icon: Building2,
     match: ({ panel }) => panel === "lmnp"
+  },
+  {
+    href: "/dashboard?panel=valeur-reelle",
+    label: "Valeur",
+    icon: Gem,
+    match: ({ panel }) => panel === "valeur-reelle"
   }
 ];
 

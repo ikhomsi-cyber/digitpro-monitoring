@@ -18,6 +18,7 @@ import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
+import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { Logo } from "@/components/ui/Logo";
 import { AppSectionNav } from "@/components/AppSectionNav";
 import { DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
@@ -46,14 +47,10 @@ function parseDashboardScopeParam(
   return null;
 }
 
-function parseDashboardPanelParam(
-  sp: Record<string, string | string[] | undefined> | undefined
-): "lmnp" | null {
-  if (!sp) return null;
-  const raw = sp.panel;
-  const v = Array.isArray(raw) ? raw[0] : raw;
-  return v === "lmnp" ? "lmnp" : null;
-}
+import {
+  isDashboardAnalyticsPanel,
+  parseDashboardPanelParam
+} from "@/lib/dashboard-panel";
 
 /** Always evaluate Supabase env + session at request time. */
 export const dynamic = "force-dynamic";
@@ -67,6 +64,8 @@ export default async function DashboardPage({
   const initialDashboardScope = parseDashboardScopeParam(sp);
   const initialDashboardPanel = parseDashboardPanelParam(sp);
   const showLmnpPanel = initialDashboardPanel === "lmnp";
+  const showValeurReellePanel = initialDashboardPanel === "valeur-reelle";
+  const showAnalyticsPanel = isDashboardAnalyticsPanel(initialDashboardPanel);
   reportSupabaseEnvDiagnostics("app/dashboard/page");
 
   const envMode = getSupabaseRuntimeMode();
@@ -202,7 +201,7 @@ export default async function DashboardPage({
         showLogout={envMode !== "DEMO"}
       />
 
-      {!showLmnpPanel ? (
+      {!showAnalyticsPanel ? (
         <DashboardPremiumHero
           stats={heroStats}
           contextMessage={heroContextMessage}
@@ -215,6 +214,13 @@ export default async function DashboardPage({
       {showLmnpPanel ? (
         <LMNPClient
           analysis={analyzeLmnp(transactions)}
+          demoMode={demoMode}
+          loadError={transactionsLoadError}
+        />
+      ) : showValeurReellePanel ? (
+        <ValeurReelleClient
+          initialTransactions={transactions}
+          transactionYearBounds={transactionYearBounds}
           demoMode={demoMode}
           loadError={transactionsLoadError}
         />

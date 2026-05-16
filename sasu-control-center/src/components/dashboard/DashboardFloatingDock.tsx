@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Activity, Home, Landmark, LineChart, UserRound } from "lucide-react";
 import { clsx } from "clsx";
 import { motion } from "framer-motion";
+import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 
 type Tab = {
   href: string;
@@ -25,34 +26,34 @@ const TABS: Tab[] = [
     label: "Accueil",
     icon: Home,
     isActive: ({ scope, panel, section }) =>
-      panel !== "lmnp" && (section == null || section === "") && scope == null
+      !isDashboardAnalyticsPanel(panel) && (section == null || section === "") && scope == null
   },
   {
     href: "/dashboard?section=activite",
     label: "Activité",
     icon: Activity,
-    isActive: ({ panel, section }) => panel !== "lmnp" && section === "activite"
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "activite"
   },
   {
     href: "/dashboard#dashboard-analytics",
     label: "Analytics",
     icon: LineChart,
     isActive: ({ hash, panel, section }) =>
-      panel !== "lmnp" && (section == null || section === "") && hash === "#dashboard-analytics"
+      !isDashboardAnalyticsPanel(panel) && (section == null || section === "") && hash === "#dashboard-analytics"
   },
   {
     href: "/dashboard#dashboard-fiscal",
     label: "Fiscalité",
     icon: Landmark,
     isActive: ({ hash, panel, section }) =>
-      panel !== "lmnp" && (section == null || section === "") && hash === "#dashboard-fiscal"
+      !isDashboardAnalyticsPanel(panel) && (section == null || section === "") && hash === "#dashboard-fiscal"
   },
   {
     href: "/dashboard?section=private&scope=personal",
     label: "Profil",
     icon: UserRound,
     isActive: ({ scope, panel, section }) =>
-      panel !== "lmnp" && (section === "private" || (section == null && scope === "personal"))
+      !isDashboardAnalyticsPanel(panel) && (section === "private" || (section == null && scope === "personal"))
   }
 ];
 

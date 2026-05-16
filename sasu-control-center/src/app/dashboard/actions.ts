@@ -803,6 +803,93 @@ export async function syncPowensCloudTransactionsPersonal(): Promise<{
   return syncPowensCloudTransactionsForAxis("personal");
 }
 
+export type PurgePowensDataResult = {
+  deletedTransactions: number;
+  deletedImportSessions: number;
+  deletedPowensUsers: number;
+  legacyTablesCleared: string[];
+};
+
+/**
+ * Supprime toutes les données Powens de l’utilisateur connecté :
+ * transactions (sessions `format = powens`), sessions d’import, `powens_users`,
+ * et tables legacy LCL / Revolut perso si présentes.
+ */
+export async function purgePowensData(): Promise<PurgePowensDataResult> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configuré (mode démo).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
+
+  const { data: sessions, error: sessionsErr } = await supabase
+    .from("import_sessions")
+    .select("id")
+    .eq("format", "powens");
+  if (sessionsErr) throw new Error(sessionsErr.message);
+
+  const sessionIds = (sessions ?? []).map((s) => s.id).filter(Boolean);
+  let deletedTransactions = 0;
+
+  if (sessionIds.length > 0) {
+    const { count, error: txErr } = await supabase
+      .from("transactions")
+      .delete({ count: "exact" })
+      .in("import_session_id", sessionIds);
+    if (txErr) throw new Error(txErr.message);
+    deletedTransactions = count ?? 0;
+  }
+
+  const { count: deletedSessions, error: delSessionsErr } = await supabase
+    .from("import_sessions")
+    .delete({ count: "exact" })
+    .eq("format", "powens");
+  if (delSessionsErr) throw new Error(delSessionsErr.message);
+
+  const { count: deletedPowensUsers, error: delPowensErr } = await supabase
+    .from("powens_users")
+    .delete({ count: "exact" })
+    .eq("user_id", user.id);
+  if (delPowensErr) {
+    const msg = delPowensErr.message ?? "";
+    if (!/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(msg);
+    }
+  }
+
+  const legacyTables = [
+    "lcl_transactions",
+    "lcl_accounts",
+    "revolut_personal_transactions",
+    "revolut_personal_accounts"
+  ] as const;
+  const legacyTablesCleared: string[] = [];
+
+  for (const table of legacyTables) {
+    const { error } = await supabase.from(table).delete().eq("user_id", user.id);
+    if (!error) {
+      legacyTablesCleared.push(table);
+      continue;
+    }
+    const msg = error.message ?? "";
+    if (!/does not exist|schema cache|42P01|Could not find the table/i.test(msg)) {
+      throw new Error(`${table}: ${msg}`);
+    }
+  }
+
+  await syncMonthlyMetricsFromDb(supabase);
+  revalidatePath("/dashboard");
+
+  return {
+    deletedTransactions,
+    deletedImportSessions: deletedSessions ?? 0,
+    deletedPowensUsers: deletedPowensUsers ?? 0,
+    legacyTablesCleared
+  };
+}
+
 /**
  * Import d’un export Bankin (.xls / .xlsx) dans les transactions **perso** (`scope: personal`).
  * Catégories : hiérarchie Bankin + inférences sur le libellé si « A catégoriser ».

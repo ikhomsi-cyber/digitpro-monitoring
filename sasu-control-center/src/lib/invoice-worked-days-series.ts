@@ -1,5 +1,6 @@
 import type { DashboardTx } from "./dashboard-metrics";
 import { effectiveRevenueAnalyticsDateIso } from "./dashboard-metrics";
+import { countAgendaWorkDaysInMonth } from "./billable-calendar-metrics";
 import { BILLABLE_CLIENT_TJM_HT } from "./billable-client-days";
 import { isRevenueCategory } from "./revenue-category";
 
@@ -7,6 +8,8 @@ const VAT_RATE = 0.2;
 
 /** Premier mois affiché sur l’axe du graphique « Jours facturés » (mois-barre B, format YYYY-MM). */
 export const INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY = "2022-10";
+
+export type InvoiceWorkedDayKind = "encaisse" | "deja_facture" | "a_facturer";
 
 export type InvoiceWorkedDayMonth = {
   /** Mois sur l’axe du graphique (mois « décalé » : la barre est placée 2 mois avant l’encaissement CA). */
@@ -18,9 +21,10 @@ export type InvoiceWorkedDayMonth = {
   caHt: number;
   /** Mois d’encaissement du CA (deux mois après le mois de la barre). */
   sourceMonthKey: string;
+  kind: InvoiceWorkedDayKind;
 };
 
-function monthKeyFromYm(y: number, month0: number): string {
+export function monthKeyFromYm(y: number, month0: number): string {
   return `${y}-${String(month0 + 1).padStart(2, "0")}`;
 }
 
@@ -127,7 +131,61 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
       label,
       days: Math.round(days * 10) / 10,
       caHt: Math.round(caHt * 100) / 100,
-      sourceMonthKey
+      sourceMonthKey,
+      kind: "encaisse"
     };
   });
+}
+
+const chartLabelFmt = new Intl.DateTimeFormat("fr-FR", { month: "short", year: "2-digit" });
+
+function agendaMonthBar(
+  year: number,
+  month0: number,
+  days: number,
+  tjmHt: number,
+  kind: "deja_facture" | "a_facturer"
+): InvoiceWorkedDayMonth {
+  const monthKey = monthKeyFromYm(year, month0);
+  const caHt = Math.round(days * tjmHt * 100) / 100;
+  return {
+    monthKey,
+    label: chartLabelFmt.format(new Date(year, month0, 1)),
+    days: Math.round(days * 10) / 10,
+    caHt,
+    sourceMonthKey: monthKey,
+    kind
+  };
+}
+
+/** Ajoute les barres agenda (mois dernier + mois en cours) après la série encaissée. */
+export function appendAgendaWorkedDayMonths(
+  encaisseRows: readonly InvoiceWorkedDayMonth[],
+  selected: ReadonlySet<string>,
+  tjmHt: number,
+  refDate = new Date()
+): InvoiceWorkedDayMonth[] {
+  const base = encaisseRows.map((r) => ({ ...r, kind: r.kind ?? ("encaisse" as const) }));
+  const existingKeys = new Set(base.map((r) => r.monthKey));
+
+  const cy = refDate.getFullYear();
+  const cm0 = refDate.getMonth();
+  const last =
+    cm0 === 0 ? { y: cy - 1, m0: 11 } : { y: cy, m0: cm0 - 1 };
+
+  const extras: InvoiceWorkedDayMonth[] = [];
+
+  const lastKey = monthKeyFromYm(last.y, last.m0);
+  if (!existingKeys.has(lastKey)) {
+    const days = countAgendaWorkDaysInMonth(selected, last.y, last.m0, refDate);
+    extras.push(agendaMonthBar(last.y, last.m0, days, tjmHt, "deja_facture"));
+  }
+
+  const currentKey = monthKeyFromYm(cy, cm0);
+  if (!existingKeys.has(currentKey)) {
+    const days = countAgendaWorkDaysInMonth(selected, cy, cm0, refDate);
+    extras.push(agendaMonthBar(cy, cm0, days, tjmHt, "a_facturer"));
+  }
+
+  return [...base, ...extras].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 }
