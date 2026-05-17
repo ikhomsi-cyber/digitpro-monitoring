@@ -306,6 +306,16 @@ function asArray<T = unknown>(v: unknown): T[] {
   return [];
 }
 
+function powensErrorCode(text: string): string | null {
+  try {
+    const json = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    const code = json.code;
+    return typeof code === "string" ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 function num(v: unknown): number | null {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : null;
@@ -404,22 +414,20 @@ export async function powensCloudFetchTransactions(
       `Powens GET ${p}`
     );
     const text = await res.text();
+    const errorCode = powensErrorCode(text);
 
-    if (res.status === 409) {
+    if (errorCode === "noAccount") {
       throw new Error(
-        "Powens 409 : aucun compte bancaire activé ou conflit de consentement — terminez la webview Powens et activez au moins un compte. " +
+        "Powens : aucun compte bancaire n’est rattaché à cet utilisateur. " +
+          "Ouvrez « Connecter Powens », terminez la webview bancaire et cochez au moins un compte à synchroniser, puis relancez la synchronisation. " +
+          (effectiveUserId ? `Utilisateur Powens utilisé : ${effectiveUserId}. ` : "") +
           `Réponse : ${text.slice(0, 480)}`
       );
     }
 
     if (!res.ok) {
       if (res.status === 401) {
-        try {
-          const j = JSON.parse(text) as { code?: string };
-          if (j.code === "unauthorized") saw401Unauthorized = true;
-        } catch {
-          if (/unauthorized/i.test(text)) saw401Unauthorized = true;
-        }
+        if (errorCode === "unauthorized" || /unauthorized/i.test(text)) saw401Unauthorized = true;
       }
       lastFailure = `${p.split("?")[0]} → HTTP ${res.status}: ${text.slice(0, 240)}`;
       continue;

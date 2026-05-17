@@ -8,9 +8,7 @@ import {
   useRef,
   useState,
   useTransition,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction
+  type ReactNode
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -19,7 +17,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   Briefcase,
-  Calendar,
   CalendarClock,
   CalendarRange,
   ChevronDown,
@@ -51,11 +48,6 @@ import {
 } from "@/lib/billable-client-days";
 import { isRevenueCategory, revenueCounterpartyDisplayName } from "@/lib/revenue-category";
 import {
-  buildDashboardYearOptions,
-  formatDashboardPeriodLabel,
-  toggleDashboardYearInFilter
-} from "@/lib/dashboard-period";
-import {
   BNC_PAYROLL_EXPENSE_CATEGORY,
   computeDashboardMonthlyMetrics,
   computeDerivedExpenseCategoryMonthlyBreakdown,
@@ -76,6 +68,7 @@ import {
   syncQontoTransactionsFromApi,
   importBankinPersonalXlsx,
   preparePowensConnectSession,
+  resetPowensConnectSession,
   getPowensWebviewConnectUrl,
   syncPowensCloudTransactions,
   syncPowensCloudTransactionsPersonal
@@ -575,7 +568,7 @@ export function DashboardClient({
     });
   }
 
-  function onClickPowensConnect() {
+  function onClickPowensConnect(opts?: { reset?: boolean }) {
     if (runtimeMode === "DEMO") {
       toast.warning("Powens indisponible en mode démo.");
       return;
@@ -587,7 +580,9 @@ export function DashboardClient({
     const toastId = toast.loading("Préparation Powens…");
     startTransition(async () => {
       try {
-        const session = await preparePowensConnectSession();
+        const session = opts?.reset
+          ? await resetPowensConnectSession()
+          : await preparePowensConnectSession();
         try {
           const { url } = await getPowensWebviewConnectUrl();
           /** Pop-up : souvent bloquée ou incompatible OAuth banque (Revolut, etc.). Pleine page : recommandé Powens PSD2. */
@@ -666,9 +661,16 @@ export function DashboardClient({
         });
         router.refresh();
       } catch (e) {
+        const message = e instanceof Error ? e.message : undefined;
         toast.error("Synchronisation Powens échouée", {
           id: toastId,
-          description: e instanceof Error ? e.message : undefined
+          description: message,
+          action: message?.includes("aucun compte bancaire")
+            ? {
+                label: "Nouvelle connexion",
+                onClick: () => onClickPowensConnect({ reset: true })
+              }
+            : undefined
         });
       }
     });
@@ -693,9 +695,16 @@ export function DashboardClient({
         });
         router.refresh();
       } catch (e) {
+        const message = e instanceof Error ? e.message : undefined;
         toast.error("Synchronisation Powens perso échouée", {
           id: toastId,
-          description: e instanceof Error ? e.message : undefined
+          description: message,
+          action: message?.includes("aucun compte bancaire")
+            ? {
+                label: "Nouvelle connexion",
+                onClick: () => onClickPowensConnect({ reset: true })
+              }
+            : undefined
         });
       }
     });
@@ -855,7 +864,7 @@ export function DashboardClient({
                   <>
                     <button
                       type="button"
-                      onClick={onClickPowensConnect}
+                      onClick={() => onClickPowensConnect()}
                       disabled={isPending}
                       className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
                       title="Crée l’utilisateur Powens côté serveur puis ouvre PowensConnect (script optionnel NEXT_PUBLIC_POWENS_CONNECT_SCRIPT_URL)."
@@ -1506,7 +1515,7 @@ export function DashboardClient({
             <>
               <button
                 type="button"
-                onClick={onClickPowensConnect}
+                onClick={() => onClickPowensConnect()}
                 disabled={isPending}
                 className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
                 title="Connexion bancaire Powens."

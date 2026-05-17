@@ -133,7 +133,7 @@ export function LMNPClient({
         ) : null}
       </header>
 
-      <AppSectionNav offset="lmnp" maxWidthClass="max-w-5xl" />
+      <AppSectionNav />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card variant="solid" className="border-emerald-200/80 dark:border-emerald-900/50">

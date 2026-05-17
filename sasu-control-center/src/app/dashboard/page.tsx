@@ -201,7 +201,7 @@ export default async function DashboardPage({
         showLogout={envMode !== "DEMO"}
       />
 
-      {!showAnalyticsPanel ? (
+      {!showAnalyticsPanel || showValeurReellePanel ? (
         <DashboardPremiumHero
           stats={heroStats}
           contextMessage={heroContextMessage}
@@ -209,7 +209,7 @@ export default async function DashboardPage({
         />
       ) : null}
 
-      <AppSectionNav offset="dashboard" />
+      <AppSectionNav />
 
       {showLmnpPanel ? (
         <LMNPClient

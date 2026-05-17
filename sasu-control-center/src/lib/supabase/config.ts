@@ -55,6 +55,13 @@ function credentialsPresent(): boolean {
   return Boolean(urlFromEnv() && anonKeyFromEnv());
 }
 
+function diagnosticsEnabled(): boolean {
+  return (
+    readProcessEnv("SUPABASE_DEBUG") === "true" ||
+    readProcessEnv("NEXT_PUBLIC_SUPABASE_DEBUG") === "true"
+  );
+}
+
 export function getSupabaseRuntimeMode(): SupabaseRuntimeMode {
   return credentialsPresent() ? "SUPABASE" : "DEMO";
 }
@@ -65,10 +72,12 @@ export function hasSupabaseEnv(): boolean {
 }
 
 /**
- * Console diagnostics (logs public URL; anon key presence only, never the key value).
- * Omit dedupeKey to log every call (e.g. dashboard request).
+ * Optional console diagnostics (logs public URL; anon key presence only, never the key value).
+ * Enable with SUPABASE_DEBUG=true or NEXT_PUBLIC_SUPABASE_DEBUG=true.
  */
 export function reportSupabaseEnvDiagnostics(source: string, opts?: { dedupeKey?: string }): void {
+  if (!diagnosticsEnabled()) return;
+
   if (opts?.dedupeKey) {
     const g = globalThis as unknown as Record<string, boolean>;
     const flag = `__supabase_diag_${opts.dedupeKey}__`;
@@ -80,9 +89,8 @@ export function reportSupabaseEnvDiagnostics(source: string, opts?: { dedupeKey?
   const keyPresent = Boolean(anonKeyFromEnv());
   const mode = getSupabaseRuntimeMode();
 
-  console.log("SUPABASE URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
   console.info(
-    `[Supabase] ${source}: NEXT_PUBLIC_SUPABASE_URL=${urlPresent ? "present" : "MISSING"}, NEXT_PUBLIC_SUPABASE_ANON_KEY=${keyPresent ? "present" : "MISSING"} → mode=${mode}`
+    `[Supabase] ${source}: NEXT_PUBLIC_SUPABASE_URL=${urlPresent ? "present" : "MISSING"}, NEXT_PUBLIC_SUPABASE_ANON_KEY=${keyPresent ? "present" : "MISSING"} -> mode=${mode}`
   );
 }
 

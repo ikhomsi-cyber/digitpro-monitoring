@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -171,8 +171,8 @@ export function BillableDaysCalendarBlock({
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
 }) {
-  const { selected, setSelected, hydrated, tjmHt, persistToSupabase } = useBillableActivity();
-  const now = new Date();
+  const { selected, setSelected, tjmHt, persistToSupabase } = useBillableActivity();
+  const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth0, setViewMonth0] = useState(now.getMonth());
   const fmt = useDashboardDisplayFormat();
@@ -299,14 +299,17 @@ export function BillableDaysCalendarBlock({
     [selected, tjmHt, viewYear, viewMonth0]
   );
 
-  const toggleDay = useCallback((iso: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(iso)) next.delete(iso);
-      else next.add(iso);
-      return next;
-    });
-  }, []);
+  const toggleDay = useCallback(
+    (iso: string) => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(iso)) next.delete(iso);
+        else next.add(iso);
+        return next;
+      });
+    },
+    [setSelected]
+  );
 
   const clearMonth = useCallback(() => {
     const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
@@ -317,7 +320,7 @@ export function BillableDaysCalendarBlock({
       }
       return next;
     });
-  }, [viewYear, viewMonth0]);
+  }, [setSelected, viewYear, viewMonth0]);
 
   const goPrevMonth = () => {
     if (viewMonth0 === 0) {

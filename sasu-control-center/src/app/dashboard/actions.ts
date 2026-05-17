@@ -637,6 +637,31 @@ export async function preparePowensConnectSession(): Promise<{ userId: string; t
 }
 
 /**
+ * Repart sur un nouvel utilisateur Powens sans supprimer les transactions déjà importées.
+ * Utile quand l'utilisateur stocké répond `noAccount` après une webview incomplète.
+ */
+export async function resetPowensConnectSession(): Promise<{ userId: string; token: string }> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase.from("powens_users").delete().eq("user_id", user.id);
+  if (error) {
+    const msg = error.message ?? "";
+    if (!/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(msg);
+    }
+  }
+
+  revalidatePath("/dashboard");
+  return preparePowensConnectSession();
+}
+
+/**
  * URL de la webview Powens (`https://webview.powens.com/connect?…`) à ouvrir après
  * `preparePowensConnectSession`. Exige POWENS_REDIRECT_URI autorisée dans la console Powens.
  */

@@ -2,13 +2,14 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FlaskConical } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { clsx } from "clsx";
 import { setDashboardDummyDataMode } from "@/app/dashboard/actions";
 
 export function DashboardDummyDataToggle({ active }: { active: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const Icon = active ? EyeOff : Eye;
 
   return (
     <button
@@ -28,30 +29,22 @@ export function DashboardDummyDataToggle({ active }: { active: boolean }) {
         })
       }
       className={clsx(
-        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-2 text-[11px] font-medium transition sm:gap-2 sm:px-2.5 sm:text-xs",
+        "group relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-black",
         active
-          ? "border-amber-400/90 bg-amber-50 text-amber-950 shadow-sm dark:border-amber-500/45 dark:bg-amber-500/15 dark:text-amber-50"
-          : "border-ink-200/90 bg-white/90 text-ink-700 dark:border-white/10 dark:bg-white/5 dark:text-white/85"
+          ? "border-amber-300/70 bg-gradient-to-br from-amber-200 to-orange-100 text-amber-950 shadow-[0_10px_28px_-16px_rgba(245,158,11,0.8)] dark:border-amber-300/35 dark:from-amber-300/25 dark:to-orange-500/10 dark:text-amber-50"
+          : "border-white/10 bg-gradient-to-br from-white/[0.12] to-white/[0.035] text-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:from-white/[0.16] hover:to-white/[0.06]"
       )}
     >
-      <FlaskConical className="h-3.5 w-3.5 shrink-0 opacity-85 sm:h-4 sm:w-4" aria-hidden />
-      <span className="max-[360px]:sr-only">Fictif</span>
+      <span className={clsx("absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100", active ? "bg-amber-300/20" : "bg-emerald-400/10")} aria-hidden />
+      <Icon className="relative h-[18px] w-[18px]" strokeWidth={1.9} aria-hidden />
       <span
         className={clsx(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-          active
-            ? "border-amber-500/60 bg-amber-300/80 dark:border-amber-400/50 dark:bg-amber-400/35"
-            : "border-ink-300 bg-ink-100 dark:border-white/15 dark:bg-white/10"
+          "absolute bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-white/80 dark:ring-black",
+          active ? "bg-amber-400" : "bg-emerald-400"
         )}
         aria-hidden
-      >
-        <span
-          className={clsx(
-            "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow dark:bg-ink-950",
-            active ? "translate-x-[18px]" : "translate-x-0.5"
-          )}
-        />
-      </span>
+      />
+      <span className="sr-only">{active ? "Réel masqué" : "Fictif"}</span>
     </button>
   );
 }

@@ -25,6 +25,12 @@ const ITEMS: readonly {
     match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
   },
   {
+    href: "/dashboard?panel=valeur-reelle",
+    label: "Valeur",
+    icon: Gem,
+    match: ({ panel }) => panel === "valeur-reelle"
+  },
+  {
     href: "/dashboard?section=private&scope=personal",
     label: "Privé",
     icon: User,
@@ -35,12 +41,6 @@ const ITEMS: readonly {
     label: "LMNP",
     icon: Building2,
     match: ({ panel }) => panel === "lmnp"
-  },
-  {
-    href: "/dashboard?panel=valeur-reelle",
-    label: "Valeur",
-    icon: Gem,
-    match: ({ panel }) => panel === "valeur-reelle"
   }
 ];
 
