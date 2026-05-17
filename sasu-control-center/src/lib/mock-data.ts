@@ -18,6 +18,7 @@ export type Transaction = {
   category: "Clients" | "Outils" | "Banque" | "Charges" | "Impôts" | "Autres";
   amount: number; // positive = revenue, negative = expense
   company?: string;
+  note?: string;
   scope?: "pro" | "personal";
 };
 

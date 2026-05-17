@@ -110,7 +110,7 @@ async function loadTransactions(): Promise<{
  * Choix du modèle : Groq et/ou OpenAI selon les clés et CHAT_PROVIDER.
  * - CHAT_PROVIDER=openai : uniquement OpenAI (aucun repli Groq).
  * - CHAT_PROVIDER=groq : Groq en priorité, repli OpenAI si besoin.
- * - Sinon : Groq en priorité si les deux clés sont présentes (défaut), sinon l’une ou l’autre.
+ * - Sinon : ChatGPT/OpenAI en priorité si les deux clés sont présentes (défaut), sinon l’une ou l’autre.
  */
 function pickChatModel(): { model: LanguageModel; provider: string } | null {
   const pref = (process.env.CHAT_PROVIDER ?? "").trim().toLowerCase();
@@ -134,7 +134,7 @@ function pickChatModel(): { model: LanguageModel; provider: string } | null {
   if (pref === "groq") {
     return groqModel() ?? openaiModel();
   }
-  return groqModel() ?? openaiModel();
+  return openaiModel() ?? groqModel();
 }
 
 export async function POST(req: Request) {
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
     return new Response(
       JSON.stringify({
         error:
-          "Aucune clé d’API IA utilisable. Définissez GROQ_API_KEY (recommandé) ou OPENAI_API_KEY dans .env.local, puis redémarrez. CHAT_PROVIDER=openai force uniquement OpenAI."
+          "Aucune clé d’API IA utilisable. Définissez OPENAI_API_KEY dans .env.local pour utiliser ChatGPT, puis redémarrez. Optionnel : GROQ_API_KEY peut servir de repli."
       }),
       { status: 503, headers: { "Content-Type": "application/json" } }
     );

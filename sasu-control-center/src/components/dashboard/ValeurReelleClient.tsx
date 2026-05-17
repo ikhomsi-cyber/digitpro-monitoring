@@ -6,14 +6,8 @@ import { motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowLeft,
-  Banknote,
   ChevronDown,
-  Flame,
-  Gem,
   HelpCircle,
-  Home,
-  PiggyBank,
-  Sparkles,
   TrendingUp
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -59,55 +53,6 @@ function PedagogicTooltip({ text, detail }: { text: string; detail?: string }) {
   );
 }
 
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tone,
-  delay
-}: {
-  icon: typeof Banknote;
-  label: string;
-  value: string;
-  hint: string;
-  tone: "rose" | "emerald" | "sky" | "amber" | "violet";
-  delay: number;
-}) {
-  const toneClass =
-    tone === "rose"
-      ? "border-rose-200/80 bg-gradient-to-br from-rose-50/90 to-white dark:border-rose-900/40 dark:from-rose-950/30 dark:to-[#0a0a0a]"
-      : tone === "emerald"
-        ? "border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-white dark:border-emerald-900/40 dark:from-emerald-950/25 dark:to-[#0a0a0a]"
-        : tone === "sky"
-          ? "border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-white dark:border-sky-900/40 dark:from-sky-950/25 dark:to-[#0a0a0a]"
-          : tone === "amber"
-            ? "border-amber-200/80 bg-gradient-to-br from-amber-50/90 to-white dark:border-amber-900/40 dark:from-amber-950/25 dark:to-[#0a0a0a]"
-            : "border-violet-200/80 bg-gradient-to-br from-violet-50/90 to-white dark:border-violet-900/40 dark:from-violet-950/25 dark:to-[#0a0a0a]";
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, delay }}
-      className={clsx("rounded-2xl border p-4 shadow-sm dark:shadow-none", toneClass)}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-black/[0.06] bg-white/80 dark:border-white/10 dark:bg-white/[0.06]">
-          <Icon className="h-4 w-4 text-ink-700 dark:text-white/80" strokeWidth={1.85} aria-hidden />
-        </span>
-      </div>
-      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/45">
-        {label}
-      </p>
-      <p className="mt-1 font-display text-xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-2xl">
-        {value}
-      </p>
-      <p className="mt-1.5 text-[11px] leading-snug text-ink-500 dark:text-white/40">{hint}</p>
-    </motion.div>
-  );
-}
-
 function CashFlowTreeVisual({
   tree,
   fmt,
@@ -120,63 +65,63 @@ function CashFlowTreeVisual({
   periodLabel: string;
 }) {
   const reelParJour =
-    billableDays > 0 ? Math.round((tree.netReelEur / billableDays) * 100) / 100 : null;
+    billableDays > 0 ? Math.round((tree.realEarningsEur / billableDays) * 100) / 100 : null;
+  const percentOfCa = (amount: number) =>
+    tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
   const rows: Array<{
-    prefix: string;
+    icon?: string;
     label: string;
     detail?: string;
     amount: number | null;
+    gaugeAmount?: number;
+    breakdown?: ValeurReelleWaterfallBreakdownRow[];
+    transactions?: ValeurReelleCashTree["mandatoryFeeTransactions"];
     tone: "neutral" | "deduct" | "result" | "highlight";
     emphasize?: boolean;
   }> = [
     {
-      prefix: " ",
-      label: "CA facturé",
+      icon: "💶",
+      label: "CA facturé HT",
+      detail: `TTC encaissé ${fmt.euro(tree.caTtcEur)} / 1,20`,
       amount: tree.caFactureEur,
+      gaugeAmount: tree.caFactureEur,
       tone: "neutral"
     },
     {
-      prefix: "├─",
-      label: "charges (dont beaucoup utiles pour toi) et CSG",
-      detail:
-        tree.chargesUtilesRecupereesEur > 0
-          ? `dont ${fmt.euro(tree.chargesUtilesRecupereesEur)} récupérés (IK, repas, CESU…)`
-          : undefined,
-      amount: -tree.chargesEtCsgEur,
+      icon: "🧾",
+      label: "frais obligatoires",
+      detail: "Hiway, impôt, URSSAF, SFR, Free, mutuelle Wemind et autres",
+      amount: -tree.mandatoryFeesEur,
+      gaugeAmount: tree.mandatoryFeesEur,
+      breakdown: tree.mandatoryFeesBreakdown,
+      transactions: tree.mandatoryFeeTransactions,
       tone: "deduct"
     },
     {
-      prefix: "│",
-      label: "",
-      amount: null,
-      tone: "neutral"
+      icon: "🏠",
+      label: "charges perso",
+      detail: "NDF, IK, CESU",
+      amount: -tree.personalChargesEur,
+      gaugeAmount: tree.personalChargesEur,
+      breakdown: tree.personalChargesBreakdown,
+      tone: "deduct"
     },
     {
-      prefix: "├─",
-      label: "BNC brut",
-      detail: "CA − charges & CSG",
-      amount: tree.bncBrutEur,
+      icon: "📋",
+      label: "CSG",
+      detail: "9,7 % de (CA HT − frais obligatoires − charges perso)",
+      amount: -tree.csgEur,
+      gaugeAmount: tree.csgEur,
+      tone: "deduct"
+    },
+    {
+      icon: "📘",
+      label: "BNC",
+      detail: "somme des transactions virement BNC",
+      amount: tree.bncEur,
+      gaugeAmount: tree.bncEur,
       tone: "result"
-    },
-    {
-      prefix: "├─",
-      label: tree.impotEstime ? "impôt estimé sur BNC (30 %)" : "impôt sur BNC",
-      detail: tree.impotEstime
-        ? "Aucun IR constaté — estimation"
-        : tree.impotPayeEur > 0
-          ? "Prélèvements IR constatés"
-          : undefined,
-      amount: -tree.impotUtiliseEur,
-      tone: "deduct"
-    },
-    {
-      prefix: "└─",
-      label: "net cash + revenus indirects",
-      detail: `net cash ${fmt.euro(tree.netCashEur)} + ${fmt.euro(tree.revenusIndirectsEur)} indirects`,
-      amount: tree.netReelEur,
-      tone: "highlight",
-      emphasize: true
     }
   ];
 
@@ -190,14 +135,14 @@ function CashFlowTreeVisual({
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <motion.div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-            Trésorerie réelle
+            Combien je gagne vraiment
           </p>
           <p className="mt-1 text-xs text-ink-600 dark:text-white/50">{periodLabel}</p>
         </motion.div>
         {reelParJour != null ? (
           <div className="text-right">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-              = réel / jour
+              = gain / jour
             </p>
             <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(reelParJour)}
@@ -213,14 +158,41 @@ function CashFlowTreeVisual({
         )}
       </div>
 
-      <div className="font-mono text-[12px] leading-relaxed sm:text-[13px]">
+      <div className="mb-4 rounded-2xl border border-white/[0.08] bg-white/45 p-3 dark:bg-white/[0.025]">
+        <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+          <span className="font-semibold text-ink-800 dark:text-white/80">Jauge du CA HT</span>
+          <span className="tabular-nums text-ink-500 dark:text-white/45">{fmt.euro(tree.caFactureEur)} = 100 %</span>
+        </div>
+        <div className="flex h-3 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[0.08]">
+          {[
+            { key: "mandatory", value: tree.mandatoryFeesEur, color: "bg-rose-500" },
+            { key: "csg", value: tree.csgEur, color: "bg-orange-400" },
+            { key: "personal", value: tree.personalChargesEur, color: "bg-emerald-500" },
+            { key: "bnc", value: tree.bncEur, color: "bg-sky-500" }
+          ].map((segment) => {
+            const width = Math.max(0, Math.min(100, percentOfCa(segment.value)));
+            return width > 0 ? (
+              <span
+                key={segment.key}
+                className={segment.color}
+                style={{ width: `${width}%` }}
+                aria-hidden
+              />
+            ) : null;
+          })}
+        </div>
+        <div className="mt-2 grid gap-1.5 text-[10px] text-ink-500 dark:text-white/45 sm:grid-cols-4">
+          <span><span className="text-rose-500">●</span> frais {percentOfCa(tree.mandatoryFeesEur)} %</span>
+          <span><span className="text-orange-400">●</span> CSG {percentOfCa(tree.csgEur)} %</span>
+          <span><span className="text-emerald-500">●</span> perso {percentOfCa(tree.personalChargesEur)} %</span>
+          <span><span className="text-sky-500">●</span> BNC {percentOfCa(tree.bncEur)} %</span>
+        </div>
+      </div>
+
+      <div className="space-y-2 text-[12px] leading-relaxed sm:text-[13px]">
         {rows.map((row, i) => {
           if (row.amount === null) {
-            return (
-              <div key={`spacer-${i}`} className="h-1 text-ink-300 dark:text-white/15" aria-hidden>
-                {row.prefix}
-              </div>
-            );
+            return null;
           }
 
           const amountClass =
@@ -236,25 +208,90 @@ function CashFlowTreeVisual({
             <div
               key={`${row.label}-${i}`}
               className={clsx(
-                "grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-baseline gap-x-2 py-1",
-                row.emphasize && "mt-1 rounded-lg bg-emerald-500/5 px-1 py-1.5 dark:bg-emerald-500/10"
+                "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 rounded-xl border border-transparent px-3 py-2",
+                row.emphasize
+                  ? "border-emerald-500/15 bg-emerald-500/8 dark:bg-emerald-500/10"
+                  : "bg-white/45 dark:bg-white/[0.025]"
               )}
             >
-              <span className="text-ink-400 dark:text-white/30">{row.prefix}</span>
               <span className="min-w-0 font-sans">
                 <span
                   className={clsx(
-                    "font-medium",
+                    "inline-flex items-center gap-1.5 font-medium",
                     row.emphasize
                       ? "text-ink-900 dark:text-white"
                       : "text-ink-700 dark:text-white/80"
                   )}
                 >
+                  {row.icon ? <span aria-hidden>{row.icon}</span> : null}
                   {row.label}
                 </span>
                 {row.detail ? (
                   <span className="mt-0.5 block font-sans text-[10px] font-normal text-ink-500 dark:text-white/40">
                     {row.detail}
+                    {row.gaugeAmount != null ? ` · ${percentOfCa(row.gaugeAmount)} % du CA HT` : ""}
+                  </span>
+                ) : null}
+                {row.breakdown?.length ? (
+                  <span className="mt-1 flex flex-wrap gap-1.5">
+                    {row.breakdown.map((b) => {
+                      const chipTransactions = row.transactions?.filter((tx) => tx.group === b.label) ?? [];
+
+                      return (
+                        <span
+                          key={`${row.label}-${b.label}`}
+                          className="group/chip relative inline-flex rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-ink-600 ring-1 ring-transparent transition hover:bg-white hover:text-ink-900 hover:ring-ink-200 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 dark:bg-white/[0.06] dark:text-white/55 dark:hover:bg-white/[0.1] dark:hover:text-white dark:hover:ring-white/10"
+                          tabIndex={chipTransactions.length ? 0 : -1}
+                        >
+                          {b.label} {fmt.euro(b.amountEur)}
+                          {chipTransactions.length ? (
+                            <span className="pointer-events-none absolute left-0 top-full z-40 mt-2 hidden w-[24rem] max-w-[86vw] overflow-hidden rounded-2xl border border-ink-200/80 bg-white/95 text-left font-normal text-ink-700 shadow-2xl shadow-ink-950/15 ring-1 ring-black/[0.03] backdrop-blur-xl group-hover/chip:block group-focus/chip:block dark:border-white/10 dark:bg-[#101015]/95 dark:text-white/75 dark:shadow-black/50 dark:ring-white/[0.03]">
+                              <span className="block border-b border-ink-100 bg-gradient-to-br from-ink-50 to-white px-3 py-2.5 dark:border-white/[0.06] dark:from-white/[0.08] dark:to-white/[0.025]">
+                                <span className="flex items-start justify-between gap-3">
+                                  <span>
+                                    <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/45">
+                                      Transactions
+                                    </span>
+                                    <span className="mt-0.5 block text-sm font-semibold text-ink-950 dark:text-white">
+                                      {b.label}
+                                    </span>
+                                  </span>
+                                  <span className="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-bold tabular-nums text-rose-700 ring-1 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-200 dark:ring-rose-400/15">
+                                    {fmt.euro(b.amountEur)}
+                                  </span>
+                                </span>
+                                <span className="mt-1 block text-[10px] text-ink-500 dark:text-white/45">
+                                  {chipTransactions.length} ligne{chipTransactions.length > 1 ? "s" : ""} prise{chipTransactions.length > 1 ? "s" : ""} en compte
+                                </span>
+                              </span>
+                              <span className="block max-h-56 overflow-auto p-2">
+                                {chipTransactions.slice(0, 8).map((tx) => (
+                                  <span
+                                    key={`${b.label}-${tx.date}-${tx.label}-${tx.amountEur}`}
+                                    className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-xl px-2 py-1.5 transition odd:bg-ink-50/70 dark:odd:bg-white/[0.035]"
+                                  >
+                                    <span className="text-[10px] font-medium tabular-nums text-ink-500 dark:text-white/45">
+                                      {tx.date.slice(5)}
+                                    </span>
+                                    <span className="truncate text-[11px] font-medium text-ink-800 dark:text-white/80">
+                                      {tx.label}
+                                    </span>
+                                    <span className="text-[11px] font-bold tabular-nums text-rose-700 dark:text-rose-200">
+                                      {fmt.euro(tx.amountEur)}
+                                    </span>
+                                  </span>
+                                ))}
+                                {chipTransactions.length > 8 ? (
+                                  <span className="mt-1 block rounded-xl bg-ink-50 px-2 py-1.5 text-center text-[10px] font-medium text-ink-500 dark:bg-white/[0.04] dark:text-white/45">
+                                    +{chipTransactions.length - 8} autres transactions
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })}
                   </span>
                 ) : null}
               </span>
@@ -478,8 +515,6 @@ export function ValeurReelleClient({
     [billableActivity?.sortedIsos, selectedYears]
   );
 
-  const scorePositive = analysis.realValueScoreEur >= 0;
-
   return (
     <main className="mx-auto max-w-6xl space-y-6 px-4 pb-16 pt-4 sm:px-6 sm:pt-6">
       <Link
@@ -539,77 +574,6 @@ export function ValeurReelleClient({
         billableDays={billableDaysInPeriod}
         periodLabel={analysis.periodLabel}
       />
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <KpiCard
-          icon={Banknote}
-          label="Argent réellement consommé"
-          value={fmt.euro(analysis.realExpensesEur)}
-          hint="Hiway, retraite, frais bancaires, assurances, prévoyance, fournitures, mobilier…"
-          tone="rose"
-          delay={0}
-        />
-        <KpiCard
-          icon={Gem}
-          label="Avantages & flux récupérés"
-          value={fmt.euro(analysis.hiddenValueRecoveredEur)}
-          hint="IK, repas, CESU, télécom, logiciels, énergie, cadeaux, ANCV…"
-          tone="emerald"
-          delay={0.05}
-        />
-        <KpiCard
-          icon={Home}
-          label="Revenus passifs"
-          value={fmt.euro(analysis.passiveIncomeEur)}
-          hint="Loyers, dividendes, intérêts…"
-          tone="sky"
-          delay={0.1}
-        />
-        <KpiCard
-          icon={Flame}
-          label="Taux d'optimisation"
-          value={`${fmt.percent0to100(analysis.optimizationRatePct)} %`}
-          hint={PEDAGOGIC_TOOLTIPS.optimization}
-          tone="amber"
-          delay={0.15}
-        />
-        <KpiCard
-          icon={PiggyBank}
-          label="Argent réellement conservé"
-          value={fmt.euro(analysis.moneyConservedEur)}
-          hint="Score valeur réelle (revenus + avantages − charges réelles)"
-          tone="violet"
-          delay={0.2}
-        />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className={clsx(
-          "rounded-2xl border px-5 py-4 sm:px-6",
-          scorePositive
-            ? "border-emerald-300/60 bg-gradient-to-r from-emerald-50/90 to-white dark:border-emerald-500/25 dark:from-emerald-950/30 dark:to-[#080808]"
-            : "border-amber-300/60 bg-gradient-to-r from-amber-50/90 to-white dark:border-amber-500/25 dark:from-amber-950/30 dark:to-[#080808]"
-        )}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-            <p className="text-sm font-semibold text-ink-900 dark:text-white">Score valeur réelle</p>
-            <PedagogicTooltip text={PEDAGOGIC_TOOLTIPS.realValueScore} detail={PEDAGOGIC_TOOLTIPS.hiddenValue} />
-          </div>
-          <p className="font-display text-2xl font-bold tabular-nums text-ink-900 dark:text-white">
-            {fmt.euro(analysis.realValueScoreEur)}
-          </p>
-        </div>
-        <p className="mt-2 text-xs text-ink-600 dark:text-white/50">
-          (CA {fmt.euro(analysis.activeIncomeEur)} + passif {fmt.euro(analysis.passiveIncomeEur)} + valeur
-          cachée {fmt.euro(analysis.hiddenValueRecoveredEur)}) − dépenses réelles{" "}
-          {fmt.euro(analysis.realExpensesEur)}
-        </p>
-      </motion.div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card variant="solid" className="overflow-hidden">

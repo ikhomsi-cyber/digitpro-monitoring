@@ -16,7 +16,6 @@ import type {
   InvoiceWorkedDayKind,
   InvoiceWorkedDayMonth
 } from "@/lib/invoice-worked-days-series";
-import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
 
 const KIND_META: Record<
@@ -192,13 +191,6 @@ export function BillableInvoiceWorkedDaysChart({
           </span>
         </p>
       ) : null}
-      <p className="mb-3 text-[10px] leading-snug text-ink-500 dark:text-ink-400">
-        <span className="font-medium text-emerald-700 dark:text-emerald-300">Encaissé</span> : mois B ·
-        jours = CA HT encaissé en B+2 ÷ {fmt.euro(BILLABLE_CLIENT_TJM_HT)} ·{" "}
-        <span className="font-medium text-sky-700 dark:text-sky-300">Déjà facturé</span> : agenda mois
-        dernier · <span className="font-medium text-violet-700 dark:text-violet-300">À facturer</span> :
-        agenda du 1er au jour J
-      </p>
       <div className="h-[11.5rem] w-full sm:h-52">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 6, right: 6, left: 0, bottom: chartBottom }}>

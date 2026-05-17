@@ -62,7 +62,9 @@ export function BillableActivityProvider({
   persistToSupabase: boolean;
   initialWorkDayIsos: string[];
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [selected, setSelected] = useState<Set<string>>(() =>
+    persistToSupabase ? new Set(initialWorkDayIsos) : new Set()
+  );
   const [hydrated, setHydrated] = useState(false);
   const [, startTransition] = useTransition();
   const selectedRef = useRef(selected);

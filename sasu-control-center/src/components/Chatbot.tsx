@@ -19,10 +19,6 @@ const SUGGESTIONS = [
  * — no transactions are sent over the wire from the client.
  */
 export function Chatbot() {
-  // Pour le moment : on masque le bouton flottant et le panneau assistant.
-  // Si tu veux le réactiver plus tard, repasse SHOW_ASSISTANT à true.
-  const SHOW_ASSISTANT = false;
-
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -55,8 +51,6 @@ export function Chatbot() {
     sendMessage({ text: value });
     setInput("");
   }
-
-  if (!SHOW_ASSISTANT) return null;
 
   return (
     <>
@@ -93,7 +87,7 @@ export function Chatbot() {
                   <div className="font-display text-base font-semibold tracking-apple-tight text-ink-900 dark:text-ink-50">
                     Assistant DigitPro
                   </div>
-                  <div className="text-xs text-ink-500 dark:text-ink-400">Analyse vos transactions en direct</div>
+                  <div className="text-xs text-ink-500 dark:text-ink-400">AI bot : ChatGPT</div>
                 </div>
               </div>
               <button
@@ -132,7 +126,7 @@ export function Chatbot() {
               {error ? (
                 <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
                   {error.message ||
-                    "Erreur de l’assistant. Vérifiez OPENAI_API_KEY (ou GROQ_API_KEY) côté serveur, puis redémarrez."}
+                    "Erreur de l’assistant. Vérifiez OPENAI_API_KEY côté serveur, puis redémarrez."}
                 </div>
               ) : null}
             </div>
@@ -187,23 +181,34 @@ export function Chatbot() {
                   <kbd className="rounded bg-ink-100 px-1 dark:bg-ink-800">Maj</kbd>+
                   <kbd className="rounded bg-ink-100 px-1 dark:bg-ink-800">Entrée</kbd> pour une nouvelle ligne.
                 </p>
-                <div className="flex items-start gap-2 rounded-xl border border-ink-100 bg-ink-50/90 px-2.5 py-2 text-[11px] leading-snug text-ink-600 dark:border-ink-800 dark:bg-ink-900/60 dark:text-ink-300">
+                <div className="space-y-1.5 rounded-xl border border-ink-100 bg-ink-50/90 px-2.5 py-2 text-[11px] leading-snug text-ink-600 dark:border-ink-800 dark:bg-ink-900/60 dark:text-ink-300">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-ink-800 dark:text-ink-100">
+                      <Bot className="h-3.5 w-3.5" aria-hidden />
+                      Paramétrage assistant
+                    </span>
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      ChatGPT
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
                   <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-500 dark:text-ink-400" aria-hidden />
                   <p>
-                    Clés côté serveur dans{" "}
-                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900 dark:bg-ink-950 dark:text-ink-100">
-                      .env.local
-                    </code>
-                    :{" "}
-                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900 dark:bg-ink-950 dark:text-ink-100">
-                      OPENAI_API_KEY
-                    </code>{" "}
-                    et{" "}
+                    Bot IA côté serveur :{" "}
                     <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900 dark:bg-ink-950 dark:text-ink-100">
                       CHAT_PROVIDER=openai
                     </code>{" "}
-                    pour n’utiliser que ChatGPT (sans Groq). Redémarrez le serveur après modification.
+                    avec clé{" "}
+                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900 dark:bg-ink-950 dark:text-ink-100">
+                      OPENAI_API_KEY
+                    </code>
+                    . Modèle par défaut :{" "}
+                    <code className="rounded bg-white px-1 font-mono text-[10px] text-ink-900 dark:bg-ink-950 dark:text-ink-100">
+                      OPENAI_CHAT_MODEL=gpt-4o-mini
+                    </code>
+                    .
                   </p>
+                  </div>
                 </div>
               </div>
             </form>

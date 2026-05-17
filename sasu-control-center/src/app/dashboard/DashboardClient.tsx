@@ -1553,7 +1553,7 @@ export function DashboardClient({
         </>
       )}
 
-      {dashboardSection !== "activite" ? <Chatbot /> : null}
+      <Chatbot />
         </motion.div>
       </AnimatePresence>
     </main>

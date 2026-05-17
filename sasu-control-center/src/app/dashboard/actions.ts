@@ -425,10 +425,10 @@ export async function importTransactions(
     content_hash: p.content_hash,
     import_session_id: importSessionId
   }));
-  function stripBalanceFromInsert(rows: InsertedPayload[]): InsertedPayload[] {
+  function stripUnsupportedInsertFields(rows: InsertedPayload[]): InsertedPayload[] {
     return rows.map((row) => {
       const copy: InsertedPayload = { ...row };
-      delete copy.balance;
+      if (!balanceSupported) delete copy.balance;
       return copy;
     });
   }
@@ -449,13 +449,13 @@ export async function importTransactions(
     if (!slice.length) continue;
     let attempt = await client
       .from("transactions")
-      .insert(balanceSupported ? slice : stripBalanceFromInsert(slice))
+      .insert(stripUnsupportedInsertFields(slice))
       .select("id,date,label,category,amount,company,scope");
     if (attempt.error && balanceSupported && isMissingColumnError(attempt.error, "balance")) {
       balanceSupported = false;
       attempt = await client
         .from("transactions")
-        .insert(stripBalanceFromInsert(slice))
+        .insert(stripUnsupportedInsertFields(slice))
         .select("id,date,label,category,amount,company,scope");
     }
     if (attempt.error && isMissingColumnError(attempt.error, "scope")) {
@@ -463,7 +463,7 @@ export async function importTransactions(
       attempt = await client
         .from("transactions")
         .insert(
-          (balanceSupported ? slice : stripBalanceFromInsert(slice)).map((r) => {
+          stripUnsupportedInsertFields(slice).map((r) => {
             const copy = { ...r } as InsertedPayload;
             delete copy.scope;
             return copy;
