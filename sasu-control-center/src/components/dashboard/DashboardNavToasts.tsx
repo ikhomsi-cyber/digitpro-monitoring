@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Building2, Briefcase, Gem, User, type LucideIcon } from "lucide-react";
+import { Activity, Building2, Briefcase, Gem, Tags, User, type LucideIcon } from "lucide-react";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
 
@@ -41,6 +41,12 @@ const ITEMS: readonly {
     label: "LMNP",
     icon: Building2,
     match: ({ panel }) => panel === "lmnp"
+  },
+  {
+    href: "/categorisation",
+    label: "Catég.",
+    icon: Tags,
+    match: () => false
   }
 ];
 

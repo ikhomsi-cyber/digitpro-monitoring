@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Building2, Briefcase, Gem, LayoutDashboard, Menu, User, X } from "lucide-react";
+import { Building2, Briefcase, Gem, LayoutDashboard, Menu, Tags, User, X } from "lucide-react";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
 
@@ -55,6 +55,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Gem,
     isActive: (pathname, _scope, panel) =>
       pathname.startsWith("/dashboard") && panel === "valeur-reelle"
+  },
+  {
+    href: "/categorisation",
+    label: "Catégorisation",
+    description: "Classer les transactions Powens",
+    icon: Tags,
+    isActive: (pathname) => pathname.startsWith("/categorisation")
   }
 ];
 

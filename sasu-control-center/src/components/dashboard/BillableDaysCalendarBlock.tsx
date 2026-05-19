@@ -141,26 +141,12 @@ function BudgetGauge({
   );
 }
 
-function foldTxBlob(raw: string): string {
-  return (raw ?? "")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Dépenses privées « NDF DigitPro » (Bankin : sous-cat. DigitPro consulting NDF → catégorie stockée
- * `NDF DigitPro`, ou anciennes lignes `Notes de frais` + mention DigitPro dans libellé / société).
- */
-function isPersonalNdfDigitProInMonth(tx: DashboardTx, monthKey: string): boolean {
-  if ((tx.scope ?? "pro") !== "personal" || tx.amount >= 0) return false;
+/** Dépenses Powens reclassées explicitement en « NDF DigitPro » pour le mois affiché. */
+function isPowensNdfDigitProInMonth(tx: DashboardTx, monthKey: string): boolean {
+  if (tx.amount >= 0) return false;
   if (tx.date.slice(0, 7) !== monthKey) return false;
-  if (tx.category === "NDF DigitPro") return true;
-  const blob = foldTxBlob(`${tx.label} ${tx.company} ${tx.category}`);
-  if (!blob.includes("digitpro")) return false;
-  return deriveExpenseBucket(tx) === "NDF";
+  if (tx.importFormat !== "powens") return false;
+  return tx.category === "NDF DigitPro";
 }
 
 export function BillableDaysCalendarBlock({
@@ -252,45 +238,26 @@ export function BillableDaysCalendarBlock({
   const mealFeesForViewedMonth = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return null;
     const monthKey = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`;
-    const nextMonthStart = new Date(viewYear, viewMonth0, 1);
-    nextMonthStart.setMonth(nextMonthStart.getMonth() + 1);
-    const nextMonthKey = `${nextMonthStart.getFullYear()}-${String(nextMonthStart.getMonth() + 1).padStart(2, "0")}`;
-
-    const cal = new Date();
-    const isViewedCalendarMonthCurrent =
-      viewYear === cal.getFullYear() && viewMonth0 === cal.getMonth();
-
     let dirigeant = 0;
-    let ndfMoisSuivant = 0;
+    let ndfDigitPro = 0;
     for (const tx of treasuryTransactions) {
-      if ((tx.scope ?? "pro") !== treasuryScope) continue;
       if (tx.amount >= 0) continue;
       const d = tx.date.slice(0, 7);
-      const bucket = deriveExpenseBucket(tx);
       const amt = Math.abs(tx.amount);
-      if (d === monthKey && bucket === "Repas dirigeant") dirigeant += amt;
-      if (d === nextMonthKey && bucket === "NDF") ndfMoisSuivant += amt;
-    }
-
-    /** Notes DigitPro avancées sur compte perso (même mois civil que le calendrier), uniquement mois en cours. */
-    let ndfPersoDigitProMoisCourant = 0;
-    if (isViewedCalendarMonthCurrent) {
-      for (const tx of treasuryTransactions) {
-        if (!isPersonalNdfDigitProInMonth(tx, monthKey)) continue;
-        ndfPersoDigitProMoisCourant += Math.abs(tx.amount);
+      if ((tx.scope ?? "pro") === treasuryScope && d === monthKey && deriveExpenseBucket(tx) === "Repas dirigeant") {
+        dirigeant += amt;
       }
+      if (isPowensNdfDigitProInMonth(tx, monthKey)) ndfDigitPro += amt;
     }
 
-    const ndfAffiche = ndfMoisSuivant + ndfPersoDigitProMoisCourant;
     const repasTotal = dirigeant;
     return {
       dirigeant,
       repasTotal,
-      ndfMoisSuivant,
-      ndfPersoDigitProMoisCourant,
-      ndfAffiche,
-      /** Repas dirigeant du mois affiché + NDF (mois suivant côté périmètre trésorerie + NDF DigitPro privé du mois en cours). */
-      total: repasTotal + ndfAffiche
+      ndfDigitPro,
+      ndfAffiche: ndfDigitPro,
+      /** Repas dirigeant du mois affiché + transactions reclassées NDF DigitPro sur le même mois. */
+      total: repasTotal + ndfDigitPro
     };
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
 

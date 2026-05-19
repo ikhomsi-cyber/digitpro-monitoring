@@ -15,6 +15,10 @@ export type DashboardTx = {
   balance?: number | null;
   /** Société / compte (import Qonto « Nom du compte », saisie manuelle, etc.). */
   company: string;
+  /** Banque source, quand l'import la fournit (ex. Powens). */
+  bankName?: string | null;
+  /** Format de la session d’import source (`powens`, `bankin`, `qonto`, etc.). */
+  importFormat?: string | null;
   /** Périmètre des transactions : pro (SASU) vs personal (privé). */
   scope?: "pro" | "personal";
 };

@@ -174,6 +174,7 @@ alter table public.transactions add column if not exists content_hash text;
 alter table public.transactions add column if not exists import_session_id uuid references public.import_sessions (id) on delete set null;
 alter table public.transactions add column if not exists company text not null default '';
 alter table public.transactions add column if not exists balance numeric;
+alter table public.transactions add column if not exists bank_name text;
 
 create index if not exists transactions_user_company_date_idx on public.transactions (user_id, company, date desc);
 

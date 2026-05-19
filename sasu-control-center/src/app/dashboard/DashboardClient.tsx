@@ -1468,6 +1468,11 @@ export function DashboardClient({
                                               {tx.company}
                                             </span>
                                           ) : null}
+                                          {tx.bankName ? (
+                                            <span className="mt-0.5 block truncate text-[10px] font-medium text-ink-500 dark:text-ink-400">
+                                              Banque : {tx.bankName}
+                                            </span>
+                                          ) : null}
                                         </span>
                                         <span className="shrink-0 font-medium tabular-nums text-rose-800 dark:text-rose-300">
                                           {fmt.euro(Math.abs(tx.amount))}

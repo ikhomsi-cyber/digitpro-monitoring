@@ -292,14 +292,14 @@ function asArray<T = unknown>(v: unknown): T[] {
   if (!v || typeof v !== "object") return [];
   const o = v as Record<string, unknown>;
 
-  const direct = o.transactions ?? o.items ?? o.results;
+  const direct = o.transactions ?? o.accounts ?? o.items ?? o.results;
   if (Array.isArray(direct)) return direct as T[];
 
   const topData = o.data;
   if (Array.isArray(topData)) return topData as T[];
   if (topData && typeof topData === "object") {
     const d = topData as Record<string, unknown>;
-    const nested = d.transactions ?? d.items ?? d.results;
+    const nested = d.transactions ?? d.accounts ?? d.items ?? d.results;
     if (Array.isArray(nested)) return nested as T[];
   }
 
@@ -332,6 +332,7 @@ export type PowensImportRow = {
   amount: number;
   balance: number | null;
   company: string;
+  bankName?: string | null;
   scope?: "pro" | "personal";
   dedupeKey?: string;
   /** `id_account` Powens (pour filtrage SASU / perso par compte). */
@@ -367,6 +368,78 @@ function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | 
   };
 }
 
+function pickPowensAccountBankName(raw: Record<string, unknown>): string | null {
+  const nestedBank = raw.bank as Record<string, unknown> | undefined;
+  const nestedConnector = raw.connector as Record<string, unknown> | undefined;
+  const nestedConnection = raw.connection as Record<string, unknown> | undefined;
+  const nestedProvider = raw.provider as Record<string, unknown> | undefined;
+  const candidates = [
+    raw.bank_name,
+    raw.bank,
+    raw.institution_name,
+    raw.institution,
+    raw.provider_name,
+    raw.provider,
+    raw.connector_name,
+    raw.name,
+    nestedBank?.name,
+    nestedBank?.full_name,
+    nestedConnector?.name,
+    nestedConnection?.name,
+    nestedProvider?.name
+  ];
+  for (const candidate of candidates) {
+    const value = str(candidate);
+    if (value) return value;
+  }
+  return null;
+}
+
+async function powensFetchAccountBankNames(
+  base: string,
+  bearer: string,
+  effectiveUserId: string | null
+): Promise<Map<number, string>> {
+  const paths: string[] = [];
+  if (effectiveUserId) {
+    paths.push(`/users/${encodeURIComponent(effectiveUserId)}/accounts?limit=1000`);
+  }
+  paths.push("/users/me/accounts?limit=1000");
+
+  for (const p of paths) {
+    const res = await fetchWithNetworkDiagnostics(
+      powensAppendOptionalClientIdQuery(`${base}${p}`),
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      },
+      `Powens GET ${p}`
+    );
+    if (!res.ok) continue;
+    const text = await res.text();
+    let json: unknown;
+    try {
+      json = text ? JSON.parse(text) : [];
+    } catch {
+      continue;
+    }
+    const accounts = asArray<Record<string, unknown>>(json);
+    const out = new Map<number, string>();
+    for (const account of accounts) {
+      const id = num(account.id ?? account.id_account);
+      const bankName = pickPowensAccountBankName(account);
+      if (id != null && bankName) out.set(id, bankName);
+    }
+    if (out.size) return out;
+  }
+
+  return new Map();
+}
+
 /**
  * Récupère les transactions avec le **token utilisateur** Powens (pas le token plateforme).
  * Doc : `GET /2.0/users/{userId}/transactions?limit=…` avec userId numérique ou `me` ; **limit** obligatoire (max 1000).
@@ -389,6 +462,7 @@ export async function powensCloudFetchTransactions(
   if (!effectiveUserId) {
     effectiveUserId = await powensResolveUserIdFromMeEndpoint(userBearer);
   }
+  const accountBankNames = await powensFetchAccountBankNames(base, bearer, effectiveUserId);
 
   const paths: string[] = [];
   if (effectiveUserId) {
@@ -443,6 +517,11 @@ export async function powensCloudFetchTransactions(
     let out: PowensImportRow[] = [];
     for (const row of list) {
       const m = mapOneTx(row, opts.company, opts.scope);
+      if (m?.powensAccountId != null) {
+        m.bankName = accountBankNames.get(m.powensAccountId) ?? pickPowensAccountBankName(row);
+      } else if (m) {
+        m.bankName = pickPowensAccountBankName(row);
+      }
       if (m) out.push(m);
     }
     if (opts.filterAccountIds?.length) {

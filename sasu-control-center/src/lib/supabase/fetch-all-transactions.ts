@@ -17,6 +17,8 @@ export type SupabaseTxRow = {
   amount: number | string;
   balance?: number | string | null;
   company: string | null;
+  bank_name?: string | null;
+  import_sessions?: { format?: string | null } | null;
   scope?: "pro" | "personal" | null;
 };
 
@@ -69,6 +71,8 @@ function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {
     amount: Number(row.amount),
     balance: row.balance == null ? null : Number(row.balance),
     company: String(row.company ?? "").trim(),
+    bankName: row.bank_name == null ? null : String(row.bank_name).trim(),
+    importFormat: row.import_sessions?.format == null ? null : String(row.import_sessions.format).trim(),
     scope: row.scope === "personal" ? "personal" : "pro"
   }));
 }
@@ -80,7 +84,10 @@ export async function loadAllUserTransactionsFromSupabase(
   client: SupabaseServerClient
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
   const selectVariants = [
+    "id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)",
+    "id,date,label,category,amount,balance,company,bank_name,scope",
     "id,date,label,category,amount,balance,company,scope",
+    "id,date,label,category,amount,company,bank_name,scope",
     "id,date,label,category,amount,company,scope",
     "id,date,label,category,amount,balance,company",
     "id,date,label,category,amount,company"
@@ -96,6 +103,9 @@ export async function loadAllUserTransactionsFromSupabase(
       continue;
     }
     if (transactionSelectMissingColumn(err, "scope") && selectStr.includes("scope")) {
+      continue;
+    }
+    if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) {
       continue;
     }
     return { transactions: [], errorMessage: err };

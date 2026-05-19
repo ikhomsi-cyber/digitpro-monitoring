@@ -130,6 +130,8 @@ async function handle(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       count: rows.length,
+      withBankName: rows.filter((row) => row.bankName?.trim()).length,
+      bankNames: Array.from(new Set(rows.map((row) => row.bankName?.trim()).filter(Boolean))).slice(0, 20),
       scope: axis,
       company,
       filterAccountIdsCount: filterAccountIds?.length ?? 0,

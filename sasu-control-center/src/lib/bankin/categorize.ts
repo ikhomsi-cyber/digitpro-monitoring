@@ -14,6 +14,8 @@ export type BankinCategorizeInput = {
   amount: number;
 };
 
+export const BANKIN_UNCATEGORIZED_CATEGORY = "Divers › A catégoriser";
+
 function fold(s: string): string {
   return (s ?? "")
     .normalize("NFD")
@@ -113,10 +115,15 @@ export function categorizeBankinTransaction(input: BankinCategorizeInput): strin
     const inferred = inferCategoryFromDescription(desc);
     if (inferred) return inferred;
     if (parent || sub) return formatBankinHierarchy(parent, sub);
-    return "Divers › A catégoriser";
+    return BANKIN_UNCATEGORIZED_CATEGORY;
   }
 
   return formatBankinHierarchy(parent, sub);
+}
+
+export function isBankinUncategorizedCategory(category: string | null | undefined): boolean {
+  const folded = fold(String(category ?? ""));
+  return folded === fold(BANKIN_UNCATEGORIZED_CATEGORY) || folded.includes("a categoriser");
 }
 
 function strPowensField(v: unknown): string {

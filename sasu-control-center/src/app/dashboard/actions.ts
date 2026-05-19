@@ -17,6 +17,13 @@ import {
 import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import {
+  BANKIN_UNCATEGORIZED_CATEGORY,
+} from "@/lib/bankin/categorize";
+import {
+  buildBankinReferenceCategoryList,
+  normalizeBankinReferenceCategory
+} from "@/lib/bankin/reference-categories";
 import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
 import {
   isPowensCloudConfigured,
@@ -43,6 +50,7 @@ type ImportTx = {
   amount: number;
   balance?: number | null;
   company: string;
+  bankName?: string | null;
   scope?: "pro" | "personal";
   /** Clé optionnelle pour le content_hash (ex. id transaction import). */
   dedupeKey?: string;
@@ -56,12 +64,44 @@ function mapPowensRowsToImportTx(rows: PowensImportRow[]): ImportTx[] {
     amount: r.amount,
     balance: r.balance ?? undefined,
     company: r.company,
+    bankName: r.bankName ?? null,
     scope: r.scope,
     dedupeKey: r.dedupeKey
   }));
 }
 
 type SupabaseServer = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
+async function loadBankinReferenceCategories(client: SupabaseServer): Promise<Set<string>> {
+  const { data, error } = await client
+    .from("transactions")
+    .select("category,import_sessions!inner(format)")
+    .eq("import_sessions.format", "bankin")
+    .order("category", { ascending: true });
+
+  if (error) {
+    const msg = error.message ?? "";
+    if (/import_sessions|relationship|schema cache|PGRST200|PGRST201/i.test(msg)) return new Set();
+    throw new Error(msg);
+  }
+
+  return new Set(
+    buildBankinReferenceCategoryList(
+      (data ?? []).map((row) => (row as { category?: string | null }).category)
+    )
+  );
+}
+
+function applyBankinReferenceToPowensRows(rows: ImportTx[], referenceCategories: Set<string>): ImportTx[] {
+  if (referenceCategories.size === 0) return rows;
+  return rows.map((row) => {
+    const category = normalizeBankinReferenceCategory(row.category);
+    return {
+      ...row,
+      category: referenceCategories.has(category) ? category : BANKIN_UNCATEGORIZED_CATEGORY
+    };
+  });
+}
 
 /**
  * True when a Postgrest/PG error means a given column does not exist in the schema cache yet.
@@ -287,6 +327,7 @@ export async function importTransactions(
     category: string;
     amount: number;
     company: string;
+    bankName?: string | null;
   }>;
   metrics: Array<{ month: string; revenue: number; expenses: number }>;
   skippedInFile: number;
@@ -313,7 +354,8 @@ export async function importTransactions(
 
   const importRows = transactions.map((t) => ({
     ...t,
-    category: mapExpenseCategoryLabel(t.category)
+    category: mapExpenseCategoryLabel(t.category),
+    bankName: t.bankName?.trim() || null
   }));
 
   const originalCount = importRows.length;
@@ -402,6 +444,7 @@ export async function importTransactions(
   }
 
   let balanceSupported = true;
+  let bankNameSupported = true;
 
   type InsertedPayload = {
     date: string;
@@ -410,6 +453,7 @@ export async function importTransactions(
     amount: number;
     balance?: number | null;
     company: string;
+    bank_name?: string | null;
     scope?: "pro" | "personal";
     content_hash: string;
     import_session_id: string;
@@ -421,6 +465,7 @@ export async function importTransactions(
     amount: p.amount,
     balance: p.balance ?? null,
     company: p.company,
+    bank_name: p.bankName ?? null,
     scope: p.scope === "personal" ? "personal" : "pro",
     content_hash: p.content_hash,
     import_session_id: importSessionId
@@ -429,6 +474,7 @@ export async function importTransactions(
     return rows.map((row) => {
       const copy: InsertedPayload = { ...row };
       if (!balanceSupported) delete copy.balance;
+      if (!bankNameSupported) delete copy.bank_name;
       return copy;
     });
   }
@@ -440,6 +486,7 @@ export async function importTransactions(
     category: string;
     amount: number;
     company: string;
+    bankName?: string | null;
     scope?: "pro" | "personal";
   }> = [];
 
@@ -450,13 +497,20 @@ export async function importTransactions(
     let attempt = await client
       .from("transactions")
       .insert(stripUnsupportedInsertFields(slice))
-      .select("id,date,label,category,amount,company,scope");
+      .select("id,date,label,category,amount,company,bank_name,scope");
+    if (attempt.error && bankNameSupported && isMissingColumnError(attempt.error, "bank_name")) {
+      bankNameSupported = false;
+      attempt = await client
+        .from("transactions")
+        .insert(stripUnsupportedInsertFields(slice))
+        .select("id,date,label,category,amount,company,scope");
+    }
     if (attempt.error && balanceSupported && isMissingColumnError(attempt.error, "balance")) {
       balanceSupported = false;
       attempt = await client
         .from("transactions")
         .insert(stripUnsupportedInsertFields(slice))
-        .select("id,date,label,category,amount,company,scope");
+        .select(bankNameSupported ? "id,date,label,category,amount,company,bank_name,scope" : "id,date,label,category,amount,company,scope");
     }
     if (attempt.error && isMissingColumnError(attempt.error, "scope")) {
       // Backwards-compat when the column does not exist yet.
@@ -481,6 +535,7 @@ export async function importTransactions(
         category: r.category,
         amount: Number(r.amount),
         company: String(r.company ?? ""),
+        bankName: "bank_name" in r ? String(r.bank_name ?? "").trim() || null : null,
         scope: r.scope === "personal" ? "personal" : "pro"
       });
     }
@@ -493,15 +548,32 @@ export async function importTransactions(
       slice.map(async (row) => {
         const baseUpdate = {
           category: row.category,
+          ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
           import_session_id: importSessionId
         } as const;
         const fullUpdate = balanceSupported
           ? { ...baseUpdate, balance: row.balance ?? null }
           : baseUpdate;
         let res = await client.from("transactions").update(fullUpdate).eq("id", row.id);
+        if (res.error && bankNameSupported && isMissingColumnError(res.error, "bank_name")) {
+          bankNameSupported = false;
+          const retryBaseUpdate = {
+            category: row.category,
+            import_session_id: importSessionId
+          };
+          const retryFullUpdate = balanceSupported
+            ? { ...retryBaseUpdate, balance: row.balance ?? null }
+            : retryBaseUpdate;
+          res = await client.from("transactions").update(retryFullUpdate).eq("id", row.id);
+        }
         if (res.error && balanceSupported && isMissingColumnError(res.error, "balance")) {
           balanceSupported = false;
-          res = await client.from("transactions").update(baseUpdate).eq("id", row.id);
+          const retryBaseUpdate = {
+            category: row.category,
+            ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
+            import_session_id: importSessionId
+          };
+          res = await client.from("transactions").update(retryBaseUpdate).eq("id", row.id);
         }
         return res;
       })
@@ -783,7 +855,8 @@ async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promi
     powensUserId,
     filterAccountIds
   });
-  const txs = mapPowensRowsToImportTx(rows);
+  const referenceCategories = await loadBankinReferenceCategories(supabase);
+  const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), referenceCategories);
 
   const axisLabel = axis === "personal" ? "perso" : "SASU";
   const result = await importTransactions(txs, {

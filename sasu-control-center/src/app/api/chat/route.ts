@@ -61,14 +61,13 @@ async function loadTransactions(): Promise<{
 
   const withBalance = await supabase
     .from("transactions")
-    .select("id,date,label,category,amount,balance,company")
+    .select("id,date,label,category,amount,balance,company,bank_name")
     .order("date", { ascending: false })
     .limit(5000);
 
-  const balanceColumnMissing =
+  const missingOptionalColumn =
     withBalance.error &&
     typeof withBalance.error.message === "string" &&
-    /balance/i.test(withBalance.error.message) &&
     /(could not find|schema cache|does not exist)/i.test(withBalance.error.message);
 
   type TxRow = {
@@ -79,10 +78,11 @@ async function loadTransactions(): Promise<{
     amount: number | string;
     balance?: number | string | null;
     company: string | null;
+    bank_name?: string | null;
   };
 
   let rawRows: TxRow[] = [];
-  if (balanceColumnMissing) {
+  if (missingOptionalColumn) {
     const fallback = await supabase
       .from("transactions")
       .select("id,date,label,category,amount,company")
@@ -100,7 +100,8 @@ async function loadTransactions(): Promise<{
     category: mapExpenseCategoryLabel(String(row.category ?? "")),
     amount: Number(row.amount),
     balance: row.balance == null ? null : Number(row.balance),
-    company: String(row.company ?? "").trim()
+    company: String(row.company ?? "").trim(),
+    bankName: row.bank_name == null ? null : String(row.bank_name).trim()
   }));
 
   return { transactions, userEmail, source: "supabase" };

@@ -34,6 +34,7 @@ export type Database = {
           amount: number;
           balance: number | null;
           company: string;
+          bank_name: string | null;
           /** Périmètre : pro (SASU) vs personal (privé). */
           scope: "pro" | "personal";
           content_hash: string | null;
@@ -50,6 +51,7 @@ export type Database = {
           amount: number;
           balance?: number | null;
           company?: string;
+          bank_name?: string | null;
           scope?: "pro" | "personal";
           content_hash?: string | null;
           import_session_id?: string | null;
@@ -61,6 +63,7 @@ export type Database = {
           amount: number;
           balance: number | null;
           company: string;
+          bank_name: string | null;
           scope: "pro" | "personal";
           content_hash: string | null;
           import_session_id: string | null;
