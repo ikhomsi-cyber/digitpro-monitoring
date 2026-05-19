@@ -46,6 +46,7 @@ function BreakdownPieChart({
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   palette: readonly string[];
 }) {
+  const [showDetails, setShowDetails] = useState(false);
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
   if (total <= 0) return null;
 
@@ -81,62 +82,91 @@ function BreakdownPieChart({
           ))}
         </div>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-center">
-        <svg viewBox="0 0 200 200" role="img" aria-label="Répartition par catégorie" className="mx-auto block h-52 w-52">
-          <defs>
-            <filter id="breakdown-pie-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
-            </filter>
-          </defs>
-          <circle cx="100" cy="100" r="58" fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="16" />
-          {slices.map((slice) => (
-            <circle
-              key={`slice-${slice.row.label}`}
-              cx="100"
-              cy="100"
-              r="58"
-              fill="none"
-              stroke={slice.color}
-              strokeWidth="16"
-              strokeDasharray={`${slice.dash} ${circumference}`}
-              strokeDashoffset={slice.offset}
-              strokeLinecap="round"
-              transform="rotate(-90 100 100)"
-              filter="url(#breakdown-pie-shadow)"
-            />
-          ))}
-          <circle cx="100" cy="100" r="43" className="fill-white dark:fill-[#101015]" />
-          <text x="100" y="98" textAnchor="middle" className="fill-ink-900 text-[11px] font-bold tabular-nums dark:fill-white">
-            {fmt.euro(total)}
-          </text>
-          <text x="100" y="112" textAnchor="middle" className="fill-ink-400 text-[7px] font-semibold uppercase tracking-[0.14em] dark:fill-white/35">
-            total
-          </text>
-        </svg>
-        <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+      <div className="space-y-3">
+        <div className="flex flex-col items-center">
+          <svg viewBox="0 0 200 200" role="img" aria-label="Répartition par catégorie" className="block h-52 w-52">
+            <defs>
+              <filter id="breakdown-pie-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
+              </filter>
+            </defs>
+            <circle cx="100" cy="100" r="58" fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="16" />
+            {slices.map((slice) => (
+              <circle
+                key={`slice-${slice.row.label}`}
+                cx="100"
+                cy="100"
+                r="58"
+                fill="none"
+                stroke={slice.color}
+                strokeWidth="16"
+                strokeDasharray={`${slice.dash} ${circumference}`}
+                strokeDashoffset={slice.offset}
+                strokeLinecap="round"
+                transform="rotate(-90 100 100)"
+                filter="url(#breakdown-pie-shadow)"
+              />
+            ))}
+            <circle cx="100" cy="100" r="43" className="fill-white dark:fill-[#101015]" />
+            <text x="100" y="98" textAnchor="middle" className="fill-ink-900 text-[11px] font-bold tabular-nums dark:fill-white">
+              {fmt.euro(total)}
+            </text>
+            <text x="100" y="112" textAnchor="middle" className="fill-ink-400 text-[7px] font-semibold uppercase tracking-[0.14em] dark:fill-white/35">
+              total
+            </text>
+          </svg>
+          <div className="mb-3 flex max-w-full flex-wrap justify-center gap-1.5">
+            {slices.slice(0, 6).map((slice) => (
+              <span
+                key={`compact-legend-${slice.row.label}`}
+                className="inline-flex max-w-[9rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
+                <span className="truncate">{slice.row.label}</span>
+              </span>
+            ))}
+            {slices.length > 6 ? (
+              <span className="inline-flex items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
+                +{slices.length - 6}
+              </span>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            className="inline-flex h-9 items-center justify-center rounded-full border border-ink-200 bg-white/70 px-4 text-xs font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:text-white/70 dark:hover:bg-white/[0.08]"
+            aria-expanded={showDetails}
+          >
+            {showDetails ? "Masquer le détail" : "Afficher le détail"}
+          </button>
+        </div>
+        {showDetails ? (
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => (
             <div
               key={`legend-${slice.row.label}`}
-              className="min-w-0 rounded-xl bg-white/40 px-2.5 py-1.5 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]"
+              className="min-w-0 rounded-xl bg-white/40 px-3 py-2 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 inline-flex items-center gap-1.5 text-[10px] font-semibold text-ink-700 dark:text-white/70">
+                <span className="min-w-0 inline-flex items-center gap-2 text-[13px] font-semibold text-ink-700 dark:text-white/70">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                   <span className="truncate">{slice.row.label}</span>
                 </span>
-                <span className="shrink-0 text-[10px] font-bold tabular-nums text-ink-950 dark:text-white">
+                <span className="shrink-0 text-[13px] font-bold tabular-nums text-ink-950 dark:text-white">
                   {slice.percent} %
                 </span>
               </div>
-              <div className="mt-1 h-0.5 overflow-hidden rounded-full bg-ink-200/55 dark:bg-black/25">
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-200/55 dark:bg-black/25">
                 <span className="block h-full rounded-full" style={{ width: `${slice.percent}%`, backgroundColor: slice.color }} aria-hidden />
               </div>
-              <p className="mt-0.5 text-right text-[9px] font-semibold tabular-nums text-ink-500 dark:text-white/40">
+              <p className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
                 {fmt.euro(slice.row.amountEur)}
               </p>
             </div>
           ))}
         </div>
+        ) : null}
       </div>
     </div>
   );
@@ -184,6 +214,14 @@ function CashFlowTreeVisual({
       tone: "neutral"
     },
     {
+      icon: "📋",
+      label: "CSG",
+      detail: "9,7 % de (CA HT − frais obligatoires − charges perso)",
+      amount: -tree.csgEur,
+      gaugeAmount: tree.csgEur,
+      tone: "deduct"
+    },
+    {
       icon: "🧾",
       label: "Frais DigitPro",
       amount: -tree.mandatoryFeesEur,
@@ -203,22 +241,6 @@ function CashFlowTreeVisual({
       breakdownPalette: PERSONAL_CHARGES_COLORS,
       tone: "deduct"
     },
-    {
-      icon: "📋",
-      label: "CSG",
-      detail: "9,7 % de (CA HT − frais obligatoires − charges perso)",
-      amount: -tree.csgEur,
-      gaugeAmount: tree.csgEur,
-      tone: "deduct"
-    },
-    {
-      icon: "📘",
-      label: "BNC",
-      detail: "somme des transactions virement BNC",
-      amount: tree.bncEur,
-      gaugeAmount: tree.bncEur,
-      tone: "result"
-    }
   ];
 
   return (
@@ -309,6 +331,9 @@ function CashFlowTreeVisual({
               </div>
               <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
                 {percentOfCa(item.value)} %
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-ink-500 dark:text-white/45">
+                {fmt.euro(item.value)}
               </p>
             </div>
           ))}

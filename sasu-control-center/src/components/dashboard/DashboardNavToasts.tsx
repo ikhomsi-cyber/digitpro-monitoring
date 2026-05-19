@@ -44,7 +44,7 @@ const ITEMS: readonly {
   },
   {
     href: "/categorisation",
-    label: "Catég.",
+    label: "Catégorisation",
     icon: Tags,
     match: () => false
   }
@@ -80,11 +80,11 @@ export function DashboardNavToasts() {
       </p>
       <div
         className={clsx(
-          "overflow-x-auto overscroll-x-contain scroll-smooth px-4 pb-0.5 sm:px-0",
+          "overflow-visible px-4 pb-0.5 sm:px-0",
           "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         )}
       >
-        <div className="flex min-w-full flex-nowrap justify-center gap-2 sm:gap-2.5">
+        <div className="flex min-w-full flex-wrap justify-center gap-2 sm:gap-2.5">
           {ITEMS.map((item) => {
             const active = item.match(ctx);
             const Icon = item.icon;
@@ -97,7 +97,7 @@ export function DashboardNavToasts() {
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 text-center transition sm:px-4 sm:py-2",
-                  "min-h-0 min-w-[4.75rem] sm:min-w-[5.25rem]",
+                  "min-h-0 min-w-[4.75rem] max-w-full sm:min-w-[5.25rem]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-50 dark:focus-visible:ring-emerald-400/50 dark:focus-visible:ring-offset-[#050505]",
                   active
                     ? clsx(

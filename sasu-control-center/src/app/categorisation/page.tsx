@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CreditCard, Sparkles, Tags } from "lucide-react";
+import { CreditCard, Sparkles } from "lucide-react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -8,10 +8,15 @@ import { BANKIN_UNCATEGORIZED_CATEGORY } from "@/lib/bankin/categorize";
 import { buildBankinReferenceCategoryList } from "@/lib/bankin/reference-categories";
 import { CategorisationClient, type CategorisationTx } from "./CategorisationClient";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
+import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { AppSectionNav } from "@/components/AppSectionNav";
 import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
+import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
+import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
+import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -63,10 +68,13 @@ export default async function CategorisationPage() {
 
   let categories: string[] = [];
   let transactions: CategorisationTx[] = [];
+  let dashboardTransactions: Awaited<ReturnType<typeof loadAllUserTransactionsFromSupabase>>["transactions"] = [];
   let loadError: string | null = null;
+  let initialBillableWorkDays: string[] = [];
+  let initialBillableTjmHt: number | null = null;
 
   if (supabase) {
-    const [categoryRes, txRes] = await Promise.all([
+    const [categoryRes, txRes, loadedTx] = await Promise.all([
       supabase
         .from("transactions")
         .select("category,import_sessions!inner(format)")
@@ -78,11 +86,13 @@ export default async function CategorisationPage() {
         .eq("import_sessions.format", "powens")
         .eq("category", BANKIN_UNCATEGORIZED_CATEGORY)
         .order("date", { ascending: false })
-        .limit(200)
+        .limit(200),
+      loadAllUserTransactionsFromSupabase(supabase)
     ]);
+    dashboardTransactions = loadedTx.transactions;
 
-    if (categoryRes.error || txRes.error) {
-      loadError = categoryRes.error?.message ?? txRes.error?.message ?? "Chargement impossible.";
+    if (categoryRes.error || txRes.error || loadedTx.errorMessage) {
+      loadError = categoryRes.error?.message ?? txRes.error?.message ?? loadedTx.errorMessage ?? "Chargement impossible.";
     } else {
       categories = buildBankinReferenceCategoryList(
         (categoryRes.data ?? []).map((row) => normalizeCategory((row as { category?: unknown }).category))
@@ -98,13 +108,44 @@ export default async function CategorisationPage() {
         }))
         .filter((tx) => isCardPowensLabel(`${tx.label} ${tx.company}`));
     }
+
+    if (user) {
+      const [daysRes, setRes] = await Promise.all([
+        supabase
+          .from("billable_work_days")
+          .select("work_date")
+          .eq("user_id", user.id)
+          .order("work_date", { ascending: true }),
+        supabase
+          .from("user_billable_settings")
+          .select("tjm_ht")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      ]);
+      if (!daysRes.error && daysRes.data) {
+        initialBillableWorkDays = daysRes.data.map((r) =>
+          String((r as { work_date: string }).work_date).slice(0, 10)
+        );
+      }
+      if (!setRes.error && setRes.data != null) {
+        const n = Number((setRes.data as { tjm_ht: number | string }).tjm_ht);
+        if (Number.isFinite(n) && n > 0) initialBillableTjmHt = n;
+      }
+    }
   }
 
   const totalToReview = transactions.length;
   const totalAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+  const heroStats = computeDashboardHeroStats(dashboardTransactions);
+  const billableTjmHt = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
 
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
+    <BillableActivityProvider
+      tjmHt={billableTjmHt}
+      persistToSupabase={envMode === "SUPABASE"}
+      initialWorkDayIsos={initialBillableWorkDays}
+    >
       <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
         <DashboardTopNav
           envMode={envMode}
@@ -117,39 +158,16 @@ export default async function CategorisationPage() {
           showLogout={envMode !== "DEMO"}
         />
 
+        <DashboardPremiumHero
+          stats={heroStats}
+          contextMessage=""
+          showContextBanner={false}
+        />
+
         <AppSectionNav />
 
-        <section className="mt-5 overflow-hidden rounded-[2rem] border border-ink-200 bg-white shadow-[0_16px_60px_-28px_rgba(0,0,0,0.28)] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#101412] dark:via-[#080a09] dark:to-[#050505]">
-          <div className="relative p-5 sm:p-7">
-            <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-400/15" />
-            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <Link
-                  href="/dashboard?panel=valeur-reelle"
-                  className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-ink-500 transition hover:text-ink-900 dark:text-white/45 dark:hover:text-white"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
-                  Retour dashboard
-                </Link>
-                <div className="flex items-center gap-3">
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/15 dark:text-emerald-300">
-                    <Tags className="h-5 w-5" aria-hidden />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
-                      Categorisation
-                    </p>
-                    <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-ink-950 dark:text-white">
-                      Revue des paiements carte Powens
-                    </h1>
-                  </div>
-                </div>
-                <p className="mt-4 text-sm leading-relaxed text-ink-600 dark:text-white/55">
-                  On ne te montre ici que les transactions Powens non identifiées qui ressemblent à des paiements carte
-                  ou CB. Les virements, prélèvements et mouvements bancaires automatiques restent hors de cette revue.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:min-w-[22rem]">
+        <section className="mt-5">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-3xl border border-ink-200 bg-ink-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.04]">
                   <CreditCard className="h-4 w-4 text-sky-600 dark:text-sky-300" aria-hidden />
                   <p className="mt-2 text-xs text-ink-500 dark:text-white/45">À classer</p>
@@ -167,8 +185,6 @@ export default async function CategorisationPage() {
                   </p>
                 </div>
               </div>
-            </div>
-          </div>
         </section>
 
         <main className="mt-5">
@@ -185,6 +201,7 @@ export default async function CategorisationPage() {
           )}
         </main>
       </div>
+    </BillableActivityProvider>
     </DashboardDummyDataProvider>
   );
 }
