@@ -52,6 +52,16 @@ function stripTrailingBiApiV2(url: string): string {
   return url.replace(/\/2\.0\/?$/, "").replace(/\/$/, "");
 }
 
+function ensureHttpUrl(raw: string, label: string): string {
+  const value = raw.trim().replace(/\/$/, "");
+  const withProtocol = value.includes("://") ? value : `https://${value}`;
+  try {
+    return new URL(withProtocol).toString().replace(/\/$/, "");
+  } catch {
+    throw new Error(`${label} : URL invalide. Utilisez par exemple https://votre-instance.biapi.pro.`);
+  }
+}
+
 type PowensEndpointResolution =
   | { mode: "domain"; domainOrigin: string }
   | { mode: "explicit"; fullBaseUrl: string };
@@ -75,11 +85,13 @@ function resolvePowensEndpoints(): PowensEndpointResolution {
   if (explicit) {
     return {
       mode: "explicit",
-      fullBaseUrl: sanitizeLatin1HttpValue(explicit, "POWENS_API_BASE_URL")
+      fullBaseUrl: sanitizeLatin1HttpValue(ensureHttpUrl(explicit, "POWENS_API_BASE_URL"), "POWENS_API_BASE_URL")
     };
   }
   if (domain) {
-    const domainOrigin = stripTrailingBiApiV2(sanitizeLatin1HttpValue(domain, "POWENS_DOMAIN"));
+    const domainOrigin = stripTrailingBiApiV2(
+      sanitizeLatin1HttpValue(ensureHttpUrl(domain, "POWENS_DOMAIN"), "POWENS_DOMAIN")
+    );
     return { mode: "domain", domainOrigin };
   }
   throw new Error(

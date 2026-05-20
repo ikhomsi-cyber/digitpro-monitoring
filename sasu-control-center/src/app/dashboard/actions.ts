@@ -795,6 +795,24 @@ export async function getPowensWebviewConnectUrl(): Promise<{ url: string }> {
   return { url };
 }
 
+export async function safeGetPowensWebviewConnectUrl(): Promise<
+  { ok: true; url: string } | { ok: false; error: string }
+> {
+  try {
+    const { url } = await getPowensWebviewConnectUrl();
+    return { ok: true, url };
+  } catch (error) {
+    console.error("[powens] webview url failed", error);
+    return {
+      ok: false,
+      error:
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Impossible de préparer l’URL Powens Connect."
+    };
+  }
+}
+
 /**
  * Récupère les transactions Powens puis importe (`format: powens`) pour l’axe demandé (SASU ou perso).
  */

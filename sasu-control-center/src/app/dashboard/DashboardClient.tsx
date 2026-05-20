@@ -69,7 +69,7 @@ import {
   importBankinPersonalXlsx,
   preparePowensConnectSession,
   resetPowensConnectSession,
-  getPowensWebviewConnectUrl,
+  safeGetPowensWebviewConnectUrl,
   safeSyncPowensCloudTransactions,
   safeSyncPowensCloudTransactionsPersonal
 } from "./actions";
@@ -583,8 +583,9 @@ export function DashboardClient({
         const session = opts?.reset
           ? await resetPowensConnectSession()
           : await preparePowensConnectSession();
-        try {
-          const { url } = await getPowensWebviewConnectUrl();
+        const webviewResult = await safeGetPowensWebviewConnectUrl();
+        if (webviewResult.ok) {
+          const { url } = webviewResult;
           /** Pop-up : souvent bloquée ou incompatible OAuth banque (Revolut, etc.). Pleine page : recommandé Powens PSD2. */
           const tabPref = process.env.NEXT_PUBLIC_POWENS_WEBVIEW_NEW_TAB?.trim().toLowerCase();
           const preferNewTab = tabPref === "true" || tabPref === "1";
@@ -607,7 +608,7 @@ export function DashboardClient({
             toast.dismiss(toastId);
             window.location.assign(url);
           }
-        } catch (webviewErr) {
+        } else {
           const opened = await openPowensConnectWidget({
             userId: session.userId,
             token: session.token
@@ -618,11 +619,9 @@ export function DashboardClient({
               description: "Si la fenêtre ne s’affiche pas, vérifiez le bloqueur de pop-ups."
             });
           } else {
-            const wvMsg =
-              webviewErr instanceof Error ? webviewErr.message : String(webviewErr);
             toast.message("Compte Powens prêt", {
               id: toastId,
-              description: `${wvMsg} · ${opened.message} Vous pouvez lancer la synchro une fois la banque liée côté Powens.`
+              description: `${webviewResult.error} · ${opened.message} Vous pouvez lancer la synchro une fois la banque liée côté Powens.`
             });
           }
         }
