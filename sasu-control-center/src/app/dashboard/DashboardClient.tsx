@@ -70,8 +70,8 @@ import {
   preparePowensConnectSession,
   resetPowensConnectSession,
   getPowensWebviewConnectUrl,
-  syncPowensCloudTransactions,
-  syncPowensCloudTransactionsPersonal
+  safeSyncPowensCloudTransactions,
+  safeSyncPowensCloudTransactionsPersonal
 } from "./actions";
 import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -653,26 +653,25 @@ export function DashboardClient({
     }
     const toastId = toast.loading("Synchronisation Powens en cours…");
     startTransition(async () => {
-      try {
-        const result = await syncPowensCloudTransactions();
+        const result = await safeSyncPowensCloudTransactions();
+        if (!result.ok) {
+          toast.error("Synchronisation Powens échouée", {
+            id: toastId,
+            description: result.error,
+            action: result.noAccount
+              ? {
+                  label: "Nouvelle connexion",
+                  onClick: () => onClickPowensConnect({ reset: true })
+                }
+              : undefined
+          });
+          return;
+        }
         toast.success("Powens synchronisé", {
           id: toastId,
           description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
         });
         router.refresh();
-      } catch (e) {
-        const message = e instanceof Error ? e.message : undefined;
-        toast.error("Synchronisation Powens échouée", {
-          id: toastId,
-          description: message,
-          action: message?.includes("aucun compte bancaire")
-            ? {
-                label: "Nouvelle connexion",
-                onClick: () => onClickPowensConnect({ reset: true })
-              }
-            : undefined
-        });
-      }
     });
   }
 
@@ -687,26 +686,25 @@ export function DashboardClient({
     }
     const toastId = toast.loading("Synchronisation Powens (perso)…");
     startTransition(async () => {
-      try {
-        const result = await syncPowensCloudTransactionsPersonal();
+        const result = await safeSyncPowensCloudTransactionsPersonal();
+        if (!result.ok) {
+          toast.error("Synchronisation Powens perso échouée", {
+            id: toastId,
+            description: result.error,
+            action: result.noAccount
+              ? {
+                  label: "Nouvelle connexion",
+                  onClick: () => onClickPowensConnect({ reset: true })
+                }
+              : undefined
+          });
+          return;
+        }
         toast.success("Powens perso synchronisé", {
           id: toastId,
           description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
         });
         router.refresh();
-      } catch (e) {
-        const message = e instanceof Error ? e.message : undefined;
-        toast.error("Synchronisation Powens perso échouée", {
-          id: toastId,
-          description: message,
-          action: message?.includes("aucun compte bancaire")
-            ? {
-                label: "Nouvelle connexion",
-                onClick: () => onClickPowensConnect({ reset: true })
-              }
-            : undefined
-        });
-      }
     });
   }
 

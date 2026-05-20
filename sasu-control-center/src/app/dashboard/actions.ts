@@ -874,31 +874,66 @@ async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promi
   };
 }
 
-/**
- * Synchro Powens selon `POWENS_IMPORT_SCOPE` (**personal** par défaut ; `pro` uniquement si la variable vaut `pro`) et les labels / filtres d’axe correspondants.
- */
-export async function syncPowensCloudTransactions(): Promise<{
+type PowensSyncSuccess = {
   inserted: number;
   merged: number;
   skippedInFile: number;
   totalFromApi: number;
   summary: string;
-}> {
+};
+
+type PowensSyncActionResult =
+  | ({ ok: true } & PowensSyncSuccess)
+  | { ok: false; error: string; noAccount: boolean };
+
+function powensSyncErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return "Synchronisation Powens impossible. Consultez les logs serveur pour plus de détails.";
+}
+
+function toPowensSyncActionError(error: unknown): PowensSyncActionResult {
+  const message = powensSyncErrorMessage(error);
+  return {
+    ok: false,
+    error: message,
+    noAccount: message.includes("aucun compte bancaire") || message.includes("noAccount")
+  };
+}
+
+/**
+ * Synchro Powens selon `POWENS_IMPORT_SCOPE` (**personal** par défaut ; `pro` uniquement si la variable vaut `pro`) et les labels / filtres d’axe correspondants.
+ */
+export async function syncPowensCloudTransactions(): Promise<PowensSyncSuccess> {
   return syncPowensCloudTransactionsForAxis(powensPrimaryImportAxis());
+}
+
+export async function safeSyncPowensCloudTransactions(): Promise<PowensSyncActionResult> {
+  try {
+    const result = await syncPowensCloudTransactionsForAxis(powensPrimaryImportAxis());
+    return { ok: true, ...result };
+  } catch (error) {
+    console.error("[powens] sync failed", error);
+    return toPowensSyncActionError(error);
+  }
 }
 
 /**
  * Import explicite en **perso** (`scope: personal`), même si le bouton principal est en SASU.
  * Activez via `POWENS_SYNC_PERSONAL` ou `POWENS_PERSONAL_COMPANY_LABEL` (+ bouton dashboard).
  */
-export async function syncPowensCloudTransactionsPersonal(): Promise<{
-  inserted: number;
-  merged: number;
-  skippedInFile: number;
-  totalFromApi: number;
-  summary: string;
-}> {
+export async function syncPowensCloudTransactionsPersonal(): Promise<PowensSyncSuccess> {
   return syncPowensCloudTransactionsForAxis("personal");
+}
+
+export async function safeSyncPowensCloudTransactionsPersonal(): Promise<PowensSyncActionResult> {
+  try {
+    const result = await syncPowensCloudTransactionsForAxis("personal");
+    return { ok: true, ...result };
+  } catch (error) {
+    console.error("[powens] personal sync failed", error);
+    return toPowensSyncActionError(error);
+  }
 }
 
 export type PurgePowensDataResult = {
