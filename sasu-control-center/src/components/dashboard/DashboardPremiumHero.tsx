@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
@@ -59,13 +58,6 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-ink-600 dark:text-white/55 sm:text-base">
           {chips}
         </p>
-
-        <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="#dashboard-main" className="premium-cta inline-flex items-center justify-center">
-            Ouvrir le dashboard
-          </Link>
-          <span className="text-xs text-ink-500 dark:text-white/35">Accès direct aux indicateurs</span>
-        </div>
 
         <dl className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           {tiles.map((t) => (

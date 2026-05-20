@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { replaceBillableWorkDays } from "@/app/dashboard/actions";
 import { computeCurrentMonthOverview } from "@/lib/billable-calendar-metrics";
+import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import type {
   ActivityOverviewKpis,
   ActivityWorkdayGauge
@@ -39,6 +40,7 @@ function persistSignature(sortedDates: string[], tjm: number): string {
 
 type BillableActivityContextValue = {
   tjmHt: number;
+  billableRatePeriods: readonly BillableRatePeriod[];
   persistToSupabase: boolean;
   selected: Set<string>;
   setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -54,11 +56,13 @@ const BillableActivityContext = createContext<BillableActivityContextValue | nul
 export function BillableActivityProvider({
   children,
   tjmHt,
+  billableRatePeriods = [],
   persistToSupabase,
   initialWorkDayIsos
 }: {
   children: ReactNode;
   tjmHt: number;
+  billableRatePeriods?: readonly BillableRatePeriod[];
   persistToSupabase: boolean;
   initialWorkDayIsos: string[];
 }) {
@@ -126,6 +130,7 @@ export function BillableActivityProvider({
   const value = useMemo<BillableActivityContextValue>(
     () => ({
       tjmHt,
+      billableRatePeriods,
       persistToSupabase,
       selected,
       setSelected,
@@ -135,7 +140,7 @@ export function BillableActivityProvider({
       overviewKpis: overview.kpis,
       overviewWorkdayGauge: overview.workdayGauge
     }),
-    [tjmHt, persistToSupabase, selected, hydrated, sortedIsos, overview]
+    [tjmHt, billableRatePeriods, persistToSupabase, selected, hydrated, sortedIsos, overview]
   );
 
   return (

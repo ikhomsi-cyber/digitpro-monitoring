@@ -20,13 +20,17 @@ import { DashboardClient } from "./DashboardClient";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
 import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { Logo } from "@/components/ui/Logo";
-import { AppSectionNav } from "@/components/AppSectionNav";
-import { DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
+import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
-import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
-import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
+import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import {
+  loadBillableActivitySettings,
+  loadDashboardHeroStatsFromSupabase,
+  loadTransactionYearBounds
+} from "@/lib/supabase/dashboard-loaders";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 import { isPowensCloudConfigured } from "@/lib/powens/cloud-api";
 import {
@@ -110,59 +114,38 @@ export default async function DashboardPage({
 
   let rawRowsMapped: DashboardTx[] = [];
   let transactionsLoadError: string | null = null;
-  if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const { transactions: loaded, errorMessage } = await loadAllUserTransactionsFromSupabase(supabase);
-    rawRowsMapped = loaded;
-    transactionsLoadError = errorMessage ?? null;
-    if (errorMessage) {
-      console.warn("[dashboard] transactions:", errorMessage);
-    }
-  }
-
-  /** Bornes d’années sur toute la table (indépendant du chargement paginé des lignes détaillées). */
   let transactionYearBounds: { minYear: number; maxYear: number } | null = null;
+  let initialBillableWorkDays: string[] = [];
+  let initialBillableTjmHt: number | null = null;
+  let billableRatePeriods: BillableRatePeriod[] = [];
+  let heroStatsFromDb: DashboardHeroStats | null = null;
+
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [oldest, newest] = await Promise.all([
-      supabase.from("transactions").select("date").order("date", { ascending: true }).limit(1).maybeSingle(),
-      supabase.from("transactions").select("date").order("date", { ascending: false }).limit(1).maybeSingle()
+    const [transactionsRes, boundsRes, billableRes, heroRes] = await Promise.all([
+      loadAllUserTransactionsFromSupabase(supabase),
+      loadTransactionYearBounds(supabase),
+      user
+        ? loadBillableActivitySettings(supabase, user.id)
+        : Promise.resolve({
+            initialBillableWorkDays: [],
+            initialBillableTjmHt: null,
+            billableRatePeriods: []
+          }),
+      loadDashboardHeroStatsFromSupabase(supabase)
     ]);
-    const d0 = oldest.data?.date;
-    const d1 = newest.data?.date;
-    if (!oldest.error && !newest.error && d0 != null && d1 != null) {
-      const minYear = Number(String(d0).slice(0, 4));
-      const maxYear = Number(String(d1).slice(0, 4));
-      if (Number.isFinite(minYear) && Number.isFinite(maxYear) && minYear <= maxYear) {
-        transactionYearBounds = { minYear, maxYear };
-      }
+    rawRowsMapped = transactionsRes.transactions;
+    transactionsLoadError = transactionsRes.errorMessage ?? null;
+    transactionYearBounds = boundsRes;
+    initialBillableWorkDays = billableRes.initialBillableWorkDays;
+    initialBillableTjmHt = billableRes.initialBillableTjmHt;
+    billableRatePeriods = billableRes.billableRatePeriods;
+    heroStatsFromDb = heroRes.stats;
+    if (transactionsRes.errorMessage) {
+      console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
     }
   }
 
   const transactions: DashboardTx[] = dataMode === "DEMO" ? demoTransactions : rawRowsMapped;
-
-  let initialBillableWorkDays: string[] = [];
-  let initialBillableTjmHt: number | null = null;
-  if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase && user) {
-    const daysRes = await supabase
-      .from("billable_work_days")
-      .select("work_date")
-      .eq("user_id", user.id)
-      .order("work_date", { ascending: true });
-    if (!daysRes.error && daysRes.data) {
-      initialBillableWorkDays = daysRes.data.map((r) =>
-        String((r as { work_date: string }).work_date).slice(0, 10)
-      );
-    }
-    const setRes = await supabase
-      .from("user_billable_settings")
-      .select("tjm_ht")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!setRes.error && setRes.data != null) {
-      const raw = (setRes.data as { tjm_ht: number | string }).tjm_ht;
-      const n = Number(raw);
-      if (Number.isFinite(n) && n > 0) initialBillableTjmHt = n;
-    }
-  }
 
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
   const showDarkModeToggle = isDarkModeUiEnabled();
@@ -170,7 +153,7 @@ export default async function DashboardPage({
   const powensCloudEnabled = isPowensCloudConfigured();
   const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
   const powensPrimaryAxis = powensPrimaryImportAxis();
-  const heroStats = computeDashboardHeroStats(transactions);
+  const heroStats = dataMode === "DEMO" ? computeDashboardHeroStats(transactions) : (heroStatsFromDb ?? computeDashboardHeroStats(transactions));
   const heroContextMessage =
     envMode === "DEMO"
       ? "Aucune configuration Supabase détectée : données de démonstration uniquement."
@@ -186,10 +169,12 @@ export default async function DashboardPage({
     <DashboardDummyDataProvider active={dummyDataActive}>
     <BillableActivityProvider
       tjmHt={billableTjmHt}
+      billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
       initialWorkDayIsos={initialBillableWorkDays}
     >
-    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
+    <DashboardDesktopSidebar />
+    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-auto lg:px-8">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}
@@ -199,6 +184,10 @@ export default async function DashboardPage({
         userEmail={user?.email}
         showDarkModeToggle={showDarkModeToggle}
         showLogout={envMode !== "DEMO"}
+        canWrite={dataMode === "SUPABASE"}
+        powensCloudEnabled={powensCloudEnabled}
+        powensPersonalSyncEnabled={powensPersonalSyncEnabled}
+        powensPrimaryImportAxis={powensPrimaryAxis}
       />
 
       {!showAnalyticsPanel || showValeurReellePanel ? (
@@ -208,8 +197,6 @@ export default async function DashboardPage({
           showContextBanner={showContextBanner}
         />
       ) : null}
-
-      <AppSectionNav />
 
       {showLmnpPanel ? (
         <LMNPClient
@@ -234,11 +221,6 @@ export default async function DashboardPage({
           }
         >
           <DashboardClient
-            runtimeMode={dataMode}
-            canWrite={dataMode === "SUPABASE"}
-            powensCloudEnabled={powensCloudEnabled}
-            powensPersonalSyncEnabled={powensPersonalSyncEnabled}
-            powensPrimaryImportAxis={powensPrimaryAxis}
             syncKey={syncKey}
             initialTransactions={transactions}
             transactionYearBounds={transactionYearBounds}

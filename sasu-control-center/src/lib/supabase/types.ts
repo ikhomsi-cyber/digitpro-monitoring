@@ -209,6 +209,33 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      billable_rate_periods: {
+        Row: {
+          id: string;
+          user_id: string;
+          client_name: string;
+          start_date: string;
+          end_date: string | null;
+          tjm_ht: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          client_name: string;
+          start_date: string;
+          end_date?: string | null;
+          tjm_ht: number;
+        };
+        Update: Partial<{
+          client_name: string;
+          start_date: string;
+          end_date: string | null;
+          tjm_ht: number;
+        }>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

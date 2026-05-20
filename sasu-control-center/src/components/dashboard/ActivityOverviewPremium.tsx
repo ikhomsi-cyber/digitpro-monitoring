@@ -68,9 +68,6 @@ function PremiumRadialGauge({
         <span className="mt-0.5 text-[11px] font-medium tabular-nums text-ink-500 dark:text-white/45">
           / {fmt.int(max)} j.
         </span>
-        <span className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-emerald-700/90 dark:text-emerald-300/80">
-          {fmt.percent0to100(pct * 100)}
-        </span>
       </div>
       <p className="sr-only">{caption}</p>
     </div>
@@ -147,7 +144,7 @@ export function ActivityOverviewPremium({
 
         <div className="min-w-0 flex-1 space-y-4">
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-950/60 dark:text-emerald-300">
                   <TrendingUp className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -161,12 +158,6 @@ export function ActivityOverviewPremium({
                   </p>
                 </div>
               </div>
-              <p className="text-right text-[10px] tabular-nums text-ink-500 dark:text-white/40">
-                <span className="block font-semibold text-emerald-700 dark:text-emerald-300">
-                  {fmt.percent0to100(caPct * 100)}
-                </span>
-                <span>du plafond mois</span>
-              </p>
             </div>
             <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ink-100/90 ring-1 ring-black/[0.04] dark:bg-white/[0.06] dark:ring-white/10">
               <div

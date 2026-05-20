@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition,
   type ReactNode
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -16,23 +15,16 @@ import { clsx } from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
-  Briefcase,
   CalendarClock,
-  CalendarRange,
   ChevronDown,
-  CloudDownload,
-  Landmark,
   Receipt,
   TrendingDown,
   TrendingUp,
-  Upload,
-  User,
 } from "lucide-react";
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
-import { DashboardPeriodFilterControls } from "@/components/dashboard/DashboardPeriodFilterControls";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
@@ -44,7 +36,8 @@ import { counterpartyLogoHref } from "@/lib/counterparty-logo";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
-  isCounterpartyBillableDaysAtTjm
+  isCounterpartyBillableDaysAtTjm,
+  resolveBillableTjmForClientMonth
 } from "@/lib/billable-client-days";
 import { isRevenueCategory, revenueCounterpartyDisplayName } from "@/lib/revenue-category";
 import {
@@ -64,17 +57,6 @@ import {
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
-import {
-  syncQontoTransactionsFromApi,
-  importBankinPersonalXlsx,
-  preparePowensConnectSession,
-  resetPowensConnectSession,
-  safeGetPowensWebviewConnectUrl,
-  safeSyncPowensCloudTransactions,
-  safeSyncPowensCloudTransactionsPersonal
-} from "./actions";
-import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
-import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
 export type { DashboardTx };
 
@@ -158,24 +140,11 @@ function dashboardMonthKeyNowLocal(): string {
 }
 
 export function DashboardClient({
-  runtimeMode,
-  canWrite,
-  powensCloudEnabled,
-  powensPersonalSyncEnabled,
-  powensPrimaryImportAxis,
   syncKey,
   initialTransactions,
   transactionYearBounds,
   initialDashboardScope
 }: {
-  runtimeMode: SupabaseRuntimeMode;
-  canWrite: boolean;
-  /** Variables serveur Powens (API cloud) présentes : affiche connect + sync. */
-  powensCloudEnabled: boolean;
-  /** Second import perso (double synchro SASU + perso). */
-  powensPersonalSyncEnabled: boolean;
-  /** Axe du bouton principal (`POWENS_IMPORT_SCOPE`). */
-  powensPrimaryImportAxis: "pro" | "personal";
   syncKey: string;
   initialTransactions: DashboardTx[];
   /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
@@ -296,12 +265,10 @@ export function DashboardClient({
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);
 
-  const [isPending, startTransition] = useTransition();
   const fmt = useDashboardDisplayFormat();
 
-  const bankinFileInputRef = useRef<HTMLInputElement>(null);
-
-  const { sortedIsos: billableWorkDayIsos } = useBillableActivity();
+  const billableActivity = useBillableActivity();
+  const { sortedIsos: billableWorkDayIsos } = billableActivity;
 
   const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
 
@@ -541,212 +508,6 @@ export function DashboardClient({
     return list.length ? list : [new Date().getFullYear()];
   }, [transactions, transactionYearBounds]);
 
-  function onClickSyncQontoApi() {
-    if (runtimeMode === "DEMO") {
-      toast.warning("API Qonto indisponible en mode démo.");
-      return;
-    }
-    if (!canWrite) {
-      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
-      return;
-    }
-    const toastId = toast.loading("Synchronisation Qonto (API) en cours…");
-    startTransition(async () => {
-      try {
-        const result = await syncQontoTransactionsFromApi();
-        toast.success("Qonto synchronisé", {
-          id: toastId,
-          description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.bankAccountSummary}`
-        });
-        router.refresh();
-      } catch (e) {
-        toast.error("Synchronisation Qonto échouée", {
-          id: toastId,
-          description: e instanceof Error ? e.message : undefined
-        });
-      }
-    });
-  }
-
-  function onClickPowensConnect(opts?: { reset?: boolean }) {
-    if (runtimeMode === "DEMO") {
-      toast.warning("Powens indisponible en mode démo.");
-      return;
-    }
-    if (!canWrite) {
-      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
-      return;
-    }
-    const toastId = toast.loading("Préparation Powens…");
-    startTransition(async () => {
-      try {
-        const session = opts?.reset
-          ? await resetPowensConnectSession()
-          : await preparePowensConnectSession();
-        const webviewResult = await safeGetPowensWebviewConnectUrl();
-        if (webviewResult.ok) {
-          const { url } = webviewResult;
-          /** Pop-up : souvent bloquée ou incompatible OAuth banque (Revolut, etc.). Pleine page : recommandé Powens PSD2. */
-          const tabPref = process.env.NEXT_PUBLIC_POWENS_WEBVIEW_NEW_TAB?.trim().toLowerCase();
-          const preferNewTab = tabPref === "true" || tabPref === "1";
-
-          if (preferNewTab) {
-            const w = window.open(url, "_blank", "noopener,noreferrer");
-            toast.dismiss(toastId);
-            if (w) {
-              toast.success("Connexion bancaire Powens", {
-                description:
-                  "Un nouvel onglet s’est ouvert. Après la liaison, revenez ici et lancez la synchro."
-              });
-            } else {
-              toast.message("Pop-up bloquée", {
-                description:
-                  "Autorisez les fenêtres pour ce site, ou retirez NEXT_PUBLIC_POWENS_WEBVIEW_NEW_TAB pour une redirection dans cet onglet (recommandé)."
-              });
-            }
-          } else {
-            toast.dismiss(toastId);
-            window.location.assign(url);
-          }
-        } else {
-          const opened = await openPowensConnectWidget({
-            userId: session.userId,
-            token: session.token
-          });
-          if (opened.ok) {
-            toast.success("Widget Powens", {
-              id: toastId,
-              description: "Si la fenêtre ne s’affiche pas, vérifiez le bloqueur de pop-ups."
-            });
-          } else {
-            toast.message("Compte Powens prêt", {
-              id: toastId,
-              description: `${webviewResult.error} · ${opened.message} Vous pouvez lancer la synchro une fois la banque liée côté Powens.`
-            });
-          }
-        }
-      } catch (e) {
-        toast.error("Powens — préparation échouée", {
-          id: toastId,
-          description: e instanceof Error ? e.message : undefined
-        });
-      }
-    });
-  }
-
-  const powensPrimarySyncLabel =
-    powensPrimaryImportAxis === "personal" ? "Synchroniser Powens (perso)" : "Synchroniser Powens (SASU)";
-  const powensPrimarySyncTitle =
-    powensPrimaryImportAxis === "personal"
-      ? "Import principal en perso (défaut Powens ; filtre optionnel POWENS_PERSONAL_ACCOUNT_IDS). Définissez POWENS_IMPORT_SCOPE=pro pour la SASU."
-      : "Import principal en SASU (POWENS_IMPORT_SCOPE=pro ; filtre optionnel POWENS_PRO_ACCOUNT_IDS).";
-
-  function onClickSyncPowensApi() {
-    if (runtimeMode === "DEMO") {
-      toast.warning("Powens indisponible en mode démo.");
-      return;
-    }
-    if (!canWrite) {
-      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
-      return;
-    }
-    const toastId = toast.loading("Synchronisation Powens en cours…");
-    startTransition(async () => {
-        const result = await safeSyncPowensCloudTransactions();
-        if (!result.ok) {
-          toast.error("Synchronisation Powens échouée", {
-            id: toastId,
-            description: result.error,
-            action: result.noAccount
-              ? {
-                  label: "Nouvelle connexion",
-                  onClick: () => onClickPowensConnect({ reset: true })
-                }
-              : undefined
-          });
-          return;
-        }
-        toast.success("Powens synchronisé", {
-          id: toastId,
-          description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
-        });
-        router.refresh();
-    });
-  }
-
-  function onClickSyncPowensPersonalApi() {
-    if (runtimeMode === "DEMO") {
-      toast.warning("Powens indisponible en mode démo.");
-      return;
-    }
-    if (!canWrite) {
-      toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
-      return;
-    }
-    const toastId = toast.loading("Synchronisation Powens (perso)…");
-    startTransition(async () => {
-        const result = await safeSyncPowensCloudTransactionsPersonal();
-        if (!result.ok) {
-          toast.error("Synchronisation Powens perso échouée", {
-            id: toastId,
-            description: result.error,
-            action: result.noAccount
-              ? {
-                  label: "Nouvelle connexion",
-                  onClick: () => onClickPowensConnect({ reset: true })
-                }
-              : undefined
-          });
-          return;
-        }
-        toast.success("Powens perso synchronisé", {
-          id: toastId,
-          description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API · ${result.summary}`
-        });
-        router.refresh();
-    });
-  }
-
-  const onBankinFileSelected = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      e.target.value = "";
-      if (!file) return;
-      if (runtimeMode === "DEMO") {
-        toast.warning("Import Bankin indisponible en mode démo.");
-        return;
-      }
-      if (!canWrite) {
-        toast.warning("Action désactivée", { description: "Aucune base n’est connectée." });
-        return;
-      }
-      const toastId = toast.loading("Import Bankin en cours…");
-      startTransition(async () => {
-        try {
-          const fd = new FormData();
-          fd.append("file", file);
-          const result = await importBankinPersonalXlsx(fd);
-          if (result.fileAlreadyImported) {
-            toast.info("Ce fichier a déjà été importé", { id: toastId });
-            router.refresh();
-            return;
-          }
-          toast.success("Import Bankin terminé", {
-            id: toastId,
-            description: `${result.inserted.length} nouvelle(s) · ${result.merged} mise(s) à jour · ${result.skippedInFile} doublon(s) dans le fichier`
-          });
-          router.refresh();
-        } catch (err) {
-          toast.error("Import Bankin échoué", {
-            id: toastId,
-            description: err instanceof Error ? err.message : undefined
-          });
-        }
-      });
-    },
-    [canWrite, router, runtimeMode]
-  );
-
   function toggleYearInFilter(y: number) {
     setSelectedYears((prev) => {
       const base = prev ?? [yearOptions[0] ?? new Date().getFullYear()];
@@ -774,17 +535,6 @@ export function DashboardClient({
 
   return (
     <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
-      {canWrite ? (
-        <input
-          ref={bankinFileInputRef}
-          type="file"
-          accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="hidden"
-          aria-hidden
-          tabIndex={-1}
-          onChange={onBankinFileSelected}
-        />
-      ) : null}
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div
           key={dashboardSection}
@@ -801,118 +551,6 @@ export function DashboardClient({
           treasuryScope="pro"
         />
       ) : null}
-      {false ? (
-      <section id="dashboard-analytics-legacy" className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-800 dark:bg-ink-900/50 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <span className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
-              <CalendarRange className="h-4 w-4 text-ink-400" aria-hidden />
-              Fenêtre d’analyse
-            </span>
-            <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
-              <button
-                type="button"
-                aria-pressed={scope === "pro"}
-                onClick={() => router.replace("/dashboard?scope=pro", { scroll: false })}
-                className={clsx(
-                  "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial",
-                  scope === "pro"
-                    ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
-                    : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
-                )}
-              >
-                <Briefcase className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                SASU
-              </button>
-              <button
-                type="button"
-                aria-pressed={scope === "personal"}
-                onClick={() => router.replace("/dashboard?scope=personal", { scroll: false })}
-                className={clsx(
-                  "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial",
-                  scope === "personal"
-                    ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
-                    : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
-                )}
-              >
-                <User className="h-3.5 w-3.5 opacity-80" aria-hidden />
-                Privé
-              </button>
-            </div>
-            <DashboardPeriodFilterControls
-              selectedYears={selectedYears}
-              setSelectedYears={setSelectedYears}
-              yearOptions={yearOptions}
-              onToggleYear={toggleYearInFilter}
-            />
-            {canWrite ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClickSyncQontoApi}
-                  disabled={isPending}
-                  className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
-                  title="Récupère les transactions via l’API Qonto (variables QONTO_LOGIN et QONTO_SECRET_KEY côté serveur)."
-                >
-                  <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                  Synchroniser Qonto (API)
-                </button>
-                {powensCloudEnabled ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onClickPowensConnect()}
-                      disabled={isPending}
-                      className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
-                      title="Crée l’utilisateur Powens côté serveur puis ouvre PowensConnect (script optionnel NEXT_PUBLIC_POWENS_CONNECT_SCRIPT_URL)."
-                    >
-                      <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
-                      Connecter Powens
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onClickSyncPowensApi}
-                      disabled={isPending}
-                      className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
-                      title={powensPrimarySyncTitle}
-                    >
-                      <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                      {powensPrimarySyncLabel}
-                    </button>
-                    {powensPersonalSyncEnabled ? (
-                      <button
-                        type="button"
-                        onClick={onClickSyncPowensPersonalApi}
-                        disabled={isPending}
-                        className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
-                        title="Second import : scope personal, libellé POWENS_PERSONAL_COMPANY_LABEL et filtre POWENS_PERSONAL_ACCOUNT_IDS si défini."
-                      >
-                        <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                        Import Powens perso
-                      </button>
-                    ) : null}
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => bankinFileInputRef.current?.click()}
-                  disabled={isPending}
-                  className="btn-secondary inline-flex max-md:hidden items-center gap-2 disabled:opacity-60"
-                  title="Importe l’export « Liste des transactions » Bankin (.xls / .xlsx) ; les lignes sont enregistrées en scope privé (comme l’import fichier habituel)."
-                >
-                  <Upload className="h-4 w-4 text-ink-500" aria-hidden />
-                  Importer Bankin (.xls)
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <p className="max-w-xl text-sm leading-relaxed text-ink-500 dark:text-ink-400 lg:text-right">
-            Vue active : <span className="font-medium text-ink-700 dark:text-ink-200">{periodLabel}</span>.
-          </p>
-        </div>
-      </section>
-      ) : null}
-
       {(dashboardSection === "sasu" || dashboardSection === "private") && (
         <>
           <DashboardPeriodFilterSection
@@ -1119,7 +757,13 @@ export function DashboardClient({
                         const showBillableDays =
                           kpiMode !== "personal" && isCounterpartyBillableDaysAtTjm(name);
                         const htForClient = totalHt;
-                        const workedDays = showBillableDays ? htForClient / BILLABLE_CLIENT_TJM_HT : 0;
+                        const clientTjmHt = resolveBillableTjmForClientMonth(
+                          billableActivity.billableRatePeriods,
+                          name,
+                          dashboardMonthKeyNowLocal(),
+                          BILLABLE_CLIENT_TJM_HT
+                        );
+                        const workedDays = showBillableDays ? htForClient / clientTjmHt : 0;
                         const open = revenueCounterpartyDetail === name;
                         return (
                           <li
@@ -1153,7 +797,7 @@ export function DashboardClient({
                                   {showBillableDays ? (
                                     <span className="mt-0.5 block text-[10px] font-normal leading-snug text-ink-500 dark:text-ink-400">
                                       ≈ {formatWorkedDaysFr(workedDays)} j · TJM{" "}
-                                      {fmt.euro(BILLABLE_CLIENT_TJM_HT)} HT
+                                      {fmt.euro(clientTjmHt)} HT
                                     </span>
                                   ) : null}
                                 </span>
@@ -1498,69 +1142,6 @@ export function DashboardClient({
         </div>
       </section>
 
-      {canWrite && (dashboardSection === "sasu" || dashboardSection === "private") ? (
-        <div className="mt-8 space-y-3 border-t border-ink-200/80 pt-5 dark:border-ink-800 md:hidden">
-          <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
-            Synchronisations
-          </p>
-          <button
-            type="button"
-            onClick={onClickSyncQontoApi}
-            disabled={isPending}
-            className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-            title="Récupère les transactions via l’API Qonto."
-          >
-            <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-            Synchroniser Qonto (API)
-          </button>
-          {powensCloudEnabled ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onClickPowensConnect()}
-                disabled={isPending}
-                className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-                title="Connexion bancaire Powens."
-              >
-                <Landmark className="h-4 w-4 text-ink-500" aria-hidden />
-                Connecter Powens
-              </button>
-              <button
-                type="button"
-                onClick={onClickSyncPowensApi}
-                disabled={isPending}
-                className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-                title={powensPrimarySyncTitle}
-              >
-                <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                {powensPrimarySyncLabel}
-              </button>
-              {powensPersonalSyncEnabled ? (
-                <button
-                  type="button"
-                  onClick={onClickSyncPowensPersonalApi}
-                  disabled={isPending}
-                  className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-                  title="Second import perso (même utilisateur Powens ; séparez les comptes avec POWENS_PERSONAL_ACCOUNT_IDS si besoin)."
-                >
-                  <CloudDownload className="h-4 w-4 text-ink-500" aria-hidden />
-                  Import Powens perso
-                </button>
-              ) : null}
-            </>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => bankinFileInputRef.current?.click()}
-            disabled={isPending}
-            className="btn-secondary flex w-full min-h-[48px] items-center justify-center gap-2 disabled:opacity-60"
-            title="Importe l’export Bankin (.xls / .xlsx) en scope privé."
-          >
-            <Upload className="h-4 w-4 text-ink-500" aria-hidden />
-            Importer Bankin (.xls)
-          </button>
-        </div>
-      ) : null}
         </>
       )}
 

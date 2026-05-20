@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, LogOut, Settings2 } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
+import { DashboardDataActionsMenu } from "@/components/dashboard/DashboardDataActionsMenu";
 import { DashboardDummyDataToggle } from "@/components/dashboard/DashboardDummyDataToggle";
 import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderProfile";
 import { Logo } from "@/components/ui/Logo";
@@ -18,6 +19,10 @@ type Props = {
   userEmail: string | null | undefined;
   showDarkModeToggle: boolean;
   showLogout: boolean;
+  canWrite?: boolean;
+  powensCloudEnabled?: boolean;
+  powensPersonalSyncEnabled?: boolean;
+  powensPrimaryImportAxis?: "pro" | "personal";
 };
 
 export function DashboardTopNav({
@@ -28,7 +33,11 @@ export function DashboardTopNav({
   showDummyDataToggle,
   userEmail,
   showDarkModeToggle,
-  showLogout
+  showLogout,
+  canWrite = false,
+  powensCloudEnabled = false,
+  powensPersonalSyncEnabled = false,
+  powensPrimaryImportAxis = "pro"
 }: Props) {
   const statusLabel =
     envMode === "DEMO"
@@ -82,25 +91,16 @@ export function DashboardTopNav({
 
         <div className="flex items-center justify-end gap-1 sm:gap-1.5">
           {showDummyDataToggle ? <DashboardDummyDataToggle active={dummyDataActive} /> : null}
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-ink-200/90 bg-white/90 text-ink-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"
-            aria-label="Notifications (bientôt)"
-            title="Notifications"
-          >
-            <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-          </button>
           {showDarkModeToggle ? (
             <DarkModeToggle className="h-10 w-10 rounded-xl border-ink-200/90 bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-white" />
           ) : null}
-          <button
-            type="button"
-            className="hidden h-10 w-10 items-center justify-center rounded-xl border border-ink-200/90 bg-white/90 text-ink-700 transition hover:bg-white sm:inline-flex dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"
-            aria-label="Réglages (bientôt)"
-            title="Réglages"
-          >
-            <Settings2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
-          </button>
+          <DashboardDataActionsMenu
+            runtimeMode={dataMode}
+            canWrite={canWrite}
+            powensCloudEnabled={powensCloudEnabled}
+            powensPersonalSyncEnabled={powensPersonalSyncEnabled}
+            powensPrimaryImportAxis={powensPrimaryImportAxis}
+          />
           {showLogout ? (
             <form action="/logout" method="post" className="contents">
               <button

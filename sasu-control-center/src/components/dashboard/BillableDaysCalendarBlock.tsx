@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -27,11 +28,24 @@ import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { TreasuryVerserPanel } from "@/components/dashboard/TreasuryVerserPanel";
-import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
 import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
 } from "@/lib/invoice-worked-days-series";
+import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
+
+const BillableInvoiceWorkedDaysChart = dynamic(
+  () =>
+    import("@/components/dashboard/BillableInvoiceWorkedDaysChart").then(
+      (m) => m.BillableInvoiceWorkedDaysChart
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[11.5rem] w-full animate-pulse rounded-2xl bg-ink-100/70 dark:bg-white/[0.05] sm:h-52" />
+    )
+  }
+);
 
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
@@ -149,6 +163,15 @@ function isPowensNdfDigitProInMonth(tx: DashboardTx, monthKey: string): boolean 
   return tx.category === "NDF DigitPro";
 }
 
+function cleanNdfMerchantLabel(raw: string): string {
+  return raw
+    .replace(/\b(cb|carte|card|cblm|paiement|payment)\b/gi, " ")
+    .replace(/\b\d{2,}\/\d{2,}\/\d{2,4}\b/g, " ")
+    .replace(/\b\d{3,}\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() || raw;
+}
+
 export function BillableDaysCalendarBlock({
   treasuryTransactions,
   treasuryScope
@@ -157,7 +180,7 @@ export function BillableDaysCalendarBlock({
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
 }) {
-  const { selected, setSelected, tjmHt, persistToSupabase } = useBillableActivity();
+  const { selected, setSelected, tjmHt, billableRatePeriods, persistToSupabase } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth0, setViewMonth0] = useState(now.getMonth());
@@ -240,6 +263,8 @@ export function BillableDaysCalendarBlock({
     const monthKey = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`;
     let dirigeant = 0;
     let ndfDigitPro = 0;
+    const ndfTransactions: DashboardTx[] = [];
+    const ndfDedupeKeys = new Set<string>();
     for (const tx of treasuryTransactions) {
       if (tx.amount >= 0) continue;
       const d = tx.date.slice(0, 7);
@@ -247,7 +272,14 @@ export function BillableDaysCalendarBlock({
       if ((tx.scope ?? "pro") === treasuryScope && d === monthKey && deriveExpenseBucket(tx) === "Repas dirigeant") {
         dirigeant += amt;
       }
-      if (isPowensNdfDigitProInMonth(tx, monthKey)) ndfDigitPro += amt;
+      if (isPowensNdfDigitProInMonth(tx, monthKey)) {
+        const dedupeKey = `${cleanNdfMerchantLabel(tx.label).toLowerCase()}|${tx.date}|${amt.toFixed(2)}`;
+        if (!ndfDedupeKeys.has(dedupeKey)) {
+          ndfDedupeKeys.add(dedupeKey);
+          ndfDigitPro += amt;
+          ndfTransactions.push(tx);
+        }
+      }
     }
 
     const repasTotal = dirigeant;
@@ -256,6 +288,7 @@ export function BillableDaysCalendarBlock({
       repasTotal,
       ndfDigitPro,
       ndfAffiche: ndfDigitPro,
+      ndfTransactions,
       /** Repas dirigeant du mois affiché + transactions reclassées NDF DigitPro sur le même mois. */
       total: repasTotal + ndfDigitPro
     };
@@ -314,8 +347,15 @@ export function BillableDaysCalendarBlock({
 
   const invoiceWorkedDaysSeries = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return [];
-    return buildInvoiceWorkedDaysPastMonthsSeries(treasuryTransactions, treasuryScope);
-  }, [treasuryTransactions, treasuryScope]);
+    return buildInvoiceWorkedDaysPastMonthsSeries(
+      treasuryTransactions,
+      treasuryScope,
+      new Date(),
+      undefined,
+      billableRatePeriods,
+      tjmHt
+    );
+  }, [billableRatePeriods, tjmHt, treasuryTransactions, treasuryScope]);
 
   const [workedDaysChartYear, setWorkedDaysChartYear] = useState<number | "all">(now.getFullYear());
   const [workedDaysChartQuarter, setWorkedDaysChartQuarter] = useState<"full" | 1 | 2 | 3 | 4>("full");
@@ -350,7 +390,13 @@ export function BillableDaysCalendarBlock({
   }, [invoiceWorkedDaysSeries, workedDaysChartYear, workedDaysChartQuarter]);
 
   const chartWorkedDaysData = useMemo(() => {
-    const withAgenda = appendAgendaWorkedDayMonths(filteredInvoiceWorkedDaysSeries, selected, tjmHt);
+    const agendaTjmHt = resolveBillableTjmForClientMonth(
+      billableRatePeriods,
+      billableRatePeriods[0]?.clientName ?? "",
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
+      tjmHt
+    );
+    const withAgenda = appendAgendaWorkedDayMonths(filteredInvoiceWorkedDaysSeries, selected, agendaTjmHt);
     if (workedDaysChartYear === "all") return withAgenda;
     let rows = withAgenda.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
     if (workedDaysChartQuarter !== "full") {
@@ -365,6 +411,8 @@ export function BillableDaysCalendarBlock({
     return rows;
   }, [
     filteredInvoiceWorkedDaysSeries,
+    billableRatePeriods,
+    now,
     selected,
     tjmHt,
     workedDaysChartYear,
@@ -566,59 +614,36 @@ export function BillableDaysCalendarBlock({
             >
               Effacer ce mois
             </button>
-            <div className="mt-1.5 max-w-[238px] space-y-1 text-center text-[9px] leading-snug text-ink-400 dark:text-ink-500 sm:text-left">
-              <p className="inline-flex items-center gap-1">
+            <div className="mt-2 flex max-w-[238px] flex-wrap justify-center gap-x-3 gap-y-1 text-[9px] leading-snug text-ink-500 dark:text-white/50 sm:justify-start">
+              <span className="inline-flex items-center gap-1">
                 <span
                   className="relative inline-block h-2 w-2 shrink-0 rounded-full bg-brand-500 shadow-[0_0_6px_rgba(59,130,246,0.55)] ring-2 ring-brand-500/35 dark:bg-brand-400 dark:shadow-[0_0_8px_rgba(96,165,250,0.45)] dark:ring-brand-400/40"
                   aria-hidden
                 />
-                <span>
-                  <span className="font-medium text-ink-500 dark:text-ink-400">Aujourd’hui</span> — bordure bleue +
-                  point sous la date.
-                </span>
-              </p>
-              <p className="inline-flex items-center gap-1">
+                Aujourd’hui
+              </span>
+              <span className="inline-flex items-center gap-1">
                 <span
                   className="inline-block h-2 w-2 shrink-0 rounded-sm bg-amber-100 ring-1 ring-amber-200/80 dark:bg-amber-900/60 dark:ring-amber-700/60"
                   aria-hidden
                 />
-                <span>
-                  <span className="font-medium text-ink-500 dark:text-ink-400">Fériés</span> (métrop.) — survol pour le
-                  nom.
-                </span>
-              </p>
-              <p className="inline-flex items-start gap-1.5 text-left">
+                Férié
+              </span>
+              <span className="inline-flex items-center gap-1">
                 <span
-                  className="mt-0.5 inline-block h-2 w-2 shrink-0 rounded-sm bg-sky-100 ring-1 ring-sky-200/80 dark:bg-sky-900/50 dark:ring-sky-700/60"
+                  className="inline-block h-2 w-2 shrink-0 rounded-sm bg-sky-100 ring-1 ring-sky-200/80 dark:bg-sky-900/50 dark:ring-sky-700/60"
                   aria-hidden
                 />
-                <span>
-                  <span className="font-medium text-ink-500 dark:text-ink-400">Vacances scolaires Paris</span> —
-                  calendrier officiel{" "}
-                  <abbr title="Créteil, Montpellier, Paris, Toulouse, Versailles" className="no-underline">
-                    zone&nbsp;C
-                  </abbr>
-                  . Survol d’un jour pour la période (Toussaint, Noël, hiver, printemps, été).
-                </span>
-              </p>
-              <div className="mt-3 flex max-w-[260px] flex-wrap justify-center gap-x-3 gap-y-1 text-[9px] text-ink-500 dark:text-white/50 sm:justify-start">
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]" aria-hidden />
-                  Facturé
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded bg-sky-500" aria-hidden />
-                  Prévu
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded bg-orange-400" aria-hidden />
-                  Congé
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded bg-rose-500" aria-hidden />
-                  Non rentable
-                </span>
-              </div>
+                Vacances
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]" aria-hidden />
+                Facturé
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded bg-sky-500" aria-hidden />
+                Prévu
+              </span>
             </div>
           </div>
 
@@ -731,8 +756,39 @@ export function BillableDaysCalendarBlock({
                     </p>
                     {mealFeesForViewedMonth ? (
                       <p className="text-[10px] text-ink-400 dark:text-ink-500">
-                        Dirigeant {fmt.euro(mealFeesForViewedMonth.dirigeant)} · NDF{" "}
-                        {fmt.euro(mealFeesForViewedMonth.ndfAffiche)}
+                        Dirigeant {fmt.euro(mealFeesForViewedMonth.dirigeant)} ·{" "}
+                        <span className="group/ndf relative inline-flex cursor-help items-center rounded-full px-1 font-semibold text-emerald-700 ring-1 ring-transparent transition hover:bg-emerald-500/10 hover:ring-emerald-500/20 dark:text-emerald-300">
+                          NDF {fmt.euro(mealFeesForViewedMonth.ndfAffiche)}
+                          <span className="absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-ink-200 bg-white p-3 text-left text-[11px] text-ink-700 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/ndf:block group-hover/ndf:opacity-100 dark:border-white/10 dark:bg-[#101412] dark:text-white/75">
+                            <span className="mb-2 block font-bold text-ink-950 dark:text-white">
+                              Transactions NDF DigitPro
+                            </span>
+                            {mealFeesForViewedMonth.ndfTransactions.length ? (
+                              <span className="scrollbar-clean block max-h-72 space-y-1.5 overflow-y-auto overscroll-contain pr-1">
+                                {mealFeesForViewedMonth.ndfTransactions.map((tx) => (
+                                  <span
+                                    key={tx.id}
+                                    className="grid grid-cols-[1fr_auto] gap-2 rounded-xl bg-ink-50 px-2 py-1.5 dark:bg-white/[0.05]"
+                                  >
+                                    <span className="min-w-0">
+                                      <span className="block truncate font-semibold text-ink-900 dark:text-white">
+                                        {cleanNdfMerchantLabel(tx.label)}
+                                      </span>
+                                      <span className="text-[10px] text-ink-400 dark:text-white/35">{tx.date}</span>
+                                    </span>
+                                    <span className="font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                      {fmt.euro(Math.abs(tx.amount))}
+                                    </span>
+                                  </span>
+                                ))}
+                              </span>
+                            ) : (
+                              <span className="block text-ink-500 dark:text-white/45">
+                                Aucune transaction NDF DigitPro sur ce mois.
+                              </span>
+                            )}
+                          </span>
+                        </span>
                       </p>
                     ) : null}
                     <BudgetGauge

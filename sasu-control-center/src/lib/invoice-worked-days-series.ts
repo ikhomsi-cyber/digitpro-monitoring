@@ -1,8 +1,12 @@
 import type { DashboardTx } from "./dashboard-metrics";
 import { effectiveRevenueAnalyticsDateIso } from "./dashboard-metrics";
 import { countAgendaWorkDaysInMonth } from "./billable-calendar-metrics";
-import { BILLABLE_CLIENT_TJM_HT } from "./billable-client-days";
-import { isRevenueCategory } from "./revenue-category";
+import {
+  BILLABLE_CLIENT_TJM_HT,
+  resolveBillableTjmForClientMonth,
+  type BillableRatePeriod
+} from "./billable-client-days";
+import { isRevenueCategory, revenueCounterpartyDisplayName } from "./revenue-category";
 
 const VAT_RATE = 0.2;
 
@@ -19,6 +23,8 @@ export type InvoiceWorkedDayMonth = {
   days: number;
   /** CA HT retenu pour le calcul (encaissements du mois source). */
   caHt: number;
+  /** TJM HT utilisé pour convertir le CA HT en jours. */
+  tjmHt: number;
   /** Mois d’encaissement du CA (deux mois après le mois de la barre). */
   sourceMonthKey: string;
   kind: InvoiceWorkedDayKind;
@@ -52,7 +58,9 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
   scope: "pro" | "personal",
   now = new Date(),
   /** Si défini et strictement positif : au plus ce nombre de mois-barres ; sinon tout l’historique. */
-  maxMonths?: number
+  maxMonths?: number,
+  billableRatePeriods: readonly BillableRatePeriod[] = [],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT
 ): InvoiceWorkedDayMonth[] {
   const scoped = transactions.filter((t) => (t.scope ?? "pro") === scope);
 
@@ -93,12 +101,14 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
 
   if (startKey > lastBarKey) return [];
 
-  const caTtcByMonth = new Map<string, number>();
+  const revenueLinesByMonth = new Map<string, DashboardTx[]>();
   for (const tx of scoped) {
     if (!isRevenueCategory(tx.category)) continue;
     const mk = effectiveRevenueAnalyticsDateIso(tx).slice(0, 7);
     if (mk > endKey) continue;
-    caTtcByMonth.set(mk, (caTtcByMonth.get(mk) ?? 0) + tx.amount);
+    const rows = revenueLinesByMonth.get(mk);
+    if (rows) rows.push(tx);
+    else revenueLinesByMonth.set(mk, [tx]);
   }
 
   const labelFmt = new Intl.DateTimeFormat("fr-FR", { month: "short", year: "2-digit" });
@@ -121,9 +131,24 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
     const { y, m0 } = parseMonthKey(mk);
     const src = addCalendarMonths(y, m0, 2);
     const sourceMonthKey = monthKeyFromYm(src.y, src.m0);
-    const caTtc = caTtcByMonth.get(sourceMonthKey) ?? 0;
-    const caHt = caTtc / (1 + VAT_RATE);
-    const days = caHt / BILLABLE_CLIENT_TJM_HT;
+    const revenueLines = revenueLinesByMonth.get(sourceMonthKey) ?? [];
+    let caHt = 0;
+    let days = 0;
+    let weightedTjmTotal = 0;
+    for (const tx of revenueLines) {
+      const lineCaHt = tx.amount / (1 + VAT_RATE);
+      const client = revenueCounterpartyDisplayName(tx);
+      const tjmHt = resolveBillableTjmForClientMonth(
+        billableRatePeriods,
+        client,
+        mk,
+        fallbackTjmHt
+      );
+      caHt += lineCaHt;
+      days += lineCaHt / tjmHt;
+      weightedTjmTotal += tjmHt * Math.max(0, lineCaHt);
+    }
+    const tjmHt = caHt > 0 ? weightedTjmTotal / caHt : fallbackTjmHt;
     const m = Number(mk.slice(5, 7));
     const label = labelFmt.format(new Date(y, m - 1, 1));
     return {
@@ -131,6 +156,7 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
       label,
       days: Math.round(days * 10) / 10,
       caHt: Math.round(caHt * 100) / 100,
+      tjmHt: Math.round(tjmHt * 100) / 100,
       sourceMonthKey,
       kind: "encaisse"
     };
@@ -153,6 +179,7 @@ function agendaMonthBar(
     label: chartLabelFmt.format(new Date(year, month0, 1)),
     days: Math.round(days * 10) / 10,
     caHt,
+    tjmHt,
     sourceMonthKey: monthKey,
     kind
   };

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CreditCard, Sparkles } from "lucide-react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -8,15 +7,10 @@ import { BANKIN_UNCATEGORIZED_CATEGORY } from "@/lib/bankin/categorize";
 import { buildBankinReferenceCategoryList } from "@/lib/bankin/reference-categories";
 import { CategorisationClient, type CategorisationTx } from "./CategorisationClient";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
-import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
-import { AppSectionNav } from "@/components/AppSectionNav";
+import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
-import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
-import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
-import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
-import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +35,17 @@ function isCardPowensLabel(raw: string): boolean {
     .replace(/\p{M}/gu, "")
     .toLowerCase();
   return /\b(cb|carte|card)\b/.test(label);
+}
+
+function isLikelyNdfDigitProCandidate(raw: string): boolean {
+  const label = raw
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+  if (/\b(quick|domino|dominos|tacos|boucherie|boucheries|auchan|grand frais|carrefour)\b/.test(label)) {
+    return false;
+  }
+  return /\b(repas|dejeuner|dej|restaurant|resto|brasserie|bistrot|cafe|burger|pizza|sushi|monoprix|franprix)\b/.test(label);
 }
 
 export default async function CategorisationPage() {
@@ -68,13 +73,10 @@ export default async function CategorisationPage() {
 
   let categories: string[] = [];
   let transactions: CategorisationTx[] = [];
-  let dashboardTransactions: Awaited<ReturnType<typeof loadAllUserTransactionsFromSupabase>>["transactions"] = [];
   let loadError: string | null = null;
-  let initialBillableWorkDays: string[] = [];
-  let initialBillableTjmHt: number | null = null;
 
   if (supabase) {
-    const [categoryRes, txRes, loadedTx] = await Promise.all([
+    const [categoryRes, txRes] = await Promise.all([
       supabase
         .from("transactions")
         .select("category,import_sessions!inner(format)")
@@ -86,13 +88,11 @@ export default async function CategorisationPage() {
         .eq("import_sessions.format", "powens")
         .eq("category", BANKIN_UNCATEGORIZED_CATEGORY)
         .order("date", { ascending: false })
-        .limit(200),
-      loadAllUserTransactionsFromSupabase(supabase)
+        .limit(200)
     ]);
-    dashboardTransactions = loadedTx.transactions;
 
-    if (categoryRes.error || txRes.error || loadedTx.errorMessage) {
-      loadError = categoryRes.error?.message ?? txRes.error?.message ?? loadedTx.errorMessage ?? "Chargement impossible.";
+    if (categoryRes.error || txRes.error) {
+      loadError = categoryRes.error?.message ?? txRes.error?.message ?? "Chargement impossible.";
     } else {
       categories = buildBankinReferenceCategoryList(
         (categoryRes.data ?? []).map((row) => normalizeCategory((row as { category?: unknown }).category))
@@ -106,47 +106,17 @@ export default async function CategorisationPage() {
           company: String(row.company ?? "").trim(),
           bankName: row.bank_name ? String(row.bank_name).trim() : null
         }))
-        .filter((tx) => isCardPowensLabel(`${tx.label} ${tx.company}`));
-    }
-
-    if (user) {
-      const [daysRes, setRes] = await Promise.all([
-        supabase
-          .from("billable_work_days")
-          .select("work_date")
-          .eq("user_id", user.id)
-          .order("work_date", { ascending: true }),
-        supabase
-          .from("user_billable_settings")
-          .select("tjm_ht")
-          .eq("user_id", user.id)
-          .maybeSingle()
-      ]);
-      if (!daysRes.error && daysRes.data) {
-        initialBillableWorkDays = daysRes.data.map((r) =>
-          String((r as { work_date: string }).work_date).slice(0, 10)
-        );
-      }
-      if (!setRes.error && setRes.data != null) {
-        const n = Number((setRes.data as { tjm_ht: number | string }).tjm_ht);
-        if (Number.isFinite(n) && n > 0) initialBillableTjmHt = n;
-      }
+        .filter((tx) => {
+          const blob = `${tx.label} ${tx.company}`;
+          return isCardPowensLabel(blob) && isLikelyNdfDigitProCandidate(blob);
+        });
     }
   }
 
-  const totalToReview = transactions.length;
-  const totalAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
-  const heroStats = computeDashboardHeroStats(dashboardTransactions);
-  const billableTjmHt = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
-
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
-    <BillableActivityProvider
-      tjmHt={billableTjmHt}
-      persistToSupabase={envMode === "SUPABASE"}
-      initialWorkDayIsos={initialBillableWorkDays}
-    >
-      <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
+      <DashboardDesktopSidebar />
+      <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-auto lg:px-8">
         <DashboardTopNav
           envMode={envMode}
           dataMode={envMode}
@@ -157,35 +127,6 @@ export default async function CategorisationPage() {
           showDarkModeToggle={showDarkModeToggle}
           showLogout={envMode !== "DEMO"}
         />
-
-        <DashboardPremiumHero
-          stats={heroStats}
-          contextMessage=""
-          showContextBanner={false}
-        />
-
-        <AppSectionNav />
-
-        <section className="mt-5">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-3xl border border-ink-200 bg-ink-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                  <CreditCard className="h-4 w-4 text-sky-600 dark:text-sky-300" aria-hidden />
-                  <p className="mt-2 text-xs text-ink-500 dark:text-white/45">À classer</p>
-                  <p className="font-display text-2xl font-bold text-ink-950 dark:text-white">{totalToReview}</p>
-                </div>
-                <div className="rounded-3xl border border-ink-200 bg-ink-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                  <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden />
-                  <p className="mt-2 text-xs text-ink-500 dark:text-white/45">Montant</p>
-                  <p className="font-display text-2xl font-bold text-ink-950 dark:text-white">
-                    {new Intl.NumberFormat("fr-FR", {
-                      style: "currency",
-                      currency: "EUR",
-                      maximumFractionDigits: 0
-                    }).format(totalAmount)}
-                  </p>
-                </div>
-              </div>
-        </section>
 
         <main className="mt-5">
           {loadError ? (
@@ -200,8 +141,8 @@ export default async function CategorisationPage() {
             <CategorisationClient transactions={transactions} categories={categories} />
           )}
         </main>
+        <DashboardFloatingDock />
       </div>
-    </BillableActivityProvider>
     </DashboardDummyDataProvider>
   );
 }
