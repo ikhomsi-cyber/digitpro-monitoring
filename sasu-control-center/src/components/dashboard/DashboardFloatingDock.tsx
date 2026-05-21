@@ -73,7 +73,11 @@ export function DashboardFloatingDock() {
 
   const ctx = { scope, panel, hash, section };
   const isCategorisation = pathname === "/categorisation";
-  const isDashboardHome = pathname === "/dashboard" && searchParams.toString() === "";
+  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+  };
 
   return (
     <nav
@@ -90,14 +94,7 @@ export function DashboardFloatingDock() {
               href={tab.href}
               prefetch={!tab.href.includes("#")}
               scroll={false}
-              onClick={
-                tab.href === "/dashboard" && !isDashboardHome
-                  ? (event) => {
-                      event.preventDefault();
-                      window.location.assign("/dashboard");
-                    }
-                  : undefined
-              }
+              onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
               className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5"
             >
               {active ? (
@@ -150,21 +147,18 @@ export function DashboardDesktopSidebar() {
 
   const ctx = { scope, panel, hash, section };
   const isCategorisation = pathname === "/categorisation";
-  const isDashboardHome = pathname === "/dashboard" && searchParams.toString() === "";
+  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+  };
 
   return (
     <aside className="fixed left-4 top-4 z-50 hidden h-[calc(100dvh-2rem)] w-24 flex-col rounded-[2rem] border border-white/10 bg-black/45 p-3 shadow-[0_24px_90px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl lg:flex">
       <div className="flex h-full flex-col items-center">
         <Link
           href="/dashboard"
-          onClick={
-            !isDashboardHome
-              ? (event) => {
-                  event.preventDefault();
-                  window.location.assign("/dashboard");
-                }
-              : undefined
-          }
+          onClick={navigateWithinDashboard("/dashboard")}
           className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.18)]"
           aria-label="Dashboard"
         >
@@ -180,14 +174,7 @@ export function DashboardDesktopSidebar() {
                 href={tab.href}
                 prefetch={!tab.href.includes("#")}
                 scroll={false}
-                onClick={
-                  tab.href === "/dashboard" && !isDashboardHome
-                    ? (event) => {
-                        event.preventDefault();
-                        window.location.assign("/dashboard");
-                      }
-                    : undefined
-                }
+                onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "group flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center transition",

@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
@@ -26,6 +27,7 @@ import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
+import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { Chatbot } from "@/components/Chatbot";
@@ -34,6 +36,7 @@ import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDispl
 import { categoryGlyph } from "@/lib/category-glyph";
 import { counterpartyLogoHref } from "@/lib/counterparty-logo";
 import { buildDashboardMonthOptions, formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
+import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
@@ -74,6 +77,15 @@ const DASHBOARD_SECTION_SLIDE_VARIANTS = {
     transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
   })
 };
+
+const ValeurReelleClient = dynamic(
+  () => import("@/components/dashboard/ValeurReelleClient").then((mod) => mod.ValeurReelleClient),
+  {
+    loading: () => (
+      <div className="mt-6 h-72 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
+    )
+  }
+);
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -144,7 +156,12 @@ export function DashboardClient({
   syncKey,
   initialTransactions,
   transactionYearBounds,
-  initialDashboardScope
+  initialDashboardScope,
+  heroStats,
+  heroContextMessage,
+  showContextBanner,
+  demoMode,
+  loadError
 }: {
   syncKey: string;
   initialTransactions: DashboardTx[];
@@ -152,12 +169,18 @@ export function DashboardClient({
   transactionYearBounds: { minYear: number; maxYear: number } | null;
   /** Dérivé de `?scope=` sur `/dashboard` (pro | personal), sinon défaut SASU. */
   initialDashboardScope?: "pro" | "personal" | null;
+  heroStats: DashboardHeroStats;
+  heroContextMessage: string;
+  showContextBanner: boolean;
+  demoMode: boolean;
+  loadError: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const dashboardSection = useMemo(() => {
+    if (searchParams.get("panel") === "valeur-reelle") return "valeur" as const;
     const s = searchParams.get("section");
     if (s === "activite") return "activite" as const;
     if (s === "sasu") return "sasu" as const;
@@ -169,8 +192,9 @@ export function DashboardClient({
   const sectionOrder: Record<typeof dashboardSection, number> = {
     full: 0,
     activite: 1,
-    sasu: 2,
-    private: 3
+    valeur: 2,
+    sasu: 3,
+    private: 4
   };
   const prevSectionRef = useRef(dashboardSection);
   const slideDirRef = useRef(1);
@@ -544,7 +568,15 @@ export function DashboardClient({
     });
   }, []);
 
-  if (dashboardSection === "full") return null;
+  if (dashboardSection === "full") {
+    return (
+      <DashboardPremiumHero
+        stats={heroStats}
+        contextMessage={heroContextMessage}
+        showContextBanner={showContextBanner}
+      />
+    );
+  }
 
   return (
     <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
@@ -562,6 +594,14 @@ export function DashboardClient({
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
+        />
+      ) : null}
+      {dashboardSection === "valeur" ? (
+        <ValeurReelleClient
+          initialTransactions={transactions}
+          transactionYearBounds={transactionYearBounds}
+          demoMode={demoMode}
+          loadError={loadError}
         />
       ) : null}
       {(dashboardSection === "sasu" || dashboardSection === "private") && (

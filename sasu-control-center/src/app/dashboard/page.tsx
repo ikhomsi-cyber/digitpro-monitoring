@@ -18,12 +18,10 @@ import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
-import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
-import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
@@ -64,13 +62,7 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const initialDashboardScope = parseDashboardScopeParam(sp);
   const initialDashboardPanel = parseDashboardPanelParam(sp);
-  const initialDashboardSection = Array.isArray(sp.section) ? sp.section[0] : sp.section;
   const showLmnpPanel = initialDashboardPanel === "lmnp";
-  const showValeurReellePanel = initialDashboardPanel === "valeur-reelle";
-  const showDashboardHomeHero =
-    !initialDashboardPanel &&
-    !initialDashboardSection &&
-    !initialDashboardScope;
   reportSupabaseEnvDiagnostics("app/dashboard/page");
 
   const envMode = getSupabaseRuntimeMode();
@@ -191,24 +183,9 @@ export default async function DashboardPage({
         powensPrimaryImportAxis={powensPrimaryAxis}
       />
 
-      {showDashboardHomeHero ? (
-        <DashboardPremiumHero
-          stats={heroStats}
-          contextMessage={heroContextMessage}
-          showContextBanner={showContextBanner}
-        />
-      ) : null}
-
       {showLmnpPanel ? (
         <LMNPClient
           analysis={analyzeLmnp(transactions)}
-          demoMode={demoMode}
-          loadError={transactionsLoadError}
-        />
-      ) : showValeurReellePanel ? (
-        <ValeurReelleClient
-          initialTransactions={transactions}
-          transactionYearBounds={transactionYearBounds}
           demoMode={demoMode}
           loadError={transactionsLoadError}
         />
@@ -226,6 +203,11 @@ export default async function DashboardPage({
             initialTransactions={transactions}
             transactionYearBounds={transactionYearBounds}
             initialDashboardScope={initialDashboardScope}
+            heroStats={heroStats}
+            heroContextMessage={heroContextMessage}
+            showContextBanner={showContextBanner}
+            demoMode={demoMode}
+            loadError={transactionsLoadError}
           />
         </Suspense>
       )}
