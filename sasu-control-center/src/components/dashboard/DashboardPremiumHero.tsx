@@ -5,6 +5,7 @@ import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -13,21 +14,46 @@ type Props = {
   showContextBanner: boolean;
 };
 
+type Tile = {
+  label: string;
+  value: string;
+  suffix?: string;
+  breakdown?: Array<{ label: string; value: number; colorClass: string }>;
+};
+
 export function DashboardPremiumHero({ stats, contextMessage, showContextBanner }: Props) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
+  const activeTjmHt = useMemo(() => {
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    return resolveBillableTjmForClientMonth(
+      billable.billableRatePeriods,
+      billable.billableRatePeriods[0]?.clientName ?? "",
+      monthKey,
+      billable.tjmHt
+    );
+  }, [billable.billableRatePeriods, billable.tjmHt]);
 
-  const tiles: { label: string; value: string; suffix?: string }[] = useMemo(
+  const tiles: Tile[] = useMemo(
     () => [
       { label: "Encaissé ce mois", value: fmt.euro(stats.caMensuelEur), suffix: "TTC" },
       {
         label: "Cash disponible",
         value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—"
       },
-      { label: "Dépenses du mois (SASU)", value: fmt.euro(stats.depensesQontoSasuMoisEur), suffix: "TTC" },
-      { label: "TJM (indicatif)", value: fmt.euro(stats.tjmAfficheEur) }
+      {
+        label: "Dépenses du mois (SASU)",
+        value: fmt.euro(stats.depensesQontoSasuMoisEur),
+        suffix: "TTC",
+        breakdown: [
+          { label: "DigitPro", value: stats.depensesDigitProMoisEur, colorClass: "bg-amber-300" },
+          { label: "Perso", value: stats.depensesPersoMoisEur, colorClass: "bg-emerald-400" }
+        ]
+      },
+      { label: "TJM en vigueur", value: fmt.euro(activeTjmHt), suffix: "HT" }
     ],
-    [fmt, stats]
+    [activeTjmHt, fmt, stats]
   );
 
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
@@ -74,6 +100,34 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
                   </span>
                 ) : null}
               </dd>
+              {t.breakdown ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                    {t.breakdown.map((item) => {
+                      const pct =
+                        stats.depensesQontoSasuMoisEur > 0
+                          ? Math.max(0, (item.value / stats.depensesQontoSasuMoisEur) * 100)
+                          : 0;
+                      return (
+                        <span
+                          key={item.label}
+                          className={item.colorClass}
+                          style={{ width: `${pct}%` }}
+                          aria-hidden
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-ink-500 dark:text-white/40">
+                    {t.breakdown.map((item) => (
+                      <span key={item.label} className="inline-flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 rounded-full ${item.colorClass}`} aria-hidden />
+                        {item.label} {fmt.euro(item.value)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
         </dl>

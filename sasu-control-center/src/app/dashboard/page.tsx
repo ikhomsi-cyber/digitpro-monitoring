@@ -212,7 +212,8 @@ export default async function DashboardPage({
         </Suspense>
       )}
 
-      <footer className="mt-16 flex flex-col gap-3 border-t border-ink-200/80 pt-8 text-xs text-ink-500 dark:border-white/[0.08] dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+      <footer className="mt-16 flex flex-col gap-2 border-t border-ink-200/80 pt-8 text-xs text-ink-500 dark:border-white/[0.08] dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
+        {(envMode === "DEMO" || demoPreferenceOn || dummyDataActive) ? (
         <div className="flex items-center gap-2">
           <Logo size={20} withWordmark={false} />
           <span>
@@ -220,12 +221,13 @@ export default async function DashboardPage({
               ? "Mode démo (mock) · ne remplace pas un conseil comptable."
               : demoPreferenceOn
                 ? "Mode démo volontaire · données fictives."
-                : dummyDataActive
-                  ? "Données Supabase · affichage masqué (montants fictifs)."
-                  : "Données Supabase."}
+                : "Affichage masqué : montants fictifs."}
           </span>
         </div>
-        <span>Copyright © {new Date().getFullYear()} DigitPro · Iliass KHOMSI.</span>
+        ) : <span aria-hidden />}
+        <span className="font-medium text-ink-500 dark:text-white/45">
+          © {new Date().getFullYear()} DigitPro. Conçu par Iliass KHOMSI.
+        </span>
       </footer>
 
       <Suspense fallback={null}>

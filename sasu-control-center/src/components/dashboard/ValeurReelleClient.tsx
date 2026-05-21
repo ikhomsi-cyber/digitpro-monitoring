@@ -16,6 +16,7 @@ import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
 import type {
   ValeurReelleCashTree,
+  ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
 
@@ -427,6 +428,167 @@ function CashFlowTreeVisual({
   );
 }
 
+function RecoverableVatMonthlyBlock({
+  rows,
+  fmt,
+  periodLabel
+}: {
+  rows: ValeurReelleVatMonthlyRow[];
+  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+  periodLabel: string;
+}) {
+  const [showDetails, setShowDetails] = useState(false);
+  const totalVat = rows.reduce((sum, row) => sum + row.vatEur, 0);
+  const totalGross = rows.reduce((sum, row) => sum + row.grossEur, 0);
+  const averageVat = rows.length > 0 ? totalVat / rows.length : 0;
+  const latest = rows[0] ?? null;
+  const categoryBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      for (const item of row.breakdown) {
+        map.set(item.label, (map.get(item.label) ?? 0) + item.amountEur);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([label, amountEur]) => ({ label, amountEur }))
+      .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
+  }, [rows]);
+  const topCategories = categoryBreakdown.slice(0, 4);
+  const maxCategory = Math.max(1, ...topCategories.map((item) => Math.abs(item.amountEur)));
+  const chartRows = [...rows].reverse();
+  const maxMonthlyVat = Math.max(1, ...chartRows.map((row) => row.vatEur));
+
+  const monthLabel = (monthKey: string) => {
+    const [year, month] = monthKey.split("-").map(Number);
+    return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
+      new Date(Date.UTC(year || 2000, (month || 1) - 1, 1))
+    );
+  };
+
+  return (
+    <section className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-sky-950/20 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
+            TVA récupérable
+          </p>
+          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
+            Ce que je gagne en TVA par mois
+          </h2>
+        </div>
+        <div className="rounded-2xl bg-white/45 px-4 py-3 text-right dark:bg-white/[0.025]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
+            Moyenne mensuelle
+          </p>
+          <p className="mt-1 font-display text-xl font-bold tabular-nums text-sky-800 dark:text-sky-200">
+            {fmt.euro(averageVat)}
+          </p>
+          <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">{periodLabel}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          { label: "Dernier mois", value: latest ? fmt.euro(latest.vatEur) : "—", sub: latest ? monthLabel(latest.monthKey) : "Aucun mois" },
+          { label: "Total TVA", value: fmt.euro(totalVat), sub: `${rows.length} mois` },
+          { label: "Base TTC", value: fmt.euro(totalGross), sub: "Éligible" },
+          { label: "Taux", value: "20 / 10 %", sub: "Services / resto" }
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl bg-white/40 px-3 py-2 dark:bg-white/[0.03]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-white/40">
+              {item.label}
+            </p>
+            <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-950 dark:text-white">
+              {item.value}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] capitalize text-ink-500 dark:text-white/40">{item.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {chartRows.length ? (
+        <div className="mt-4 rounded-2xl bg-white/40 px-3 py-3 dark:bg-white/[0.025]">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 dark:text-white/40">
+              Évolution mensuelle
+            </p>
+            <p className="text-[11px] font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+              max {fmt.euro(maxMonthlyVat)}
+            </p>
+          </div>
+          <div className="flex h-36 items-end gap-1.5">
+            {chartRows.map((row) => {
+              const heightPx = Math.max(10, Math.round((row.vatEur / maxMonthlyVat) * 92));
+              return (
+                <div key={row.monthKey} className="group relative flex h-full min-w-0 flex-1 flex-col items-center justify-end">
+                  <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded-lg border border-ink-200 bg-white px-2 py-1 text-[10px] font-semibold tabular-nums text-ink-800 shadow-lg group-hover:block dark:border-white/10 dark:bg-[#101015] dark:text-white">
+                    {monthLabel(row.monthKey)} · {fmt.euro(row.vatEur)}
+                  </div>
+                  <span className="mb-1 text-[10px] font-bold tabular-nums text-sky-900 dark:text-sky-100">
+                    {fmt.euro(row.vatEur)}
+                  </span>
+                  <div
+                    className="w-full rounded-t-lg bg-sky-400/90 shadow-[0_0_18px_rgba(56,189,248,0.18)]"
+                    style={{ height: `${heightPx}px` }}
+                    aria-hidden
+                  />
+                  <span className="mt-1 h-3 max-w-full truncate text-[9px] font-semibold uppercase text-ink-400 dark:text-white/30">
+                    {row.monthKey.slice(5)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {topCategories.length ? (
+        <div className="mt-4 space-y-2">
+          {topCategories.map((item) => (
+            <div key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-white/45 px-3 py-2 text-xs dark:bg-white/[0.025]">
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate font-semibold text-ink-700 dark:text-white/65">{item.label}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/10">
+                  <span
+                    className="block h-full rounded-full bg-sky-400"
+                    style={{ width: `${Math.max(5, Math.round((Math.abs(item.amountEur) / maxCategory) * 100))}%` }}
+                    aria-hidden
+                  />
+                </div>
+              </div>
+              <span className="shrink-0 font-bold tabular-nums text-ink-950 dark:text-white">{fmt.euro(item.amountEur)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => setShowDetails((v) => !v)}
+        className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-sky-200 bg-white/70 px-4 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-white dark:border-sky-400/20 dark:bg-white/[0.05] dark:text-sky-200 dark:hover:bg-white/[0.08]"
+        aria-expanded={showDetails}
+      >
+        {showDetails ? "Masquer le détail" : "Afficher les catégories TVA"}
+      </button>
+
+      {showDetails ? (
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {categoryBreakdown.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl bg-white/50 px-3 py-2 text-xs dark:bg-white/[0.03]">
+                <span className="min-w-0 truncate font-semibold text-ink-700 dark:text-white/65">
+                  {item.label}
+                </span>
+                <span className="shrink-0 font-bold tabular-nums text-ink-950 dark:text-white">{fmt.euro(item.amountEur)}</span>
+              </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function ValeurReelleClient({
   initialTransactions,
   transactionYearBounds,
@@ -500,6 +662,12 @@ export function ValeurReelleClient({
         tree={analysis.cashTree}
         fmt={fmt}
         billableDays={billableDaysInPeriod}
+        periodLabel={analysis.periodLabel}
+      />
+
+      <RecoverableVatMonthlyBlock
+        rows={analysis.vatRecoverableMonthlyRows}
+        fmt={fmt}
         periodLabel={analysis.periodLabel}
       />
 

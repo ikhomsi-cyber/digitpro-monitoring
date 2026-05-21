@@ -2,8 +2,14 @@ import { computeLatestQontoBalanceEur } from "@/lib/bank";
 import {
   computeMetricsFromTransactions,
   filterDashboardTransactions,
+  transactionAnalyticsDayIso,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
+import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import {
+  isValeurReelleMandatoryFeeLine,
+  isValeurReellePersonalChargeLine
+} from "@/lib/valeur-reelle-analyze";
 
 export type DashboardHeroStats = {
   /**
@@ -18,8 +24,8 @@ export type DashboardHeroStats = {
    * périmètre SASU, sur les transactions incluses dans la fenêtre 12 mois glissants.
    */
   depensesQontoSasuMoisEur: number;
-  /** Affichage indicatif — le TJM réel des jours facturables vient des réglages / Supabase. */
-  tjmAfficheEur: number;
+  depensesDigitProMoisEur: number;
+  depensesPersoMoisEur: number;
 };
 
 /**
@@ -31,11 +37,26 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const windowed = filterDashboardTransactions(proTxs, { years: null }, now);
   const monthly = computeMetricsFromTransactions(windowed, now);
   const last = monthly.length ? monthly[monthly.length - 1]! : { month: "", revenue: 0, expenses: 0 };
+  let depensesDigitProMoisEur = 0;
+  let depensesPersoMoisEur = 0;
+
+  for (const tx of windowed) {
+    if (tx.amount >= 0 || transactionAnalyticsDayIso(tx).slice(0, 7) !== last.month) continue;
+    const bucket = deriveExpenseBucket(tx);
+    const amount = Math.abs(tx.amount);
+    if (isValeurReelleMandatoryFeeLine(tx, bucket)) {
+      depensesDigitProMoisEur += amount;
+    }
+    if (isValeurReellePersonalChargeLine(bucket)) {
+      depensesPersoMoisEur += amount;
+    }
+  }
 
   return {
     caMensuelEur: last.revenue,
     soldeQontoEur: computeLatestQontoBalanceEur(transactions, "pro"),
     depensesQontoSasuMoisEur: last.expenses,
-    tjmAfficheEur: 620
+    depensesDigitProMoisEur,
+    depensesPersoMoisEur
   };
 }

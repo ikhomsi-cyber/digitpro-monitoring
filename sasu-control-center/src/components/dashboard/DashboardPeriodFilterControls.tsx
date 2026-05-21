@@ -24,6 +24,13 @@ export function DashboardPeriodFilterControls({
   onToggleYear: (y: number) => void;
 }) {
   const monthModeActive = Boolean(selectedMonth);
+  const availableMonthOptions =
+    selectedYears != null && selectedYears.length > 0
+      ? monthOptions.filter((month) => selectedYears.includes(Number(month.slice(0, 4))))
+      : monthOptions.slice(0, 12);
+  const activeMonthStillAvailable = selectedMonth
+    ? availableMonthOptions.includes(selectedMonth)
+    : true;
 
   return (
     <div className="inline-flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -67,8 +74,12 @@ export function DashboardPeriodFilterControls({
             type="button"
             aria-pressed={monthModeActive}
             onClick={() => {
-              setSelectedYears(null);
-              setSelectedMonth((prev) => prev ?? monthOptions[0] ?? new Date().toISOString().slice(0, 7));
+              setSelectedYears((prev) => prev ?? null);
+              setSelectedMonth((prev) =>
+                prev && availableMonthOptions.includes(prev)
+                  ? prev
+                  : availableMonthOptions[0] ?? new Date().toISOString().slice(0, 7)
+              );
             }}
             className={clsx(
               "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
@@ -89,7 +100,16 @@ export function DashboardPeriodFilterControls({
           aria-label="Sélection du mois à afficher"
         >
           <span className="shrink-0 text-xs font-medium text-ink-500 dark:text-ink-400">Mois :</span>
-          {monthOptions.map((month) => {
+          {!activeMonthStillAvailable ? (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(availableMonthOptions[0] ?? null)}
+              className="min-h-[40px] shrink-0 rounded-full border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100 sm:min-h-0 sm:py-1"
+            >
+              Revenir à la période
+            </button>
+          ) : null}
+          {availableMonthOptions.map((month) => {
             const on = selectedMonth === month;
             return (
               <button
