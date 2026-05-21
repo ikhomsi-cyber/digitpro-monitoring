@@ -51,10 +51,7 @@ function parseDashboardScopeParam(
   return null;
 }
 
-import {
-  isDashboardAnalyticsPanel,
-  parseDashboardPanelParam
-} from "@/lib/dashboard-panel";
+import { parseDashboardPanelParam } from "@/lib/dashboard-panel";
 
 /** Always evaluate Supabase env + session at request time. */
 export const dynamic = "force-dynamic";
@@ -67,9 +64,13 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const initialDashboardScope = parseDashboardScopeParam(sp);
   const initialDashboardPanel = parseDashboardPanelParam(sp);
+  const initialDashboardSection = Array.isArray(sp.section) ? sp.section[0] : sp.section;
   const showLmnpPanel = initialDashboardPanel === "lmnp";
   const showValeurReellePanel = initialDashboardPanel === "valeur-reelle";
-  const showAnalyticsPanel = isDashboardAnalyticsPanel(initialDashboardPanel);
+  const showDashboardHomeHero =
+    !initialDashboardPanel &&
+    !initialDashboardSection &&
+    !initialDashboardScope;
   reportSupabaseEnvDiagnostics("app/dashboard/page");
 
   const envMode = getSupabaseRuntimeMode();
@@ -190,7 +191,7 @@ export default async function DashboardPage({
         powensPrimaryImportAxis={powensPrimaryAxis}
       />
 
-      {!showAnalyticsPanel || showValeurReellePanel ? (
+      {showDashboardHomeHero ? (
         <DashboardPremiumHero
           stats={heroStats}
           contextMessage={heroContextMessage}

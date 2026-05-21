@@ -7,7 +7,7 @@ import {
   last12MonthsKeys,
   type DashboardAnalyticsFilter
 } from "@/lib/dashboard-metrics";
-import { formatDashboardPeriodLabel } from "@/lib/dashboard-period";
+import { formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
 import { deriveExpenseBucket, type DerivedExpenseBucket } from "@/lib/derived-expense-bucket";
 import { matchesLoyersRecusSubcategory } from "@/lib/lmnp-analyze";
 import { isRevenueCategory } from "@/lib/revenue-category";
@@ -179,8 +179,12 @@ export type ValeurReelleCashTree = {
 export function countBillableDaysForAnalyticsFilter(
   billableIsos: readonly string[],
   years: number[] | null,
+  month: string | null = null,
   now = new Date()
 ): number {
+  if (month) {
+    return billableIsos.filter((iso) => iso.slice(0, 7) === month).length;
+  }
   if (years != null && years.length > 0) {
     const set = new Set(years);
     return billableIsos.filter((iso) => set.has(Number(iso.slice(0, 4)))).length;
@@ -402,8 +406,9 @@ export function analyzeValeurReelle(
 ): ValeurReelleAnalysis {
   const now = options?.now ?? new Date();
   const years = options?.years ?? null;
-  const periodLabel = formatDashboardPeriodLabel(years);
-  const scoped = filterDashboardTransactions([...transactions], { years }, now);
+  const month = options?.month ?? null;
+  const periodLabel = formatDashboardPeriodLabelWithMonth(years, month);
+  const scoped = filterDashboardTransactions([...transactions], { years, month }, now);
 
   let activeIncomeEur = 0;
   let passiveIncomeEur = 0;

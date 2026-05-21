@@ -6,7 +6,11 @@ import { clsx } from "clsx";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
-import { buildDashboardYearOptions, toggleDashboardYearInFilter } from "@/lib/dashboard-period";
+import {
+  buildDashboardMonthOptions,
+  buildDashboardYearOptions,
+  toggleDashboardYearInFilter
+} from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
@@ -436,22 +440,28 @@ export function ValeurReelleClient({
 }) {
   const fmt = useDashboardDisplayFormat();
   const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const yearOptions = useMemo(
     () => buildDashboardYearOptions(transactionYearBounds, initialTransactions),
     [transactionYearBounds, initialTransactions]
   );
+  const monthOptions = useMemo(
+    () => buildDashboardMonthOptions(transactionYearBounds, initialTransactions),
+    [transactionYearBounds, initialTransactions]
+  );
 
   const onToggleYear = useCallback(
     (y: number) => {
+      setSelectedMonth(null);
       setSelectedYears(toggleDashboardYearInFilter(y, yearOptions));
     },
     [yearOptions]
   );
 
   const analysis = useMemo(
-    () => analyzeValeurReelle(initialTransactions, { years: selectedYears }),
-    [initialTransactions, selectedYears]
+    () => analyzeValeurReelle(initialTransactions, { years: selectedYears, month: selectedMonth }),
+    [initialTransactions, selectedMonth, selectedYears]
   );
 
   const billableActivity = useBillableActivityOptional();
@@ -469,8 +479,12 @@ export function ValeurReelleClient({
       <DashboardPeriodFilterSection
         selectedYears={selectedYears}
         setSelectedYears={setSelectedYears}
+        selectedMonth={selectedMonth}
+        setSelectedMonth={setSelectedMonth}
+        monthOptions={monthOptions}
         yearOptions={yearOptions}
         onToggleYear={onToggleYear}
+        sticky
       />
 
       {demoMode ? (

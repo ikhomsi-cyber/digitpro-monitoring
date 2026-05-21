@@ -788,6 +788,8 @@ export function mergeImportedWithTransactions(
 export type DashboardAnalyticsFilter = {
   /** null = 12 mois glissants ; sinon une ou plusieurs années civiles incluses. */
   years: number[] | null;
+  /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM. */
+  month?: string | null;
 };
 
 export function filterDashboardTransactions(
@@ -795,6 +797,9 @@ export function filterDashboardTransactions(
   filter: DashboardAnalyticsFilter,
   now = new Date()
 ): DashboardTx[] {
+  if (filter.month) {
+    return txs.filter((t) => transactionAnalyticsDayIso(t).slice(0, 7) === filter.month);
+  }
   if (filter.years != null && filter.years.length > 0) {
     const set = new Set(filter.years);
     return txs.filter((t) => set.has(Number(transactionAnalyticsDayIso(t).slice(0, 4))));

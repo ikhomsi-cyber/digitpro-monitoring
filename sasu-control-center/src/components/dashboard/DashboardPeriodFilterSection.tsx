@@ -2,28 +2,43 @@
 
 import { useMemo, type Dispatch, type SetStateAction } from "react";
 import { CalendarRange } from "lucide-react";
+import { clsx } from "clsx";
 import { DashboardPeriodFilterControls } from "@/components/dashboard/DashboardPeriodFilterControls";
-import { formatDashboardPeriodLabel } from "@/lib/dashboard-period";
+import { formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
 
 /** Bloc « Fenêtre d'analyse » (pilules + libellé vue active), identique SASU / Privé. */
 export function DashboardPeriodFilterSection({
   selectedYears,
   setSelectedYears,
+  selectedMonth = null,
+  setSelectedMonth,
+  monthOptions = [],
   yearOptions,
-  onToggleYear
+  onToggleYear,
+  sticky = false
 }: {
   selectedYears: number[] | null;
   setSelectedYears: Dispatch<SetStateAction<number[] | null>>;
+  selectedMonth?: string | null;
+  setSelectedMonth?: Dispatch<SetStateAction<string | null>>;
+  monthOptions?: string[];
   yearOptions: number[];
   onToggleYear: (y: number) => void;
+  sticky?: boolean;
 }) {
   const periodLabel = useMemo(
-    () => formatDashboardPeriodLabel(selectedYears),
-    [selectedYears]
+    () => formatDashboardPeriodLabelWithMonth(selectedYears, selectedMonth),
+    [selectedYears, selectedMonth]
   );
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div
+      className={clsx(
+        "flex min-w-0 flex-col gap-3 transition-[padding,background-color,border-color,box-shadow] duration-200",
+        sticky &&
+          "sticky top-[calc(env(safe-area-inset-top)+0.25rem)] z-20 -mx-4 px-4 py-2 backdrop-blur-md supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/35 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      )}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <span className="flex shrink-0 items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
           <CalendarRange className="h-4 w-4 text-ink-400" aria-hidden />
@@ -32,6 +47,9 @@ export function DashboardPeriodFilterSection({
         <DashboardPeriodFilterControls
           selectedYears={selectedYears}
           setSelectedYears={setSelectedYears}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          monthOptions={monthOptions}
           yearOptions={yearOptions}
           onToggleYear={onToggleYear}
         />

@@ -33,6 +33,7 @@ import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { categoryGlyph } from "@/lib/category-glyph";
 import { counterpartyLogoHref } from "@/lib/counterparty-logo";
+import { buildDashboardMonthOptions, formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
@@ -187,6 +188,8 @@ export function DashboardClient({
   );
   /** null = fenêtre glissante 12 mois ; sinon une ou plusieurs années civiles */
   const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
+  /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM. */
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) pour la carte Total expenses. */
   const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
@@ -204,7 +207,7 @@ export function DashboardClient({
     setRevenueCounterpartyDetail(null);
     setExpenseCategoryDetail(null);
     setSelectedExpenseCategoryFilters([]);
-  }, [scope, selectedYears, syncKey]);
+  }, [scope, selectedMonth, selectedYears, syncKey]);
 
   useEffect(() => {
     setExpenseCategoryDetail(null);
@@ -270,7 +273,10 @@ export function DashboardClient({
   const billableActivity = useBillableActivity();
   const { sortedIsos: billableWorkDayIsos } = billableActivity;
 
-  const analyticsFilter = useMemo(() => ({ years: selectedYears }), [selectedYears]);
+  const analyticsFilter = useMemo(
+    () => ({ years: selectedYears, month: selectedMonth }),
+    [selectedMonth, selectedYears]
+  );
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),
@@ -303,8 +309,12 @@ export function DashboardClient({
   }, [periodFilteredTx, kpiMode]);
 
   const metrics = useMemo(
-    () => computeDashboardMonthlyMetrics(filteredTx, { years: selectedYears, kpiMode }),
-    [filteredTx, selectedYears, kpiMode]
+    () =>
+      computeDashboardMonthlyMetrics(filteredTx, {
+        years: selectedMonth ? [Number(selectedMonth.slice(0, 4))] : selectedYears,
+        kpiMode
+      }),
+    [filteredTx, kpiMode, selectedMonth, selectedYears]
   );
 
   /** Mois de la fenêtre d’analyse déjà écoulés (≤ mois en cours), pour les moyennes. */
@@ -464,11 +474,8 @@ export function DashboardClient({
   );
 
   const periodLabel = useMemo(() => {
-    if (selectedYears == null) return "12 derniers mois (fenêtre glissante)";
-    if (selectedYears.length === 1) return `Année ${selectedYears[0]}`;
-    const sorted = [...selectedYears].sort((a, b) => a - b);
-    return `Années ${sorted.join(", ")}`;
-  }, [selectedYears]);
+    return formatDashboardPeriodLabelWithMonth(selectedYears, selectedMonth);
+  }, [selectedMonth, selectedYears]);
 
   const totalExpensesCardSubtitle = useMemo(() => {
     let base: string;
@@ -508,7 +515,13 @@ export function DashboardClient({
     return list.length ? list : [new Date().getFullYear()];
   }, [transactions, transactionYearBounds]);
 
+  const monthOptions = useMemo(
+    () => buildDashboardMonthOptions(transactionYearBounds, transactions),
+    [transactionYearBounds, transactions]
+  );
+
   function toggleYearInFilter(y: number) {
+    setSelectedMonth(null);
     setSelectedYears((prev) => {
       const base = prev ?? [yearOptions[0] ?? new Date().getFullYear()];
       const next = new Set(base);
@@ -556,8 +569,12 @@ export function DashboardClient({
           <DashboardPeriodFilterSection
             selectedYears={selectedYears}
             setSelectedYears={setSelectedYears}
+            selectedMonth={selectedMonth}
+            setSelectedMonth={setSelectedMonth}
+            monthOptions={monthOptions}
             yearOptions={yearOptions}
             onToggleYear={toggleYearInFilter}
+            sticky
           />
 
       <section className="space-y-4">

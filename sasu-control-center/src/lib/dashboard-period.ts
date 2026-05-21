@@ -9,6 +9,20 @@ export function formatDashboardPeriodLabel(selectedYears: number[] | null): stri
   return `Années ${sorted.join(", ")}`;
 }
 
+export function formatDashboardMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map((part) => Number(part));
+  const date = new Date(Date.UTC(year || 2000, (month || 1) - 1, 1));
+  return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(date);
+}
+
+export function formatDashboardPeriodLabelWithMonth(
+  selectedYears: number[] | null,
+  selectedMonth: string | null
+): string {
+  if (selectedMonth) return formatDashboardMonthLabel(selectedMonth);
+  return formatDashboardPeriodLabel(selectedYears);
+}
+
 export function buildDashboardYearOptions(
   transactionYearBounds: { minYear: number; maxYear: number } | null,
   transactions: readonly DashboardTx[]
@@ -27,6 +41,33 @@ export function buildDashboardYearOptions(
     if (Number.isFinite(y)) ys.add(y);
   }
   return Array.from(ys).sort((a, b) => b - a);
+}
+
+export function buildDashboardMonthOptions(
+  transactionYearBounds: { minYear: number; maxYear: number } | null,
+  transactions: readonly DashboardTx[]
+): string[] {
+  const months = new Set<string>();
+  for (const tx of transactions) {
+    months.add(transactionAnalyticsDayIso(tx).slice(0, 7));
+  }
+  if (transactionYearBounds) {
+    const { minYear, maxYear } = transactionYearBounds;
+    if (Number.isFinite(minYear) && Number.isFinite(maxYear) && minYear <= maxYear) {
+      const now = new Date();
+      const maxMonth =
+        maxYear >= now.getFullYear()
+          ? now.getMonth() + 1
+          : 12;
+      for (let year = minYear; year <= maxYear; year++) {
+        const upperMonth = year === maxYear ? maxMonth : 12;
+        for (let month = 1; month <= upperMonth; month++) {
+          months.add(`${year}-${String(month).padStart(2, "0")}`);
+        }
+      }
+    }
+  }
+  return Array.from(months).sort((a, b) => b.localeCompare(a));
 }
 
 export function toggleDashboardYearInFilter(
