@@ -8,7 +8,8 @@ import {
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import {
   isValeurReelleMandatoryFeeLine,
-  isValeurReellePersonalChargeLine
+  isValeurReellePersonalChargeLine,
+  analyzeValeurReelle
 } from "@/lib/valeur-reelle-analyze";
 
 export type DashboardHeroStats = {
@@ -26,6 +27,7 @@ export type DashboardHeroStats = {
   depensesQontoSasuMoisEur: number;
   depensesDigitProMoisEur: number;
   depensesPersoMoisEur: number;
+  netDansMaPocheMoisEur: number;
 };
 
 /**
@@ -37,6 +39,8 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const windowed = filterDashboardTransactions(proTxs, { years: null }, now);
   const monthly = computeMetricsFromTransactions(windowed, now);
   const last = monthly.length ? monthly[monthly.length - 1]! : { month: "", revenue: 0, expenses: 0 };
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const valueAnalysis = analyzeValeurReelle(transactions, { years: null, month: currentMonth, now });
   let depensesDigitProMoisEur = 0;
   let depensesPersoMoisEur = 0;
 
@@ -57,6 +61,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     soldeQontoEur: computeLatestQontoBalanceEur(transactions, "pro"),
     depensesQontoSasuMoisEur: last.expenses,
     depensesDigitProMoisEur,
-    depensesPersoMoisEur
+    depensesPersoMoisEur,
+    netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur
   };
 }

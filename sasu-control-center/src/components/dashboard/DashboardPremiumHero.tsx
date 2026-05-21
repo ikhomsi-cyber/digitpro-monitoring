@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { BriefcaseBusiness, CalendarCheck2, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
@@ -18,12 +19,19 @@ type Tile = {
   label: string;
   value: string;
   suffix?: string;
+  sublabel?: string;
+  icon: typeof TrendingUp;
+  iconClassName: string;
+  href?: string;
+  ariaLabel?: string;
+  wide?: boolean;
   breakdown?: Array<{ label: string; value: number; colorClass: string }>;
 };
 
 export function DashboardPremiumHero({ stats, contextMessage, showContextBanner }: Props) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
+  const billedDaysToDate = billable.overviewWorkdayGauge.countedBillable;
   const activeTjmHt = useMemo(() => {
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -34,26 +42,66 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
       billable.tjmHt
     );
   }, [billable.billableRatePeriods, billable.tjmHt]);
+  const inPocketToDateEur = useMemo(() => {
+    const caHtMonth = stats.caMensuelEur > 0 ? stats.caMensuelEur / 1.2 : 0;
+    const billedDaysInRevenue = activeTjmHt > 0 ? caHtMonth / activeTjmHt : 0;
+    if (billedDaysToDate <= 0) return 0;
+    if (billedDaysInRevenue > 0) {
+      return (stats.netDansMaPocheMoisEur / billedDaysInRevenue) * billedDaysToDate;
+    }
+    return activeTjmHt * billedDaysToDate;
+  }, [activeTjmHt, billedDaysToDate, stats.caMensuelEur, stats.netDansMaPocheMoisEur]);
+  const billedDaysLabel = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(billedDaysToDate);
 
   const tiles: Tile[] = useMemo(
     () => [
-      { label: "Encaissé ce mois", value: fmt.euro(stats.caMensuelEur), suffix: "TTC" },
+      {
+        label: "Encaissé ce mois",
+        value: fmt.euro(stats.caMensuelEur),
+        suffix: "TTC",
+        icon: TrendingUp,
+        iconClassName: "text-emerald-300 bg-emerald-500/12 border-emerald-400/20",
+        href: "/dashboard?section=sasu&scope=pro",
+        ariaLabel: "Ouvrir la page SASU"
+      },
       {
         label: "Cash disponible",
-        value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—"
+        value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—",
+        icon: WalletCards,
+        iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
+      },
+      {
+        label: "Dans ma poche",
+        value: fmt.euro(inPocketToDateEur),
+        sublabel: `${billedDaysLabel} j. facturés à date`,
+        icon: PiggyBank,
+        iconClassName: "text-amber-200 bg-amber-500/12 border-amber-300/20"
+      },
+      {
+        label: "TJM en vigueur",
+        value: fmt.euro(activeTjmHt),
+        suffix: "HT",
+        icon: CalendarCheck2,
+        iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
+        href: "/parametres",
+        ariaLabel: "Ouvrir le paramétrage des TJM"
       },
       {
         label: "Dépenses du mois (SASU)",
         value: fmt.euro(stats.depensesQontoSasuMoisEur),
         suffix: "TTC",
+        icon: BriefcaseBusiness,
+        iconClassName: "text-rose-200 bg-rose-500/12 border-rose-300/20",
+        href: "/dashboard?panel=valeur-reelle",
+        ariaLabel: "Ouvrir la page Valeur",
+        wide: true,
         breakdown: [
           { label: "DigitPro", value: stats.depensesDigitProMoisEur, colorClass: "bg-amber-300" },
           { label: "Perso", value: stats.depensesPersoMoisEur, colorClass: "bg-emerald-400" }
         ]
-      },
-      { label: "TJM en vigueur", value: fmt.euro(activeTjmHt), suffix: "HT" }
+      }
     ],
-    [activeTjmHt, fmt, stats]
+    [activeTjmHt, billedDaysLabel, fmt, inPocketToDateEur, stats]
   );
 
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
@@ -69,7 +117,7 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         aria-hidden
       />
 
-      <div className="relative text-center">
+      <div className="relative text-center" suppressHydrationWarning>
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-ink-500 dark:text-emerald-300/80">
           DigitPro Monitoring
         </p>
@@ -78,58 +126,117 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
             {contextMessage}
           </p>
         ) : null}
-        <h1 className="mx-auto mt-4 max-w-3xl text-balance font-display text-3xl font-semibold leading-[1.08] tracking-apple-tight text-ink-900 dark:text-white sm:text-4xl md:text-[2.65rem]">
+        <h1
+          suppressHydrationWarning
+          className="mx-auto mt-4 max-w-3xl text-balance font-display text-3xl font-semibold leading-[1.08] tracking-apple-tight text-ink-900 dark:text-white sm:text-4xl md:text-[2.65rem]"
+        >
           Pilotage finances, trésorerie et chiffre d’affaires en temps réel.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-ink-600 dark:text-white/55 sm:text-base">
           {chips}
         </p>
 
-        <dl className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          {tiles.map((t) => (
+        <dl className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-3 sm:gap-4">
+          {tiles.map((t) => {
+            const interactive = Boolean(t.href);
+            const href = t.href;
+            const Icon = t.icon;
+            const content = (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <dt className="text-[11px] font-medium text-ink-500 dark:text-white/45">{t.label}</dt>
+                  <span
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border ${t.iconClassName}`}
+                    aria-hidden
+                  >
+                    <Icon className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                </div>
+                <dd className="mt-1.5 font-display text-lg font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-xl">
+                  {t.value}
+                  {t.suffix ? (
+                    <span className="ml-1.5 align-baseline text-xs font-semibold tracking-normal text-ink-500 dark:text-white/45">
+                      {t.suffix}
+                    </span>
+                  ) : null}
+                </dd>
+                {t.sublabel ? (
+                  <p className="mt-1 text-[11px] font-medium text-ink-500 dark:text-white/40">{t.sublabel}</p>
+                ) : null}
+                {t.breakdown ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                      {t.breakdown.map((item) => {
+                        const pct =
+                          stats.depensesQontoSasuMoisEur > 0
+                            ? Math.max(0, (item.value / stats.depensesQontoSasuMoisEur) * 100)
+                            : 0;
+                        return (
+                          <span
+                            key={item.label}
+                            className={item.colorClass}
+                            style={{ width: `${pct}%` }}
+                            aria-hidden
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-ink-500 dark:text-white/40">
+                      {t.breakdown.map((item) => (
+                        <span key={item.label} className="inline-flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${item.colorClass}`} aria-hidden />
+                          {item.label} {fmt.euro(item.value)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            );
+            return (
             <div
               key={t.label}
-              className="rounded-2xl border border-ink-200/80 bg-white/70 px-3 py-3 text-left shadow-sm dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none sm:px-4 sm:py-4"
+              role={interactive ? "button" : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              onClick={
+                href
+                  ? () => {
+                      if (href.startsWith("/dashboard")) {
+                        window.history.pushState(null, "", href);
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      } else {
+                        window.location.assign(href);
+                      }
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                href
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      if (href.startsWith("/dashboard")) {
+                        window.history.pushState(null, "", href);
+                        window.dispatchEvent(new PopStateEvent("popstate"));
+                      } else {
+                        window.location.assign(href);
+                      }
+                    }
+                  : undefined
+              }
+              className={`rounded-2xl border border-ink-200/80 bg-white/70 px-3 py-3 text-left shadow-sm dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none sm:px-4 sm:py-4 ${
+                t.wide ? "col-span-2" : ""
+              } ${
+                interactive
+                  ? "cursor-pointer transition hover:-translate-y-0.5 hover:border-emerald-300/70 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 dark:hover:border-emerald-400/25 dark:hover:bg-white/[0.07]"
+                  : ""
+              }`}
+              aria-label={interactive ? t.ariaLabel : undefined}
             >
-              <dt className="text-[11px] font-medium text-ink-500 dark:text-white/45">{t.label}</dt>
-              <dd className="mt-1.5 font-display text-lg font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-xl">
-                {t.value}
-                {t.suffix ? (
-                  <span className="ml-1.5 align-baseline text-xs font-semibold tracking-normal text-ink-500 dark:text-white/45">
-                    {t.suffix}
-                  </span>
-                ) : null}
-              </dd>
-              {t.breakdown ? (
-                <div className="mt-3 space-y-2">
-                  <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
-                    {t.breakdown.map((item) => {
-                      const pct =
-                        stats.depensesQontoSasuMoisEur > 0
-                          ? Math.max(0, (item.value / stats.depensesQontoSasuMoisEur) * 100)
-                          : 0;
-                      return (
-                        <span
-                          key={item.label}
-                          className={item.colorClass}
-                          style={{ width: `${pct}%` }}
-                          aria-hidden
-                        />
-                      );
-                    })}
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-ink-500 dark:text-white/40">
-                    {t.breakdown.map((item) => (
-                      <span key={item.label} className="inline-flex items-center gap-1.5">
-                        <span className={`h-1.5 w-1.5 rounded-full ${item.colorClass}`} aria-hidden />
-                        {item.label} {fmt.euro(item.value)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {content}
             </div>
-          ))}
+          );
+          })}
         </dl>
 
         <div className="mx-auto mt-8 max-w-3xl text-left">

@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Briefcase, Gem, Home, Tags } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 
 type Tab = {
   href: string;
   label: string;
-  icon: typeof Home;
+  icon: typeof House;
   isActive: (ctx: {
     scope: string | null;
     panel: string | null;
@@ -23,32 +23,32 @@ const TABS: Tab[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
-    icon: Home,
+    icon: House,
     isActive: ({ scope, panel, section }) =>
       !isDashboardAnalyticsPanel(panel) && (section == null || section === "") && scope == null
   },
   {
     href: "/dashboard?section=activite",
     label: "Activité",
-    icon: Activity,
+    icon: Gauge,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "activite"
   },
   {
     href: "/dashboard?panel=valeur-reelle",
     label: "Valeur",
-    icon: Gem,
+    icon: Banknote,
     isActive: ({ panel }) => panel === "valeur-reelle"
   },
   {
     href: "/dashboard?section=sasu&scope=pro",
     label: "SASU",
-    icon: Briefcase,
+    icon: ChartNoAxesCombined,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
   },
   {
     href: "/categorisation",
     label: "Catég.",
-    icon: Tags,
+    icon: ScanSearch,
     isActive: () => false
   }
 ];
@@ -81,7 +81,7 @@ export function DashboardFloatingDock() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-[90] animate-floatIn border-t border-white/[0.07] bg-black/55 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-2xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[90] animate-floatIn border-t border-white/[0.07] bg-black/55 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur-2xl md:hidden"
       aria-label="Navigation principale"
     >
       <div className="mx-auto flex max-w-lg items-end justify-between gap-0.5">
@@ -95,25 +95,25 @@ export function DashboardFloatingDock() {
               prefetch={!tab.href.includes("#")}
               scroll={false}
               onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
-              className="relative flex min-w-0 flex-1 flex-col items-center gap-0.5 py-1.5"
+              className="relative flex min-w-0 flex-1 flex-col items-center gap-1 py-1"
             >
               {active ? (
                 <span className="absolute inset-x-0.5 -top-0.5 h-9 rounded-2xl bg-emerald-500/30 blur-md" aria-hidden />
               ) : null}
               <span
                 className={clsx(
-                  "relative z-[1] flex h-10 w-10 items-center justify-center rounded-2xl border transition",
+                  "relative z-[1] flex h-14 w-14 items-center justify-center rounded-[1.35rem] border transition",
                   active
                     ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
                     : "border-white/10 bg-white/5 text-white/55"
                 )}
               >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2.2 : 1.75} aria-hidden />
+                <Icon className="h-7 w-7" strokeWidth={active ? 2.4 : 2} aria-hidden />
                 <span className="sr-only">{tab.label}</span>
               </span>
               <span
                 className={clsx(
-                  "relative z-[1] max-w-[4.5rem] truncate text-center text-[10px] font-medium leading-tight",
+                  "relative z-[1] max-w-[4.75rem] truncate text-center text-xs font-semibold leading-tight",
                   active ? "text-white" : "text-white/45"
                 )}
               >
@@ -162,7 +162,7 @@ export function DashboardDesktopSidebar() {
           className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.18)]"
           aria-label="Dashboard"
         >
-          <Home className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <House className="h-5 w-5" strokeWidth={2} aria-hidden />
         </Link>
         <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
           {TABS.map((tab) => {
@@ -183,8 +183,8 @@ export function DashboardDesktopSidebar() {
                     : "border-white/8 bg-white/[0.035] text-white/48 hover:bg-white/[0.07] hover:text-white/78"
                 )}
               >
-                <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.2 : 1.75} aria-hidden />
-                <span className="text-[10px] font-semibold leading-tight tracking-tight">{tab.label}</span>
+                <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.25 : 1.85} aria-hidden />
+                <span className="text-[11px] font-semibold leading-tight tracking-tight">{tab.label}</span>
               </Link>
             );
           })}
