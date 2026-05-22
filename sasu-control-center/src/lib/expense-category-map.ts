@@ -9,6 +9,7 @@ export const ICLOUD_IA_STORE_CATEGORY_LABEL = "iCloud IA Store";
 export const QONTO_CATEGORY_LABEL = "Qonto";
 export const ASSURANCE_CATEGORY_LABEL = "Assurance";
 export const MUTUELLE_CATEGORY_LABEL = "Mutuelle";
+export const MATERIEL_CATEGORY_LABEL = "Matériel";
 /** Prélèvements DGFIP hors TVA (IS, CFE, etc.). */
 export const IMPOT_CATEGORY_LABEL = "Impôt";
 /** Regroupement affiché pour frais de compta / secrétariat / outils de gestion (libellés bancaires « hiway », etc.). */
@@ -25,6 +26,11 @@ const RAW_ENTRIES: [string, string][] = [
   ["Dépenses liées au marketing", "Repas d'affaires"],
   ["Dépenses administratives", COMPTA_ADMIN_BUCKET_LABEL],
   ["Frais de nourriture et boissons", "Repas Ilias"],
+  ["Restauration pro", "Repas Ilias"],
+  ["Déjeuner", "Repas Ilias"],
+  ["Dejeuner", "Repas Ilias"],
+  ["Matériel", MATERIEL_CATEGORY_LABEL],
+  ["Materiel", MATERIEL_CATEGORY_LABEL],
   ["AXA SOGAREP", ASSURANCE_CATEGORY_LABEL],
   ["DSN", IMPOT_CATEGORY_LABEL],
   ["PAS", IMPOT_CATEGORY_LABEL]
@@ -63,6 +69,11 @@ function buildMap(): Map<string, string> {
     ["administrative expenses", COMPTA_ADMIN_BUCKET_LABEL],
     ["frais de nourriture et boissons", "Repas Ilias"],
     ["food and drink", "Repas Ilias"],
+    ["restauration pro", "Repas Ilias"],
+    ["dejeuner", "Repas Ilias"],
+    ["déjeuner", "Repas Ilias"],
+    ["materiel", MATERIEL_CATEGORY_LABEL],
+    ["matériel", MATERIEL_CATEGORY_LABEL],
     ["apple.com bill", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["cursor, ai powered ide", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["cursor ai powered ide", ICLOUD_IA_STORE_CATEGORY_LABEL],

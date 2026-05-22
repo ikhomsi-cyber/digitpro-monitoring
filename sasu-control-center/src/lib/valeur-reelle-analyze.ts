@@ -301,6 +301,7 @@ export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedE
     bucket === "Mutuelle" ||
     bucket === "Qonto" ||
     bucket === "Assurance" ||
+    bucket === "Matériel" ||
     bucket === "Autres"
   );
 }
@@ -325,6 +326,9 @@ function mandatoryFeeLabel(tx: DashboardTx, bucket: DerivedExpenseBucket | null)
   }
   if (/\bsfr\b/.test(b)) return "SFR";
   if (/\bfree\b/.test(b)) return "Free";
+  if (bucket === "Qonto") return "Qonto";
+  if (bucket === "Assurance") return "Assurance";
+  if (bucket === "Matériel") return "Matériel";
   if (b.includes("wemind") || bucket === "Mutuelle") return "Mutuelle Wemind";
   return "Autres";
 }
@@ -370,6 +374,7 @@ function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null
   }
   if (bucket === "Mobile et Internet") return { label: "Télécom", rate: 0.2 };
   if (bucket === "Qonto") return { label: "Qonto", rate: 0.2 };
+  if (bucket === "Matériel") return { label: "Matériel", rate: 0.2 };
   if (bucket === "Assurance") return null;
   return null;
 }

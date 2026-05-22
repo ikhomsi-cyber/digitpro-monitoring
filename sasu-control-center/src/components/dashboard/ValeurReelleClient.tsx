@@ -71,6 +71,7 @@ function BreakdownPieChart({
   const [showDetails, setShowDetails] = useState(false);
   const [openOther, setOpenOther] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [hiddenTransactionIds, setHiddenTransactionIds] = useState<Set<string>>(() => new Set());
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
   if (total <= 0) return null;
 
@@ -102,6 +103,7 @@ function BreakdownPieChart({
       const body = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string };
       if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Impossible d’enregistrer");
       toast.success("Catégorie mise à jour");
+      setHiddenTransactionIds((prev) => new Set(prev).add(transactionId));
       onRecategorized?.(transactionId, category);
     } catch (error) {
       toast.error("Catégorisation impossible", {
@@ -190,7 +192,7 @@ function BreakdownPieChart({
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => {
             const isOther = slice.row.label === "Autres";
-            const transactions = slice.row.transactions ?? [];
+            const transactions = (slice.row.transactions ?? []).filter((tx) => !hiddenTransactionIds.has(tx.id));
             return (
             <div
               key={`legend-${slice.row.label}`}
@@ -333,7 +335,7 @@ function CashFlowTreeVisual({
       breakdown: tree.mandatoryFeesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: MANDATORY_FEES_COLORS,
-      recategorizeOptions: ["Hiway", "URSSAF", "Impôt", "SFR", "Free", "Qonto", "Assurance", "Mutuelle"],
+      recategorizeOptions: ["Hiway", "URSSAF", "Impôt", "SFR", "Free", "Qonto", "Assurance", "Mutuelle", "Matériel"],
       tone: "deduct"
     },
     {
@@ -344,7 +346,7 @@ function CashFlowTreeVisual({
       breakdown: tree.personalChargesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: PERSONAL_CHARGES_COLORS,
-      recategorizeOptions: ["NDF DigitPro", "Indemnités kilométriques", "CESU", "Repas d'affaires", "Repas Ilias"],
+      recategorizeOptions: ["NDF DigitPro", "Indemnités kilométriques", "CESU", "Repas d'affaires", "Restauration pro", "Déjeuner"],
       tone: "deduct"
     },
   ];

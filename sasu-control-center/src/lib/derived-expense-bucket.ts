@@ -5,6 +5,7 @@ import {
   IK_CATEGORY_LABEL,
   IMPOT_CATEGORY_LABEL,
   COMPTA_ADMIN_BUCKET_LABEL,
+  MATERIEL_CATEGORY_LABEL,
   mapExpenseCategoryLabel,
   MUTUELLE_CATEGORY_LABEL,
   QONTO_CATEGORY_LABEL
@@ -27,6 +28,7 @@ export const DERIVED_EXPENSE_BUCKETS = [
   ICLOUD_IA_STORE_CATEGORY_LABEL,
   QONTO_CATEGORY_LABEL,
   ASSURANCE_CATEGORY_LABEL,
+  MATERIEL_CATEGORY_LABEL,
   MUTUELLE_CATEGORY_LABEL,
   "Autres"
 ] as const;
@@ -212,8 +214,11 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
     return ASSURANCE_CATEGORY_LABEL;
   }
   if (mapped === MUTUELLE_CATEGORY_LABEL || mk === "mutuelle") return MUTUELLE_CATEGORY_LABEL;
+  if (mapped === MATERIEL_CATEGORY_LABEL || mk === "materiel") return MATERIEL_CATEGORY_LABEL;
   if (mapped === "Repas d'affaires" || (mk.includes("repas") && mk.includes("affair"))) return "Repas d'affaire";
-  if (mapped === "Repas Ilias" || mk.includes("repas ilias")) return "Repas dirigeant";
+  if (mapped === "Repas Ilias" || mk.includes("repas ilias") || mk.includes("restauration pro") || mk.includes("dejeuner")) {
+    return "Repas dirigeant";
+  }
 
   return "Autres";
 }
