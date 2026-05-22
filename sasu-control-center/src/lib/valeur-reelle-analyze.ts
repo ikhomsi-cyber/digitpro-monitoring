@@ -9,6 +9,7 @@ import {
 } from "@/lib/dashboard-metrics";
 import { formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
 import { deriveExpenseBucket, type DerivedExpenseBucket } from "@/lib/derived-expense-bucket";
+import { categorizeHiwayExpense, HIWAY_EXPENSE_CATEGORIES, type HiwayExpenseCategory } from "@/lib/hiway-categorisation";
 import { matchesLoyersRecusSubcategory } from "@/lib/lmnp-analyze";
 import { isRevenueCategory } from "@/lib/revenue-category";
 import {
@@ -37,6 +38,12 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
+export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.015;
+
+export function applyFiscalDebtSafetyMargin(amountEur: number): number {
+  if (!Number.isFinite(amountEur) || amountEur <= 0) return amountEur;
+  return Math.round(amountEur * (1 + FISCAL_DEBT_SAFETY_MARGIN_RATE) * 100) / 100;
+}
 
 function fold(raw: string): string {
   return (raw ?? "")
@@ -111,6 +118,16 @@ export type ValeurReelleVatMonthlyRow = {
   vatEur: number;
   count: number;
   breakdown: ValeurReelleWaterfallBreakdownRow[];
+};
+
+export type ValeurReelleVatLiability = {
+  collectedVatEur: number;
+  paidVatEur: number;
+  recoverableVatEur: number;
+  recoverableVat20Eur: number;
+  recoverableVat10Eur: number;
+  remainingVatEur: number;
+  paidTransactions: BreakdownTransaction[];
 };
 
 export type ValeurReelleWaterfallStep = {
@@ -233,6 +250,7 @@ export type ValeurReelleAnalysis = {
   categoryRows: ValeurReelleCategoryRow[];
   waterfall: ValeurReelleWaterfallStep[];
   vatRecoverableMonthlyRows: ValeurReelleVatMonthlyRow[];
+  vatLiability: ValeurReelleVatLiability;
   /** @deprecated alias */
   activeRevenueEur: number;
   /** @deprecated */
@@ -306,6 +324,10 @@ export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedE
   );
 }
 
+export const VALEUR_REELLE_EXPENSE_CATEGORIES = HIWAY_EXPENSE_CATEGORIES;
+
+export type ValeurReelleExpenseCategory = HiwayExpenseCategory;
+
 function breakdownTransaction(tx: DashboardTx, amountEur: number): BreakdownTransaction {
   return {
     id: tx.id,
@@ -317,20 +339,11 @@ function breakdownTransaction(tx: DashboardTx, amountEur: number): BreakdownTran
   };
 }
 
-function mandatoryFeeLabel(tx: DashboardTx, bucket: DerivedExpenseBucket | null): string {
-  const b = txBlob(tx);
-  if (b.includes("hiway") || bucket === "Compta & admin.") return "Hiway";
-  if (b.includes("urssaf") || bucket === "Urssaf") return "URSSAF";
-  if (b.includes("dgfip") || b.includes("impot") || b.includes("impôt") || /\bpas\b/.test(b) || bucket === "Impôt") {
-    return "Impôt";
-  }
-  if (/\bsfr\b/.test(b)) return "SFR";
-  if (/\bfree\b/.test(b)) return "Free";
-  if (bucket === "Qonto") return "Qonto";
-  if (bucket === "Assurance") return "Assurance";
-  if (bucket === "Matériel") return "Matériel";
-  if (b.includes("wemind") || bucket === "Mutuelle") return "Mutuelle Wemind";
-  return "Autres";
+export function valeurReelleExpenseCategoryLabel(
+  tx: DashboardTx,
+  bucket: DerivedExpenseBucket | null
+): ValeurReelleExpenseCategory {
+  return categorizeHiwayExpense({ ...tx, category: tx.category || bucket || "" });
 }
 
 export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | null): boolean {
@@ -341,15 +354,6 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
     bucket === "Repas d'affaire" ||
     bucket === "Repas dirigeant"
   );
-}
-
-function personalChargeLabel(bucket: DerivedExpenseBucket | null): string {
-  if (bucket === "Indemnités kilométriques") return "IK";
-  if (bucket === "CESU") return "CESU";
-  if (bucket === "NDF") return "NDF";
-  if (bucket === "Repas d'affaire") return "Déj. d'affaire";
-  if (bucket === "Repas dirigeant") return "Restauration pro";
-  return "Charges perso";
 }
 
 function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null): { label: string; rate: number } | null {
@@ -522,6 +526,10 @@ export function analyzeValeurReelle(
   let mandatoryFeesEur = 0;
   let personalChargesEur = 0;
   let bncPaidEur = 0;
+  let paidVatEur = 0;
+  let recoverableVat20Eur = 0;
+  let recoverableVat10Eur = 0;
+  const paidVatTransactions: BreakdownTransaction[] = [];
 
   const movements: ClassifiedValeurReelleMovement[] = [];
   const categoryMap = new Map<string, ValeurReelleCategoryRow>();
@@ -541,8 +549,12 @@ export function analyzeValeurReelle(
     if (isProScope(tx) && outgoingTransferLabelIsBnc(tx)) {
       bncPaidEur += amtAbs;
     }
+    if (isProScope(tx) && tx.amount < 0 && bucket === "TVA") {
+      paidVatEur += amtAbs;
+      paidVatTransactions.push(breakdownTransaction(tx, amtAbs));
+    }
     if (isProScope(tx) && tx.amount < 0 && isValeurReelleMandatoryFeeLine(tx, bucket)) {
-      const feeLabel = mandatoryFeeLabel(tx, bucket);
+      const feeLabel = valeurReelleExpenseCategoryLabel(tx, bucket);
       const feeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
       mandatoryFeesEur += feeAmountEur;
       addBreakdownRow(mandatoryFeesBreakdown, feeLabel, feeAmountEur, breakdownTransaction(tx, feeAmountEur));
@@ -564,6 +576,11 @@ export function analyzeValeurReelle(
         row.grossEur += amtAbs;
         row.vatEur += vatEur;
         row.count += 1;
+        if (Math.round(vatRule.rate * 100) === 10) {
+          recoverableVat10Eur += vatEur;
+        } else {
+          recoverableVat20Eur += vatEur;
+        }
         addBreakdownRow(row.breakdown, `${vatRule.label} · ${Math.round(vatRule.rate * 100)} %`, vatEur);
         vatRecoverableMonthly.set(monthKey, row);
       }
@@ -607,7 +624,7 @@ export function analyzeValeurReelle(
       if (isValeurReellePersonalChargeLine(bucket)) {
         const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
         personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
       }
       if (
         classified.bucket === "NDF" ||
@@ -627,7 +644,7 @@ export function analyzeValeurReelle(
       if (isValeurReellePersonalChargeLine(bucket)) {
         const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
         personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
       }
       if (classified.bucket === "NDF" || classified.sublabel.toLowerCase().includes("note de frais")) {
         ndfIkGrossEur += amtAbs;
@@ -684,12 +701,17 @@ export function analyzeValeurReelle(
   const chargesHorsImpots = Math.max(0, realExpensesEur - taxesEur);
   const caTtcEur = activeIncomeEur;
   const caFactureEur = Math.round((caTtcEur / 1.2) * 100) / 100;
+  const collectedVatEur = Math.max(0, Math.round((caTtcEur - caFactureEur) * 100) / 100);
+  const recoverableVatEur = Math.round((recoverableVat20Eur + recoverableVat10Eur) * 100) / 100;
+  const remainingVatEur = applyFiscalDebtSafetyMargin(
+    Math.round((collectedVatEur - paidVatEur - recoverableVatEur) * 100) / 100
+  );
   const realEarningsEur = caFactureEur - mandatoryFeesEur + personalChargesEur;
   const chargesEtCsgEur = digitProChargesEur;
   const bncBrutEur = Math.max(0, caFactureEur - digitProChargesEur);
   const bncEur = bncPaidEur;
   const csgBaseEur = Math.max(0, caFactureEur - mandatoryFeesEur - personalChargesEur);
-  const csgEur = Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100;
+  const csgEur = applyFiscalDebtSafetyMargin(Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100);
   const bncRestantApresChargesEur = bncBrutEur;
   const impotEstimeEur = Math.round(bncBrutEur * DEFAULT_IR_ON_BNC_RATE * 100) / 100;
   const impotEstime = true;
@@ -810,6 +832,17 @@ export function analyzeValeurReelle(
     categoryRows,
     waterfall,
     vatRecoverableMonthlyRows: materializeVatMonthlyRows(vatRecoverableMonthly),
+    vatLiability: {
+      collectedVatEur,
+      paidVatEur: Math.round(paidVatEur * 100) / 100,
+      recoverableVatEur,
+      recoverableVat20Eur: Math.round(recoverableVat20Eur * 100) / 100,
+      recoverableVat10Eur: Math.round(recoverableVat10Eur * 100) / 100,
+      remainingVatEur,
+      paidTransactions: paidVatTransactions.sort(
+        (a, b) => b.date.localeCompare(a.date) || Math.abs(b.amountEur) - Math.abs(a.amountEur)
+      )
+    },
     activeRevenueEur: activeIncomeEur,
     indirectBenefitsEur: hiddenValueRecoveredEur,
     ambiguousExpensesEur: mixedExpensesEur

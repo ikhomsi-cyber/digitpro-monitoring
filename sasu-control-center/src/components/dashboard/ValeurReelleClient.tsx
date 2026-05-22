@@ -14,9 +14,10 @@ import {
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
-import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
+import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
 import type {
   ValeurReelleCashTree,
+  ValeurReelleVatLiability,
   ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
@@ -55,6 +56,12 @@ function cleanTransactionLabel(raw: string, company?: string): string {
   return cleaned || company || raw;
 }
 
+function formatTransactionDate(raw: string): string {
+  const d = new Date(`${raw}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return raw;
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(d);
+}
+
 function BreakdownPieChart({
   breakdown,
   fmt,
@@ -69,7 +76,7 @@ function BreakdownPieChart({
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
-  const [openOther, setOpenOther] = useState(false);
+  const [openUncategorizedLabel, setOpenUncategorizedLabel] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [hiddenTransactionIds, setHiddenTransactionIds] = useState<Set<string>>(() => new Set());
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
@@ -191,31 +198,36 @@ function BreakdownPieChart({
         {showDetails ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => {
-            const isOther = slice.row.label === "Autres";
+            const isUncategorized = slice.row.label === "Autres" || slice.row.label === "Non catégorisé";
+            const isOpen = openUncategorizedLabel === slice.row.label;
             const transactions = (slice.row.transactions ?? []).filter((tx) => !hiddenTransactionIds.has(tx.id));
             return (
             <div
               key={`legend-${slice.row.label}`}
               className={clsx(
                 "min-w-0 rounded-xl bg-white/40 px-3 py-2 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]",
-                isOther && "sm:col-span-2"
+                isUncategorized && "sm:col-span-2"
               )}
             >
               <button
                 type="button"
-                onClick={() => isOther && transactions.length ? setOpenOther((v) => !v) : undefined}
+                onClick={() =>
+                  isUncategorized && transactions.length
+                    ? setOpenUncategorizedLabel((current) => (current === slice.row.label ? null : slice.row.label))
+                    : undefined
+                }
                 className={clsx(
                   "flex w-full items-center justify-between gap-2 text-left",
-                  isOther && transactions.length && "cursor-pointer"
+                  isUncategorized && transactions.length && "cursor-pointer"
                 )}
-                aria-expanded={isOther ? openOther : undefined}
+                aria-expanded={isUncategorized ? isOpen : undefined}
               >
                 <span className="min-w-0 inline-flex items-center gap-2 text-[13px] font-semibold text-ink-700 dark:text-white/70">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                   <span className="truncate">{slice.row.label}</span>
-                  {isOther && transactions.length ? (
+                  {isUncategorized && transactions.length ? (
                     <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-bold text-ink-500 dark:bg-white/[0.06] dark:text-white/45">
-                      {openOther ? "Masquer" : "Voir"} {transactions.length}
+                      {isOpen ? "Masquer" : "Voir"} {transactions.length}
                     </span>
                   ) : null}
                 </span>
@@ -229,7 +241,7 @@ function BreakdownPieChart({
               <p className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
                 {fmt.euro(slice.row.amountEur)}
               </p>
-              {isOther && openOther && transactions.length ? (
+              {isUncategorized && isOpen && transactions.length ? (
                 <div className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {transactions.map((tx) => (
                     <div key={tx.id} className="rounded-xl border border-ink-100 bg-white/70 p-2.5 dark:border-white/10 dark:bg-black/20">
@@ -335,7 +347,7 @@ function CashFlowTreeVisual({
       breakdown: tree.mandatoryFeesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: MANDATORY_FEES_COLORS,
-      recategorizeOptions: ["Hiway", "URSSAF", "Impôt", "SFR", "Free", "Qonto", "Assurance", "Mutuelle", "Matériel"],
+      recategorizeOptions: VALEUR_REELLE_EXPENSE_CATEGORIES,
       tone: "deduct"
     },
     {
@@ -346,7 +358,7 @@ function CashFlowTreeVisual({
       breakdown: tree.personalChargesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: PERSONAL_CHARGES_COLORS,
-      recategorizeOptions: ["NDF DigitPro", "Indemnités kilométriques", "CESU", "Repas d'affaires", "Restauration pro", "Déjeuner"],
+      recategorizeOptions: VALEUR_REELLE_EXPENSE_CATEGORIES,
       tone: "deduct"
     },
   ];
@@ -698,6 +710,217 @@ function RecoverableVatMonthlyBlock({
   );
 }
 
+function VatLiabilityBlock({
+  liability,
+  fmt,
+  periodLabel
+}: {
+  liability: ValeurReelleVatLiability;
+  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+  periodLabel: string;
+}) {
+  const [showPaidTransactions, setShowPaidTransactions] = useState(false);
+  const remainingTone =
+    liability.remainingVatEur > 0
+      ? "text-amber-800 dark:text-amber-200"
+      : "text-emerald-800 dark:text-emerald-200";
+  const denominator = Math.max(
+    1,
+    liability.collectedVatEur,
+    liability.paidVatEur + liability.recoverableVatEur
+  );
+  const paidPct = Math.max(0, Math.min(100, (liability.paidVatEur / denominator) * 100));
+  const recoveredPct = Math.max(0, Math.min(100, (liability.recoverableVatEur / denominator) * 100));
+  const remainingPct = Math.max(0, Math.min(100, (Math.max(0, liability.remainingVatEur) / denominator) * 100));
+
+  return (
+    <section className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-amber-50/35 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-amber-950/15 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
+            TVA à reverser
+          </p>
+          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
+            TVA collectée non versée
+          </h2>
+          <p className="mt-1 text-xs font-medium text-ink-500 dark:text-white/40">{periodLabel}</p>
+        </div>
+        <div className="rounded-2xl bg-white/50 px-4 py-3 text-right dark:bg-white/[0.025]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
+            Reste estimé
+          </p>
+          <p className={`mt-1 font-display text-2xl font-bold tabular-nums ${remainingTone}`}>
+            {fmt.euro(liability.remainingVatEur)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-white/10 dark:bg-black/30">
+        <div className="flex h-4 overflow-hidden rounded-full">
+          <span className="bg-slate-400" style={{ width: `${paidPct}%` }} aria-hidden />
+          <span className="bg-sky-400" style={{ width: `${recoveredPct}%` }} aria-hidden />
+          <span className="bg-amber-400" style={{ width: `${remainingPct}%` }} aria-hidden />
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          { label: "TVA collectée", value: fmt.euro(liability.collectedVatEur), sub: "CA TTC - CA HT", dot: "bg-violet-400" },
+          { label: "Déjà payée", value: fmt.euro(liability.paidVatEur), sub: "Transactions TVA", dot: "bg-slate-400" },
+          { label: "Gagnée 20 %", value: fmt.euro(liability.recoverableVat20Eur), sub: "Services / logiciels", dot: "bg-sky-400" },
+          { label: "Gagnée 10 %", value: fmt.euro(liability.recoverableVat10Eur), sub: "Repas / NDF", dot: "bg-emerald-400" }
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl bg-white/45 px-3 py-2 dark:bg-white/[0.03]">
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-white/40">
+              <span className={`h-2 w-2 rounded-full ${item.dot}`} aria-hidden />
+              {item.label}
+            </p>
+            <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-950 dark:text-white">
+              {item.value}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-ink-500 dark:text-white/40">{item.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-white/40 p-3 dark:bg-white/[0.025]">
+        <button
+          type="button"
+          onClick={() => setShowPaidTransactions((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+          aria-expanded={showPaidTransactions}
+        >
+          <span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 dark:text-white/40">
+              Paiements TVA
+            </span>
+            <span className="mt-0.5 block text-sm font-bold text-ink-950 dark:text-white">
+              {liability.paidTransactions.length} transaction{liability.paidTransactions.length > 1 ? "s" : ""}
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full border border-ink-200 bg-white px-3 py-1 text-[11px] font-bold text-ink-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/60">
+            {showPaidTransactions ? "Masquer" : "Afficher"}
+          </span>
+        </button>
+
+        {showPaidTransactions ? (
+          liability.paidTransactions.length ? (
+            <div className="mt-3 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {liability.paidTransactions.map((tx) => (
+                <div key={tx.id} className="flex items-start justify-between gap-3 rounded-xl border border-ink-100 bg-white/70 px-3 py-2 dark:border-white/10 dark:bg-black/20">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-ink-950 dark:text-white">
+                      {cleanTransactionLabel(tx.label, tx.company)}
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">
+                      {formatTransactionDate(tx.date)} · {tx.category || "TVA"}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-bold tabular-nums text-ink-700 dark:text-white/70">
+                    {fmt.euro(tx.amountEur)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-xl border border-dashed border-ink-200 px-3 py-3 text-sm font-medium text-ink-500 dark:border-white/10 dark:text-white/45">
+              Aucun paiement TVA sur cette période.
+            </p>
+          )
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function DebtDistributionBlock({
+  tvaDebtEur,
+  csgDebtEur,
+  fmt
+}: {
+  tvaDebtEur: number;
+  csgDebtEur: number;
+  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+}) {
+  const tvaDebt = Math.max(0, tvaDebtEur);
+  const csgDebt = Math.max(0, csgDebtEur);
+  const totalDebt = tvaDebt + csgDebt;
+  const circumference = 2 * Math.PI * 54;
+  const tvaRatio = totalDebt > 0 ? tvaDebt / totalDebt : 0;
+  const csgRatio = totalDebt > 0 ? csgDebt / totalDebt : 0;
+  const tvaDash = Math.max(0, tvaRatio * circumference - 2);
+  const csgDash = Math.max(0, csgRatio * circumference - 2);
+
+  return (
+    <section className="rounded-2xl border border-ink-200/90 bg-white p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03] sm:p-5">
+      <h2 className="font-display text-lg font-bold tracking-tight text-ink-800 dark:text-white sm:text-xl">
+        Répartition des dettes
+      </h2>
+
+      <div className="mt-4 flex justify-center">
+        <div className="relative h-56 w-56">
+          <svg viewBox="0 0 160 160" className="h-full w-full" role="img" aria-label="Répartition des dettes TVA et CSG">
+            <circle cx="80" cy="80" r="54" fill="none" stroke="rgba(248,113,113,0.22)" strokeWidth="16" />
+            {totalDebt > 0 ? (
+              <>
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="54"
+                  fill="none"
+                  stroke="#fb7c63"
+                  strokeWidth="16"
+                  strokeLinecap="round"
+                  strokeDasharray={`${tvaDash} ${circumference}`}
+                  strokeDashoffset="0"
+                  transform="rotate(-90 80 80)"
+                />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="54"
+                  fill="none"
+                  stroke="#fec7bc"
+                  strokeWidth="16"
+                  strokeLinecap="round"
+                  strokeDasharray={`${csgDash} ${circumference}`}
+                  strokeDashoffset={-(tvaRatio * circumference)}
+                  transform="rotate(-90 80 80)"
+                />
+              </>
+            ) : null}
+          </svg>
+          <div className="absolute inset-0 grid place-items-center text-center">
+            <div>
+              <p className="font-display text-3xl font-black tabular-nums text-rose-900 dark:text-rose-200">
+                {fmt.euro(totalDebt)}
+              </p>
+              <p className="mt-2 text-lg font-bold text-ink-700 dark:text-white/65">Dette totale</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {[
+          { label: "Dette TVA", value: tvaDebt, color: "bg-[#fb7c63]" },
+          { label: "Dette CSG", value: csgDebt, color: "bg-[#fec7bc]" }
+        ].map((item) => (
+          <div key={item.label} className="flex items-center justify-between gap-4">
+            <span className="inline-flex min-w-0 items-center gap-3 text-lg font-bold text-ink-700 dark:text-white/70">
+              <span className={`h-3 w-3 shrink-0 rounded-full ${item.color} shadow-[0_0_0_8px_rgba(251,124,99,0.08)]`} aria-hidden />
+              {item.label}
+            </span>
+            <span className="shrink-0 font-display text-xl font-black tabular-nums text-ink-950 dark:text-white">
+              {fmt.euro(item.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function ValeurReelleClient({
   initialTransactions,
   demoMode,
@@ -796,6 +1019,18 @@ export function ValeurReelleClient({
         rows={analysis.vatRecoverableMonthlyRows}
         fmt={fmt}
         periodLabel={analysis.periodLabel}
+      />
+
+      <VatLiabilityBlock
+        liability={analysis.vatLiability}
+        fmt={fmt}
+        periodLabel={analysis.periodLabel}
+      />
+
+      <DebtDistributionBlock
+        tvaDebtEur={analysis.vatLiability.remainingVatEur}
+        csgDebtEur={analysis.cashTree.csgEur}
+        fmt={fmt}
       />
 
     </div>

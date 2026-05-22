@@ -294,6 +294,8 @@ export const REAL_EXPENSE_BUCKETS = new Set<DerivedExpenseBucket>([
   "TVA",
   "Impôt",
   "Urssaf",
+  "Retraite",
+  "PAS DSN",
   "Compta & admin.",
   "Qonto",
   "Assurance",

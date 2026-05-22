@@ -28,6 +28,10 @@ export type DashboardHeroStats = {
   depensesDigitProMoisEur: number;
   depensesPersoMoisEur: number;
   netDansMaPocheMoisEur: number;
+  detteCsgDepuisDebutEur: number;
+  detteTvaDepuisDebutEur: number;
+  detteTotaleDepuisDebutEur: number;
+  resteAVerserApresCashEur: number;
 };
 
 /**
@@ -41,6 +45,17 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const last = monthly.length ? monthly[monthly.length - 1]! : { month: "", revenue: 0, expenses: 0 };
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const valueAnalysis = analyzeValeurReelle(transactions, { years: null, month: currentMonth, now });
+  const allYears = Array.from(
+    new Set(
+      proTxs
+        .map((tx) => Number(tx.date.slice(0, 4)))
+        .filter((year) => Number.isFinite(year))
+    )
+  ).sort((a, b) => a - b);
+  const allTimeValueAnalysis = analyzeValeurReelle(transactions, {
+    years: allYears.length ? allYears : [now.getFullYear()],
+    now
+  });
   let depensesDigitProMoisEur = 0;
   let depensesPersoMoisEur = 0;
 
@@ -56,12 +71,22 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     }
   }
 
+  const soldeQontoEur = computeLatestQontoBalanceEur(transactions, "pro");
+  const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
+  const detteTvaDepuisDebutEur = Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur);
+  const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
+  const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);
+
   return {
     caMensuelEur: last.revenue,
-    soldeQontoEur: computeLatestQontoBalanceEur(transactions, "pro"),
+    soldeQontoEur,
     depensesQontoSasuMoisEur: last.expenses,
     depensesDigitProMoisEur,
     depensesPersoMoisEur,
-    netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur
+    netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur,
+    detteCsgDepuisDebutEur,
+    detteTvaDepuisDebutEur,
+    detteTotaleDepuisDebutEur,
+    resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100)
   };
 }

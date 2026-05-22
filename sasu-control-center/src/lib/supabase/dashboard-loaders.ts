@@ -2,60 +2,19 @@ import "server-only";
 
 import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
-import type { DashboardTx } from "@/lib/dashboard-metrics";
-import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
-
-type TxSummaryRow = {
-  id: string;
-  date: string;
-  label: string | null;
-  category: string | null;
-  amount: number | string;
-  balance?: number | string | null;
-  company: string | null;
-  bank_name?: string | null;
-  scope?: "pro" | "personal" | null;
-  import_sessions?: { format?: string | null } | null;
-};
-
-function mapTxSummaryRows(rows: readonly TxSummaryRow[]): DashboardTx[] {
-  return rows.map((row) => ({
-    id: String(row.id),
-    date: String(row.date).slice(0, 10),
-    label: String(row.label ?? ""),
-    category: mapExpenseCategoryLabel(String(row.category ?? "")),
-    amount: Number(row.amount),
-    balance: row.balance == null ? null : Number(row.balance),
-    company: String(row.company ?? "").trim(),
-    bankName: row.bank_name == null ? null : String(row.bank_name).trim(),
-    importFormat: row.import_sessions?.format == null ? null : String(row.import_sessions.format).trim(),
-    scope: row.scope === "personal" ? "personal" : "pro"
-  }));
-}
-
-function startOfRollingHeroWindow(now = new Date()): string {
-  const d = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
 
 export async function loadDashboardHeroStatsFromSupabase(
   client: SupabaseServerClient,
   now = new Date()
 ): Promise<{ stats: DashboardHeroStats | null; errorMessage: string | null }> {
-  const since = startOfRollingHeroWindow(now);
-  const { data, error } = await client
-    .from("transactions")
-    .select("id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)")
-    .gte("date", since)
-    .order("date", { ascending: false })
-    .limit(2500);
-
-  if (error) return { stats: null, errorMessage: error.message };
+  const { transactions, errorMessage } = await loadAllUserTransactionsFromSupabase(client);
+  if (errorMessage) return { stats: null, errorMessage };
   return {
-    stats: computeDashboardHeroStats(mapTxSummaryRows((data ?? []) as unknown as TxSummaryRow[]), now),
+    stats: computeDashboardHeroStats(transactions, now),
     errorMessage: null
   };
 }

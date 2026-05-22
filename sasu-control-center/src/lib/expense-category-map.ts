@@ -1,3 +1,5 @@
+import { mapHiwayExpenseCategory } from "@/lib/hiway-categorisation";
+
 /**
  * Libellés Qonto (cashflow / catégorie API / CSV) → libellés affichés dans l’app.
  * Correspondance demandée côté produit (clés insensibles à la casse / accents).
@@ -23,17 +25,29 @@ const RAW_ENTRIES: [string, string][] = [
   ["Frais de personnel", "BNC"],
   ["Impôts et taxes", "TVA"],
   ["Travel Expenses", IK_CATEGORY_LABEL],
+  ["Repas d’affaires", "Repas d'affaires"],
   ["Dépenses liées au marketing", "Repas d'affaires"],
+  ["Abonnement Hiway", COMPTA_ADMIN_BUCKET_LABEL],
+  ["Hiway compta", COMPTA_ADMIN_BUCKET_LABEL],
   ["Dépenses administratives", COMPTA_ADMIN_BUCKET_LABEL],
   ["Frais de nourriture et boissons", "Repas Ilias"],
+  ["Repas du dirigeant", "Repas Ilias"],
   ["Restauration pro", "Repas Ilias"],
   ["Déjeuner", "Repas Ilias"],
   ["Dejeuner", "Repas Ilias"],
   ["Matériel", MATERIEL_CATEGORY_LABEL],
   ["Materiel", MATERIEL_CATEGORY_LABEL],
+  ["Retraite", "Retraite"],
+  ["PAS DSN", "PAS DSN"],
+  ["Abonnement internet & mobile", "Mobile et Internet"],
+  ["Assurances", ASSURANCE_CATEGORY_LABEL],
+  ["Frais bancaires", QONTO_CATEGORY_LABEL],
+  ["Non catégorisé", "Autres"],
+  ["Non categorise", "Autres"],
+  ["Abonnement logiciel", ICLOUD_IA_STORE_CATEGORY_LABEL],
   ["AXA SOGAREP", ASSURANCE_CATEGORY_LABEL],
-  ["DSN", IMPOT_CATEGORY_LABEL],
-  ["PAS", IMPOT_CATEGORY_LABEL]
+  ["DSN", "PAS DSN"],
+  ["PAS", "PAS DSN"]
 ];
 
 function normKey(raw: string): string {
@@ -63,24 +77,38 @@ function buildMap(): Map<string, string> {
     ["indemnites ik", IK_CATEGORY_LABEL],
     ["note ik", IK_CATEGORY_LABEL],
     ["mileage", IK_CATEGORY_LABEL],
+    ["repas d affaires", "Repas d'affaires"],
     ["depenses liees au marketing", "Repas d'affaires"],
     ["marketing expenses", "Repas d'affaires"],
+    ["abonnement hiway", COMPTA_ADMIN_BUCKET_LABEL],
+    ["hiway compta", COMPTA_ADMIN_BUCKET_LABEL],
     ["depenses administratives", COMPTA_ADMIN_BUCKET_LABEL],
     ["administrative expenses", COMPTA_ADMIN_BUCKET_LABEL],
     ["frais de nourriture et boissons", "Repas Ilias"],
     ["food and drink", "Repas Ilias"],
+    ["repas du dirigeant", "Repas Ilias"],
     ["restauration pro", "Repas Ilias"],
     ["dejeuner", "Repas Ilias"],
     ["déjeuner", "Repas Ilias"],
     ["materiel", MATERIEL_CATEGORY_LABEL],
     ["matériel", MATERIEL_CATEGORY_LABEL],
+    ["retraite", "Retraite"],
+    ["pas dsn", "PAS DSN"],
+    ["pasdsn", "PAS DSN"],
+    ["abonnement internet mobile", "Mobile et Internet"],
+    ["abonnement internet & mobile", "Mobile et Internet"],
+    ["assurances", ASSURANCE_CATEGORY_LABEL],
+    ["frais bancaires", QONTO_CATEGORY_LABEL],
+    ["non categorise", "Autres"],
+    ["non catégorisé", "Autres"],
+    ["abonnement logiciel", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["apple.com bill", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["cursor, ai powered ide", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["cursor ai powered ide", ICLOUD_IA_STORE_CATEGORY_LABEL],
     ["axa sogarep", ASSURANCE_CATEGORY_LABEL],
     ["sogarep", ASSURANCE_CATEGORY_LABEL],
-    ["dsn", IMPOT_CATEGORY_LABEL],
-    ["pas", IMPOT_CATEGORY_LABEL],
+    ["dsn", "PAS DSN"],
+    ["pas", "PAS DSN"],
     ["notes de frais", "NDF"],
     ["note de frais", "NDF"]
   ];
@@ -99,5 +127,7 @@ export { IK_CATEGORY_LABEL };
 export function mapExpenseCategoryLabel(raw: string | null | undefined): string {
   const t = String(raw ?? "").trim();
   if (!t) return t;
+  const hiwayCategory = mapHiwayExpenseCategory(t);
+  if (hiwayCategory) return CATEGORY_MAP.get(normKey(hiwayCategory)) ?? hiwayCategory;
   return CATEGORY_MAP.get(normKey(t)) ?? t;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { BriefcaseBusiness, CalendarCheck2, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck2, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
@@ -20,6 +20,7 @@ type Tile = {
   value: string;
   suffix?: string;
   sublabel?: string;
+  sublabelTone?: "positive" | "negative" | "neutral";
   icon: typeof TrendingUp;
   iconClassName: string;
   href?: string;
@@ -52,6 +53,7 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
     return activeTjmHt * billedDaysToDate;
   }, [activeTjmHt, billedDaysToDate, stats.caMensuelEur, stats.netDansMaPocheMoisEur]);
   const billedDaysLabel = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(billedDaysToDate);
+  const remunerationDisponibleEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
 
   const tiles: Tile[] = useMemo(
     () => [
@@ -67,6 +69,8 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
       {
         label: "Cash disponible",
         value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—",
+        sublabel: `Rémunération à verser ${fmt.euro(remunerationDisponibleEur)}`,
+        sublabelTone: remunerationDisponibleEur >= 0 ? "positive" : "negative",
         icon: WalletCards,
         iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
       },
@@ -96,12 +100,25 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         ariaLabel: "Ouvrir la page Valeur",
         wide: true,
         breakdown: [
-          { label: "DigitPro", value: stats.depensesDigitProMoisEur, colorClass: "bg-amber-300" },
-          { label: "Perso", value: stats.depensesPersoMoisEur, colorClass: "bg-emerald-400" }
+          { label: "DigitPro", value: stats.depensesDigitProMoisEur, colorClass: "bg-orange-300" },
+          { label: "Perso", value: stats.depensesPersoMoisEur, colorClass: "bg-teal-300" }
+        ]
+      },
+      {
+        label: "Dettes fiscales",
+        value: fmt.euro(stats.detteTotaleDepuisDebutEur),
+        icon: Landmark,
+        iconClassName: "text-orange-200 bg-orange-500/12 border-orange-300/20",
+        href: "/dashboard?panel=valeur-reelle",
+        ariaLabel: "Ouvrir la page Valeur pour voir les dettes fiscales",
+        wide: true,
+        breakdown: [
+          { label: "CSG +1,5 %", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
+          { label: "TVA +1,5 %", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
         ]
       }
     ],
-    [activeTjmHt, billedDaysLabel, fmt, inPocketToDateEur, stats]
+    [activeTjmHt, billedDaysLabel, fmt, inPocketToDateEur, remunerationDisponibleEur, stats]
   );
 
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
@@ -161,15 +178,26 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
                   ) : null}
                 </dd>
                 {t.sublabel ? (
-                  <p className="mt-1 text-[11px] font-medium text-ink-500 dark:text-white/40">{t.sublabel}</p>
+                  <p
+                    className={`mt-1 text-[11px] font-bold ${
+                      t.sublabelTone === "positive"
+                        ? "text-emerald-700 dark:text-emerald-300"
+                        : t.sublabelTone === "negative"
+                          ? "text-rose-700 dark:text-rose-300"
+                          : "text-ink-500 dark:text-white/40"
+                    }`}
+                  >
+                    {t.sublabel}
+                  </p>
                 ) : null}
                 {t.breakdown ? (
                   <div className="mt-3 space-y-2">
                     <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
                       {t.breakdown.map((item) => {
+                        const total = t.breakdown?.reduce((sum, x) => sum + Math.max(0, x.value), 0) ?? 0;
                         const pct =
-                          stats.depensesQontoSasuMoisEur > 0
-                            ? Math.max(0, (item.value / stats.depensesQontoSasuMoisEur) * 100)
+                          total > 0
+                            ? Math.max(0, (item.value / total) * 100)
                             : 0;
                         return (
                           <span
