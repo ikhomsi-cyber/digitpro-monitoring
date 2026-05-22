@@ -9,7 +9,6 @@ import {
   useState,
   type ReactNode
 } from "react";
-import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
@@ -28,6 +27,8 @@ import { useBillableActivity } from "@/components/dashboard/BillableActivityCont
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
+import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
+import { DashboardCategorisationPanel } from "@/app/dashboard/DashboardCategorisationPanel";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { Chatbot } from "@/components/Chatbot";
@@ -77,15 +78,6 @@ const DASHBOARD_SECTION_SLIDE_VARIANTS = {
     transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
   })
 };
-
-const ValeurReelleClient = dynamic(
-  () => import("@/components/dashboard/ValeurReelleClient").then((mod) => mod.ValeurReelleClient),
-  {
-    loading: () => (
-      <div className="mt-6 h-72 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
-    )
-  }
-);
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -185,6 +177,7 @@ export function DashboardClient({
     if (s === "activite") return "activite" as const;
     if (s === "sasu") return "sasu" as const;
     if (s === "private") return "private" as const;
+    if (s === "categorisation") return "categorisation" as const;
     return "full" as const;
   }, [searchParams]);
 
@@ -194,7 +187,8 @@ export function DashboardClient({
     activite: 1,
     valeur: 2,
     sasu: 3,
-    private: 4
+    private: 4,
+    categorisation: 5
   };
   const prevSectionRef = useRef(dashboardSection);
   const slideDirRef = useRef(1);
@@ -228,6 +222,33 @@ export function DashboardClient({
   }, [syncKey, initialTransactions]);
 
   useEffect(() => {
+    let cancelled = false;
+    const initialCount = initialTransactions.length;
+    if (initialCount === 0 || initialCount >= 10_000) return;
+
+    const timer = window.setTimeout(() => {
+      void fetch("/api/dashboard/transactions", { cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) return null;
+          return (await res.json()) as { ok?: boolean; transactions?: DashboardTx[] };
+        })
+        .then((payload) => {
+          if (cancelled || !payload?.ok || !Array.isArray(payload.transactions)) return;
+          if (payload.transactions.length <= initialCount) return;
+          setTransactions(payload.transactions);
+        })
+        .catch(() => {
+          // Le lot initial suffit pour afficher l'app ; l'historique complet est opportuniste.
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [initialTransactions]);
+
+  useEffect(() => {
     setRevenueCounterpartyDetail(null);
     setExpenseCategoryDetail(null);
     setSelectedExpenseCategoryFilters([]);
@@ -253,6 +274,12 @@ export function DashboardClient({
       setScope("pro");
     }
   }, [pathname, searchParams]);
+
+  useEffect(() => {
+    if (dashboardSection !== "sasu") return;
+    setSelectedMonth(null);
+    setSelectedYears((prev) => prev ?? [new Date().getFullYear()]);
+  }, [dashboardSection]);
 
   /** Retour webview Powens : query après redirection depuis /api/powens/callback */
   useEffect(() => {
@@ -522,7 +549,7 @@ export function DashboardClient({
   }, [totalExpensesMonthFilter, periodLabel, selectedExpenseCategoryFilters, kpiMode]);
 
   const yearOptions = useMemo(() => {
-    if (transactionYearBounds) {
+    if (dashboardSection !== "sasu" && transactionYearBounds) {
       const { minYear, maxYear } = transactionYearBounds;
       if (Number.isFinite(minYear) && Number.isFinite(maxYear) && minYear <= maxYear) {
         const out: number[] = [];
@@ -532,16 +559,21 @@ export function DashboardClient({
     }
     const ys = new Set<number>();
     for (const t of transactions) {
+      if (dashboardSection === "sasu" && (t.scope ?? "pro") !== "pro") continue;
       const y = Number(transactionAnalyticsDayIso(t).slice(0, 4));
       if (Number.isFinite(y)) ys.add(y);
     }
     const list = Array.from(ys).sort((a, b) => b - a);
     return list.length ? list : [new Date().getFullYear()];
-  }, [transactions, transactionYearBounds]);
+  }, [dashboardSection, transactions, transactionYearBounds]);
 
   const monthOptions = useMemo(
-    () => buildDashboardMonthOptions(transactionYearBounds, transactions),
-    [transactionYearBounds, transactions]
+    () =>
+      buildDashboardMonthOptions(
+        dashboardSection === "sasu" ? null : transactionYearBounds,
+        dashboardSection === "sasu" ? transactions.filter((t) => (t.scope ?? "pro") === "pro") : transactions
+      ),
+    [dashboardSection, transactionYearBounds, transactions]
   );
 
   function toggleYearInFilter(y: number) {
@@ -599,11 +631,11 @@ export function DashboardClient({
       {dashboardSection === "valeur" ? (
         <ValeurReelleClient
           initialTransactions={transactions}
-          transactionYearBounds={transactionYearBounds}
           demoMode={demoMode}
           loadError={loadError}
         />
       ) : null}
+      {dashboardSection === "categorisation" ? <DashboardCategorisationPanel /> : null}
       {(dashboardSection === "sasu" || dashboardSection === "private") && (
         <>
           <DashboardPeriodFilterSection
@@ -615,6 +647,8 @@ export function DashboardClient({
             yearOptions={yearOptions}
             onToggleYear={toggleYearInFilter}
             sticky
+            showRollingOption={dashboardSection !== "sasu"}
+            showActiveLabel={dashboardSection !== "sasu"}
           />
 
       <section className="space-y-4">

@@ -13,7 +13,8 @@ export function DashboardPeriodFilterControls({
   setSelectedMonth,
   monthOptions = [],
   yearOptions,
-  onToggleYear
+  onToggleYear,
+  showRollingOption = true
 }: {
   selectedYears: number[] | null;
   setSelectedYears: Dispatch<SetStateAction<number[] | null>>;
@@ -22,6 +23,7 @@ export function DashboardPeriodFilterControls({
   monthOptions?: string[];
   yearOptions: number[];
   onToggleYear: (y: number) => void;
+  showRollingOption?: boolean;
 }) {
   const monthModeActive = Boolean(selectedMonth);
   const availableMonthOptions =
@@ -35,6 +37,7 @@ export function DashboardPeriodFilterControls({
   return (
     <div className="inline-flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+        {showRollingOption ? (
         <button
           type="button"
           aria-pressed={selectedYears === null && !monthModeActive}
@@ -52,6 +55,7 @@ export function DashboardPeriodFilterControls({
           <CalendarRange className="h-3.5 w-3.5 opacity-80" aria-hidden />
           12 mois glissants
         </button>
+        ) : null}
         <button
           type="button"
           aria-pressed={selectedYears !== null && !monthModeActive}

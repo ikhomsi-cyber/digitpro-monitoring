@@ -95,6 +95,14 @@ export type ValeurReelleWaterfallBreakdownRow = {
   label: string;
   amountEur: number;
   count: number;
+  transactions?: Array<{
+    id: string;
+    date: string;
+    label: string;
+    category: string;
+    company: string;
+    amountEur: number;
+  }>;
 };
 
 export type ValeurReelleVatMonthlyRow = {
@@ -114,7 +122,8 @@ export type ValeurReelleWaterfallStep = {
   breakdown: ValeurReelleWaterfallBreakdownRow[];
 };
 
-type WaterfallBreakdownAccumulator = Map<string, { amountEur: number; count: number }>;
+type BreakdownTransaction = NonNullable<ValeurReelleWaterfallBreakdownRow["transactions"]>[number];
+type WaterfallBreakdownAccumulator = Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>;
 
 function waterfallBreakdownMap(): Map<string, WaterfallBreakdownAccumulator> {
   return new Map();
@@ -124,7 +133,8 @@ function addWaterfallBreakdown(
   root: Map<string, WaterfallBreakdownAccumulator>,
   stepId: string,
   label: string,
-  amountEur: number
+  amountEur: number,
+  transaction?: BreakdownTransaction
 ) {
   if (!amountEur) return;
   let step = root.get(stepId);
@@ -136,8 +146,9 @@ function addWaterfallBreakdown(
   if (prev) {
     prev.amountEur += amountEur;
     prev.count += 1;
+    if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
   } else {
-    step.set(label, { amountEur, count: 1 });
+    step.set(label, { amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
 }
 
@@ -148,7 +159,7 @@ function materializeWaterfallBreakdown(
   const step = root.get(stepId);
   if (!step) return [];
   return Array.from(step.entries())
-    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count }))
+    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count, transactions: v.transactions }))
     .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
 }
 
@@ -249,23 +260,25 @@ function toClassification(
 }
 
 function addBreakdownRow(
-  rows: Map<string, { amountEur: number; count: number }>,
+  rows: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>,
   label: string,
-  amountEur: number
+  amountEur: number,
+  transaction?: BreakdownTransaction
 ) {
   if (!amountEur) return;
   const prev = rows.get(label);
   if (prev) {
     prev.amountEur += amountEur;
     prev.count += 1;
+    if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
   } else {
-    rows.set(label, { amountEur, count: 1 });
+    rows.set(label, { amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
 }
 
-function materializeRows(rows: Map<string, { amountEur: number; count: number }>): ValeurReelleWaterfallBreakdownRow[] {
+function materializeRows(rows: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>): ValeurReelleWaterfallBreakdownRow[] {
   return Array.from(rows.entries())
-    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count }))
+    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count, transactions: v.transactions }))
     .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
 }
 
@@ -292,6 +305,17 @@ export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedE
   );
 }
 
+function breakdownTransaction(tx: DashboardTx, amountEur: number): BreakdownTransaction {
+  return {
+    id: tx.id,
+    date: tx.date,
+    label: tx.label,
+    category: tx.category,
+    company: tx.company,
+    amountEur
+  };
+}
+
 function mandatoryFeeLabel(tx: DashboardTx, bucket: DerivedExpenseBucket | null): string {
   const b = txBlob(tx);
   if (b.includes("hiway") || bucket === "Compta & admin.") return "Hiway";
@@ -306,13 +330,21 @@ function mandatoryFeeLabel(tx: DashboardTx, bucket: DerivedExpenseBucket | null)
 }
 
 export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | null): boolean {
-  return bucket === "NDF" || bucket === "Indemnités kilométriques" || bucket === "CESU";
+  return (
+    bucket === "NDF" ||
+    bucket === "Indemnités kilométriques" ||
+    bucket === "CESU" ||
+    bucket === "Repas d'affaire" ||
+    bucket === "Repas dirigeant"
+  );
 }
 
 function personalChargeLabel(bucket: DerivedExpenseBucket | null): string {
   if (bucket === "Indemnités kilométriques") return "IK";
   if (bucket === "CESU") return "CESU";
   if (bucket === "NDF") return "NDF";
+  if (bucket === "Repas d'affaire") return "Déj. d'affaire";
+  if (bucket === "Repas dirigeant") return "Restauration pro";
   return "Charges perso";
 }
 
@@ -345,6 +377,12 @@ function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null
 function vatIncludedInGross(grossEur: number, rate: number): number {
   if (!Number.isFinite(grossEur) || grossEur <= 0 || !Number.isFinite(rate) || rate <= 0) return 0;
   return Math.round((grossEur * rate / (1 + rate)) * 100) / 100;
+}
+
+function amountNetOfRecoverableVat(tx: DashboardTx, bucket: DerivedExpenseBucket | null, grossEur: number): number {
+  const rule = recoverableVatRule(tx, bucket);
+  if (!rule) return grossEur;
+  return Math.max(0, Math.round((grossEur - vatIncludedInGross(grossEur, rule.rate)) * 100) / 100);
 }
 
 function materializeVatMonthlyRows(
@@ -483,9 +521,9 @@ export function analyzeValeurReelle(
   const movements: ClassifiedValeurReelleMovement[] = [];
   const categoryMap = new Map<string, ValeurReelleCategoryRow>();
   const waterfallBreakdown = waterfallBreakdownMap();
-  const mandatoryFeesBreakdown = new Map<string, { amountEur: number; count: number }>();
-  const personalChargesBreakdown = new Map<string, { amountEur: number; count: number }>();
-  const vatRecoverableMonthly = new Map<string, { grossEur: number; vatEur: number; count: number; breakdown: Map<string, { amountEur: number; count: number }> }>();
+  const mandatoryFeesBreakdown = new Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>();
+  const personalChargesBreakdown = new Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>();
+  const vatRecoverableMonthly = new Map<string, { grossEur: number; vatEur: number; count: number; breakdown: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }> }>();
   const mandatoryFeeTransactions: ValeurReelleCashTree["mandatoryFeeTransactions"] = [];
 
   for (const tx of scoped) {
@@ -500,13 +538,14 @@ export function analyzeValeurReelle(
     }
     if (isProScope(tx) && tx.amount < 0 && isValeurReelleMandatoryFeeLine(tx, bucket)) {
       const feeLabel = mandatoryFeeLabel(tx, bucket);
-      mandatoryFeesEur += amtAbs;
-      addBreakdownRow(mandatoryFeesBreakdown, feeLabel, amtAbs);
+      const feeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
+      mandatoryFeesEur += feeAmountEur;
+      addBreakdownRow(mandatoryFeesBreakdown, feeLabel, feeAmountEur, breakdownTransaction(tx, feeAmountEur));
       mandatoryFeeTransactions.push({
         date: tx.date,
         label: tx.label,
         group: feeLabel,
-        amountEur: amtAbs
+        amountEur: feeAmountEur
       });
     }
     if (isProScope(tx) && tx.amount < 0) {
@@ -516,7 +555,7 @@ export function analyzeValeurReelle(
         const vatEur = vatIncludedInGross(amtAbs, vatRule.rate);
         const row =
           vatRecoverableMonthly.get(monthKey) ??
-          { grossEur: 0, vatEur: 0, count: 0, breakdown: new Map<string, { amountEur: number; count: number }>() };
+          { grossEur: 0, vatEur: 0, count: 0, breakdown: new Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>() };
         row.grossEur += amtAbs;
         row.vatEur += vatEur;
         row.count += 1;
@@ -561,8 +600,9 @@ export function analyzeValeurReelle(
       hiddenExpensesGrossEur += amtAbs;
       hiddenValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        personalChargesEur += amtAbs;
-        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), amtAbs);
+        const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
+        personalChargesEur += personalChargeAmountEur;
+        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
       }
       if (
         classified.bucket === "NDF" ||
@@ -580,8 +620,9 @@ export function analyzeValeurReelle(
       mixedExpensesEur += amtAbs;
       mixedValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        personalChargesEur += amtAbs;
-        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), amtAbs);
+        const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
+        personalChargesEur += personalChargeAmountEur;
+        addBreakdownRow(personalChargesBreakdown, personalChargeLabel(bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
       }
       if (classified.bucket === "NDF" || classified.sublabel.toLowerCase().includes("note de frais")) {
         ndfIkGrossEur += amtAbs;

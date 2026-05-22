@@ -15,7 +15,9 @@ export function DashboardPeriodFilterSection({
   monthOptions = [],
   yearOptions,
   onToggleYear,
-  sticky = false
+  sticky = false,
+  showRollingOption = true,
+  showActiveLabel = true
 }: {
   selectedYears: number[] | null;
   setSelectedYears: Dispatch<SetStateAction<number[] | null>>;
@@ -25,6 +27,8 @@ export function DashboardPeriodFilterSection({
   yearOptions: number[];
   onToggleYear: (y: number) => void;
   sticky?: boolean;
+  showRollingOption?: boolean;
+  showActiveLabel?: boolean;
 }) {
   const periodLabel = useMemo(
     () => formatDashboardPeriodLabelWithMonth(selectedYears, selectedMonth),
@@ -52,11 +56,14 @@ export function DashboardPeriodFilterSection({
           monthOptions={monthOptions}
           yearOptions={yearOptions}
           onToggleYear={onToggleYear}
+          showRollingOption={showRollingOption}
         />
       </div>
+      {showActiveLabel ? (
       <p className="text-sm leading-relaxed text-ink-500 dark:text-ink-400">
         Vue active : <span className="font-medium text-ink-700 dark:text-ink-200">{periodLabel}</span>.
       </p>
+      ) : null}
     </div>
   );
 }

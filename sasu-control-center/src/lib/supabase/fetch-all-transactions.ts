@@ -112,3 +112,39 @@ export async function loadAllUserTransactionsFromSupabase(
   }
   return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };
 }
+
+export async function loadRecentUserTransactionsFromSupabase(
+  client: SupabaseServerClient,
+  limit = 2000
+): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
+  const selectVariants = [
+    "id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)",
+    "id,date,label,category,amount,balance,company,bank_name,scope",
+    "id,date,label,category,amount,balance,company,scope",
+    "id,date,label,category,amount,company,bank_name,scope",
+    "id,date,label,category,amount,company,scope",
+    "id,date,label,category,amount,balance,company",
+    "id,date,label,category,amount,company"
+  ] as const;
+
+  for (const selectStr of selectVariants) {
+    const { data, error } = await client
+      .from("transactions")
+      .select(selectStr)
+      .order("date", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(limit);
+    if (!error) {
+      return {
+        transactions: mapRowsToDashboardTx((data ?? []) as unknown as SupabaseTxRow[]),
+        errorMessage: null
+      };
+    }
+    const err = error.message;
+    if (transactionSelectMissingColumn(err, "balance") && selectStr.includes("balance")) continue;
+    if (transactionSelectMissingColumn(err, "scope") && selectStr.includes("scope")) continue;
+    if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) continue;
+    return { transactions: [], errorMessage: err };
+  }
+  return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };
+}

@@ -71,7 +71,7 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
       },
       {
-        label: "Dans ma poche",
+        label: "Avant IR (mois en cours)",
         value: fmt.euro(inPocketToDateEur),
         sublabel: `${billedDaysLabel} j. facturés à date`,
         icon: PiggyBank,

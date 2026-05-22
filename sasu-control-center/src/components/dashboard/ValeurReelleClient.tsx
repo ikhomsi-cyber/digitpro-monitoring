@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
+import { toast } from "sonner";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
@@ -42,16 +43,34 @@ const PERSONAL_CHARGES_COLORS = [
   "#6ee7b7"
 ];
 
+function cleanTransactionLabel(raw: string, company?: string): string {
+  const cleaned = (raw || "")
+    .replace(/\b(carte|cb|card)\b(?:\s+\d{2,})?/gi, " ")
+    .replace(/\b\d{2}([./-]\d{2}){1,2}\b/g, " ")
+    .replace(/\bcompte principal\s*\(qonto\)\b/gi, " ")
+    .replace(/\bqonto\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\-–—·:]+|[\s\-–—·:]+$/g, "")
+    .trim();
+  return cleaned || company || raw;
+}
+
 function BreakdownPieChart({
   breakdown,
   fmt,
-  palette
+  palette,
+  recategorizeOptions,
+  onRecategorized
 }: {
   breakdown: ValeurReelleWaterfallBreakdownRow[];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   palette: readonly string[];
+  recategorizeOptions?: readonly string[];
+  onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
+  const [openOther, setOpenOther] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
   if (total <= 0) return null;
 
@@ -71,6 +90,27 @@ function BreakdownPieChart({
       percent: pct(row.amountEur)
     };
   });
+
+  async function saveCategory(transactionId: string, category: string) {
+    setPendingId(transactionId);
+    try {
+      const res = await fetch("/api/categorisation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transactionId, category })
+      });
+      const body = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string };
+      if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Impossible d’enregistrer");
+      toast.success("Catégorie mise à jour");
+      onRecategorized?.(transactionId, category);
+    } catch (error) {
+      toast.error("Catégorisation impossible", {
+        description: error instanceof Error ? error.message : undefined
+      });
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   return (
     <div className="mt-3 space-y-3">
@@ -148,28 +188,84 @@ function BreakdownPieChart({
         </div>
         {showDetails ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {slices.map((slice) => (
+          {slices.map((slice) => {
+            const isOther = slice.row.label === "Autres";
+            const transactions = slice.row.transactions ?? [];
+            return (
             <div
               key={`legend-${slice.row.label}`}
-              className="min-w-0 rounded-xl bg-white/40 px-3 py-2 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]"
+              className={clsx(
+                "min-w-0 rounded-xl bg-white/40 px-3 py-2 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]",
+                isOther && "sm:col-span-2"
+              )}
             >
-              <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => isOther && transactions.length ? setOpenOther((v) => !v) : undefined}
+                className={clsx(
+                  "flex w-full items-center justify-between gap-2 text-left",
+                  isOther && transactions.length && "cursor-pointer"
+                )}
+                aria-expanded={isOther ? openOther : undefined}
+              >
                 <span className="min-w-0 inline-flex items-center gap-2 text-[13px] font-semibold text-ink-700 dark:text-white/70">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                   <span className="truncate">{slice.row.label}</span>
+                  {isOther && transactions.length ? (
+                    <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-bold text-ink-500 dark:bg-white/[0.06] dark:text-white/45">
+                      {openOther ? "Masquer" : "Voir"} {transactions.length}
+                    </span>
+                  ) : null}
                 </span>
                 <span className="shrink-0 text-[13px] font-bold tabular-nums text-ink-950 dark:text-white">
                   {slice.percent} %
                 </span>
-              </div>
+              </button>
               <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-200/55 dark:bg-black/25">
                 <span className="block h-full rounded-full" style={{ width: `${slice.percent}%`, backgroundColor: slice.color }} aria-hidden />
               </div>
               <p className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
                 {fmt.euro(slice.row.amountEur)}
               </p>
+              {isOther && openOther && transactions.length ? (
+                <div className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1">
+                  {transactions.map((tx) => (
+                    <div key={tx.id} className="rounded-xl border border-ink-100 bg-white/70 p-2.5 dark:border-white/10 dark:bg-black/20">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-bold text-ink-900 dark:text-white">
+                            {cleanTransactionLabel(tx.label, tx.company)}
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
+                            {tx.date} · {tx.category || "Sans catégorie"}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-xs font-bold tabular-nums text-ink-700 dark:text-white/70">
+                          {fmt.euro(tx.amountEur)}
+                        </p>
+                      </div>
+                      {recategorizeOptions?.length ? (
+                        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                          {recategorizeOptions.map((category) => (
+                            <button
+                              key={`${tx.id}-${category}`}
+                              type="button"
+                              disabled={pendingId === tx.id}
+                              onClick={() => saveCategory(tx.id, category)}
+                              className="shrink-0 rounded-full border border-ink-200 bg-white px-2.5 py-1 text-[10px] font-bold text-ink-700 transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-emerald-500/10"
+                            >
+                              {category}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ))}
+          );
+          })}
         </div>
         ) : null}
       </div>
@@ -181,12 +277,14 @@ function CashFlowTreeVisual({
   tree,
   fmt,
   billableDays,
-  periodLabel
+  periodLabel,
+  onRecategorized
 }: {
   tree: ValeurReelleCashTree;
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   billableDays: number;
   periodLabel: string;
+  onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const formattedBillableDays = new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: 1
@@ -207,6 +305,7 @@ function CashFlowTreeVisual({
     breakdown?: ValeurReelleWaterfallBreakdownRow[];
     showBreakdownPie?: boolean;
     breakdownPalette?: readonly string[];
+    recategorizeOptions?: readonly string[];
     tone: "neutral" | "deduct" | "result" | "highlight";
     emphasize?: boolean;
   }> = [
@@ -234,6 +333,7 @@ function CashFlowTreeVisual({
       breakdown: tree.mandatoryFeesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: MANDATORY_FEES_COLORS,
+      recategorizeOptions: ["Hiway", "URSSAF", "Impôt", "SFR", "Free", "Qonto", "Assurance", "Mutuelle"],
       tone: "deduct"
     },
     {
@@ -244,6 +344,7 @@ function CashFlowTreeVisual({
       breakdown: tree.personalChargesBreakdown,
       showBreakdownPie: true,
       breakdownPalette: PERSONAL_CHARGES_COLORS,
+      recategorizeOptions: ["NDF DigitPro", "Indemnités kilométriques", "CESU", "Repas d'affaires", "Repas Ilias"],
       tone: "deduct"
     },
   ];
@@ -411,7 +512,13 @@ function CashFlowTreeVisual({
                   </span>
                 ) : null}
                 {row.showBreakdownPie && row.breakdown?.length ? (
-                  <BreakdownPieChart breakdown={row.breakdown} fmt={fmt} palette={row.breakdownPalette ?? MANDATORY_FEES_COLORS} />
+                  <BreakdownPieChart
+                    breakdown={row.breakdown}
+                    fmt={fmt}
+                    palette={row.breakdownPalette ?? MANDATORY_FEES_COLORS}
+                    recategorizeOptions={row.recategorizeOptions}
+                    onRecategorized={onRecategorized}
+                  />
                 ) : null}
               </div>
               {!row.showBreakdownPie ? (
@@ -591,26 +698,37 @@ function RecoverableVatMonthlyBlock({
 
 export function ValeurReelleClient({
   initialTransactions,
-  transactionYearBounds,
   demoMode,
   loadError
 }: {
   initialTransactions: readonly DashboardTx[];
-  transactionYearBounds: { minYear: number; maxYear: number } | null;
   demoMode: boolean;
   loadError: string | null;
 }) {
   const fmt = useDashboardDisplayFormat();
-  const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
+  const [selectedYears, setSelectedYears] = useState<number[] | null>(() => [new Date().getFullYear()]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [localCategoryOverrides, setLocalCategoryOverrides] = useState<Record<string, string>>({});
+  const transactions = useMemo(
+    () =>
+      initialTransactions.map((tx) => {
+        const category = localCategoryOverrides[tx.id];
+        return category ? { ...tx, category } : tx;
+      }),
+    [initialTransactions, localCategoryOverrides]
+  );
+  const proTransactions = useMemo(
+    () => transactions.filter((tx) => (tx.scope ?? "pro") === "pro"),
+    [transactions]
+  );
 
   const yearOptions = useMemo(
-    () => buildDashboardYearOptions(transactionYearBounds, initialTransactions),
-    [transactionYearBounds, initialTransactions]
+    () => buildDashboardYearOptions(null, proTransactions),
+    [proTransactions]
   );
   const monthOptions = useMemo(
-    () => buildDashboardMonthOptions(transactionYearBounds, initialTransactions),
-    [transactionYearBounds, initialTransactions]
+    () => buildDashboardMonthOptions(null, proTransactions),
+    [proTransactions]
   );
 
   const onToggleYear = useCallback(
@@ -622,9 +740,13 @@ export function ValeurReelleClient({
   );
 
   const analysis = useMemo(
-    () => analyzeValeurReelle(initialTransactions, { years: selectedYears, month: selectedMonth }),
-    [initialTransactions, selectedMonth, selectedYears]
+    () => analyzeValeurReelle(transactions, { years: selectedYears, month: selectedMonth }),
+    [selectedMonth, selectedYears, transactions]
   );
+
+  const handleRecategorized = useCallback((transactionId: string, category: string) => {
+    setLocalCategoryOverrides((prev) => ({ ...prev, [transactionId]: category }));
+  }, []);
 
   const billableActivity = useBillableActivityOptional();
   const billableDaysInPeriod = useMemo(
@@ -637,7 +759,7 @@ export function ValeurReelleClient({
   );
 
   return (
-    <main id="dashboard-main" className="mt-6 scroll-mt-28 space-y-6 overflow-x-hidden sm:mt-8 sm:space-y-8">
+    <div className="scroll-mt-28 space-y-6 overflow-x-hidden sm:space-y-8">
       <DashboardPeriodFilterSection
         selectedYears={selectedYears}
         setSelectedYears={setSelectedYears}
@@ -647,6 +769,8 @@ export function ValeurReelleClient({
         yearOptions={yearOptions}
         onToggleYear={onToggleYear}
         sticky
+        showRollingOption={false}
+        showActiveLabel={false}
       />
 
       {demoMode ? (
@@ -663,6 +787,7 @@ export function ValeurReelleClient({
         fmt={fmt}
         billableDays={billableDaysInPeriod}
         periodLabel={analysis.periodLabel}
+        onRecategorized={handleRecategorized}
       />
 
       <RecoverableVatMonthlyBlock
@@ -671,6 +796,6 @@ export function ValeurReelleClient({
         periodLabel={analysis.periodLabel}
       />
 
-    </main>
+    </div>
   );
 }

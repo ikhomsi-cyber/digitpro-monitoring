@@ -46,10 +46,10 @@ const TABS: Tab[] = [
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
   },
   {
-    href: "/categorisation",
+    href: "/dashboard?section=categorisation",
     label: "Catég.",
     icon: ScanSearch,
-    isActive: () => false
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "categorisation"
   }
 ];
 
@@ -72,11 +72,11 @@ export function DashboardFloatingDock() {
   if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
 
   const ctx = { scope, panel, hash, section };
-  const isCategorisation = pathname === "/categorisation";
   const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
     event.preventDefault();
     window.history.pushState(null, "", href);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   return (
@@ -86,7 +86,7 @@ export function DashboardFloatingDock() {
     >
       <div className="mx-auto flex max-w-lg items-end justify-between gap-0.5">
         {TABS.map((tab) => {
-          const active = tab.href === "/categorisation" ? isCategorisation : tab.isActive(ctx);
+          const active = tab.isActive(ctx);
           const Icon = tab.icon;
           return (
             <Link
@@ -146,11 +146,11 @@ export function DashboardDesktopSidebar() {
   if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
 
   const ctx = { scope, panel, hash, section };
-  const isCategorisation = pathname === "/categorisation";
   const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
     event.preventDefault();
     window.history.pushState(null, "", href);
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
 
   return (
@@ -166,7 +166,7 @@ export function DashboardDesktopSidebar() {
         </Link>
         <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
           {TABS.map((tab) => {
-            const active = tab.href === "/categorisation" ? isCategorisation : tab.isActive(ctx);
+            const active = tab.isActive(ctx);
             const Icon = tab.icon;
             return (
               <Link
