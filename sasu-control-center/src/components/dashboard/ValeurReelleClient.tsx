@@ -196,13 +196,16 @@ function BreakdownPieChart({
             {slices.slice(0, 6).map((slice) => (
               <span
                 key={`compact-legend-${slice.row.label}`}
-                className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                className="group/legend relative inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
                 title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                 <span className="truncate">{slice.row.label}</span>
                 <span className="shrink-0 text-ink-500 dark:text-white/45">
                   · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
+                </span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-white/10 dark:bg-[#101412] dark:text-white/80">
+                  {slice.row.label} · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
                 </span>
               </span>
             ))}

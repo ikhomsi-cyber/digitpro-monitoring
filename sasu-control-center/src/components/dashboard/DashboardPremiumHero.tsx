@@ -7,7 +7,6 @@ import { useBillableActivity } from "@/components/dashboard/BillableActivityCont
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import { countAgendaWorkDaysInMonth } from "@/lib/billable-calendar-metrics";
-import { DEFAULT_IR_ON_BNC_RATE } from "@/lib/valeur-reelle-analyze";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -24,21 +23,13 @@ type TileMetric = {
   tone?: "positive" | "negative" | "neutral";
 };
 
-type YtdTrendPoint = {
-  key: string;
-  label: string;
-  generatedHtEur: number;
-  collectedHtEur: number;
-  expensesEur: number;
-  billedDays: number;
-};
-
 type Tile = {
   label: string;
   value: string;
   suffix?: string;
+  valueNote?: { text: string; tone: "positive" | "negative" };
   sublabel?: string;
-  sublabelTone?: "positive" | "negative" | "neutral";
+  sublabelTone?: "positive" | "negative" | "neutral" | "warning";
   metrics?: TileMetric[];
   icon: typeof TrendingUp;
   iconClassName: string;
@@ -46,19 +37,20 @@ type Tile = {
   ariaLabel?: string;
   wide?: boolean;
   breakdown?: Array<{ label: string; value: number; colorClass: string }>;
-  trend?: YtdTrendPoint[];
-  tjmGauge?: {
-    globalTjmEur: number;
-    realBeforeIrEur: number;
-    estimatedIrEur: number;
-    sharePct: number;
+  workdayProgress?: {
+    billedDays: number;
+    remainingDays: number;
+    billedAmountEur: number;
+    remainingAmountEur: number;
   };
+  tjmRepartition?: Array<{ label: string; value: number; colorClass: string; textClass: string }>;
 };
 
 export function DashboardPremiumHero({ stats, statsReady, contextMessage, showContextBanner }: Props) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
   const billedDaysToDate = billable.overviewWorkdayGauge.countedBillable;
+  const remainingBillableDays = billable.overviewWorkdayGauge.remainingBillable;
   const activeTjmHt = useMemo(() => {
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -81,27 +73,23 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   const billedDaysLabel = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(billedDaysToDate);
   const remunerationDisponibleEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
   const realTjmBeforeIncomeTaxEur = billedDaysToDate > 0 ? inPocketToDateEur / billedDaysToDate : 0;
-  const realTjmSharePct =
-    activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
-  const estimatedIncomeTaxPerDayEur = Math.max(0, realTjmBeforeIncomeTaxEur * DEFAULT_IR_ON_BNC_RATE);
+  const realTjmSharePct = activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
+  const tjmRepartitionTotalEur = Math.max(
+    1,
+    stats.tjmRepartitionMois.bncEur + stats.tjmRepartitionMois.ikEur + stats.tjmRepartitionMois.ndfEur
+  );
   const yearToDate = useMemo(() => {
     const now = new Date();
     const year = now.getFullYear();
-    const todayIso = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const monthly = new Map<string, { generatedHtEur: number; billedDays: number }>();
+    const currentMonthKey = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     let billedDays = 0;
     let generatedHt = 0;
 
-    for (let month0 = 0; month0 <= now.getMonth(); month0 += 1) {
-      const key = `${year}-${String(month0 + 1).padStart(2, "0")}`;
-      monthly.set(key, { generatedHtEur: 0, billedDays: 0 });
-    }
-
     for (const iso of billable.sortedIsos) {
       if (!iso.startsWith(`${year}-`)) continue;
-      if (iso > todayIso) continue;
-      billedDays += 1;
       const monthKey = iso.slice(0, 7);
+      if (monthKey >= currentMonthKey) continue;
+      billedDays += 1;
       const amount = resolveBillableTjmForClientMonth(
         billable.billableRatePeriods,
         billable.billableRatePeriods[0]?.clientName ?? "",
@@ -109,29 +97,13 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         billable.tjmHt
       );
       generatedHt += amount;
-      const current = monthly.get(monthKey) ?? { generatedHtEur: 0, billedDays: 0 };
-      monthly.set(monthKey, {
-        generatedHtEur: current.generatedHtEur + amount,
-        billedDays: current.billedDays + 1
-      });
     }
-    const statMonths = new Map(stats.ytdMonthly.map((month) => [month.month, month]));
     return {
       year,
       billedDays,
-      generatedHt: Math.round(generatedHt * 100) / 100,
-      monthly: [...monthly.entries()].map(([key, values]) => ({
-        key,
-        label: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(
-          new Date(year, Number(key.slice(5, 7)) - 1, 1)
-        ),
-        generatedHtEur: Math.round(values.generatedHtEur * 100) / 100,
-        collectedHtEur: statMonths.get(key)?.revenueHtEur ?? 0,
-        expensesEur: statMonths.get(key)?.expensesEur ?? 0,
-        billedDays: values.billedDays
-      }))
+      generatedHt: Math.round(generatedHt * 100) / 100
     };
-  }, [billable.billableRatePeriods, billable.sortedIsos, billable.tjmHt, stats.ytdMonthly]);
+  }, [billable.billableRatePeriods, billable.sortedIsos, billable.tjmHt]);
   const invoicesToCollect = useMemo(() => {
     const now = new Date();
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -141,6 +113,10 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     const monthLabel = new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(
       new Date(lastMonth.year, lastMonth.month0, 1)
     );
+    const invoiceIssueDate = new Date(lastMonth.year, lastMonth.month0 + 1, 1);
+    const invoiceDueDate = new Date(invoiceIssueDate);
+    invoiceDueDate.setDate(invoiceDueDate.getDate() + 30);
+    const dueInDays = Math.ceil((invoiceDueDate.getTime() - now.getTime()) / 86_400_000);
     const chartTjmHt = resolveBillableTjmForClientMonth(
       billable.billableRatePeriods,
       billable.billableRatePeriods[0]?.clientName ?? "",
@@ -156,9 +132,25 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     return {
       amountHtEur: Math.round(daysAlreadyInvoiced * chartTjmHt * 100) / 100,
       days: daysAlreadyInvoiced,
-      monthLabel
+      monthLabel,
+      dueInDays,
+      statusLabel:
+        dueInDays >= 0
+          ? `📅 À venir J-${Math.ceil(dueInDays)}`
+          : `⚠️ Retard de ${Math.abs(Math.floor(dueInDays))} j.`
     };
   }, [billable.billableRatePeriods, billable.selected, billable.tjmHt]);
+  const activityYtd = useMemo(() => {
+    const totalDays = yearToDate.billedDays;
+    const facturedDays = Math.min(invoicesToCollect.days, totalDays);
+    const encaisseDays = Math.max(0, totalDays - facturedDays);
+    return {
+      amountHtEur: yearToDate.generatedHt,
+      encaisseDays: Math.round(encaisseDays * 10) / 10,
+      facturedDays: Math.round(facturedDays * 10) / 10,
+      totalDays: Math.round(totalDays * 10) / 10
+    };
+  }, [invoicesToCollect.days, yearToDate]);
 
   const tiles: Tile[] = useMemo(
     () => [
@@ -166,6 +158,8 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         label: "Encaissé ce mois",
         value: fmt.euro(stats.caMensuelEur),
         suffix: "TTC",
+        sublabel: `${invoicesToCollect.statusLabel} · ${fmt.euro(invoicesToCollect.amountHtEur * 1.2)} TTC`,
+        sublabelTone: invoicesToCollect.amountHtEur <= 0 ? "positive" : invoicesToCollect.dueInDays < 0 ? "negative" : "warning",
         icon: TrendingUp,
         iconClassName: "text-emerald-300 bg-emerald-500/12 border-emerald-400/20",
         href: "/dashboard?section=sasu&scope=pro",
@@ -174,7 +168,11 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       {
         label: "Cash disponible",
         value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—",
-        sublabel: statsReady ? `Rémunération à verser ${fmt.euro(remunerationDisponibleEur)}` : undefined,
+        sublabel: statsReady
+          ? remunerationDisponibleEur >= 0
+            ? `💸 Rémunération à verser ${fmt.euro(remunerationDisponibleEur)}`
+            : `🛑 Dette ${fmt.euro(Math.abs(remunerationDisponibleEur))}`
+          : undefined,
         sublabelTone: remunerationDisponibleEur >= 0 ? "positive" : "negative",
         icon: WalletCards,
         iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
@@ -183,6 +181,12 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         label: "Avant IR (mois en cours)",
         value: fmt.euro(inPocketToDateEur),
         sublabel: `${billedDaysLabel} j. facturés à date`,
+        workdayProgress: {
+          billedDays: billedDaysToDate,
+          remainingDays: remainingBillableDays,
+          billedAmountEur: inPocketToDateEur,
+          remainingAmountEur: activeTjmHt * remainingBillableDays
+        },
         icon: PiggyBank,
         iconClassName: "text-amber-200 bg-amber-500/12 border-amber-300/20"
       },
@@ -190,12 +194,13 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         label: "TJM en vigueur",
         value: fmt.euro(activeTjmHt),
         suffix: "HT",
-        tjmGauge: {
-          globalTjmEur: activeTjmHt,
-          realBeforeIrEur: realTjmBeforeIncomeTaxEur,
-          estimatedIrEur: estimatedIncomeTaxPerDayEur,
-          sharePct: realTjmSharePct
-        },
+        sublabel: `Réel ${fmt.euro(realTjmBeforeIncomeTaxEur)}/j · ${fmt.int(realTjmSharePct)} %`,
+        sublabelTone: "positive",
+        tjmRepartition: [
+          { label: "BNC", value: stats.tjmRepartitionMois.bncEur, colorClass: "bg-sky-400", textClass: "text-sky-700 dark:text-sky-300" },
+          { label: "IK", value: stats.tjmRepartitionMois.ikEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" },
+          { label: "NDF", value: stats.tjmRepartitionMois.ndfEur, colorClass: "bg-violet-400", textClass: "text-violet-700 dark:text-violet-300" }
+        ],
         icon: CalendarCheck2,
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
         href: "/parametres",
@@ -203,20 +208,15 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       },
       {
         label: `Depuis janvier ${yearToDate.year}`,
-        value: fmt.euro(yearToDate.generatedHt),
-        suffix: "HT généré",
+        value: fmt.euro(activityYtd.amountHtEur),
+        suffix: "HT encaissé + facturé",
+        sublabel: `${fmt.int(activityYtd.encaisseDays)} j. encaissés + ${fmt.int(activityYtd.facturedDays)} j. facturés`,
+        sublabelTone: "neutral",
         metrics: [
-          { label: "Jours facturés", value: `${fmt.int(yearToDate.billedDays)} j.` },
+          { label: "Jours activité", value: `${fmt.int(activityYtd.totalDays)} j.` },
           { label: "Encaissé", value: `${fmt.euro(stats.caAnnuelEncaisseHtEur)} HT`, tone: "positive" },
-          {
-            label: "À encaisser",
-            value: `${fmt.euro(invoicesToCollect.amountHtEur)} HT`,
-            detail: `${invoicesToCollect.monthLabel} · ${fmt.int(invoicesToCollect.days)} j.`,
-            tone: invoicesToCollect.amountHtEur > 0 ? "negative" : "positive"
-          },
           { label: "Dépenses SASU", value: fmt.euro(stats.depensesAnnuelPasseesTtcEur), tone: "negative" }
         ],
-        trend: yearToDate.monthly,
         icon: TrendingUp,
         iconClassName: "text-emerald-300 bg-emerald-500/12 border-emerald-400/20",
         href: "/dashboard?section=activite",
@@ -242,6 +242,13 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       {
         label: "Dettes fiscales",
         value: fmt.euro(stats.detteTotaleDepuisDebutEur),
+        valueNote: {
+          text:
+          (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur
+            ? "✅ Solde suffisant pour couvrir la dette"
+            : `🛑 Il manque ${fmt.euro(stats.resteAVerserApresCashEur)} pour couvrir la dette`,
+          tone: (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur ? "positive" : "negative"
+        },
         icon: Landmark,
         iconClassName: "text-orange-200 bg-orange-500/12 border-orange-300/20",
         href: "/dashboard?panel=valeur-reelle",
@@ -255,16 +262,18 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     ],
     [
       activeTjmHt,
+      activityYtd,
       billedDaysLabel,
       fmt,
       inPocketToDateEur,
       invoicesToCollect,
-      estimatedIncomeTaxPerDayEur,
       realTjmBeforeIncomeTaxEur,
       realTjmSharePct,
+      remainingBillableDays,
       remunerationDisponibleEur,
       stats,
       statsReady,
+      tjmRepartitionTotalEur,
       yearToDate
     ]
   );
@@ -324,80 +333,92 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                       {t.suffix}
                     </span>
                   ) : null}
+                  {t.valueNote ? (
+                    <span
+                      className={`ml-2 align-baseline text-[11px] font-bold tracking-normal ${
+                        t.valueNote.tone === "positive"
+                          ? "text-emerald-700 dark:text-emerald-300"
+                          : "text-rose-700 dark:text-rose-300"
+                      }`}
+                    >
+                      {t.valueNote.text}
+                    </span>
+                  ) : null}
                 </dd>
                 {t.sublabel ? (
                   <p
-                    className={`mt-1 text-[11px] font-bold ${
+                    className={`mt-1 truncate whitespace-nowrap text-[11px] font-bold ${
                       t.sublabelTone === "positive"
                         ? "text-emerald-700 dark:text-emerald-300"
                         : t.sublabelTone === "negative"
                           ? "text-rose-700 dark:text-rose-300"
-                          : "text-ink-500 dark:text-white/40"
+                          : t.sublabelTone === "warning"
+                            ? "text-amber-700 dark:text-amber-300"
+                            : "text-ink-500 dark:text-white/40"
                     }`}
                   >
                     {t.sublabel}
                   </p>
                 ) : null}
-                {t.tjmGauge ? (
-                  <div className="mt-3 rounded-xl border border-violet-200/70 bg-violet-50/55 p-2.5 dark:border-violet-400/15 dark:bg-violet-500/[0.06]">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-200">
-                          Décomposition du TJM
-                        </p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-ink-500 dark:text-white/40">
-                          Sur {fmt.euro(t.tjmGauge.globalTjmEur)} facturés / jour
-                        </p>
-                      </div>
-                      <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[9px] font-bold tabular-nums text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                        {fmt.int(t.tjmGauge.sharePct)} %
-                      </span>
-                    </div>
-                    <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-ink-200/80 dark:bg-white/10">
-                      <div
-                        className="h-full bg-emerald-400"
-                        style={{
-                          width: `${Math.max(0, Math.min(100, t.tjmGauge.sharePct))}%`
-                        }}
-                        aria-hidden
-                      />
-                      <div
-                        className="h-full bg-amber-300"
-                        style={{
-                          width: `${Math.max(0, Math.min(100, (t.tjmGauge.estimatedIrEur / Math.max(1, t.tjmGauge.globalTjmEur)) * 100))}%`
-                        }}
-                        aria-hidden
-                      />
-                    </div>
-                    <div className="mt-2 space-y-1.5">
-                      {[
-                        {
-                          label: "Réel encaissé hors IR",
-                          value: `${fmt.euro(t.tjmGauge.realBeforeIrEur)}/j`,
-                          dot: "bg-emerald-400",
-                          text: "text-emerald-700 dark:text-emerald-300"
-                        },
-                        {
-                          label: "IR estimé à provisionner",
-                          value: `${fmt.euro(t.tjmGauge.estimatedIrEur)}/j`,
-                          dot: "bg-amber-300",
-                          text: "text-amber-700 dark:text-amber-300"
-                        },
-                        {
-                          label: "Écart charges / TVA / arrondis",
-                          value: `${fmt.euro(Math.max(0, t.tjmGauge.globalTjmEur - t.tjmGauge.realBeforeIrEur - t.tjmGauge.estimatedIrEur))}/j`,
-                          dot: "bg-ink-300 dark:bg-white/20",
-                          text: "text-ink-600 dark:text-white/55"
-                        }
-                      ].map((row) => (
-                        <div key={row.label} className="flex items-center justify-between gap-2 rounded-lg bg-white/65 px-2 py-1.5 dark:bg-white/[0.04]">
-                          <span className="inline-flex min-w-0 items-center gap-1.5 text-[9px] font-semibold text-ink-500 dark:text-white/40">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${row.dot}`} />
-                            <span className="truncate">{row.label}</span>
-                          </span>
-                          <span className={`shrink-0 text-[10px] font-bold tabular-nums ${row.text}`}>{row.value}</span>
-                        </div>
+                {t.tjmRepartition ? (
+                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-2 dark:border-violet-400/15 dark:bg-white/[0.025]">
+                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                      {t.tjmRepartition.map((part) => (
+                        <div
+                          key={part.label}
+                          className={part.colorClass}
+                          style={{ width: `${Math.max(4, (part.value / tjmRepartitionTotalEur) * 100)}%` }}
+                          aria-hidden
+                        />
                       ))}
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-[8px] font-bold">
+                      {t.tjmRepartition.map((part) => {
+                        const pct = (part.value / tjmRepartitionTotalEur) * 100;
+                        const dailyValue = activeTjmHt * (pct / 100);
+                        return (
+                          <span key={part.label} className={`min-w-0 ${part.textClass}`}>
+                            <span className="flex items-center gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full ${part.colorClass}`} />
+                              <span>{part.label}</span>
+                              <span className="tabular-nums">{fmt.int(pct)}%</span>
+                            </span>
+                            <span className="mt-0.5 block truncate tabular-nums text-ink-500 dark:text-white/40">
+                              {fmt.euro(dailyValue)}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {t.workdayProgress ? (
+                  <div className="mt-3 rounded-xl border border-amber-200/60 bg-amber-50/45 p-2 dark:border-amber-300/15 dark:bg-amber-400/[0.04]">
+                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                      <span
+                        className="bg-amber-300"
+                        style={{
+                          width: `${Math.max(
+                            0,
+                            Math.min(
+                              100,
+                              (t.workdayProgress.billedDays /
+                                Math.max(1, t.workdayProgress.billedDays + t.workdayProgress.remainingDays)) *
+                                100
+                            )
+                          )}%`
+                        }}
+                        aria-hidden
+                      />
+                      <span className="flex-1 bg-white/70 dark:bg-white/20" aria-hidden />
+                    </div>
+                    <div className="mt-1.5 flex items-center justify-between gap-1 text-[8px] font-bold sm:text-[9px]">
+                      <span className="shrink-0 whitespace-nowrap text-amber-700 dark:text-amber-300">
+                        Facturé {fmt.int(t.workdayProgress.billedDays)} j.
+                      </span>
+                      <span className="shrink-0 whitespace-nowrap text-ink-500 dark:text-white/40">
+                        À venir {fmt.int(t.workdayProgress.remainingDays)} j. · {fmt.euro(t.workdayProgress.remainingAmountEur)}
+                      </span>
                     </div>
                   </div>
                 ) : null}
@@ -429,74 +450,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                         ) : null}
                       </div>
                     ))}
-                  </div>
-                ) : null}
-                {t.trend ? (
-                  <div className="mt-4 rounded-2xl border border-ink-200/70 bg-gradient-to-b from-white/60 to-ink-50/40 px-3 py-3 dark:border-white/[0.07] dark:from-white/[0.035] dark:to-white/[0.015]">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-ink-500 dark:text-white/35">
-                          Synthèse mensuelle depuis janvier
-                        </p>
-                        <p className="mt-0.5 text-[10px] font-semibold text-ink-500 dark:text-white/40">
-                          Généré, encaissé, dépenses et jours
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {(() => {
-                        const trend = t.trend ?? [];
-                        const maxMoney = Math.max(
-                          1,
-                          ...trend.flatMap((x) => [x.generatedHtEur, x.collectedHtEur, x.expensesEur])
-                        );
-                        return (
-                          <>
-                            {trend.map((point) => {
-                              const generatedPct = Math.max(0, Math.min(100, (point.generatedHtEur / maxMoney) * 100));
-                              const collectedPct = Math.max(0, Math.min(100, (point.collectedHtEur / maxMoney) * 100));
-                              const expensesPct = Math.max(0, Math.min(100, (point.expensesEur / maxMoney) * 100));
-                              return (
-                                <div
-                                  key={point.key}
-                                  className="rounded-2xl border border-ink-200/60 bg-white/45 px-3 py-2 dark:border-white/[0.06] dark:bg-black/10"
-                                >
-                                  <div className="grid grid-cols-[3.2rem_1fr] gap-3">
-                                    <div>
-                                      <p className="text-[10px] font-bold uppercase text-ink-700 dark:text-white/60">{point.label}</p>
-                                      <p className="mt-1 text-[10px] font-semibold tabular-nums text-violet-700 dark:text-violet-300">
-                                        {fmt.int(point.billedDays)} j.
-                                      </p>
-                                    </div>
-                                    <div className="min-w-0 space-y-1.5">
-                                      {[
-                                        { label: "Généré", value: point.generatedHtEur, pct: generatedPct, color: "bg-emerald-400", text: "text-emerald-700 dark:text-emerald-300" },
-                                        { label: "Encaissé", value: point.collectedHtEur, pct: collectedPct, color: "bg-sky-400", text: "text-sky-700 dark:text-sky-300" },
-                                        { label: "Dépenses", value: point.expensesEur, pct: expensesPct, color: "bg-rose-400", text: "text-rose-700 dark:text-rose-300" }
-                                      ].map((row) => (
-                                        <div key={row.label} className="grid grid-cols-[4.4rem_1fr_4.2rem] items-center gap-2">
-                                          <span className="truncate text-[9px] font-semibold text-ink-500 dark:text-white/35">{row.label}</span>
-                                          <span className="h-1.5 overflow-hidden rounded-full bg-ink-200/80 dark:bg-white/10">
-                                            <span
-                                              className={`block h-full rounded-full ${row.color}`}
-                                              style={{ width: `${row.pct}%` }}
-                                              aria-hidden
-                                            />
-                                          </span>
-                                          <span className={`truncate text-right text-[9px] font-bold tabular-nums ${row.text}`}>
-                                            {fmt.chartAxisEuro(row.value)}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </>
-                        );
-                      })()}
-                    </div>
                   </div>
                 ) : null}
                 {t.breakdown ? (

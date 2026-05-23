@@ -53,6 +53,11 @@ export type DashboardHeroStats = {
   depensesDigitProMoisEur: number;
   depensesPersoMoisEur: number;
   netDansMaPocheMoisEur: number;
+  tjmRepartitionMois: {
+    bncEur: number;
+    ikEur: number;
+    ndfEur: number;
+  };
   detteCsgDepuisDebutEur: number;
   detteTvaDepuisDebutEur: number;
   detteTotaleDepuisDebutEur: number;
@@ -71,6 +76,14 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const currentYear = now.getFullYear();
   const valueAnalysis = analyzeValeurReelle(transactions, { years: null, month: currentMonth, now });
+  const tjmRepartitionMois = valueAnalysis.cashTree.personalChargesBreakdown.reduce(
+    (acc, row) => {
+      if (row.label === "Indemnités kilométriques") acc.ikEur += row.amountEur;
+      if (row.label === "Repas du dirigeant" || row.label === "Repas d’affaires") acc.ndfEur += row.amountEur;
+      return acc;
+    },
+    { bncEur: Math.max(0, valueAnalysis.cashTree.bncEur), ikEur: 0, ndfEur: 0 }
+  );
   const allYears = Array.from(
     new Set(
       proTxs
@@ -135,6 +148,11 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     depensesDigitProMoisEur,
     depensesPersoMoisEur,
     netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur,
+    tjmRepartitionMois: {
+      bncEur: Math.round(tjmRepartitionMois.bncEur * 100) / 100,
+      ikEur: Math.round(tjmRepartitionMois.ikEur * 100) / 100,
+      ndfEur: Math.round(tjmRepartitionMois.ndfEur * 100) / 100
+    },
     detteCsgDepuisDebutEur,
     detteTvaDepuisDebutEur,
     detteTotaleDepuisDebutEur,

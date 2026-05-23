@@ -783,10 +783,13 @@ export function BillableDaysCalendarBlock({
                         <div className="absolute left-[13%] top-[31%] z-[2] h-4 w-4 rounded-full border-[3px] border-white bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.65)] dark:border-[#101815]" />
                         <div className="absolute right-[14%] top-[56%] z-[2] h-4 w-4 rounded-full border-[3px] border-white bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.65)] dark:border-[#101815]" />
                         <div className="absolute left-[44%] top-[36%] z-[3] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-slate-400/70 bg-gradient-to-b from-slate-700 to-slate-950 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-50 shadow-[0_12px_28px_-14px_rgba(0,0,0,0.85)]">
-                          <span className="grid h-4 w-6 place-items-center rounded-full bg-slate-300 text-slate-900 shadow-inner">
-                            <CarFront className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
+                          <span className="grid h-5 w-5 place-items-center rounded-full border border-slate-500 bg-slate-100 text-slate-950 shadow-inner">
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                              <circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                              <path d="M12 3.5 10.7 11 4.8 17.5 12 14.1l7.2 3.4L13.3 11 12 3.5Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.35" />
+                            </svg>
                           </span>
-                          GLB gris
+                          GLB
                         </div>
                         <div className="absolute left-[43%] top-[17%] rounded border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold text-ink-500 shadow-sm dark:border-white/10 dark:bg-black/35 dark:text-white/45">
                           Paris Ouest
