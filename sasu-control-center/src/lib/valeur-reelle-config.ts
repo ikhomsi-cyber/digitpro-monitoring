@@ -206,6 +206,7 @@ export const HIDDEN_VALUE_CATEGORIES = [
   "CESU",
   "Cadeaux clientèle",
   "Repas du dirigeant",
+  "Mutuelle",
   "Chèques vacances ANCV",
   "Internet & mobile",
   "Matériel informatique",
@@ -224,6 +225,7 @@ export const HIDDEN_VALUE_CATEGORY_META: Record<
   CESU: { emoji: "👶", label: "CESU" },
   "Cadeaux clientèle": { emoji: "🎁", label: "Cadeaux clientèle" },
   "Repas du dirigeant": { emoji: "🍴", label: "Repas du dirigeant" },
+  Mutuelle: { emoji: "🛡️", label: "Mutuelle" },
   "Chèques vacances ANCV": { emoji: "🏖️", label: "Chèques vacances ANCV" },
   "Internet & mobile": { emoji: "📱", label: "Internet & mobile" },
   "Matériel informatique": { emoji: "💻", label: "Matériel informatique" },
@@ -238,6 +240,7 @@ export const HIDDEN_VALUE_RECOVERY_PERCENT: Record<HiddenValueCategory, number> 
   CESU: 55,
   "Cadeaux clientèle": 40,
   "Repas du dirigeant": 48,
+  Mutuelle: 100,
   "Chèques vacances ANCV": 60,
   "Internet & mobile": 35,
   "Matériel informatique": 28,
@@ -298,8 +301,7 @@ export const REAL_EXPENSE_BUCKETS = new Set<DerivedExpenseBucket>([
   "PAS DSN",
   "Compta & admin.",
   "Qonto",
-  "Assurance",
-  "Mutuelle"
+  "Assurance"
 ]);
 
 export const HIDDEN_VALUE_BUCKETS = new Set<DerivedExpenseBucket>([
@@ -307,6 +309,7 @@ export const HIDDEN_VALUE_BUCKETS = new Set<DerivedExpenseBucket>([
   "Repas dirigeant",
   "Repas d'affaire",
   "CESU",
+  "Mutuelle",
   "Mobile et Internet",
   "iCloud IA Store"
 ]);
@@ -538,6 +541,13 @@ export function resolveHiddenValueCategory(
 
   if (bucket === "CESU" || CESU_KEYWORDS.some((kw) => blob.includes(kw) || cat.includes(kw))) {
     return "CESU";
+  }
+
+  if (
+    bucket === "Mutuelle" ||
+    PREVOYANCE_KEYWORDS.some((kw) => blob.includes(kw) || cat.includes(kw))
+  ) {
+    return "Mutuelle";
   }
 
   if (CADEAUX_CLIENTELE_KEYWORDS.some((kw) => blob.includes(kw) || cat.includes(kw))) {

@@ -62,6 +62,19 @@ function formatTransactionDate(raw: string): string {
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(d);
 }
 
+function shouldShowHtTtc(label: string): boolean {
+  const n = label
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+  return !(
+    n.includes("kilomet") ||
+    n.includes("urssaf") ||
+    n.includes("retraite") ||
+    n.includes("assurance")
+  );
+}
+
 function BreakdownPieChart({
   breakdown,
   fmt,
@@ -76,7 +89,7 @@ function BreakdownPieChart({
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
-  const [openUncategorizedLabel, setOpenUncategorizedLabel] = useState<string | null>(null);
+  const [openCategoryLabel, setOpenCategoryLabel] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [hiddenTransactionIds, setHiddenTransactionIds] = useState<Set<string>>(() => new Set());
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
@@ -198,34 +211,36 @@ function BreakdownPieChart({
         {showDetails ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => {
-            const isUncategorized = slice.row.label === "Autres" || slice.row.label === "Non catégorisé";
-            const isOpen = openUncategorizedLabel === slice.row.label;
             const transactions = (slice.row.transactions ?? []).filter((tx) => !hiddenTransactionIds.has(tx.id));
+            const hasTransactions = transactions.length > 0;
+            const isOpen = openCategoryLabel === slice.row.label;
+            const showHtTtc = shouldShowHtTtc(slice.row.label);
+            const grossAmountEur = slice.row.grossAmountEur ?? slice.row.amountEur;
             return (
             <div
               key={`legend-${slice.row.label}`}
               className={clsx(
                 "min-w-0 rounded-xl bg-white/40 px-3 py-2 ring-1 ring-ink-100/60 dark:bg-white/[0.035] dark:ring-white/[0.05]",
-                isUncategorized && "sm:col-span-2"
+                isOpen && hasTransactions && "sm:col-span-2"
               )}
             >
               <button
                 type="button"
                 onClick={() =>
-                  isUncategorized && transactions.length
-                    ? setOpenUncategorizedLabel((current) => (current === slice.row.label ? null : slice.row.label))
+                  hasTransactions
+                    ? setOpenCategoryLabel((current) => (current === slice.row.label ? null : slice.row.label))
                     : undefined
                 }
                 className={clsx(
                   "flex w-full items-center justify-between gap-2 text-left",
-                  isUncategorized && transactions.length && "cursor-pointer"
+                  hasTransactions && "cursor-pointer"
                 )}
-                aria-expanded={isUncategorized ? isOpen : undefined}
+                aria-expanded={hasTransactions ? isOpen : undefined}
               >
                 <span className="min-w-0 inline-flex items-center gap-2 text-[13px] font-semibold text-ink-700 dark:text-white/70">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                   <span className="truncate">{slice.row.label}</span>
-                  {isUncategorized && transactions.length ? (
+                  {hasTransactions ? (
                     <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-bold text-ink-500 dark:bg-white/[0.06] dark:text-white/45">
                       {isOpen ? "Masquer" : "Voir"} {transactions.length}
                     </span>
@@ -238,10 +253,17 @@ function BreakdownPieChart({
               <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-200/55 dark:bg-black/25">
                 <span className="block h-full rounded-full" style={{ width: `${slice.percent}%`, backgroundColor: slice.color }} aria-hidden />
               </div>
-              <p className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
-                {fmt.euro(slice.row.amountEur)}
-              </p>
-              {isUncategorized && isOpen && transactions.length ? (
+              <div className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
+                {showHtTtc ? (
+                  <>
+                    <p>HT {fmt.euro(slice.row.amountEur)}</p>
+                    <p className="text-[10px] font-medium">TTC {fmt.euro(grossAmountEur)}</p>
+                  </>
+                ) : (
+                  <p>{fmt.euro(slice.row.amountEur)}</p>
+                )}
+              </div>
+              {isOpen && hasTransactions ? (
                 <div className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {transactions.map((tx) => (
                     <div key={tx.id} className="rounded-xl border border-ink-100 bg-white/70 p-2.5 dark:border-white/10 dark:bg-black/20">
@@ -251,12 +273,21 @@ function BreakdownPieChart({
                             {cleanTransactionLabel(tx.label, tx.company)}
                           </p>
                           <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
-                            {tx.date} · {tx.category || "Sans catégorie"}
+                            {formatTransactionDate(tx.date)} · {tx.category || "Sans catégorie"}
                           </p>
                         </div>
-                        <p className="shrink-0 text-xs font-bold tabular-nums text-ink-700 dark:text-white/70">
-                          {fmt.euro(tx.amountEur)}
-                        </p>
+                        <div className="shrink-0 text-right text-xs font-bold tabular-nums text-ink-700 dark:text-white/70">
+                          {showHtTtc ? (
+                            <>
+                              <p>HT {fmt.euro(tx.amountEur)}</p>
+                              <p className="text-[10px] font-medium text-ink-500 dark:text-white/40">
+                                TTC {fmt.euro(tx.grossAmountEur ?? tx.amountEur)}
+                              </p>
+                            </>
+                          ) : (
+                            <p>{fmt.euro(tx.amountEur)}</p>
+                          )}
+                        </div>
                       </div>
                       {recategorizeOptions?.length ? (
                         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">

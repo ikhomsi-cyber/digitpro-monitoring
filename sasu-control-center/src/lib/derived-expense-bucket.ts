@@ -71,6 +71,7 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
 
   if (b.includes("dgfip")) {
     if (labelStartsWithDgfipTva(tx)) return "TVA";
+    if (categorizeHiwayExpense(tx) === "PAS DSN") return "Retraite";
     if (categorizeHiwayExpense(tx) === "Retraite") return "Retraite";
     return IMPOT_CATEGORY_LABEL;
   }
@@ -97,12 +98,14 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
     case "Abonnement Hiway":
     case "Hiway compta":
       return COMPTA_ADMIN_BUCKET_LABEL;
+    case "Urssaf":
+      return "Urssaf";
     case "Mutuelle":
       return MUTUELLE_CATEGORY_LABEL;
     case "Retraite":
       return "Retraite";
     case "PAS DSN":
-      return "PAS DSN";
+      return "Retraite";
     case "Abonnement internet & mobile":
       return "Mobile et Internet";
     case "Assurances":

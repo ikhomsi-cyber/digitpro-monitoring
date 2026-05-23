@@ -5,6 +5,7 @@ export const HIWAY_EXPENSE_CATEGORIES = [
   "CESU",
   "Repas d’affaires",
   "Abonnement Hiway",
+  "Urssaf",
   "Mutuelle",
   "Hiway compta",
   "Retraite",
@@ -153,14 +154,15 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
     ["CESU", ["cesu"]],
     ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
     ["Abonnement Hiway", ["abonnement hiway"]],
+    ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
     ["Mutuelle", ["mutuelle"]],
     ["Hiway compta", ["hiway compta", "depenses administratives", "administrative expenses"]],
     ["Retraite", ["retraite", "frais de personnel"]],
     ["PAS DSN", ["pas dsn", "pasdsn", "dsn", "pas"]],
     ["Abonnement internet & mobile", ["abonnement internet mobile", "abonnement internet & mobile", "mobile et internet"]],
-    ["Repas du dirigeant", ["repas du dirigeant", "repas ilias", "restauration pro", "dejeuner", "frais de nourriture et boissons", "food and drink"]],
+    ["Repas du dirigeant", ["repas du dirigeant", "repas dirigeant", "repas ilias", "repas ilia", "restauration pro", "dejeuner", "déjeuner", "frais de nourriture et boissons", "food and drink"]],
     ["Assurances", ["assurances", "assurance", "axa sogarep", "sogarep"]],
-    ["Frais bancaires", ["frais bancaires", "qonto"]],
+    ["Frais bancaires", ["frais bancaires", "qonto solo", "solo basic", "solo_basic"]],
     ["Paiement TVA", ["paiement tva", "tva"]],
     ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
     ["Abonnement logiciel", ["abonnement logiciel", "icloud ia store", "apple.com bill", "cursor ai powered ide"]]
@@ -176,8 +178,10 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   const mapped = mapHiwayExpenseCategory(tx.category);
 
   if (labelStartsWithDgfipTva(tx)) return "Paiement TVA";
-  if (textLooksLikePasDsn(label) || textLooksLikePasDsn(source) || mapped === "PAS DSN") return "PAS DSN";
+  if (mapped && mapped !== "Non catégorisé" && mapped !== "Frais bancaires") return mapped;
+  if (textLooksLikePasDsn(label) || textLooksLikePasDsn(source)) return "PAS DSN";
   if (label.includes("dgfip")) return "Non catégorisé";
+  if (source.includes("urssaf") || source.includes("cgss")) return "Urssaf";
   if (textLooksLikeIk(source)) return "Indemnités kilométriques";
   if (source.includes("cesu") || source.includes("pluxee") || source.includes("edenred")) return "CESU";
   if (source.includes("hiway")) {
@@ -186,14 +190,15 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
       : "Abonnement Hiway";
   }
   if (source.includes("wemind") || source.includes("mutuelle")) return "Mutuelle";
-  if (textLooksLikeRetraite(source) || mapped === "Retraite") return "Retraite";
+  if (textLooksLikeRetraite(source)) return "Retraite";
   if (/\bsfr\b/.test(source) || /\bfreebox\b/.test(source) || (/\bfree\b/.test(source) && /(mobile|telecom|internet|fibre|forfait|telephone)/.test(source))) {
     return "Abonnement internet & mobile";
   }
   if (textLooksLikeRepasAffaires(source)) return "Repas d’affaires";
   if (textLooksLikeRepasDirigeant(source) || source.includes("note de frais") || /\bndf\b/.test(source)) return "Repas du dirigeant";
   if (source.includes("sogarep") || /\baxa\b/.test(source) || source.includes("assurance")) return "Assurances";
-  if (source.includes("solo_basic") || source.includes("solo basic") || source.includes("qonto")) return "Frais bancaires";
+  if (source.includes("solo_basic") || source.includes("solo basic") || source.includes("qonto solo")) return "Frais bancaires";
   if (textLooksLikeSoftware(source)) return "Abonnement logiciel";
+  if (mapped === "Frais bancaires") return "Non catégorisé";
   return mapped ?? "Non catégorisé";
 }

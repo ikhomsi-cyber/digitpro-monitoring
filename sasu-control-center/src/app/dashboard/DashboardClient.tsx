@@ -31,7 +31,6 @@ import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { DashboardCategorisationPanel } from "@/app/dashboard/DashboardCategorisationPanel";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
-import { Chatbot } from "@/components/Chatbot";
 import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { categoryGlyph } from "@/lib/category-glyph";
@@ -1236,7 +1235,6 @@ export function DashboardClient({
         </>
       )}
 
-      <Chatbot />
         </motion.div>
       </AnimatePresence>
     </main>

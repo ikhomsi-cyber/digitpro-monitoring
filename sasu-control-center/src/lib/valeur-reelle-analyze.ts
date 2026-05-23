@@ -101,6 +101,7 @@ export type ValeurReelleCategoryRow = {
 export type ValeurReelleWaterfallBreakdownRow = {
   label: string;
   amountEur: number;
+  grossAmountEur?: number;
   count: number;
   transactions?: Array<{
     id: string;
@@ -109,6 +110,7 @@ export type ValeurReelleWaterfallBreakdownRow = {
     category: string;
     company: string;
     amountEur: number;
+    grossAmountEur?: number;
   }>;
 };
 
@@ -140,7 +142,13 @@ export type ValeurReelleWaterfallStep = {
 };
 
 type BreakdownTransaction = NonNullable<ValeurReelleWaterfallBreakdownRow["transactions"]>[number];
-type WaterfallBreakdownAccumulator = Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>;
+type BreakdownAccumulatorValue = {
+  amountEur: number;
+  grossAmountEur?: number;
+  count: number;
+  transactions?: BreakdownTransaction[];
+};
+type WaterfallBreakdownAccumulator = Map<string, BreakdownAccumulatorValue>;
 
 function waterfallBreakdownMap(): Map<string, WaterfallBreakdownAccumulator> {
   return new Map();
@@ -162,10 +170,11 @@ function addWaterfallBreakdown(
   const prev = step.get(label);
   if (prev) {
     prev.amountEur += amountEur;
+    prev.grossAmountEur = (prev.grossAmountEur ?? 0) + (transaction?.grossAmountEur ?? amountEur);
     prev.count += 1;
     if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
   } else {
-    step.set(label, { amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
+    step.set(label, { amountEur, grossAmountEur: transaction?.grossAmountEur ?? amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
 }
 
@@ -176,7 +185,7 @@ function materializeWaterfallBreakdown(
   const step = root.get(stepId);
   if (!step) return [];
   return Array.from(step.entries())
-    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count, transactions: v.transactions }))
+    .map(([label, v]) => ({ label, amountEur: v.amountEur, grossAmountEur: v.grossAmountEur, count: v.count, transactions: v.transactions }))
     .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
 }
 
@@ -278,7 +287,7 @@ function toClassification(
 }
 
 function addBreakdownRow(
-  rows: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>,
+  rows: Map<string, BreakdownAccumulatorValue>,
   label: string,
   amountEur: number,
   transaction?: BreakdownTransaction
@@ -287,16 +296,17 @@ function addBreakdownRow(
   const prev = rows.get(label);
   if (prev) {
     prev.amountEur += amountEur;
+    prev.grossAmountEur = (prev.grossAmountEur ?? 0) + (transaction?.grossAmountEur ?? amountEur);
     prev.count += 1;
     if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
   } else {
-    rows.set(label, { amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
+    rows.set(label, { amountEur, grossAmountEur: transaction?.grossAmountEur ?? amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
 }
 
-function materializeRows(rows: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>): ValeurReelleWaterfallBreakdownRow[] {
+function materializeRows(rows: Map<string, BreakdownAccumulatorValue>): ValeurReelleWaterfallBreakdownRow[] {
   return Array.from(rows.entries())
-    .map(([label, v]) => ({ label, amountEur: v.amountEur, count: v.count, transactions: v.transactions }))
+    .map(([label, v]) => ({ label, amountEur: v.amountEur, grossAmountEur: v.grossAmountEur, count: v.count, transactions: v.transactions }))
     .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
 }
 
@@ -328,14 +338,15 @@ export const VALEUR_REELLE_EXPENSE_CATEGORIES = HIWAY_EXPENSE_CATEGORIES;
 
 export type ValeurReelleExpenseCategory = HiwayExpenseCategory;
 
-function breakdownTransaction(tx: DashboardTx, amountEur: number): BreakdownTransaction {
+function breakdownTransaction(tx: DashboardTx, amountEur: number, grossAmountEur?: number): BreakdownTransaction {
   return {
     id: tx.id,
     date: tx.date,
     label: tx.label,
     category: tx.category,
     company: tx.company,
-    amountEur
+    amountEur,
+    grossAmountEur
   };
 }
 
@@ -343,6 +354,7 @@ export function valeurReelleExpenseCategoryLabel(
   tx: DashboardTx,
   bucket: DerivedExpenseBucket | null
 ): ValeurReelleExpenseCategory {
+  if (bucket === "Urssaf") return "Urssaf";
   return categorizeHiwayExpense({ ...tx, category: tx.category || bucket || "" });
 }
 
@@ -352,7 +364,9 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
     bucket === "Indemnités kilométriques" ||
     bucket === "CESU" ||
     bucket === "Repas d'affaire" ||
-    bucket === "Repas dirigeant"
+    bucket === "Repas dirigeant" ||
+    bucket === "iCloud IA Store" ||
+    bucket === "Mutuelle"
   );
 }
 
@@ -534,8 +548,8 @@ export function analyzeValeurReelle(
   const movements: ClassifiedValeurReelleMovement[] = [];
   const categoryMap = new Map<string, ValeurReelleCategoryRow>();
   const waterfallBreakdown = waterfallBreakdownMap();
-  const mandatoryFeesBreakdown = new Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>();
-  const personalChargesBreakdown = new Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }>();
+  const mandatoryFeesBreakdown = new Map<string, BreakdownAccumulatorValue>();
+  const personalChargesBreakdown = new Map<string, BreakdownAccumulatorValue>();
   const vatRecoverableMonthly = new Map<string, { grossEur: number; vatEur: number; count: number; breakdown: Map<string, { amountEur: number; count: number; transactions?: BreakdownTransaction[] }> }>();
   const mandatoryFeeTransactions: ValeurReelleCashTree["mandatoryFeeTransactions"] = [];
 
@@ -557,7 +571,7 @@ export function analyzeValeurReelle(
       const feeLabel = valeurReelleExpenseCategoryLabel(tx, bucket);
       const feeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
       mandatoryFeesEur += feeAmountEur;
-      addBreakdownRow(mandatoryFeesBreakdown, feeLabel, feeAmountEur, breakdownTransaction(tx, feeAmountEur));
+      addBreakdownRow(mandatoryFeesBreakdown, feeLabel, feeAmountEur, breakdownTransaction(tx, feeAmountEur, amtAbs));
       mandatoryFeeTransactions.push({
         date: tx.date,
         label: tx.label,
@@ -624,7 +638,7 @@ export function analyzeValeurReelle(
       if (isValeurReellePersonalChargeLine(bucket)) {
         const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
         personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur, amtAbs));
       }
       if (
         classified.bucket === "NDF" ||
@@ -644,7 +658,7 @@ export function analyzeValeurReelle(
       if (isValeurReellePersonalChargeLine(bucket)) {
         const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
         personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur));
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur, amtAbs));
       }
       if (classified.bucket === "NDF" || classified.sublabel.toLowerCase().includes("note de frais")) {
         ndfIkGrossEur += amtAbs;
