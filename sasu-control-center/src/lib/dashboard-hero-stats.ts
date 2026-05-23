@@ -45,6 +45,11 @@ export type DashboardHeroStats = {
   caAnnuelEncaisseHtEur: number;
   caAnnuelEncaisseTtcEur: number;
   depensesAnnuelPasseesTtcEur: number;
+  ytdMonthly: Array<{
+    month: string;
+    revenueHtEur: number;
+    expensesEur: number;
+  }>;
   depensesDigitProMoisEur: number;
   depensesPersoMoisEur: number;
   netDansMaPocheMoisEur: number;
@@ -84,11 +89,12 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const currentYearSasuTxs = filterDashboardTransactions(proTxs, { years: [currentYear] }, now).filter(
     (tx) => !isCsgExpenseLine(tx)
   );
-  const depensesAnnuelPasseesTtcEur = computeDashboardMonthlyMetrics(
+  const currentYearMonthlyMetrics = computeDashboardMonthlyMetrics(
     currentYearSasuTxs,
     { years: [currentYear], kpiMode: "sasu" },
     now
-  ).reduce((sum, month) => sum + month.expenses, 0);
+  );
+  const depensesAnnuelPasseesTtcEur = currentYearMonthlyMetrics.reduce((sum, month) => sum + month.expenses, 0);
 
   for (const tx of windowed) {
     if (tx.amount >= 0 || transactionAnalyticsDayIso(tx).slice(0, 7) !== last.month) continue;
@@ -119,6 +125,13 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     caAnnuelEncaisseHtEur: Math.round(yearRevenue.ytdHt * 100) / 100,
     caAnnuelEncaisseTtcEur: Math.round(yearRevenue.ytdTtc * 100) / 100,
     depensesAnnuelPasseesTtcEur: Math.round(depensesAnnuelPasseesTtcEur * 100) / 100,
+    ytdMonthly: currentYearMonthlyMetrics
+      .filter((month) => month.month <= currentMonth)
+      .map((month) => ({
+        month: month.month,
+        revenueHtEur: Math.round((month.revenue / 1.2) * 100) / 100,
+        expensesEur: Math.round(month.expenses * 100) / 100
+      })),
     depensesDigitProMoisEur,
     depensesPersoMoisEur,
     netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur,

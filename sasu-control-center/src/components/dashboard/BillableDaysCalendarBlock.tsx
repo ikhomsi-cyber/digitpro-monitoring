@@ -22,7 +22,12 @@ import {
   toBillableIso,
   workedDaysChartPeriodLabel
 } from "@/lib/billable-calendar-metrics";
-import { indemniteKmPerWorkDayEur } from "@/lib/pluxee-commute-indemnity";
+import {
+  COMMUTE_HOME_LABEL,
+  COMMUTE_WORK_LABEL,
+  commuteRoundTripKm,
+  indemniteKmPerWorkDayEur
+} from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
@@ -265,6 +270,7 @@ export function BillableDaysCalendarBlock({
 
   const brutTjmMoisEncoursHt = selectedViewMonthStats.countedDays * tjmHt;
   const ikPerDay = indemniteKmPerWorkDayEur();
+  const ikRoundTripKm = commuteRoundTripKm();
   const ikMoisEncours = selectedViewMonthStats.countedDays * ikPerDay;
 
   const mealFeesForViewedMonth = useMemo(() => {
@@ -758,6 +764,48 @@ export function BillableDaysCalendarBlock({
                       referenceEur={IK_REFERENCE_EUR}
                       tone="analyze"
                     />
+                    <div className="mt-2.5 overflow-hidden rounded-2xl border border-violet-200/70 bg-white p-2 dark:border-violet-400/15 dark:bg-white/[0.03]">
+                      <div className="relative h-40 overflow-hidden rounded-xl border border-ink-200/70 bg-[#eef3ef] shadow-inner dark:border-white/[0.06] dark:bg-[#101815]">
+                        <div className="absolute inset-0 bg-[linear-gradient(rgba(100,116,139,0.13)_1px,transparent_1px),linear-gradient(90deg,rgba(100,116,139,0.13)_1px,transparent_1px)] bg-[size:32px_32px] dark:bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px)]" />
+                        <div className="absolute -left-10 top-5 h-28 w-32 rounded-[42%] bg-emerald-200/55 dark:bg-emerald-500/10" />
+                        <div className="absolute right-1 top-2 h-24 w-28 rounded-[44%] bg-emerald-200/55 dark:bg-emerald-500/10" />
+                        <div className="absolute left-2 top-2 rounded-md border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-500 shadow-sm dark:border-white/10 dark:bg-black/35 dark:text-white/45">
+                          Carte trajet IK
+                        </div>
+                        <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden>
+                          <path d="M0 70 C 18 55, 30 76, 47 57 S 70 45, 100 55" fill="none" stroke="#7dd3fc" strokeLinecap="round" strokeWidth="7" opacity="0.52" />
+                          <path d="M2 28 C 17 25, 32 35, 48 31 S 74 24, 98 29" fill="none" stroke="#facc15" strokeLinecap="round" strokeWidth="4.2" opacity="0.72" />
+                          <path d="M8 88 C 26 75, 48 84, 69 72 S 88 61, 100 66" fill="none" stroke="#94a3b8" strokeLinecap="round" strokeWidth="3" opacity="0.6" />
+                          <path d="M15 14 C 28 29, 40 17, 52 31 S 76 37, 94 20" fill="none" stroke="#94a3b8" strokeLinecap="round" strokeWidth="2.4" opacity="0.55" />
+                          <path d="M17 38 C 32 19, 49 68, 62 49 S 76 48, 84 64" fill="none" stroke="#8b5cf6" strokeLinecap="round" strokeWidth="6" opacity="0.18" />
+                          <path d="M17 38 C 32 19, 49 68, 62 49 S 76 48, 84 64" fill="none" stroke="#7c3aed" strokeDasharray="5 4" strokeLinecap="round" strokeWidth="2.7" opacity="0.9" />
+                        </svg>
+                        <div className="absolute left-[13%] top-[31%] z-[2] h-4 w-4 rounded-full border-[3px] border-white bg-violet-500 shadow-[0_0_18px_rgba(139,92,246,0.65)] dark:border-[#101815]" />
+                        <div className="absolute right-[14%] top-[56%] z-[2] h-4 w-4 rounded-full border-[3px] border-white bg-emerald-500 shadow-[0_0_18px_rgba(16,185,129,0.65)] dark:border-[#101815]" />
+                        <div className="absolute left-[44%] top-[36%] z-[3] flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-slate-400/70 bg-gradient-to-b from-slate-700 to-slate-950 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-50 shadow-[0_12px_28px_-14px_rgba(0,0,0,0.85)]">
+                          <span className="grid h-4 w-6 place-items-center rounded-full bg-slate-300 text-slate-900 shadow-inner">
+                            <CarFront className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
+                          </span>
+                          GLB gris
+                        </div>
+                        <div className="absolute left-[43%] top-[17%] rounded border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold text-ink-500 shadow-sm dark:border-white/10 dark:bg-black/35 dark:text-white/45">
+                          Paris Ouest
+                        </div>
+                        <div className="absolute bottom-2 left-2 right-2 grid grid-cols-[1fr_auto_1fr] items-end gap-2 text-[9px] font-semibold text-ink-600 dark:text-white/55">
+                          <div className="min-w-0">
+                            <p className="truncate text-violet-700 dark:text-violet-200">Départ</p>
+                            <p className="truncate">{COMMUTE_HOME_LABEL}</p>
+                          </div>
+                          <div className="rounded-full border border-ink-200/70 bg-white/80 px-2 py-1 text-center text-[9px] font-bold tabular-nums text-ink-700 dark:border-white/10 dark:bg-black/35 dark:text-white/70">
+                            {fmt.int(ikRoundTripKm)} km A/R
+                          </div>
+                          <div className="min-w-0 text-right">
+                            <p className="truncate text-emerald-700 dark:text-emerald-200">Arrivée</p>
+                            <p className="truncate">{COMMUTE_WORK_LABEL}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

@@ -3,7 +3,7 @@
  * Distance route retenue + barème fiscal €/km (8 CV, tranche &lt; 5000 km/an).
  */
 
-export const COMMUTE_HOME_LABEL = "226 rue Maurice Berteaux, 78500 Sartrouville";
+export const COMMUTE_HOME_LABEL = "Avenue Maurice Berteaux, 78500 Sartrouville";
 export const COMMUTE_WORK_LABEL = "Pluxee · Issy-les-Moulineaux";
 
 /** Chevaux fiscaux (barème « 7 CV et plus » dès 7 CV, identique pour 8 CV). */

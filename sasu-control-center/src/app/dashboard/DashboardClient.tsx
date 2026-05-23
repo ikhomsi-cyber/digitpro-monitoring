@@ -201,6 +201,7 @@ export function DashboardClient({
   }, [dashboardSection]);
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
+  const [heroStatsReady, setHeroStatsReady] = useState(demoMode);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
     initialDashboardScope === "personal" ? "personal" : "pro"
   );
@@ -220,7 +221,8 @@ export function DashboardClient({
   useEffect(() => {
     setTransactions(initialTransactions);
     setCurrentHeroStats(heroStats);
-  }, [syncKey, initialTransactions, heroStats]);
+    setHeroStatsReady(demoMode);
+  }, [syncKey, initialTransactions, heroStats, demoMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,6 +246,7 @@ export function DashboardClient({
           }
           if (payload.heroStats) {
             setCurrentHeroStats(payload.heroStats);
+            setHeroStatsReady(true);
           }
         })
         .catch(() => {
@@ -613,6 +616,7 @@ export function DashboardClient({
     return (
       <DashboardPremiumHero
         stats={currentHeroStats}
+        statsReady={heroStatsReady}
         contextMessage={heroContextMessage}
         showContextBanner={showContextBanner}
       />

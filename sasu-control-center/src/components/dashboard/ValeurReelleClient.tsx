@@ -196,12 +196,14 @@ function BreakdownPieChart({
             {slices.slice(0, 6).map((slice) => (
               <span
                 key={`compact-legend-${slice.row.label}`}
-                className="inline-flex max-w-[9rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
                 title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                 <span className="truncate">{slice.row.label}</span>
-                <span className="shrink-0 text-ink-500 dark:text-white/45">· {slice.percent} %</span>
+                <span className="shrink-0 text-ink-500 dark:text-white/45">
+                  · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
+                </span>
               </span>
             ))}
             {slices.length > 6 ? (
