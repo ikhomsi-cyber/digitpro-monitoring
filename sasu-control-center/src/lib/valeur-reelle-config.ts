@@ -298,7 +298,6 @@ export const REAL_EXPENSE_BUCKETS = new Set<DerivedExpenseBucket>([
   "Impôt",
   "Urssaf",
   "Retraite",
-  "PAS DSN",
   "Compta & admin.",
   "Qonto",
   "Assurance"
@@ -395,6 +394,7 @@ export const PREVOYANCE_KEYWORDS = [
   "prevoyance",
   "prévoyance",
   "wemind",
+  "we mind",
   "mutuelle",
   "collective"
 ] as const;

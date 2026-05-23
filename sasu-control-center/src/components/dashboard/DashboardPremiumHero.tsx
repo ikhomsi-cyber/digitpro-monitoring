@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { BriefcaseBusiness, CalendarCheck2, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
-import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
@@ -21,6 +20,7 @@ type Tile = {
   suffix?: string;
   sublabel?: string;
   sublabelTone?: "positive" | "negative" | "neutral";
+  metrics?: Array<{ label: string; value: string; tone?: "positive" | "negative" | "neutral" }>;
   icon: typeof TrendingUp;
   iconClassName: string;
   href?: string;
@@ -54,6 +54,33 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
   }, [activeTjmHt, billedDaysToDate, stats.caMensuelEur, stats.netDansMaPocheMoisEur]);
   const billedDaysLabel = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(billedDaysToDate);
   const remunerationDisponibleEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
+  const realTjmBeforeIncomeTaxEur = billedDaysToDate > 0 ? inPocketToDateEur / billedDaysToDate : 0;
+  const realTjmSharePct =
+    activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
+  const yearToDate = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const currentMonthKey = `${year}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    let billedDays = 0;
+    let generatedHt = 0;
+    for (const iso of billable.sortedIsos) {
+      if (!iso.startsWith(`${year}-`)) continue;
+      if (iso.slice(0, 7) >= currentMonthKey) continue;
+      billedDays += 1;
+      const monthKey = iso.slice(0, 7);
+      generatedHt += resolveBillableTjmForClientMonth(
+        billable.billableRatePeriods,
+        billable.billableRatePeriods[0]?.clientName ?? "",
+        monthKey,
+        billable.tjmHt
+      );
+    }
+    return {
+      year,
+      billedDays,
+      generatedHt: Math.round(generatedHt * 100) / 100
+    };
+  }, [billable.billableRatePeriods, billable.sortedIsos, billable.tjmHt]);
 
   const tiles: Tile[] = useMemo(
     () => [
@@ -85,15 +112,34 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         label: "TJM en vigueur",
         value: fmt.euro(activeTjmHt),
         suffix: "HT",
+        sublabel: `Réel hors IR ${fmt.euro(realTjmBeforeIncomeTaxEur)}/j · ${realTjmSharePct} % du TJM`,
+        sublabelTone: "neutral",
         icon: CalendarCheck2,
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
         href: "/parametres",
         ariaLabel: "Ouvrir le paramétrage des TJM"
       },
       {
+        label: `Depuis janvier ${yearToDate.year}`,
+        value: fmt.euro(yearToDate.generatedHt),
+        suffix: "HT généré",
+        metrics: [
+          { label: "Jours facturés", value: `${fmt.int(yearToDate.billedDays)} j.` },
+          { label: "CA encaissé", value: `${fmt.euro(stats.caAnnuelEncaisseHtEur)} HT`, tone: "positive" },
+          { label: "Dépenses SASU", value: fmt.euro(stats.depensesAnnuelPasseesTtcEur), tone: "negative" }
+        ],
+        icon: TrendingUp,
+        iconClassName: "text-emerald-300 bg-emerald-500/12 border-emerald-400/20",
+        href: "/dashboard?section=activite",
+        ariaLabel: "Ouvrir la page Activité",
+        wide: true
+      },
+      {
         label: "Dépenses du mois (SASU)",
         value: fmt.euro(stats.depensesQontoSasuMoisEur),
         suffix: "TTC",
+        sublabel: `HT ${fmt.euro(stats.depensesQontoSasuMoisHtEur)}`,
+        sublabelTone: "neutral",
         icon: BriefcaseBusiness,
         iconClassName: "text-rose-200 bg-rose-500/12 border-rose-300/20",
         href: "/dashboard?panel=valeur-reelle",
@@ -113,12 +159,22 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
         ariaLabel: "Ouvrir la page Valeur pour voir les dettes fiscales",
         wide: true,
         breakdown: [
-          { label: "CSG +1,5 %", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
-          { label: "TVA +1,5 %", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
+          { label: "CSG", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
+          { label: "TVA", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
         ]
       }
     ],
-    [activeTjmHt, billedDaysLabel, fmt, inPocketToDateEur, remunerationDisponibleEur, stats]
+    [
+      activeTjmHt,
+      billedDaysLabel,
+      fmt,
+      inPocketToDateEur,
+      realTjmBeforeIncomeTaxEur,
+      realTjmSharePct,
+      remunerationDisponibleEur,
+      stats,
+      yearToDate
+    ]
   );
 
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
@@ -189,6 +245,31 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
                   >
                     {t.sublabel}
                   </p>
+                ) : null}
+                {t.metrics ? (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {t.metrics.map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="min-w-0 rounded-xl border border-ink-200/70 bg-white/45 px-2.5 py-2 dark:border-white/[0.07] dark:bg-white/[0.025]"
+                      >
+                        <p className="truncate text-[9px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/35">
+                          {metric.label}
+                        </p>
+                        <p
+                          className={`mt-0.5 truncate text-[12px] font-bold tabular-nums ${
+                            metric.tone === "positive"
+                              ? "text-emerald-700 dark:text-emerald-300"
+                              : metric.tone === "negative"
+                                ? "text-rose-700 dark:text-rose-300"
+                                : "text-ink-900 dark:text-white"
+                          }`}
+                        >
+                          {metric.value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
                 {t.breakdown ? (
                   <div className="mt-3 space-y-2">
@@ -266,15 +347,6 @@ export function DashboardPremiumHero({ stats, contextMessage, showContextBanner 
           );
           })}
         </dl>
-
-        <div className="mx-auto mt-8 max-w-3xl text-left">
-          <ActivityOverviewPremium
-            monthTitle={billable.overviewMonthTitle}
-            kpis={billable.overviewKpis}
-            workdayGauge={billable.overviewWorkdayGauge}
-            ctaMode="navigate"
-          />
-        </div>
 
         <p className="mt-8 text-xs text-ink-400 dark:text-white/30">by Iliass KHOMSI</p>
       </div>

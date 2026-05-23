@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
+import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -18,5 +19,9 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: res.errorMessage }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, transactions: res.transactions });
+  return NextResponse.json({
+    ok: true,
+    transactions: res.transactions,
+    heroStats: computeDashboardHeroStats(res.transactions)
+  });
 }

@@ -200,6 +200,7 @@ export function DashboardClient({
     prevSectionRef.current = dashboardSection;
   }, [dashboardSection]);
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
+  const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
     initialDashboardScope === "personal" ? "personal" : "pro"
   );
@@ -218,7 +219,8 @@ export function DashboardClient({
 
   useEffect(() => {
     setTransactions(initialTransactions);
-  }, [syncKey, initialTransactions]);
+    setCurrentHeroStats(heroStats);
+  }, [syncKey, initialTransactions, heroStats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,12 +231,20 @@ export function DashboardClient({
       void fetch("/api/dashboard/transactions", { cache: "no-store" })
         .then(async (res) => {
           if (!res.ok) return null;
-          return (await res.json()) as { ok?: boolean; transactions?: DashboardTx[] };
+          return (await res.json()) as {
+            ok?: boolean;
+            transactions?: DashboardTx[];
+            heroStats?: DashboardHeroStats;
+          };
         })
         .then((payload) => {
           if (cancelled || !payload?.ok || !Array.isArray(payload.transactions)) return;
-          if (payload.transactions.length <= initialCount) return;
-          setTransactions(payload.transactions);
+          if (payload.transactions.length > initialCount) {
+            setTransactions(payload.transactions);
+          }
+          if (payload.heroStats) {
+            setCurrentHeroStats(payload.heroStats);
+          }
         })
         .catch(() => {
           // Le lot initial suffit pour afficher l'app ; l'historique complet est opportuniste.
@@ -245,7 +255,7 @@ export function DashboardClient({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [initialTransactions]);
+  }, [heroStats, initialTransactions]);
 
   useEffect(() => {
     setRevenueCounterpartyDetail(null);
@@ -602,7 +612,7 @@ export function DashboardClient({
   if (dashboardSection === "full") {
     return (
       <DashboardPremiumHero
-        stats={heroStats}
+        stats={currentHeroStats}
         contextMessage={heroContextMessage}
         showContextBanner={showContextBanner}
       />

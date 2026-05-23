@@ -27,7 +27,7 @@ import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
-import { TreasuryVerserPanel } from "@/components/dashboard/TreasuryVerserPanel";
+import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
@@ -180,7 +180,16 @@ export function BillableDaysCalendarBlock({
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
 }) {
-  const { selected, setSelected, tjmHt, billableRatePeriods, persistToSupabase } = useBillableActivity();
+  const {
+    selected,
+    setSelected,
+    tjmHt,
+    billableRatePeriods,
+    persistToSupabase,
+    overviewMonthTitle,
+    overviewKpis,
+    overviewWorkdayGauge
+  } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth0, setViewMonth0] = useState(now.getMonth());
@@ -443,6 +452,14 @@ export function BillableDaysCalendarBlock({
   );
 
   return (
+    <div className="space-y-5">
+      <ActivityOverviewPremium
+        monthTitle={overviewMonthTitle}
+        kpis={overviewKpis}
+        workdayGauge={overviewWorkdayGauge}
+        ctaMode="hidden"
+      />
+
     <Card variant="solid" className="overflow-hidden">
       <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-white/[0.06] dark:bg-gradient-to-b dark:from-[#0f1412] dark:via-[#0a0c0b] dark:to-[#060606]">
         <div className="flex items-start gap-3">
@@ -803,14 +820,6 @@ export function BillableDaysCalendarBlock({
             </div>
           </div>
 
-          {treasuryTransactions != null && treasuryScope != null ? (
-            <TreasuryVerserPanel
-              transactions={treasuryTransactions}
-              scope={treasuryScope}
-              viewYear={viewYear}
-              viewMonth0={viewMonth0}
-            />
-          ) : null}
           </div>
 
           {/* Synthèse */}
@@ -960,5 +969,6 @@ export function BillableDaysCalendarBlock({
           </div>
       </CardBody>
     </Card>
+    </div>
   );
 }

@@ -17,7 +17,6 @@ import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
 import type {
   ValeurReelleCashTree,
-  ValeurReelleVatLiability,
   ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
@@ -42,6 +41,15 @@ const PERSONAL_CHARGES_COLORS = [
   "#84cc16",
   "#a3e635",
   "#6ee7b7"
+];
+
+const RECOVERABLE_VAT_COLORS = [
+  "#38bdf8",
+  "#22d3ee",
+  "#60a5fa",
+  "#2dd4bf",
+  "#7dd3fc",
+  "#67e8f9"
 ];
 
 function cleanTransactionLabel(raw: string, company?: string): string {
@@ -80,13 +88,15 @@ function BreakdownPieChart({
   fmt,
   palette,
   recategorizeOptions,
-  onRecategorized
+  onRecategorized,
+  showDetailToggle = true
 }: {
   breakdown: ValeurReelleWaterfallBreakdownRow[];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   palette: readonly string[];
   recategorizeOptions?: readonly string[];
   onRecategorized?: (transactionId: string, category: string) => void;
+  showDetailToggle?: boolean;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const [openCategoryLabel, setOpenCategoryLabel] = useState<string | null>(null);
@@ -191,6 +201,7 @@ function BreakdownPieChart({
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                 <span className="truncate">{slice.row.label}</span>
+                <span className="shrink-0 text-ink-500 dark:text-white/45">· {slice.percent} %</span>
               </span>
             ))}
             {slices.length > 6 ? (
@@ -199,16 +210,18 @@ function BreakdownPieChart({
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => setShowDetails((v) => !v)}
-            className="inline-flex h-9 items-center justify-center rounded-full border border-ink-200 bg-white/70 px-4 text-xs font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:text-white/70 dark:hover:bg-white/[0.08]"
-            aria-expanded={showDetails}
-          >
-            {showDetails ? "Masquer le détail" : "Afficher le détail"}
-          </button>
+          {showDetailToggle ? (
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="inline-flex h-9 items-center justify-center rounded-full border border-ink-200 bg-white/70 px-4 text-xs font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-white/10 dark:bg-white/[0.05] dark:text-white/70 dark:hover:bg-white/[0.08]"
+              aria-expanded={showDetails}
+            >
+              {showDetails ? "Masquer le détail" : "Afficher le détail"}
+            </button>
+          ) : null}
         </div>
-        {showDetails ? (
+        {showDetails && showDetailToggle ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => {
             const transactions = (slice.row.transactions ?? []).filter((tx) => !hiddenTransactionIds.has(tx.id));
@@ -582,371 +595,67 @@ function CashFlowTreeVisual({
 
 function RecoverableVatMonthlyBlock({
   rows,
-  fmt,
-  periodLabel
+  fmt
 }: {
   rows: ValeurReelleVatMonthlyRow[];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
-  periodLabel: string;
 }) {
-  const [showDetails, setShowDetails] = useState(false);
   const totalVat = rows.reduce((sum, row) => sum + row.vatEur, 0);
   const totalGross = rows.reduce((sum, row) => sum + row.grossEur, 0);
   const averageVat = rows.length > 0 ? totalVat / rows.length : 0;
-  const latest = rows[0] ?? null;
   const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { amountEur: number; count: number }>();
     for (const row of rows) {
       for (const item of row.breakdown) {
-        map.set(item.label, (map.get(item.label) ?? 0) + item.amountEur);
+        const previous = map.get(item.label);
+        map.set(item.label, {
+          amountEur: (previous?.amountEur ?? 0) + item.amountEur,
+          count: (previous?.count ?? 0) + item.count
+        });
       }
     }
     return Array.from(map.entries())
-      .map(([label, amountEur]) => ({ label, amountEur }))
+      .map(([label, value]) => ({ label, amountEur: value.amountEur, count: value.count }))
       .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
   }, [rows]);
-  const topCategories = categoryBreakdown.slice(0, 4);
-  const maxCategory = Math.max(1, ...topCategories.map((item) => Math.abs(item.amountEur)));
-  const chartRows = [...rows].reverse();
-  const maxMonthlyVat = Math.max(1, ...chartRows.map((row) => row.vatEur));
-
-  const monthLabel = (monthKey: string) => {
-    const [year, month] = monthKey.split("-").map(Number);
-    return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
-      new Date(Date.UTC(year || 2000, (month || 1) - 1, 1))
-    );
-  };
+  const breakdownRows: ValeurReelleWaterfallBreakdownRow[] = categoryBreakdown.map((item) => ({
+    label: item.label,
+    amountEur: item.amountEur,
+    count: item.count
+  }));
 
   return (
     <section className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-sky-950/20 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-            TVA récupérable
-          </p>
-          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
-            Ce que je gagne en TVA par mois
-          </h2>
-        </div>
-        <div className="rounded-2xl bg-white/45 px-4 py-3 text-right dark:bg-white/[0.025]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
-            Moyenne mensuelle
-          </p>
-          <p className="mt-1 font-display text-xl font-bold tabular-nums text-sky-800 dark:text-sky-200">
-            {fmt.euro(averageVat)}
-          </p>
-          <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">{periodLabel}</p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { label: "Dernier mois", value: latest ? fmt.euro(latest.vatEur) : "—", sub: latest ? monthLabel(latest.monthKey) : "Aucun mois" },
-          { label: "Total TVA", value: fmt.euro(totalVat), sub: `${rows.length} mois` },
-          { label: "Base TTC", value: fmt.euro(totalGross), sub: "Éligible" },
-          { label: "Taux", value: "20 / 10 %", sub: "Services / resto" }
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl bg-white/40 px-3 py-2 dark:bg-white/[0.03]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-white/40">
-              {item.label}
+      <div className="rounded-xl border border-transparent bg-white/45 px-3 py-3 dark:bg-white/[0.025]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
+              TVA récupérable
             </p>
-            <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-950 dark:text-white">
-              {item.value}
-            </p>
-            <p className="mt-0.5 truncate text-[11px] capitalize text-ink-500 dark:text-white/40">{item.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {chartRows.length ? (
-        <div className="mt-4 rounded-2xl bg-white/40 px-3 py-3 dark:bg-white/[0.025]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 dark:text-white/40">
-              Évolution mensuelle
-            </p>
-            <p className="text-[11px] font-semibold tabular-nums text-sky-800 dark:text-sky-200">
-              max {fmt.euro(maxMonthlyVat)}
+            <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
+              TVA gagnée sur achats
+            </h2>
+            <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
+              Moy. {fmt.euro(averageVat)} / mois · Base TTC {fmt.euro(totalGross)}
             </p>
           </div>
-          <div className="flex h-36 items-end gap-1.5">
-            {chartRows.map((row) => {
-              const heightPx = Math.max(10, Math.round((row.vatEur / maxMonthlyVat) * 92));
-              return (
-                <div key={row.monthKey} className="group relative flex h-full min-w-0 flex-1 flex-col items-center justify-end">
-                  <div className="pointer-events-none absolute bottom-full mb-2 hidden rounded-lg border border-ink-200 bg-white px-2 py-1 text-[10px] font-semibold tabular-nums text-ink-800 shadow-lg group-hover:block dark:border-white/10 dark:bg-[#101015] dark:text-white">
-                    {monthLabel(row.monthKey)} · {fmt.euro(row.vatEur)}
-                  </div>
-                  <span className="mb-1 text-[10px] font-bold tabular-nums text-sky-900 dark:text-sky-100">
-                    {fmt.euro(row.vatEur)}
-                  </span>
-                  <div
-                    className="w-full rounded-t-lg bg-sky-400/90 shadow-[0_0_18px_rgba(56,189,248,0.18)]"
-                    style={{ height: `${heightPx}px` }}
-                    aria-hidden
-                  />
-                  <span className="mt-1 h-3 max-w-full truncate text-[9px] font-semibold uppercase text-ink-400 dark:text-white/30">
-                    {row.monthKey.slice(5)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {topCategories.length ? (
-        <div className="mt-4 space-y-2">
-          {topCategories.map((item) => (
-            <div key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-white/45 px-3 py-2 text-xs dark:bg-white/[0.025]">
-              <div className="min-w-0">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate font-semibold text-ink-700 dark:text-white/65">{item.label}</span>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/10">
-                  <span
-                    className="block h-full rounded-full bg-sky-400"
-                    style={{ width: `${Math.max(5, Math.round((Math.abs(item.amountEur) / maxCategory) * 100))}%` }}
-                    aria-hidden
-                  />
-                </div>
-              </div>
-              <span className="shrink-0 font-bold tabular-nums text-ink-950 dark:text-white">{fmt.euro(item.amountEur)}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={() => setShowDetails((v) => !v)}
-        className="mt-4 inline-flex h-9 items-center justify-center rounded-full border border-sky-200 bg-white/70 px-4 text-xs font-bold text-sky-800 shadow-sm transition hover:bg-white dark:border-sky-400/20 dark:bg-white/[0.05] dark:text-sky-200 dark:hover:bg-white/[0.08]"
-        aria-expanded={showDetails}
-      >
-        {showDetails ? "Masquer le détail" : "Afficher les catégories TVA"}
-      </button>
-
-      {showDetails ? (
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {categoryBreakdown.map((item) => (
-              <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl bg-white/50 px-3 py-2 text-xs dark:bg-white/[0.03]">
-                <span className="min-w-0 truncate font-semibold text-ink-700 dark:text-white/65">
-                  {item.label}
-                </span>
-                <span className="shrink-0 font-bold tabular-nums text-ink-950 dark:text-white">{fmt.euro(item.amountEur)}</span>
-              </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function VatLiabilityBlock({
-  liability,
-  fmt,
-  periodLabel
-}: {
-  liability: ValeurReelleVatLiability;
-  fmt: ReturnType<typeof useDashboardDisplayFormat>;
-  periodLabel: string;
-}) {
-  const [showPaidTransactions, setShowPaidTransactions] = useState(false);
-  const remainingTone =
-    liability.remainingVatEur > 0
-      ? "text-amber-800 dark:text-amber-200"
-      : "text-emerald-800 dark:text-emerald-200";
-  const denominator = Math.max(
-    1,
-    liability.collectedVatEur,
-    liability.paidVatEur + liability.recoverableVatEur
-  );
-  const paidPct = Math.max(0, Math.min(100, (liability.paidVatEur / denominator) * 100));
-  const recoveredPct = Math.max(0, Math.min(100, (liability.recoverableVatEur / denominator) * 100));
-  const remainingPct = Math.max(0, Math.min(100, (Math.max(0, liability.remainingVatEur) / denominator) * 100));
-
-  return (
-    <section className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-amber-50/35 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-amber-950/15 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-            TVA à reverser
-          </p>
-          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
-            TVA collectée non versée
-          </h2>
-          <p className="mt-1 text-xs font-medium text-ink-500 dark:text-white/40">{periodLabel}</p>
-        </div>
-        <div className="rounded-2xl bg-white/50 px-4 py-3 text-right dark:bg-white/[0.025]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
-            Reste estimé
-          </p>
-          <p className={`mt-1 font-display text-2xl font-bold tabular-nums ${remainingTone}`}>
-            {fmt.euro(liability.remainingVatEur)}
+          <p className="shrink-0 text-right font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+            {fmt.euro(totalVat)}
           </p>
         </div>
-      </div>
 
-      <div className="mt-4 overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-white/10 dark:bg-black/30">
-        <div className="flex h-4 overflow-hidden rounded-full">
-          <span className="bg-slate-400" style={{ width: `${paidPct}%` }} aria-hidden />
-          <span className="bg-sky-400" style={{ width: `${recoveredPct}%` }} aria-hidden />
-          <span className="bg-amber-400" style={{ width: `${remainingPct}%` }} aria-hidden />
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { label: "TVA collectée", value: fmt.euro(liability.collectedVatEur), sub: "CA TTC - CA HT", dot: "bg-violet-400" },
-          { label: "Déjà payée", value: fmt.euro(liability.paidVatEur), sub: "Transactions TVA", dot: "bg-slate-400" },
-          { label: "Gagnée 20 %", value: fmt.euro(liability.recoverableVat20Eur), sub: "Services / logiciels", dot: "bg-sky-400" },
-          { label: "Gagnée 10 %", value: fmt.euro(liability.recoverableVat10Eur), sub: "Repas / NDF", dot: "bg-emerald-400" }
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl bg-white/45 px-3 py-2 dark:bg-white/[0.03]">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-white/40">
-              <span className={`h-2 w-2 rounded-full ${item.dot}`} aria-hidden />
-              {item.label}
-            </p>
-            <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-950 dark:text-white">
-              {item.value}
-            </p>
-            <p className="mt-0.5 truncate text-[11px] text-ink-500 dark:text-white/40">{item.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-white/40 p-3 dark:bg-white/[0.025]">
-        <button
-          type="button"
-          onClick={() => setShowPaidTransactions((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 text-left"
-          aria-expanded={showPaidTransactions}
-        >
-          <span>
-            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-500 dark:text-white/40">
-              Paiements TVA
-            </span>
-            <span className="mt-0.5 block text-sm font-bold text-ink-950 dark:text-white">
-              {liability.paidTransactions.length} transaction{liability.paidTransactions.length > 1 ? "s" : ""}
-            </span>
-          </span>
-          <span className="shrink-0 rounded-full border border-ink-200 bg-white px-3 py-1 text-[11px] font-bold text-ink-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/60">
-            {showPaidTransactions ? "Masquer" : "Afficher"}
-          </span>
-        </button>
-
-        {showPaidTransactions ? (
-          liability.paidTransactions.length ? (
-            <div className="mt-3 max-h-72 space-y-2 overflow-y-auto overscroll-contain pr-1">
-              {liability.paidTransactions.map((tx) => (
-                <div key={tx.id} className="flex items-start justify-between gap-3 rounded-xl border border-ink-100 bg-white/70 px-3 py-2 dark:border-white/10 dark:bg-black/20">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-ink-950 dark:text-white">
-                      {cleanTransactionLabel(tx.label, tx.company)}
-                    </p>
-                    <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">
-                      {formatTransactionDate(tx.date)} · {tx.category || "TVA"}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-sm font-bold tabular-nums text-ink-700 dark:text-white/70">
-                    {fmt.euro(tx.amountEur)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 rounded-xl border border-dashed border-ink-200 px-3 py-3 text-sm font-medium text-ink-500 dark:border-white/10 dark:text-white/45">
-              Aucun paiement TVA sur cette période.
-            </p>
-          )
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-function DebtDistributionBlock({
-  tvaDebtEur,
-  csgDebtEur,
-  fmt
-}: {
-  tvaDebtEur: number;
-  csgDebtEur: number;
-  fmt: ReturnType<typeof useDashboardDisplayFormat>;
-}) {
-  const tvaDebt = Math.max(0, tvaDebtEur);
-  const csgDebt = Math.max(0, csgDebtEur);
-  const totalDebt = tvaDebt + csgDebt;
-  const circumference = 2 * Math.PI * 54;
-  const tvaRatio = totalDebt > 0 ? tvaDebt / totalDebt : 0;
-  const csgRatio = totalDebt > 0 ? csgDebt / totalDebt : 0;
-  const tvaDash = Math.max(0, tvaRatio * circumference - 2);
-  const csgDash = Math.max(0, csgRatio * circumference - 2);
-
-  return (
-    <section className="rounded-2xl border border-ink-200/90 bg-white p-4 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.03] sm:p-5">
-      <h2 className="font-display text-lg font-bold tracking-tight text-ink-800 dark:text-white sm:text-xl">
-        Répartition des dettes
-      </h2>
-
-      <div className="mt-4 flex justify-center">
-        <div className="relative h-56 w-56">
-          <svg viewBox="0 0 160 160" className="h-full w-full" role="img" aria-label="Répartition des dettes TVA et CSG">
-            <circle cx="80" cy="80" r="54" fill="none" stroke="rgba(248,113,113,0.22)" strokeWidth="16" />
-            {totalDebt > 0 ? (
-              <>
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="54"
-                  fill="none"
-                  stroke="#fb7c63"
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                  strokeDasharray={`${tvaDash} ${circumference}`}
-                  strokeDashoffset="0"
-                  transform="rotate(-90 80 80)"
-                />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="54"
-                  fill="none"
-                  stroke="#fec7bc"
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                  strokeDasharray={`${csgDash} ${circumference}`}
-                  strokeDashoffset={-(tvaRatio * circumference)}
-                  transform="rotate(-90 80 80)"
-                />
-              </>
-            ) : null}
-          </svg>
-          <div className="absolute inset-0 grid place-items-center text-center">
-            <div>
-              <p className="font-display text-3xl font-black tabular-nums text-rose-900 dark:text-rose-200">
-                {fmt.euro(totalDebt)}
-              </p>
-              <p className="mt-2 text-lg font-bold text-ink-700 dark:text-white/65">Dette totale</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3">
-        {[
-          { label: "Dette TVA", value: tvaDebt, color: "bg-[#fb7c63]" },
-          { label: "Dette CSG", value: csgDebt, color: "bg-[#fec7bc]" }
-        ].map((item) => (
-          <div key={item.label} className="flex items-center justify-between gap-4">
-            <span className="inline-flex min-w-0 items-center gap-3 text-lg font-bold text-ink-700 dark:text-white/70">
-              <span className={`h-3 w-3 shrink-0 rounded-full ${item.color} shadow-[0_0_0_8px_rgba(251,124,99,0.08)]`} aria-hidden />
-              {item.label}
-            </span>
-            <span className="shrink-0 font-display text-xl font-black tabular-nums text-ink-950 dark:text-white">
-              {fmt.euro(item.value)}
-            </span>
-          </div>
-        ))}
+        {breakdownRows.length ? (
+          <BreakdownPieChart
+            breakdown={breakdownRows}
+            fmt={fmt}
+            palette={RECOVERABLE_VAT_COLORS}
+            showDetailToggle={false}
+          />
+        ) : (
+          <p className="mt-3 rounded-xl bg-white/45 px-3 py-3 text-xs font-semibold text-ink-500 dark:bg-white/[0.03] dark:text-white/45">
+            Aucune TVA récupérable sur cette période.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -1048,19 +757,6 @@ export function ValeurReelleClient({
 
       <RecoverableVatMonthlyBlock
         rows={analysis.vatRecoverableMonthlyRows}
-        fmt={fmt}
-        periodLabel={analysis.periodLabel}
-      />
-
-      <VatLiabilityBlock
-        liability={analysis.vatLiability}
-        fmt={fmt}
-        periodLabel={analysis.periodLabel}
-      />
-
-      <DebtDistributionBlock
-        tvaDebtEur={analysis.vatLiability.remainingVatEur}
-        csgDebtEur={analysis.cashTree.csgEur}
         fmt={fmt}
       />
 

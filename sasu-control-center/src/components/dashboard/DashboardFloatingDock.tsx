@@ -81,7 +81,7 @@ export function DashboardFloatingDock() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-[90] animate-floatIn border-t border-white/[0.07] bg-black/55 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur-2xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[90] animate-floatIn border-t border-ink-200/80 bg-white/80 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-18px_44px_-28px_rgba(15,23,42,0.45)] backdrop-blur-2xl dark:border-white/[0.07] dark:bg-black/55 dark:shadow-none md:hidden"
       aria-label="Navigation principale"
     >
       <div className="mx-auto flex max-w-lg items-end justify-between gap-0.5">
@@ -98,14 +98,14 @@ export function DashboardFloatingDock() {
               className="relative flex min-w-0 flex-1 flex-col items-center gap-1 py-1"
             >
               {active ? (
-                <span className="absolute inset-x-0.5 -top-0.5 h-9 rounded-2xl bg-emerald-500/30 blur-md" aria-hidden />
+                <span className="absolute inset-x-0.5 -top-0.5 h-9 rounded-2xl bg-emerald-400/30 blur-md dark:bg-emerald-500/30" aria-hidden />
               ) : null}
               <span
                 className={clsx(
                   "relative z-[1] flex h-14 w-14 items-center justify-center rounded-[1.35rem] border transition",
                   active
-                    ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                    : "border-white/10 bg-white/5 text-white/55"
+                    ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-700 shadow-[0_0_20px_rgba(16,185,129,0.22)] dark:border-emerald-400/50 dark:bg-emerald-500/20 dark:text-emerald-100 dark:shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+                    : "border-ink-200/80 bg-white/70 text-ink-500 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/55 dark:shadow-none"
                 )}
               >
                 <Icon className="h-7 w-7" strokeWidth={active ? 2.4 : 2} aria-hidden />
@@ -114,7 +114,7 @@ export function DashboardFloatingDock() {
               <span
                 className={clsx(
                   "relative z-[1] max-w-[4.75rem] truncate text-center text-xs font-semibold leading-tight",
-                  active ? "text-white" : "text-white/45"
+                  active ? "text-ink-950 dark:text-white" : "text-ink-500 dark:text-white/45"
                 )}
               >
                 {tab.label}

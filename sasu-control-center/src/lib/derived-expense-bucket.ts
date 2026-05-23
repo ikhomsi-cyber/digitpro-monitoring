@@ -28,7 +28,6 @@ export const DERIVED_EXPENSE_BUCKETS = [
   "Mobile et Internet",
   ICLOUD_IA_STORE_CATEGORY_LABEL,
   "Retraite",
-  "PAS DSN",
   QONTO_CATEGORY_LABEL,
   ASSURANCE_CATEGORY_LABEL,
   MATERIEL_CATEGORY_LABEL,
@@ -61,6 +60,16 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const b = txBlob(tx);
 
   if (
+    b.includes("wemind") ||
+    b.includes("we mind") ||
+    b.includes("mutuelle") ||
+    b.includes("prevoyance") ||
+    b.includes("prévoyance")
+  ) {
+    return MUTUELLE_CATEGORY_LABEL;
+  }
+
+  if (
     b.includes("urssaf") ||
     b.includes("cgss") ||
     b.includes("cotisation sociale") ||
@@ -71,7 +80,6 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
 
   if (b.includes("dgfip")) {
     if (labelStartsWithDgfipTva(tx)) return "TVA";
-    if (categorizeHiwayExpense(tx) === "PAS DSN") return "Retraite";
     if (categorizeHiwayExpense(tx) === "Retraite") return "Retraite";
     return IMPOT_CATEGORY_LABEL;
   }
@@ -104,14 +112,14 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
       return MUTUELLE_CATEGORY_LABEL;
     case "Retraite":
       return "Retraite";
-    case "PAS DSN":
-      return "Retraite";
     case "Abonnement internet & mobile":
       return "Mobile et Internet";
     case "Assurances":
       return ASSURANCE_CATEGORY_LABEL;
     case "Frais bancaires":
       return QONTO_CATEGORY_LABEL;
+    case "Matériels et fournitures":
+      return MATERIEL_CATEGORY_LABEL;
     case "Paiement TVA":
       return labelStartsWithDgfipTva(tx) ? "TVA" : "Autres";
     case "Abonnement logiciel":

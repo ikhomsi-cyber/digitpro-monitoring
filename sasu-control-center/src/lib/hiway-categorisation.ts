@@ -9,11 +9,11 @@ export const HIWAY_EXPENSE_CATEGORIES = [
   "Mutuelle",
   "Hiway compta",
   "Retraite",
-  "PAS DSN",
   "Abonnement internet & mobile",
   "Repas du dirigeant",
   "Assurances",
   "Frais bancaires",
+  "Matériels et fournitures",
   "Paiement TVA",
   "Non catégorisé",
   "Abonnement logiciel"
@@ -42,24 +42,6 @@ function labelText(tx: Pick<DashboardTx, "label">): string {
 
 export function labelStartsWithDgfipTva(tx: Pick<DashboardTx, "label">): boolean {
   return /^dgfip\s*(?:·|\.|-|:)?\s*tva(?:\b|\d)/.test(labelText(tx));
-}
-
-function textLooksLikePasDsn(raw: string): boolean {
-  const text = foldHiwayText(raw);
-  return (
-    /\bpasdsn\b/.test(text) ||
-    /\bpas[-\s_]*dsn\b/.test(text) ||
-    /\bdsn\b/.test(text) ||
-    (/\bpas\b/.test(text) &&
-      (text.includes("dgfip") ||
-        text.includes("gfip") ||
-        text.includes("prelevement") ||
-        text.includes("prlv") ||
-        text.includes("a la source") ||
-        text.includes("retenue") ||
-        text.includes("liberatoire") ||
-        text.includes("dts")))
-  );
 }
 
 function textLooksLikeIk(raw: string): boolean {
@@ -155,14 +137,14 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
     ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
     ["Abonnement Hiway", ["abonnement hiway"]],
     ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
-    ["Mutuelle", ["mutuelle"]],
+    ["Mutuelle", ["mutuelle", "wemind", "we mind", "prevoyance", "prévoyance", "prevoyance collective", "prévoyance collective"]],
     ["Hiway compta", ["hiway compta", "depenses administratives", "administrative expenses"]],
     ["Retraite", ["retraite", "frais de personnel"]],
-    ["PAS DSN", ["pas dsn", "pasdsn", "dsn", "pas"]],
     ["Abonnement internet & mobile", ["abonnement internet mobile", "abonnement internet & mobile", "mobile et internet"]],
     ["Repas du dirigeant", ["repas du dirigeant", "repas dirigeant", "repas ilias", "repas ilia", "restauration pro", "dejeuner", "déjeuner", "frais de nourriture et boissons", "food and drink"]],
     ["Assurances", ["assurances", "assurance", "axa sogarep", "sogarep"]],
     ["Frais bancaires", ["frais bancaires", "qonto solo", "solo basic", "solo_basic"]],
+    ["Matériels et fournitures", ["materiels et fournitures", "matériels et fournitures", "materiel", "matériel", "fournitures"]],
     ["Paiement TVA", ["paiement tva", "tva"]],
     ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
     ["Abonnement logiciel", ["abonnement logiciel", "icloud ia store", "apple.com bill", "cursor ai powered ide"]]
@@ -179,7 +161,6 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
 
   if (labelStartsWithDgfipTva(tx)) return "Paiement TVA";
   if (mapped && mapped !== "Non catégorisé" && mapped !== "Frais bancaires") return mapped;
-  if (textLooksLikePasDsn(label) || textLooksLikePasDsn(source)) return "PAS DSN";
   if (label.includes("dgfip")) return "Non catégorisé";
   if (source.includes("urssaf") || source.includes("cgss")) return "Urssaf";
   if (textLooksLikeIk(source)) return "Indemnités kilométriques";
@@ -189,7 +170,7 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
       ? "Hiway compta"
       : "Abonnement Hiway";
   }
-  if (source.includes("wemind") || source.includes("mutuelle")) return "Mutuelle";
+  if (source.includes("wemind") || source.includes("we mind") || source.includes("mutuelle")) return "Mutuelle";
   if (textLooksLikeRetraite(source)) return "Retraite";
   if (/\bsfr\b/.test(source) || /\bfreebox\b/.test(source) || (/\bfree\b/.test(source) && /(mobile|telecom|internet|fibre|forfait|telephone)/.test(source))) {
     return "Abonnement internet & mobile";
@@ -198,6 +179,7 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   if (textLooksLikeRepasDirigeant(source) || source.includes("note de frais") || /\bndf\b/.test(source)) return "Repas du dirigeant";
   if (source.includes("sogarep") || /\baxa\b/.test(source) || source.includes("assurance")) return "Assurances";
   if (source.includes("solo_basic") || source.includes("solo basic") || source.includes("qonto solo")) return "Frais bancaires";
+  if (source.includes("materiel") || source.includes("matériel") || source.includes("fourniture")) return "Matériels et fournitures";
   if (textLooksLikeSoftware(source)) return "Abonnement logiciel";
   if (mapped === "Frais bancaires") return "Non catégorisé";
   return mapped ?? "Non catégorisé";

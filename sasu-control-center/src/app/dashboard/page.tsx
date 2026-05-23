@@ -23,10 +23,9 @@ import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/das
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
-import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
   loadBillableActivitySettings,
-  loadDashboardHeroStatsFromSupabase,
   loadTransactionYearBounds
 } from "@/lib/supabase/dashboard-loaders";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
@@ -111,10 +110,9 @@ export default async function DashboardPage({
   let initialBillableWorkDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
-  let heroStatsFromDb: DashboardHeroStats | null = null;
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [transactionsRes, boundsRes, billableRes, heroRes] = await Promise.all([
+    const [transactionsRes, boundsRes, billableRes] = await Promise.all([
       loadRecentUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
@@ -123,8 +121,7 @@ export default async function DashboardPage({
             initialBillableWorkDays: [],
             initialBillableTjmHt: null,
             billableRatePeriods: []
-          }),
-      loadDashboardHeroStatsFromSupabase(supabase)
+          })
     ]);
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
@@ -132,7 +129,6 @@ export default async function DashboardPage({
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
     billableRatePeriods = billableRes.billableRatePeriods;
-    heroStatsFromDb = heroRes.stats;
     if (transactionsRes.errorMessage) {
       console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
     }
@@ -146,7 +142,7 @@ export default async function DashboardPage({
   const powensCloudEnabled = isPowensCloudConfigured();
   const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
   const powensPrimaryAxis = powensPrimaryImportAxis();
-  const heroStats = dataMode === "DEMO" ? computeDashboardHeroStats(transactions) : (heroStatsFromDb ?? computeDashboardHeroStats(transactions));
+  const heroStats = computeDashboardHeroStats(transactions);
   const heroContextMessage =
     envMode === "DEMO"
       ? "Aucune configuration Supabase détectée : données de démonstration uniquement."

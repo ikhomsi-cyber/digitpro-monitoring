@@ -326,7 +326,6 @@ export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedE
     bucket === "Impôt" ||
     bucket === "Urssaf" ||
     bucket === "Mobile et Internet" ||
-    bucket === "Mutuelle" ||
     bucket === "Qonto" ||
     bucket === "Assurance" ||
     bucket === "Matériel" ||
@@ -383,7 +382,7 @@ function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null
     return null;
   }
   if (b.includes("hiway") || bucket === "Compta & admin.") return { label: "Hiway / admin", rate: 0.2 };
-  if (b.includes("wemind") || bucket === "Mutuelle") return null;
+  if (b.includes("wemind") || b.includes("we mind") || bucket === "Mutuelle") return null;
   if (bucket === "NDF" || bucket === "Repas dirigeant" || bucket === "Repas d'affaire") {
     return { label: "Repas & NDF", rate: 0.1 };
   }
@@ -402,7 +401,7 @@ function vatIncludedInGross(grossEur: number, rate: number): number {
   return Math.round((grossEur * rate / (1 + rate)) * 100) / 100;
 }
 
-function amountNetOfRecoverableVat(tx: DashboardTx, bucket: DerivedExpenseBucket | null, grossEur: number): number {
+export function amountNetOfRecoverableVat(tx: DashboardTx, bucket: DerivedExpenseBucket | null, grossEur: number): number {
   const rule = recoverableVatRule(tx, bucket);
   if (!rule) return grossEur;
   return Math.max(0, Math.round((grossEur - vatIncludedInGross(grossEur, rule.rate)) * 100) / 100);
@@ -717,9 +716,7 @@ export function analyzeValeurReelle(
   const caFactureEur = Math.round((caTtcEur / 1.2) * 100) / 100;
   const collectedVatEur = Math.max(0, Math.round((caTtcEur - caFactureEur) * 100) / 100);
   const recoverableVatEur = Math.round((recoverableVat20Eur + recoverableVat10Eur) * 100) / 100;
-  const remainingVatEur = applyFiscalDebtSafetyMargin(
-    Math.round((collectedVatEur - paidVatEur - recoverableVatEur) * 100) / 100
-  );
+  const remainingVatEur = Math.round((collectedVatEur - paidVatEur - recoverableVatEur) * 100) / 100;
   const realEarningsEur = caFactureEur - mandatoryFeesEur + personalChargesEur;
   const chargesEtCsgEur = digitProChargesEur;
   const bncBrutEur = Math.max(0, caFactureEur - digitProChargesEur);
