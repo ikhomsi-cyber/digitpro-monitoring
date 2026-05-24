@@ -146,7 +146,7 @@ function BreakdownPieChart({
 
   return (
     <div className="mt-3 space-y-3">
-      <div className="relative overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-white/10 dark:bg-black/30">
+      <div className="relative overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-cyan-100/[0.10] dark:bg-[#06242b]/70">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-white/10 dark:from-white/10" aria-hidden />
         <div className="relative flex h-5 overflow-hidden rounded-full">
           {slices.map((slice) => (
@@ -204,7 +204,7 @@ function BreakdownPieChart({
                 <span className="shrink-0 text-ink-500 dark:text-white/45">
                   · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
                 </span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-white/10 dark:bg-[#101412] dark:text-white/80">
+                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:text-white/80">
                   {slice.row.label} · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
                 </span>
               </span>
@@ -268,7 +268,7 @@ function BreakdownPieChart({
                   {slice.percent} %
                 </span>
               </button>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-200/55 dark:bg-black/25">
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-200/55 dark:bg-[#06242b]/65">
                 <span className="block h-full rounded-full" style={{ width: `${slice.percent}%`, backgroundColor: slice.color }} aria-hidden />
               </div>
               <div className="mt-1 text-right text-xs font-semibold tabular-nums text-ink-500 dark:text-white/40">
@@ -284,7 +284,7 @@ function BreakdownPieChart({
               {isOpen && hasTransactions ? (
                 <div className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1">
                   {transactions.map((tx) => (
-                    <div key={tx.id} className="rounded-xl border border-ink-100 bg-white/70 p-2.5 dark:border-white/10 dark:bg-black/20">
+                    <div key={tx.id} className="rounded-xl border border-ink-100 bg-white/70 p-2.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.05]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-[13px] font-bold text-ink-900 dark:text-white">
@@ -417,7 +417,7 @@ function CashFlowTreeVisual({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45 }}
-      className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-emerald-50/30 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-emerald-950/20 sm:p-5"
+      className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-emerald-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5"
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
         <motion.div>
@@ -462,7 +462,7 @@ function CashFlowTreeVisual({
             </p>
           </div>
         </div>
-        <div className="relative overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-white/10 dark:bg-black/30">
+        <div className="relative overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-cyan-100/[0.10] dark:bg-[#06242b]/70">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-white/10 dark:from-white/10" aria-hidden />
           <div className="relative flex h-5 overflow-hidden rounded-full">
           {[
@@ -630,8 +630,8 @@ function RecoverableVatMonthlyBlock({
   }));
 
   return (
-    <section className="rounded-2xl border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-white/[0.08] dark:from-[#0c0c10] dark:via-[#0a0a0f] dark:to-sky-950/20 sm:p-5">
-      <div className="rounded-xl border border-transparent bg-white/45 px-3 py-3 dark:bg-white/[0.025]">
+    <section className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5">
+      <div className="rounded-2xl border border-transparent bg-white/45 px-3 py-3 dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.06]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">

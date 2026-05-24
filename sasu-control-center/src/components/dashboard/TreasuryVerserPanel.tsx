@@ -40,12 +40,12 @@ export function TreasuryVerserPanel({
   return (
     <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
       <div
-        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#12101a] dark:via-violet-950/12 dark:to-[#060606] dark:shadow-none dark:ring-white/[0.05] sm:p-3.5"
+        className="flex h-full min-h-0 flex-col rounded-2xl border border-violet-200/80 bg-gradient-to-b from-violet-50/60 to-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-cyan-100/[0.10] dark:bg-[#0b3038] dark:bg-none dark:shadow-none dark:ring-cyan-100/[0.06] sm:p-3.5"
         data-private
       >
         <div className="flex items-start gap-2">
           <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-violet-200 dark:shadow-none"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.06] dark:text-violet-200 dark:shadow-none"
             aria-hidden
           >
             <Scale className="h-4 w-4" strokeWidth={1.85} />

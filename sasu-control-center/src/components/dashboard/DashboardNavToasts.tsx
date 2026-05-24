@@ -98,7 +98,7 @@ export function DashboardNavToasts() {
                 className={clsx(
                   "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 text-center transition sm:px-4 sm:py-2",
                   "min-h-0 min-w-[4.75rem] max-w-full sm:min-w-[5.25rem]",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-50 dark:focus-visible:ring-emerald-400/50 dark:focus-visible:ring-offset-[#050505]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-500/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-50 dark:focus-visible:ring-emerald-400/50 dark:focus-visible:ring-offset-[#06242b]",
                   active
                     ? clsx(
                         "border border-ink-900/18 bg-white text-ink-950 shadow-sm ring-1 ring-ink-900/[0.05]",

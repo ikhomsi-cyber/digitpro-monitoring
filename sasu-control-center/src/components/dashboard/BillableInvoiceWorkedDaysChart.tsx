@@ -84,7 +84,7 @@ function ChartTooltip({
         : "text-violet-800 dark:text-violet-300";
 
   return (
-    <div className="rounded-lg border border-ink-200 bg-white px-2.5 py-2 text-xs shadow-md dark:border-ink-600 dark:bg-ink-900 dark:shadow-none">
+    <div className="rounded-lg border border-ink-200 bg-white px-2.5 py-2 text-xs shadow-md dark:border-cyan-100/[0.12] dark:bg-[#0b3038]/95 dark:shadow-none">
       <div className="font-medium capitalize text-ink-900 dark:text-ink-50">{p.label}</div>
       <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
         {meta.label}
@@ -163,7 +163,7 @@ export function BillableInvoiceWorkedDaysChart({
 
   if (!data.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-xs text-ink-500 dark:border-ink-700 dark:bg-ink-900/50 dark:text-ink-400">
+      <div className="rounded-2xl border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-xs text-ink-500 dark:border-cyan-100/[0.12] dark:bg-cyan-50/[0.05] dark:text-ink-400">
         {emptyHint === "filter"
           ? "Aucune donnée pour ce filtre (année ou trimestre)."
           : "Aucun encaissement « Chiffre d’affaires » sur la période pour ce périmètre."}

@@ -230,7 +230,7 @@ export function DashboardDataActionsMenu({
       />
       <button
         type="button"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-ink-200/90 bg-white/90 text-ink-700 transition hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white/80 dark:hover:bg-white/10"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-ink-200/90 bg-white/90 text-ink-700 transition hover:bg-white dark:border-cyan-100/[0.16] dark:bg-cyan-50/[0.10] dark:text-white dark:hover:bg-cyan-50/[0.16]"
         aria-label="Réglages et imports"
         aria-expanded={open}
         title="Réglages et imports"
@@ -239,10 +239,10 @@ export function DashboardDataActionsMenu({
         <Settings2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded-2xl border border-ink-200/90 bg-white/95 p-2 text-sm shadow-[0_24px_80px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#080a09]/95">
+        <div className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded-2xl border border-ink-200/90 bg-white/95 p-2 text-sm shadow-[0_24px_80px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/95">
           <Link
             href="/parametres"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-ink-800 transition hover:bg-ink-50 dark:text-white/85 dark:hover:bg-white/8"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-ink-800 transition hover:bg-ink-50 dark:text-white/85 dark:hover:bg-cyan-50/[0.08]"
             onClick={() => setOpen(false)}
           >
             <Settings2 className="h-4 w-4 text-ink-500 dark:text-white/45" aria-hidden />
@@ -314,7 +314,7 @@ function MenuButton({
       type="button"
       title={title}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-medium text-ink-800 transition hover:bg-ink-50 disabled:opacity-50 dark:text-white/85 dark:hover:bg-white/8"
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-medium text-ink-800 transition hover:bg-ink-50 disabled:opacity-50 dark:text-white/85 dark:hover:bg-cyan-50/[0.08]"
       onClick={onClick}
     >
       <Icon className="h-4 w-4 text-ink-500 dark:text-white/45" aria-hidden />

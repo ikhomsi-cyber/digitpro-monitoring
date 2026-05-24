@@ -81,10 +81,10 @@ export function DashboardFloatingDock() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-[90] animate-floatIn border-t border-ink-200/80 bg-white/80 px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-18px_44px_-28px_rgba(15,23,42,0.45)] backdrop-blur-2xl dark:border-white/[0.07] dark:bg-black/55 dark:shadow-none md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] animate-floatIn px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
       aria-label="Navigation principale"
     >
-      <div className="mx-auto flex max-w-lg items-end justify-between gap-0.5">
+      <div className="pointer-events-auto mx-auto flex max-w-[27rem] items-center justify-between gap-1 rounded-[1.85rem] border border-cyan-100/[0.10] bg-[#082a31]/88 px-2 py-2 text-white shadow-[0_18px_60px_-22px_rgba(0,18,24,0.88),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
         {TABS.map((tab) => {
           const active = tab.isActive(ctx);
           const Icon = tab.icon;
@@ -95,26 +95,29 @@ export function DashboardFloatingDock() {
               prefetch={!tab.href.includes("#")}
               scroll={false}
               onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
-              className="relative flex min-w-0 flex-1 flex-col items-center gap-1 py-1"
+              className={clsx(
+                "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
+                active ? "bg-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : "hover:bg-white/[0.055]"
+              )}
             >
               {active ? (
-                <span className="absolute inset-x-0.5 -top-0.5 h-9 rounded-2xl bg-emerald-400/30 blur-md dark:bg-emerald-500/30" aria-hidden />
+                <span className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-cyan-200/10 blur-sm" aria-hidden />
               ) : null}
               <span
                 className={clsx(
-                  "relative z-[1] flex h-14 w-14 items-center justify-center rounded-[1.35rem] border transition",
+                  "relative z-[1] flex h-8 w-8 items-center justify-center rounded-full transition",
                   active
-                    ? "border-emerald-500/45 bg-emerald-500/15 text-emerald-700 shadow-[0_0_20px_rgba(16,185,129,0.22)] dark:border-emerald-400/50 dark:bg-emerald-500/20 dark:text-emerald-100 dark:shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                    : "border-ink-200/80 bg-white/70 text-ink-500 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/55 dark:shadow-none"
+                    ? "bg-white/[0.16] text-white shadow-[0_10px_26px_-18px_rgba(255,255,255,0.7)]"
+                    : "text-white/72"
                 )}
               >
-                <Icon className="h-7 w-7" strokeWidth={active ? 2.4 : 2} aria-hidden />
+                <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={active ? 2.45 : 2.05} aria-hidden />
                 <span className="sr-only">{tab.label}</span>
               </span>
               <span
                 className={clsx(
-                  "relative z-[1] max-w-[4.75rem] truncate text-center text-xs font-semibold leading-tight",
-                  active ? "text-ink-950 dark:text-white" : "text-ink-500 dark:text-white/45"
+                  "relative z-[1] mt-1 max-w-[4.2rem] truncate text-center text-[10px] font-bold leading-none tracking-tight",
+                  active ? "text-white" : "text-white/72"
                 )}
               >
                 {tab.label}

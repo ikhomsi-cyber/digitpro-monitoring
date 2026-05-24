@@ -109,26 +109,26 @@ export function ActivityOverviewPremium({
     : `${fmt.int(workdayGauge.countedBillable)} jours sur ${fmt.int(workdayGauge.totalBillableMonth)} ouvrés`;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-ink-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-5 shadow-[0_20px_60px_-28px_rgba(16,185,129,0.35)] dark:border-emerald-500/20 dark:from-[#0c100e] dark:via-[#080a09] dark:to-[#030504] dark:shadow-[0_32px_80px_-24px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] sm:p-6">
+    <div className="relative overflow-hidden rounded-[2rem] border border-ink-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-5 shadow-[0_20px_60px_-28px_rgba(16,185,129,0.35)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-6">
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl dark:bg-emerald-500/25"
+        className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl dark:bg-teal-300/18"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-12 left-8 h-36 w-36 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/15"
+        className="pointer-events-none absolute -bottom-12 left-8 h-36 w-36 rounded-full bg-sky-400/10 blur-3xl dark:bg-cyan-300/12"
         aria-hidden
       />
 
       <div className="relative flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-emerald-700/90 dark:text-emerald-300/85">
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700/90 dark:text-teal-200/80">
             Activité SASU
           </p>
-          <p className="mt-0.5 font-display text-sm font-semibold capitalize text-ink-900 dark:text-white">
+          <p className="mt-0.5 font-display text-sm font-semibold capitalize text-ink-900 dark:text-white/90">
             {monthTitle}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-200">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-800 dark:border-teal-200/[0.16] dark:bg-teal-200/[0.08] dark:text-teal-100/85">
           <BriefcaseBusiness className="h-3 w-3" aria-hidden />
           TJM · HT
         </span>
@@ -146,43 +146,43 @@ export function ActivityOverviewPremium({
           <div>
             <div className="flex items-start gap-3">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 dark:border-emerald-700/50 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 dark:border-teal-200/[0.14] dark:bg-teal-200/[0.08] dark:text-teal-100">
                   <TrendingUp className="h-4 w-4" strokeWidth={2} aria-hidden />
                 </span>
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-white/45">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/55">
                     CA estimé (mois)
                   </p>
-                  <p className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white">
+                  <p className="font-display text-2xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white/95">
                     {fmt.euro(kpis.caEstime)}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ink-100/90 ring-1 ring-black/[0.04] dark:bg-white/[0.06] dark:ring-white/10">
+            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-ink-100/90 ring-1 ring-black/[0.04] dark:bg-[#06242b]/80 dark:ring-cyan-100/[0.10]">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600 shadow-[0_0_16px_rgba(16,185,129,0.45)] transition-[width] duration-500 ease-out"
                 style={{ width: `${caPct * 100}%` }}
               />
             </div>
-            <div className="mt-1.5 flex justify-between text-[10px] tabular-nums text-ink-500 dark:text-white/40">
+            <div className="mt-1.5 flex justify-between text-[10px] font-medium tabular-nums text-ink-500 dark:text-white/55">
               <span>0 €</span>
               <span>{fmt.euro(kpis.projectionFinMois)} objectif</span>
             </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.03]">
-              <dt className="flex items-center gap-1 text-[10px] font-medium text-ink-500 dark:text-white/45">
+            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07]">
+              <dt className="flex items-center gap-1 text-[10px] font-semibold text-ink-500 dark:text-white/55">
                 <Target className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
                 Reste à facturer
               </dt>
-              <dd className="mt-1 font-display text-sm font-semibold tabular-nums text-ink-900 dark:text-white">
+              <dd className="mt-1 font-display text-sm font-semibold tabular-nums text-ink-900 dark:text-white/92">
                 {fmt.euro(kpis.resteAFacturer)}
               </dd>
             </div>
-            <div className="rounded-xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-white/[0.07] dark:bg-white/[0.03]">
-              <dt className="text-[10px] font-medium text-ink-500 dark:text-white/45">Projection fin de mois</dt>
+            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07]">
+              <dt className="text-[10px] font-semibold text-ink-500 dark:text-white/55">Projection fin de mois</dt>
               <dd className="mt-1 font-display text-sm font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
                 {fmt.euro(kpis.projectionFinMois)}
               </dd>

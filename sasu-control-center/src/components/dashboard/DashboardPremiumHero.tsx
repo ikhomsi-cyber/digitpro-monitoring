@@ -263,6 +263,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     [
       activeTjmHt,
       activityYtd,
+      billedDaysToDate,
       billedDaysLabel,
       fmt,
       inPocketToDateEur,
@@ -273,7 +274,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       remunerationDisponibleEur,
       stats,
       statsReady,
-      tjmRepartitionTotalEur,
       yearToDate
     ]
   );
@@ -281,7 +281,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   const chips = "SASU · LMNP · Cashflow · Fiscalité";
 
   return (
-    <header className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-3xl border border-ink-200/80 bg-gradient-to-b from-white via-white to-ink-50/80 px-5 py-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.15)] dark:border-white/[0.07] dark:from-[#0f1412] dark:via-[#0a0d0c] dark:to-[#050505] dark:shadow-[0_32px_100px_-20px_rgba(0,0,0,0.75)] sm:px-8 sm:py-10">
+    <header className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-[2rem] border border-ink-200/80 bg-gradient-to-b from-white via-white to-ink-50/80 px-5 py-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.15)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_100px_-20px_rgba(0,22,28,0.78),inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-8 sm:py-10">
       <div
         className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-400/15 blur-3xl dark:bg-emerald-500/20"
         aria-hidden
@@ -514,7 +514,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                     }
                   : undefined
               }
-              className={`rounded-2xl border border-ink-200/80 bg-white/70 px-3 py-3 text-left shadow-sm dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none sm:px-4 sm:py-4 ${
+              className={`rounded-2xl border border-ink-200/80 bg-white/70 px-3 py-3 text-left shadow-sm dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.055] dark:shadow-none sm:px-4 sm:py-4 ${
                 t.wide ? "col-span-2" : ""
               } ${
                 interactive

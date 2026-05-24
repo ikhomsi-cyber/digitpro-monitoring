@@ -110,13 +110,13 @@ function WorkdaysMonthGauge({
 
   return (
     <div className="mt-2">
-      <div className="flex items-baseline justify-between gap-2 text-[10px] text-ink-500 dark:text-ink-400">
-        <span className="font-medium text-ink-600 dark:text-ink-300">Jauge j. ouvrés cochés / reste</span>
+      <div className="flex items-baseline justify-between gap-2 text-[10px] text-ink-500 dark:text-cyan-50/55">
+        <span className="font-semibold text-ink-600 dark:text-cyan-50/70">Jauge j. ouvrés cochés / reste</span>
         <span className="tabular-nums text-[10px]">
           {denomLabel} · {pctLabel}%
         </span>
       </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-black/[0.04] dark:bg-ink-800 dark:ring-white/10">
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-black/[0.04] dark:bg-[#06242b]/65 dark:ring-cyan-100/[0.10]">
         <div className="h-full bg-emerald-600 dark:bg-emerald-500" style={{ width: `${pct * 100}%` }} />
       </div>
     </div>
@@ -147,13 +147,13 @@ function BudgetGauge({
 
   return (
     <div className="mt-2">
-      <div className="flex items-baseline justify-between gap-2 text-[10px] text-ink-500 dark:text-ink-400">
-        <span className="font-medium text-ink-600 dark:text-ink-300">{label}</span>
+      <div className="flex items-baseline justify-between gap-2 text-[10px] text-ink-500 dark:text-cyan-50/55">
+        <span className="font-semibold text-ink-600 dark:text-cyan-50/70">{label}</span>
         <span className="tabular-nums">
           {fmt.euro(valueEur)} / {fmt.euro(referenceEur)} · {pctLabel}%
         </span>
       </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-black/[0.04] dark:bg-ink-800 dark:ring-white/10">
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-ink-100 ring-1 ring-black/[0.04] dark:bg-[#06242b]/65 dark:ring-cyan-100/[0.10]">
         <div className={`h-full ${fillClass}`} style={{ width: `${pct * 100}%` }} />
       </div>
     </div>
@@ -467,19 +467,19 @@ export function BillableDaysCalendarBlock({
       />
 
     <Card variant="solid" className="overflow-hidden">
-      <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-white/[0.06] dark:bg-gradient-to-b dark:from-[#0f1412] dark:via-[#0a0c0b] dark:to-[#060606]">
+      <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-cyan-100/[0.12] dark:bg-[#06242b]/70 dark:bg-none">
         <div className="flex items-start gap-3">
           <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:shadow-none"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 shadow-sm dark:border-teal-200/[0.16] dark:bg-teal-200/[0.10] dark:text-teal-100 dark:shadow-none"
             aria-hidden
           >
             <CalendarDays className="h-4 w-4" strokeWidth={1.85} />
           </span>
           <div className="min-w-0 flex-1">
-            <CardTitle className="!mt-0 text-base font-semibold tracking-tight text-ink-900 dark:text-[#f4f4f2]">
+            <CardTitle className="!mt-0 text-base font-bold tracking-tight text-ink-900 dark:text-white">
               Jours travaillés & TJM
             </CardTitle>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-500 dark:text-white/50 sm:text-xs">
+            <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-ink-500 dark:text-cyan-50/62 sm:text-xs">
               Calendrier des jours facturés, TJM et indicateurs du mois.
             </p>
           </div>
@@ -492,7 +492,7 @@ export function BillableDaysCalendarBlock({
           {/* Calendrier compact */}
           <div className="flex shrink-0 flex-col items-center sm:items-start">
             <div
-              className="w-full max-w-[260px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] dark:border-white/[0.09] dark:bg-white/[0.035] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-white/[0.06] sm:p-3.5"
+              className="w-full max-w-[260px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-cyan-100/[0.06] sm:p-3.5"
               role="group"
               aria-label={`Calendrier ${monthTitleFr(viewYear, viewMonth0)}`}
             >
@@ -672,24 +672,24 @@ export function BillableDaysCalendarBlock({
 
           {/* Mois sélectionné : brut TJM + IK — à droite du calendrier (sm+) */}
           <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
-            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-white/[0.08] dark:bg-white/[0.03] dark:shadow-none dark:ring-white/[0.05] sm:p-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+            <div className="flex h-full min-h-0 flex-col rounded-[1.75rem] border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-cyan-100/[0.14] dark:bg-[#06242b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-cyan-100/[0.08] sm:p-3.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-ink-500 dark:text-cyan-50/70">
                 Mois sélectionné
               </p>
-              <p className="mt-1 text-[11px] leading-snug text-ink-600 dark:text-ink-300">
+              <p className="mt-1 text-[11px] font-semibold leading-snug text-ink-600 dark:text-white/82">
                 {selectedViewMonthStats.isCurrent ? (
                   <>
                     Jusqu’au{" "}
-                    <span className="font-medium text-ink-800 dark:text-ink-200">
+                    <span className="font-bold text-ink-800 dark:text-white">
                       {selectedViewMonthStats.todayLongFr}
                     </span>
                     , vous avez coché{" "}
-                    <span className="font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
                       {selectedViewMonthStats.countedDays}
                     </span>{" "}
                     jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} travaillé
                     {selectedViewMonthStats.countedDays !== 1 ? "s" : ""} (
-                    <span className="capitalize text-ink-800 dark:text-ink-200">
+                    <span className="capitalize text-ink-800 dark:text-white">
                       {selectedViewMonthStats.monthTitle}
                     </span>
                     ).
@@ -697,11 +697,11 @@ export function BillableDaysCalendarBlock({
                 ) : selectedViewMonthStats.isPast ? (
                   <>
                     Pour{" "}
-                    <span className="font-medium capitalize text-ink-800 dark:text-ink-200">
+                    <span className="font-bold capitalize text-ink-800 dark:text-white">
                       {selectedViewMonthStats.monthTitle}
                     </span>
                     , vous avez coché{" "}
-                    <span className="font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
                       {selectedViewMonthStats.countedDays}
                     </span>{" "}
                     jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} travaillé
@@ -709,11 +709,11 @@ export function BillableDaysCalendarBlock({
                   </>
                 ) : (
                   <>
-                    <span className="font-medium capitalize text-ink-800 dark:text-ink-200">
+                    <span className="font-bold capitalize text-ink-800 dark:text-white">
                       {selectedViewMonthStats.monthTitle}
                     </span>{" "}
                     :{" "}
-                    <span className="font-semibold tabular-nums text-ink-900 dark:text-ink-50">
+                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
                       {selectedViewMonthStats.countedDays}
                     </span>{" "}
                     jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} coché
@@ -722,18 +722,18 @@ export function BillableDaysCalendarBlock({
                 )}
               </p>
 
-              <div className="mt-3 space-y-2.5 border-t border-ink-100 pt-3 dark:border-ink-800">
+              <div className="mt-3 space-y-3 border-t border-ink-100 pt-3 dark:border-cyan-100/[0.12]">
                 {/* TJM */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-teal-200/[0.16] dark:bg-teal-200/[0.10] dark:text-teal-100">
                     <BriefcaseBusiness className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM (HT)</p>
-                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
+                    <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">TJM (HT)</p>
+                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                       {fmt.euro(brutTjmMoisEncoursHt)}
                     </p>
-                    <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                    <p className="text-[10px] font-medium text-ink-400 dark:text-cyan-50/46">
                       {fmt.int(selectedViewMonthStats.countedDays)} j. × {fmt.euro(tjmHt)}
                     </p>
                     <WorkdaysMonthGauge
@@ -747,15 +747,15 @@ export function BillableDaysCalendarBlock({
 
                 {/* IK */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-200/80 bg-violet-50 text-violet-600 dark:border-violet-800/60 dark:bg-violet-950/50 dark:text-violet-400">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-violet-200/80 bg-violet-50 text-violet-600 dark:border-violet-200/[0.18] dark:bg-violet-300/[0.12] dark:text-violet-100">
                     <CarFront className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">IK aller-retour</p>
+                    <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">IK aller-retour</p>
                     <p className="font-display text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">
                       {fmt.euro(ikMoisEncours)}
                     </p>
-                    <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                    <p className="text-[10px] font-medium text-ink-400 dark:text-cyan-50/46">
                       {fmt.int(selectedViewMonthStats.countedDays)} j. × {fmt.euro(ikPerDay)}
                     </p>
                     <BudgetGauge
@@ -764,12 +764,12 @@ export function BillableDaysCalendarBlock({
                       referenceEur={IK_REFERENCE_EUR}
                       tone="analyze"
                     />
-                    <div className="mt-2.5 overflow-hidden rounded-2xl border border-violet-200/70 bg-white p-2 dark:border-violet-400/15 dark:bg-white/[0.03]">
-                      <div className="relative h-40 overflow-hidden rounded-xl border border-ink-200/70 bg-[#eef3ef] shadow-inner dark:border-white/[0.06] dark:bg-[#101815]">
+                    <div className="mt-2.5 overflow-hidden rounded-2xl border border-violet-200/70 bg-white p-2 dark:border-violet-400/15 dark:bg-[#06242b]/55">
+                      <div className="relative h-40 overflow-hidden rounded-xl border border-ink-200/70 bg-[#eef3ef] shadow-inner dark:border-cyan-100/[0.08] dark:bg-[#0b3038]">
                         <div className="absolute inset-0 bg-[linear-gradient(rgba(100,116,139,0.13)_1px,transparent_1px),linear-gradient(90deg,rgba(100,116,139,0.13)_1px,transparent_1px)] bg-[size:32px_32px] dark:bg-[linear-gradient(rgba(255,255,255,0.07)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.07)_1px,transparent_1px)]" />
                         <div className="absolute -left-10 top-5 h-28 w-32 rounded-[42%] bg-emerald-200/55 dark:bg-emerald-500/10" />
                         <div className="absolute right-1 top-2 h-24 w-28 rounded-[44%] bg-emerald-200/55 dark:bg-emerald-500/10" />
-                        <div className="absolute left-2 top-2 rounded-md border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-500 shadow-sm dark:border-white/10 dark:bg-black/35 dark:text-white/45">
+                        <div className="absolute left-2 top-2 rounded-md border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-500 shadow-sm dark:border-cyan-100/[0.10] dark:bg-[#06242b]/55 dark:text-white/55">
                           Carte trajet IK
                         </div>
                         <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden>
@@ -791,7 +791,7 @@ export function BillableDaysCalendarBlock({
                           </span>
                           GLB
                         </div>
-                        <div className="absolute left-[43%] top-[17%] rounded border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold text-ink-500 shadow-sm dark:border-white/10 dark:bg-black/35 dark:text-white/45">
+                        <div className="absolute left-[43%] top-[17%] rounded border border-ink-200/60 bg-white/85 px-1.5 py-0.5 text-[8px] font-bold text-ink-500 shadow-sm dark:border-cyan-100/[0.10] dark:bg-[#06242b]/55 dark:text-white/55">
                           Paris Ouest
                         </div>
                         <div className="absolute bottom-2 left-2 right-2 grid grid-cols-[1fr_auto_1fr] items-end gap-2 text-[9px] font-semibold text-ink-600 dark:text-white/55">
@@ -799,7 +799,7 @@ export function BillableDaysCalendarBlock({
                             <p className="truncate text-violet-700 dark:text-violet-200">Départ</p>
                             <p className="truncate">{COMMUTE_HOME_LABEL}</p>
                           </div>
-                          <div className="rounded-full border border-ink-200/70 bg-white/80 px-2 py-1 text-center text-[9px] font-bold tabular-nums text-ink-700 dark:border-white/10 dark:bg-black/35 dark:text-white/70">
+                          <div className="rounded-full border border-ink-200/70 bg-white/80 px-2 py-1 text-center text-[9px] font-bold tabular-nums text-ink-700 dark:border-cyan-100/[0.10] dark:bg-[#06242b]/60 dark:text-white/75">
                             {fmt.int(ikRoundTripKm)} km A/R
                           </div>
                           <div className="min-w-0 text-right">
@@ -814,20 +814,20 @@ export function BillableDaysCalendarBlock({
 
                 {/* Repas + NDF */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-amber-200/80 bg-amber-50 text-amber-600 dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-400">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-amber-200/80 bg-amber-50 text-amber-600 dark:border-amber-200/[0.18] dark:bg-amber-300/[0.12] dark:text-amber-100">
                     <Utensils className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">Repas &amp; NDF</p>
-                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
+                    <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">Repas &amp; NDF</p>
+                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                       {fmt.euro(mealFeesForViewedMonth?.total ?? 0)}
                     </p>
                     {mealFeesForViewedMonth ? (
-                      <p className="text-[10px] text-ink-400 dark:text-ink-500">
+                      <p className="text-[10px] font-medium text-ink-400 dark:text-cyan-50/46">
                         Dirigeant {fmt.euro(mealFeesForViewedMonth.dirigeant)} ·{" "}
                         <span className="group/ndf relative inline-flex cursor-help items-center rounded-full px-1 font-semibold text-emerald-700 ring-1 ring-transparent transition hover:bg-emerald-500/10 hover:ring-emerald-500/20 dark:text-emerald-300">
                           NDF {fmt.euro(mealFeesForViewedMonth.ndfAffiche)}
-                          <span className="absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-ink-200 bg-white p-3 text-left text-[11px] text-ink-700 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/ndf:block group-hover/ndf:opacity-100 dark:border-white/10 dark:bg-[#101412] dark:text-white/75">
+                          <span className="absolute left-0 top-full z-50 mt-2 hidden w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-ink-200 bg-white p-3 text-left text-[11px] text-ink-700 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/ndf:block group-hover/ndf:opacity-100 dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:text-white/75">
                             <span className="mb-2 block font-bold text-ink-950 dark:text-white">
                               Transactions NDF DigitPro
                             </span>
@@ -875,18 +875,18 @@ export function BillableDaysCalendarBlock({
 
           {/* Synthèse */}
           <div className="min-w-0 w-full flex-1 lg:min-w-[280px]">
-            <div className="flex h-full flex-col justify-center rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50/80 via-white to-analyze-50/30 p-3.5 dark:border-emerald-800/25 dark:bg-gradient-to-br dark:from-emerald-950/15 dark:via-[#0a0f0d] dark:to-[#060808] sm:p-4">
+            <div className="flex h-full flex-col justify-center rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50/80 via-white to-analyze-50/30 p-3.5 dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/86 dark:bg-none sm:p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-400/75">
                 Estimation CA HT
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-2">
-                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
+                <div className="rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07] dark:shadow-none">
                   <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM / jour</p>
                   <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
                     {fmt.euro(tjmHt)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
+                <div className="rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07] dark:shadow-none">
                   <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
                     Mois · {countInMonth} j.
                   </p>
@@ -920,15 +920,15 @@ export function BillableDaysCalendarBlock({
               <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
                 Période (axe B)
               </span>
-              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-white/[0.1] dark:bg-white/[0.04]">
+              <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/70">
                 <button
                   type="button"
                   aria-pressed={workedDaysChartYear === "all"}
                   onClick={() => setWorkedDaysChartYear("all")}
                   className={clsx(
-                    "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                    "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#06242b] sm:min-h-0",
                     workedDaysChartYear === "all"
-                      ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                      ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
                       : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
                   )}
                 >
@@ -941,9 +941,9 @@ export function BillableDaysCalendarBlock({
                     aria-pressed={workedDaysChartYear === y}
                     onClick={() => setWorkedDaysChartYear(y)}
                     className={clsx(
-                      "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                      "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#06242b] sm:min-h-0",
                       workedDaysChartYear === y
-                        ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                        ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
                         : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
                     )}
                   >
@@ -958,7 +958,7 @@ export function BillableDaysCalendarBlock({
                   <span className="text-[10px] font-medium uppercase tracking-wide text-ink-500 dark:text-ink-400">
                     Trimestre
                   </span>
-                  <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-white/[0.1] dark:bg-white/[0.04]">
+                  <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/70">
                     {(["full", 1, 2, 3, 4] as const).map((q) => {
                       const label =
                         q === "full" ? "Année" : q === 1 ? "T1" : q === 2 ? "T2" : q === 3 ? "T3" : "T4";
@@ -970,9 +970,9 @@ export function BillableDaysCalendarBlock({
                           aria-pressed={on}
                           onClick={() => setWorkedDaysChartQuarter(q)}
                           className={clsx(
-                            "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0",
+                            "inline-flex min-h-[36px] items-center justify-center rounded-full px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#06242b] sm:min-h-0",
                             on
-                              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                              ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
                               : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
                           )}
                         >
@@ -1000,7 +1000,7 @@ export function BillableDaysCalendarBlock({
         ) : null}
 
           <div
-            className="sticky bottom-0 z-[8] mt-6 isolate rounded-2xl border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-white/[0.12] dark:bg-[#111111] dark:text-zinc-100 dark:shadow-[0_12px_48px_-10px_rgba(0,0,0,0.65)] dark:ring-1 dark:ring-white/[0.06]"
+            className="sticky bottom-0 z-[8] mt-6 isolate rounded-2xl border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.12] dark:bg-[#0b3038]/92 dark:text-zinc-100 dark:shadow-[0_12px_48px_-10px_rgba(0,22,28,0.65)] dark:ring-1 dark:ring-cyan-100/[0.08]"
           >
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {[

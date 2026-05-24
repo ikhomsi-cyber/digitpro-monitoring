@@ -36,7 +36,7 @@ export function DashboardPeriodFilterControls({
 
   return (
     <div className="inline-flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-ink-700 dark:bg-ink-950/80">
+      <div className="inline-flex max-w-full rounded-full border border-ink-300 bg-ink-50/80 p-1 dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/70">
         {showRollingOption ? (
         <button
           type="button"
@@ -46,9 +46,9 @@ export function DashboardPeriodFilterControls({
             setSelectedYears(null);
           }}
           className={clsx(
-            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
+            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#06242b] sm:flex-initial sm:px-4",
             selectedYears === null && !monthModeActive
-              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+              ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
               : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
           )}
         >
@@ -64,9 +64,9 @@ export function DashboardPeriodFilterControls({
             setSelectedYears((prev) => prev ?? [yearOptions[0] ?? new Date().getFullYear()]);
           }}
           className={clsx(
-            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
+            "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#06242b] sm:flex-initial sm:px-4",
             selectedYears !== null && !monthModeActive
-              ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+              ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
               : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
           )}
         >
@@ -86,9 +86,9 @@ export function DashboardPeriodFilterControls({
               );
             }}
             className={clsx(
-              "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950 sm:flex-initial sm:px-4",
+              "inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#06242b] sm:flex-initial sm:px-4",
               monthModeActive
-                ? "bg-white text-ink-900 shadow-sm dark:bg-ink-800 dark:text-ink-50 dark:shadow-none"
+                ? "bg-white text-ink-900 shadow-sm dark:bg-cyan-50/[0.12] dark:text-ink-50 dark:shadow-none"
                 : "text-ink-600 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-100"
             )}
           >
@@ -122,10 +122,10 @@ export function DashboardPeriodFilterControls({
                 aria-pressed={on}
                 onClick={() => setSelectedMonth(month)}
                 className={clsx(
-                  "min-h-[40px] shrink-0 rounded-full border px-3 py-2 text-xs font-semibold capitalize tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:py-1",
+                  "min-h-[40px] shrink-0 rounded-full border px-3 py-2 text-xs font-semibold capitalize tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#06242b] sm:min-h-0 sm:py-1",
                   on
-                    ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-900/60 dark:text-white dark:shadow-brand-950/40"
-                    : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
+                    ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-500/25 dark:text-white dark:shadow-brand-950/40"
+                    : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.06] dark:text-ink-300 dark:hover:border-cyan-100/[0.16]"
                 )}
               >
                 {formatDashboardMonthLabel(month)}
@@ -149,10 +149,10 @@ export function DashboardPeriodFilterControls({
                 aria-pressed={on}
                 onClick={() => onToggleYear(y)}
                 className={clsx(
-                  "min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-ink-950 sm:min-h-0 sm:py-1",
+                  "min-h-[40px] rounded-full border px-3 py-2 text-xs font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#06242b] sm:min-h-0 sm:py-1",
                   on
-                    ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-900/60 dark:text-white dark:shadow-brand-950/40"
-                    : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600"
+                    ? "border-brand-500 bg-brand-50 text-brand-900 shadow-sm dark:border-brand-400 dark:bg-brand-500/25 dark:text-white dark:shadow-brand-950/40"
+                    : "border-ink-200 bg-white text-ink-600 hover:border-ink-300 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.06] dark:text-ink-300 dark:hover:border-cyan-100/[0.16]"
                 )}
               >
                 {y}

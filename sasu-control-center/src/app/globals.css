@@ -30,9 +30,12 @@ body {
     @apply transition-colors;
   }
   .dark .premium-dashboard-page {
-    background-color: #050505;
-    background-image: radial-gradient(900px 480px at 15% 0%, rgba(16, 185, 129, 0.14), transparent 55%),
-      radial-gradient(700px 400px at 85% 0%, rgba(56, 189, 248, 0.1), transparent 50%);
+    background-color: #06242b;
+    background-image:
+      radial-gradient(900px 620px at 50% -10%, rgba(24, 160, 176, 0.45), transparent 62%),
+      radial-gradient(760px 520px at 10% 6%, rgba(45, 212, 191, 0.18), transparent 54%),
+      radial-gradient(700px 520px at 90% 0%, rgba(14, 116, 144, 0.24), transparent 52%),
+      linear-gradient(180deg, #0c5361 0%, #06343d 42%, #03191f 100%);
     background-attachment: fixed;
   }
 

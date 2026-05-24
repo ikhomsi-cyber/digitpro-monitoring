@@ -17,7 +17,10 @@ import type { LucideIcon } from "lucide-react";
 import {
   CalendarClock,
   ChevronDown,
+  CirclePlus,
   Receipt,
+  Search,
+  Settings,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -215,6 +218,8 @@ export function DashboardClient({
   const [revenueCounterpartyDetail, setRevenueCounterpartyDetail] = useState<string | null>(null);
   /** Catégorie dérivée sélectionnée dans Total expenses (liste des opérations). */
   const [expenseCategoryDetail, setExpenseCategoryDetail] = useState<string | null>(null);
+  const [sasuAnalysisMode, setSasuAnalysisMode] = useState<"revenues" | "expenses">("expenses");
+  const [sasuBreakdownMode, setSasuBreakdownMode] = useState<"categories" | "simplified">("categories");
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
 
@@ -497,6 +502,62 @@ export function DashboardClient({
       .sort((a, b) => b.total - a.total);
   }, [filteredTx, kpiMode]);
 
+  const sasuExpenseDonutSlices = useMemo(() => {
+    const total = Math.max(0, totalExpensesCard);
+    let cursor = 0;
+    return expenseCategoryTotalsForTotalExpensesCard.map((category) => {
+      const pct = total > 0 ? (category.total / total) * 100 : 0;
+      const dash = Math.max(0, pct - 0.8);
+      const slice = {
+        ...category,
+        pct,
+        dash,
+        offset: -cursor,
+        color: expenseCategoryColor(category.name)
+      };
+      cursor += pct;
+      return slice;
+    });
+  }, [expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard]);
+
+  const sasuRevenueDonutSlices = useMemo(() => {
+    const total = Math.max(0, totalRevenuesHt);
+    let cursor = 0;
+    return revenueCounterpartyTotals.map(({ name, total: totalTtc }) => {
+      const totalHt = totalTtc / (1 + VAT_RATE);
+      const pct = total > 0 ? (totalHt / total) * 100 : 0;
+      const dash = Math.max(0, pct - 0.8);
+      const slice = {
+        name,
+        total: totalHt,
+        pct,
+        dash,
+        offset: -cursor,
+        color: expenseCategoryColor(name)
+      };
+      cursor += pct;
+      return slice;
+    });
+  }, [revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE]);
+
+  const sasuSimplifiedExpenseSlices = useMemo(() => {
+    const digitPro = Math.max(0, currentHeroStats.depensesDigitProMoisEur);
+    const perso = Math.max(0, currentHeroStats.depensesPersoMoisEur);
+    const total = Math.max(0, digitPro + perso);
+    let cursor = 0;
+    return [
+      { name: "Frais DigitPro", total: digitPro, color: "#f59e0b" },
+      { name: "Frais perso", total: perso, color: "#14b8a6" }
+    ]
+      .filter((slice) => slice.total > 0)
+      .map((slice) => {
+        const pct = total > 0 ? (slice.total / total) * 100 : 0;
+        const out = { ...slice, pct, dash: Math.max(0, pct - 0.8), offset: -cursor };
+        cursor += pct;
+        return out;
+      });
+  }, [currentHeroStats.depensesDigitProMoisEur, currentHeroStats.depensesPersoMoisEur]);
+
   const revenueTransactionsForCounterparty = useMemo(() => {
     if (!revenueCounterpartyDetail) return [];
     return filteredTx
@@ -588,6 +649,12 @@ export function DashboardClient({
     [dashboardSection, transactionYearBounds, transactions]
   );
 
+  const currentSasuYear = selectedYears?.[0] ?? yearOptions[0] ?? new Date().getFullYear();
+  const moveSasuYear = useCallback((delta: -1 | 1) => {
+    setSelectedMonth(null);
+    setSelectedYears([currentSasuYear + delta]);
+  }, [currentSasuYear]);
+
   function toggleYearInFilter(y: number) {
     setSelectedMonth(null);
     setSelectedYears((prev) => {
@@ -651,19 +718,303 @@ export function DashboardClient({
       {dashboardSection === "categorisation" ? <DashboardCategorisationPanel /> : null}
       {(dashboardSection === "sasu" || dashboardSection === "private") && (
         <>
-          <DashboardPeriodFilterSection
-            selectedYears={selectedYears}
-            setSelectedYears={setSelectedYears}
-            selectedMonth={selectedMonth}
-            setSelectedMonth={setSelectedMonth}
-            monthOptions={monthOptions}
-            yearOptions={yearOptions}
-            onToggleYear={toggleYearInFilter}
-            sticky
-            showRollingOption={dashboardSection !== "sasu"}
-            showActiveLabel={dashboardSection !== "sasu"}
-          />
+          {dashboardSection === "private" ? (
+            <DashboardPeriodFilterSection
+              selectedYears={selectedYears}
+              setSelectedYears={setSelectedYears}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              monthOptions={monthOptions}
+              yearOptions={yearOptions}
+              onToggleYear={toggleYearInFilter}
+              sticky
+              showRollingOption
+              showActiveLabel
+            />
+          ) : null}
 
+          {dashboardSection === "sasu" ? (
+            <section className="space-y-4">
+              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82"
+                    aria-label="Compte SASU"
+                  >
+                    <Receipt className="h-5 w-5" strokeWidth={1.9} aria-hidden />
+                  </button>
+                  <div className="min-w-0 text-center">
+                    <p className="text-lg font-semibold tracking-tight">Analyse SASU</p>
+                    <p className="mt-0.5 text-[11px] font-medium text-white/48">{periodLabel}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82">
+                      <Search className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                    </span>
+                    <span className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82">
+                      <Settings className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-cyan-100/[0.08] bg-cyan-50/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => moveSasuYear(-1)}
+                      className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
+                      aria-label="Afficher l’année précédente"
+                    >
+                      ‹
+                    </button>
+                    <p className="text-sm font-bold">
+                      {selectedMonth ? monthLabelFr(selectedMonth) : currentSasuYear}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => moveSasuYear(1)}
+                      className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
+                      aria-label="Afficher l’année suivante"
+                    >
+                      ›
+                    </button>
+                  </div>
+                  <DashboardPeriodFilterSection
+                    selectedYears={selectedYears}
+                    setSelectedYears={setSelectedYears}
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    monthOptions={monthOptions}
+                    yearOptions={yearOptions}
+                    onToggleYear={toggleYearInFilter}
+                    showRollingOption={false}
+                    showActiveLabel={false}
+                  />
+                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/40 p-1">
+                    {[
+                      { label: "Entrées", mode: "revenues" as const },
+                      { label: "Sorties", mode: "expenses" as const }
+                    ].map((item) => (
+                      <button
+                        type="button"
+                        key={item.label}
+                        onClick={() => setSasuAnalysisMode(item.mode)}
+                        className={clsx(
+                          "rounded-xl px-2 py-2 text-center text-xs font-bold transition",
+                          sasuAnalysisMode === item.mode
+                            ? "bg-violet-500 text-white shadow-[0_8px_24px_-14px_rgba(139,92,246,0.9)]"
+                            : "text-white/40"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl">
+                {(() => {
+                  const currentSlices = sasuAnalysisMode === "revenues"
+                    ? sasuRevenueDonutSlices
+                    : sasuBreakdownMode === "simplified"
+                      ? sasuSimplifiedExpenseSlices
+                      : sasuExpenseDonutSlices;
+                  const currentTotal = sasuAnalysisMode === "revenues"
+                    ? totalRevenuesHt
+                    : sasuBreakdownMode === "simplified"
+                      ? sasuSimplifiedExpenseSlices.reduce((sum, slice) => sum + slice.total, 0)
+                      : totalExpensesCard;
+                  return (
+                    <>
+                <div className="mb-2 flex justify-end">
+                  <button
+                    type="button"
+                    className="grid h-7 w-7 place-items-center rounded-full border border-cyan-100/[0.16] text-white/60"
+                    aria-label="Ajouter une catégorie"
+                  >
+                    <CirclePlus className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+                  </button>
+                </div>
+                <div className="mb-4 overflow-hidden rounded-full border border-cyan-100/[0.10] bg-[#06242b]/70 p-1 shadow-inner">
+                  <div className="flex h-5 overflow-hidden rounded-full">
+                    {currentSlices.map((slice) => (
+                      <span
+                        key={`bar-${slice.name}`}
+                        style={{ width: `${slice.pct}%`, backgroundColor: slice.color }}
+                        aria-hidden
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="relative mx-auto h-56 w-56">
+                  <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
+                    <circle cx="60" cy="60" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="13" />
+                    {currentSlices.map((slice) => (
+                      <circle
+                        key={slice.name}
+                        cx="60"
+                        cy="60"
+                        r="42"
+                        fill="none"
+                        stroke={slice.color}
+                        strokeWidth="13"
+                        strokeDasharray={`${slice.dash} ${100 - slice.dash}`}
+                        strokeDashoffset={slice.offset}
+                        pathLength={100}
+                      />
+                    ))}
+                  </svg>
+                  <div className="absolute inset-0 grid place-items-center text-center">
+                    <div>
+                      <p className="font-display text-2xl font-bold tabular-nums" data-private>
+                        {fmt.euro(currentTotal)}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-white/56">
+                        {sasuAnalysisMode === "revenues" ? "Revenus HT" : "Dépenses"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3 mt-2 flex max-w-full flex-wrap justify-center gap-1.5">
+                  {currentSlices.slice(0, 6).map((slice) => (
+                    <span
+                      key={`sasu-legend-${slice.name}`}
+                      title={`${slice.name} · ${fmt.euro(slice.total)} · ${fmt.int(slice.pct)} %`}
+                      className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/72 shadow-sm"
+                    >
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
+                      <span className="truncate">{slice.name}</span>
+                      <span className="shrink-0 text-white/45">· {fmt.euro(slice.total)} · {fmt.int(slice.pct)} %</span>
+                    </span>
+                  ))}
+                </div>
+                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/35 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setSasuBreakdownMode("categories")}
+                    className={clsx(
+                      "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
+                      sasuBreakdownMode === "categories" ? "bg-violet-500 text-white" : "text-white/35"
+                    )}
+                  >
+                    {sasuAnalysisMode === "revenues" ? "Revenus" : "Catégories"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSasuBreakdownMode("simplified")}
+                    className={clsx(
+                      "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
+                      sasuBreakdownMode === "simplified" ? "bg-violet-500 text-white" : "text-white/35"
+                    )}
+                  >
+                    Simplifié
+                  </button>
+                </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl sm:p-5">
+                <button
+                  type="button"
+                  className="mb-4 flex h-12 w-full items-center justify-center rounded-full border border-cyan-100/[0.10] text-sm font-semibold text-white/82"
+                >
+                  Créer une catégorie <span className="ml-2 text-lg leading-none">+</span>
+                </button>
+                <div className="space-y-1" data-private>
+                  {(sasuAnalysisMode === "revenues"
+                    ? sasuRevenueDonutSlices
+                    : sasuBreakdownMode === "simplified"
+                      ? sasuSimplifiedExpenseSlices
+                      : sasuExpenseDonutSlices
+                  ).length ? (
+                    (sasuAnalysisMode === "revenues"
+                      ? sasuRevenueDonutSlices
+                      : sasuBreakdownMode === "simplified"
+                        ? sasuSimplifiedExpenseSlices
+                        : sasuExpenseDonutSlices
+                    ).map(({ name, total }) => {
+                      const baseTotal = sasuAnalysisMode === "revenues" ? totalRevenuesHt : totalExpensesCard;
+                      const pct = baseTotal > 0 ? Math.round((total / baseTotal) * 100) : 0;
+                      const color = expenseCategoryColor(name);
+                      const CatIcon = categoryGlyph(name);
+                      const simplified = sasuAnalysisMode === "expenses" && sasuBreakdownMode === "simplified";
+                      const open = sasuAnalysisMode === "revenues" ? revenueCounterpartyDetail === name : expenseCategoryDetail === name;
+                      const detailTransactions =
+                        sasuAnalysisMode === "revenues" ? revenueTransactionsForCounterparty : expenseTransactionsForCategory;
+                      return (
+                        <div key={name} className="border-b border-cyan-100/[0.08] py-3 last:border-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (simplified) return;
+                              if (sasuAnalysisMode === "revenues") {
+                                setRevenueCounterpartyDetail((prev) => (prev === name ? null : name));
+                              } else {
+                                setExpenseCategoryDetail((prev) => (prev === name ? null : name));
+                              }
+                            }}
+                            className="flex w-full items-center gap-3 text-left"
+                            aria-expanded={simplified ? undefined : open}
+                          >
+                            <span
+                              className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white shadow-[0_10px_28px_-18px_rgba(255,255,255,0.5)]"
+                              style={{ backgroundColor: color }}
+                              aria-hidden
+                            >
+                              <CatIcon className="h-5 w-5" strokeWidth={2} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-white/88">{name}</span>
+                              <span className="mt-0.5 block text-xs font-medium text-white/48">
+                                {pct} % · {sasuAnalysisMode === "revenues" ? "revenu SASU" : simplified ? "synthèse" : "catégorie"}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-right">
+                              <span className="block text-sm font-semibold tabular-nums text-white">{fmt.euro(total)}</span>
+                              {!simplified ? <span className="text-white/28">›</span> : null}
+                            </span>
+                          </button>
+                          {open ? (
+                            <div className="mt-3 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/40 p-3">
+                              {detailTransactions.length ? (
+                                <ul className="max-h-52 space-y-2 overflow-y-auto pr-1 text-xs">
+                                  {detailTransactions.map((tx) => (
+                                    <li key={tx.id} className="flex justify-between gap-3 border-b border-cyan-100/[0.06] pb-2 last:border-0 last:pb-0">
+                                      <span className="min-w-0">
+                                        <span className="block truncate text-white/78">{tx.label}</span>
+                                        <span className="text-white/35">{tx.date}</span>
+                                      </span>
+                                      <span className="shrink-0 font-semibold tabular-nums text-white">
+                                        {fmt.euro(sasuAnalysisMode === "revenues" ? tx.amount / (1 + VAT_RATE) : Math.abs(tx.amount))}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-xs text-white/45">
+                                  {sasuAnalysisMode === "revenues" ? "Aucun revenu pour cette catégorie." : "Aucune opération pour cette catégorie."}
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="py-6 text-center text-sm text-white/45">
+                      {sasuAnalysisMode === "revenues" ? "Aucun revenu sur cette période." : "Aucune dépense sur cette période."}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {dashboardSection === "private" ? (
       <section className="space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
           <Card variant="solid" className="flex h-full min-h-0 flex-col">
@@ -1245,6 +1596,7 @@ export function DashboardClient({
           </Card>
         </div>
       </section>
+          ) : null}
 
         </>
       )}
