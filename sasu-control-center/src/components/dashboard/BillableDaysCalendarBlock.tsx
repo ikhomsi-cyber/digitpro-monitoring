@@ -1000,7 +1000,7 @@ export function BillableDaysCalendarBlock({
         ) : null}
 
           <div
-            className="sticky bottom-0 z-[8] mt-6 isolate rounded-2xl border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.12] dark:bg-[#0b3038]/92 dark:text-zinc-100 dark:shadow-[0_12px_48px_-10px_rgba(0,22,28,0.65)] dark:ring-1 dark:ring-cyan-100/[0.08]"
+            className="sticky bottom-0 z-[8] mt-6 isolate rounded-[1.5rem] border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.16] dark:bg-[#06242b] dark:text-white dark:shadow-[0_12px_48px_-10px_rgba(0,22,28,0.75),inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-1 dark:ring-cyan-100/[0.10]"
           >
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               {[
@@ -1009,9 +1009,9 @@ export function BillableDaysCalendarBlock({
                 { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
                 { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
               ].map((row) => (
-                <div key={`sticky-${row.k}`} className="min-w-0">
-                  <dt className="truncate text-[10px] font-medium text-ink-600 dark:text-zinc-400">{row.k}</dt>
-                  <dd className="mt-0.5 truncate font-display text-sm font-semibold tabular-nums text-ink-950 dark:text-white sm:text-base">
+                <div key={`sticky-${row.k}`} className="min-w-0 rounded-2xl border border-transparent px-2 py-1.5 dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.06]">
+                  <dt className="truncate text-[10px] font-bold text-ink-600 dark:text-cyan-50/70">{row.k}</dt>
+                  <dd className="mt-0.5 truncate font-display text-sm font-extrabold tabular-nums text-ink-950 dark:text-white sm:text-base">
                     {row.v}
                   </dd>
                 </div>

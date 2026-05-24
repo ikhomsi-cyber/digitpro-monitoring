@@ -64,6 +64,11 @@ import {
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
+import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import {
+  isValeurReelleMandatoryFeeLine,
+  isValeurReellePersonalChargeLine
+} from "@/lib/valeur-reelle-analyze";
 
 export type { DashboardTx };
 
@@ -541,8 +546,15 @@ export function DashboardClient({
   }, [revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE]);
 
   const sasuSimplifiedExpenseSlices = useMemo(() => {
-    const digitPro = Math.max(0, currentHeroStats.depensesDigitProMoisEur);
-    const perso = Math.max(0, currentHeroStats.depensesPersoMoisEur);
+    let digitPro = 0;
+    let perso = 0;
+    for (const tx of filteredTx) {
+      if (tx.amount >= 0) continue;
+      const bucket = deriveExpenseBucket(tx);
+      const amount = Math.abs(tx.amount);
+      if (isValeurReelleMandatoryFeeLine(tx, bucket)) digitPro += amount;
+      if (isValeurReellePersonalChargeLine(bucket)) perso += amount;
+    }
     const total = Math.max(0, digitPro + perso);
     let cursor = 0;
     return [
@@ -556,7 +568,39 @@ export function DashboardClient({
         cursor += pct;
         return out;
       });
-  }, [currentHeroStats.depensesDigitProMoisEur, currentHeroStats.depensesPersoMoisEur]);
+  }, [filteredTx]);
+
+  const sasuSimplifiedSubcategories = useMemo(() => {
+    const groups = new Map<string, Map<string, number>>();
+    groups.set("Frais DigitPro", new Map());
+    groups.set("Frais perso", new Map());
+
+    for (const tx of filteredTx) {
+      if (tx.amount >= 0) continue;
+      const bucket = deriveExpenseBucket(tx);
+      const amount = Math.abs(tx.amount);
+      const label = bucket ?? expenseDashboardGroupingLabel(tx, kpiMode);
+
+      if (isValeurReelleMandatoryFeeLine(tx, bucket)) {
+        const digitPro = groups.get("Frais DigitPro");
+        digitPro?.set(label, (digitPro.get(label) ?? 0) + amount);
+      }
+
+      if (isValeurReellePersonalChargeLine(bucket)) {
+        const perso = groups.get("Frais perso");
+        perso?.set(label, (perso.get(label) ?? 0) + amount);
+      }
+    }
+
+    return Object.fromEntries(
+      Array.from(groups.entries()).map(([groupName, subcategories]) => [
+        groupName,
+        Array.from(subcategories.entries())
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total)
+      ])
+    ) as Record<string, Array<{ name: string; total: number }>>;
+  }, [filteredTx, kpiMode]);
 
   const revenueTransactionsForCounterparty = useMemo(() => {
     if (!revenueCounterpartyDetail) return [];
@@ -918,12 +962,6 @@ export function DashboardClient({
               </div>
 
               <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl sm:p-5">
-                <button
-                  type="button"
-                  className="mb-4 flex h-12 w-full items-center justify-center rounded-full border border-cyan-100/[0.10] text-sm font-semibold text-white/82"
-                >
-                  Créer une catégorie <span className="ml-2 text-lg leading-none">+</span>
-                </button>
                 <div className="space-y-1" data-private>
                   {(sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -945,6 +983,7 @@ export function DashboardClient({
                       const open = sasuAnalysisMode === "revenues" ? revenueCounterpartyDetail === name : expenseCategoryDetail === name;
                       const detailTransactions =
                         sasuAnalysisMode === "revenues" ? revenueTransactionsForCounterparty : expenseTransactionsForCategory;
+                      const subcategories = simplified ? sasuSimplifiedSubcategories[name] ?? [] : [];
                       return (
                         <div key={name} className="border-b border-cyan-100/[0.08] py-3 last:border-0">
                           <button
@@ -978,6 +1017,31 @@ export function DashboardClient({
                               {!simplified ? <span className="text-white/28">›</span> : null}
                             </span>
                           </button>
+                          {subcategories.length ? (
+                            <div className="ml-[3.25rem] mt-2 space-y-1.5">
+                              {subcategories.slice(0, 5).map((subcategory) => {
+                                const subPct = total > 0 ? Math.round((subcategory.total / total) * 100) : 0;
+                                return (
+                                  <div
+                                    key={`${name}-${subcategory.name}`}
+                                    className="flex items-center justify-between gap-3 rounded-xl bg-cyan-50/[0.04] px-3 py-2 text-xs"
+                                  >
+                                    <span className="min-w-0 truncate text-white/62">
+                                      {subcategory.name} · {subPct} %
+                                    </span>
+                                    <span className="shrink-0 font-semibold tabular-nums text-white/78">
+                                      {fmt.euro(subcategory.total)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                              {subcategories.length > 5 ? (
+                                <p className="px-3 text-[11px] font-medium text-white/38">
+                                  + {subcategories.length - 5} autres sous-catégories
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {open ? (
                             <div className="mt-3 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/40 p-3">
                               {detailTransactions.length ? (
