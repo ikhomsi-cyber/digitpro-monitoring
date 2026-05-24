@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 40 40" fill="none" aria-label="DigitPro" role="img">
+  <defs>
+    <linearGradient id="dp-bg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#1D1D1F" />
+      <stop offset="100%" stopColor="#000000" />
+    </linearGradient>
+    <linearGradient id="dp-shine" x1="0" y1="0" x2="0" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.18" />
+      <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0" />
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="36" height="36" rx="9" fill="url(#dp-bg)" />
+  <rect x="2" y="2" width="36" height="36" rx="9" fill="url(#dp-shine)" />
+
+  <!-- mini bars -->
+  <rect x="10" y="22" width="3.5" height="9" rx="1" fill="#FFFFFF" />
+  <rect x="16" y="17" width="3.5" height="14" rx="1" fill="#FFFFFF" />
+  <rect x="22" y="12" width="3.5" height="19" rx="1" fill="#FFFFFF" />
+
+  <!-- trend line -->
+  <path
+    d="M11.75 19 L17.75 14 L23.75 9.5 L29 7.5"
+    stroke="#FFFFFF"
+    strokeOpacity="0.55"
+    strokeWidth="1.25"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    fill="none"
+  />
+
+  <!-- blue accent peak -->
+  <circle cx="30" cy="9" r="2.5" fill="#0071E3" />
+  <circle cx="30" cy="9" r="1.1" fill="#FFFFFF" fillOpacity="0.92" />
+</svg>
+

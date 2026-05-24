@@ -1,0 +1,200 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch } from "lucide-react";
+import { clsx } from "clsx";
+import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
+
+type Tab = {
+  href: string;
+  label: string;
+  icon: typeof House;
+  isActive: (ctx: {
+    scope: string | null;
+    panel: string | null;
+    hash: string;
+    section: string | null;
+  }) => boolean;
+};
+
+const TABS: Tab[] = [
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: House,
+    isActive: ({ scope, panel, section }) =>
+      !isDashboardAnalyticsPanel(panel) && (section == null || section === "") && scope == null
+  },
+  {
+    href: "/dashboard?section=activite",
+    label: "Activité",
+    icon: Gauge,
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "activite"
+  },
+  {
+    href: "/dashboard?panel=valeur-reelle",
+    label: "Valeur",
+    icon: Banknote,
+    isActive: ({ panel }) => panel === "valeur-reelle"
+  },
+  {
+    href: "/dashboard?section=sasu&scope=pro",
+    label: "SASU",
+    icon: ChartNoAxesCombined,
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
+  },
+  {
+    href: "/dashboard?section=categorisation",
+    label: "Catég.",
+    icon: ScanSearch,
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "categorisation"
+  }
+];
+
+/** Dock iOS flottant — mobile uniquement. */
+export function DashboardFloatingDock() {
+  const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
+  const scope = searchParams.get("scope");
+  const panel = searchParams.get("panel");
+  const section = searchParams.get("section");
+  const [hash, setHash] = useState("");
+
+  useEffect(() => {
+    setHash(typeof window !== "undefined" ? window.location.hash : "");
+    const on = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+
+  if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
+
+  const ctx = { scope, panel, hash, section };
+  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
+
+  return (
+    <nav
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] animate-floatIn px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+      aria-label="Navigation principale"
+    >
+      <div className="pointer-events-auto mx-auto flex max-w-[27rem] items-center justify-between gap-1 rounded-[1.85rem] border border-cyan-100/[0.10] bg-[#082a31]/88 px-2 py-2 text-white shadow-[0_18px_60px_-22px_rgba(0,18,24,0.88),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+        {TABS.map((tab) => {
+          const active = tab.isActive(ctx);
+          const Icon = tab.icon;
+          return (
+            <Link
+              key={tab.label}
+              href={tab.href}
+              prefetch={!tab.href.includes("#")}
+              scroll={false}
+              onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
+              className={clsx(
+                "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
+                active ? "bg-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : "hover:bg-white/[0.055]"
+              )}
+            >
+              {active ? (
+                <span className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-cyan-200/10 blur-sm" aria-hidden />
+              ) : null}
+              <span
+                className={clsx(
+                  "relative z-[1] flex h-8 w-8 items-center justify-center rounded-full transition",
+                  active
+                    ? "bg-white/[0.16] text-white shadow-[0_10px_26px_-18px_rgba(255,255,255,0.7)]"
+                    : "text-white/72"
+                )}
+              >
+                <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={active ? 2.45 : 2.05} aria-hidden />
+                <span className="sr-only">{tab.label}</span>
+              </span>
+              <span
+                className={clsx(
+                  "relative z-[1] mt-1 max-w-[4.2rem] truncate text-center text-[10px] font-bold leading-none tracking-tight",
+                  active ? "text-white" : "text-white/72"
+                )}
+              >
+                {tab.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/** Sidebar premium — desktop uniquement. */
+export function DashboardDesktopSidebar() {
+  const pathname = usePathname() ?? "";
+  const searchParams = useSearchParams();
+  const scope = searchParams.get("scope");
+  const panel = searchParams.get("panel");
+  const section = searchParams.get("section");
+  const [hash, setHash] = useState("");
+
+  useEffect(() => {
+    setHash(typeof window !== "undefined" ? window.location.hash : "");
+    const on = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+
+  if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
+
+  const ctx = { scope, panel, hash, section };
+  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+    event.preventDefault();
+    window.history.pushState(null, "", href);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
+
+  return (
+    <aside className="fixed left-4 top-4 z-50 hidden h-[calc(100dvh-2rem)] w-24 flex-col rounded-[2rem] border border-white/10 bg-black/45 p-3 shadow-[0_24px_90px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl lg:flex">
+      <div className="flex h-full flex-col items-center">
+        <Link
+          href="/dashboard"
+          onClick={navigateWithinDashboard("/dashboard")}
+          className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.18)]"
+          aria-label="Dashboard"
+        >
+          <House className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </Link>
+        <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
+          {TABS.map((tab) => {
+            const active = tab.isActive(ctx);
+            const Icon = tab.icon;
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                prefetch={!tab.href.includes("#")}
+                scroll={false}
+                onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
+                aria-current={active ? "page" : undefined}
+                className={clsx(
+                  "group flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center transition",
+                  active
+                    ? "border-emerald-400/45 bg-emerald-500/[0.16] text-white shadow-[0_0_26px_rgba(16,185,129,0.18)]"
+                    : "border-white/8 bg-white/[0.035] text-white/48 hover:bg-white/[0.07] hover:text-white/78"
+                )}
+              >
+                <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.25 : 1.85} aria-hidden />
+                <span className="text-[11px] font-semibold leading-tight tracking-tight">{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
+  );
+}

@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: "ss01", "cv01", "cv11";
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  /** Fond immersif dashboard (s’active sous `html.dark`). */
+  .premium-dashboard-page {
+    @apply transition-colors;
+  }
+  .dark .premium-dashboard-page {
+    background-color: #06242b;
+    background-image:
+      radial-gradient(900px 620px at 50% -10%, rgba(24, 160, 176, 0.45), transparent 62%),
+      radial-gradient(760px 520px at 10% 6%, rgba(45, 212, 191, 0.18), transparent 54%),
+      radial-gradient(700px 520px at 90% 0%, rgba(14, 116, 144, 0.24), transparent 52%),
+      linear-gradient(180deg, #0c5361 0%, #06343d 42%, #03191f 100%);
+    background-attachment: fixed;
+  }
+
+  .premium-cta {
+    @apply rounded-full px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition;
+    background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);
+  }
+  .premium-cta:hover {
+    filter: brightness(1.07);
+  }
+  .premium-cta:focus-visible {
+    @apply outline-none ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
+  }
+  .surface-card {
+    @apply rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/80;
+  }
+  /** Card placed on the gray section bg — subtle white card */
+  .surface-glass {
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/80 dark:shadow-none;
+  }
+
+  /** Section that uses the signature Apple light-gray bg */
+  .section-alt {
+    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-ink-900/60;
+  }
+
+  /** Pill primary button (Apple CTA) */
+  .btn-primary {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
+  }
+  /** Pill secondary button (white pill on gray) */
+  .btn-secondary {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500;
+  }
+  /** Tertiary text-link "Learn more ›" */
+  .btn-link {
+    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200;
+  }
+
+  /** Skeleton with shimmer */
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-ink-200/70 dark:bg-ink-800/80;
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(255, 255, 255, 0.7) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  /** Apple-grade hero text */
+  .h-display {
+    @apply font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl md:text-6xl dark:text-ink-50;
+  }
+  .h-section {
+    @apply font-display text-3xl font-semibold leading-tight tracking-apple-tight text-ink-900 sm:text-4xl dark:text-ink-50;
+  }
+  .h-eyebrow {
+    @apply text-sm font-medium text-ink-600 dark:text-ink-400;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scrollbar-clean::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-clean::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+  }
+  .dark .scrollbar-clean::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.22);
+  }
+}
+
+/* Privacy mode: blur every [data-private] node when <html class="privacy-blur"> */
+html.privacy-blur [data-private] {
+  filter: blur(8px);
+  transition: filter 180ms ease;
+  user-select: none;
+  cursor: help;
+}
+html.privacy-blur [data-private]:hover,
+html.privacy-blur [data-private]:focus-within {
+  filter: blur(0);
+}

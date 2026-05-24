@@ -1,0 +1,58 @@
+"use client";
+
+import { useEffect } from "react";
+import Link from "next/link";
+
+/**
+ * Erreur rendu Server Component du dashboard (ex. après sync Qonto + refresh).
+ * En prod Next masque souvent le message ; le digest permet de corréler les logs Vercel.
+ */
+export default function DashboardError({
+  error,
+  reset
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error("[dashboard/error]", error.message, error.digest ?? "");
+  }, [error]);
+
+  return (
+    <div className="mx-auto max-w-lg px-6 py-20 text-center">
+      <h1 className="font-display text-2xl font-semibold text-ink-900 dark:text-ink-50">
+        Impossible d’afficher le tableau de bord
+      </h1>
+      <p className="mt-4 text-ink-600 dark:text-ink-300">
+        Une erreur s’est produite côté serveur lors du chargement de cette page. Si cela arrive
+        après une synchronisation Qonto, rechargez la page : les données ont souvent bien été
+        enregistrées.
+      </p>
+      {error.digest ? (
+        <p className="mt-3 font-mono text-xs text-ink-500 dark:text-ink-400">
+          Réf. technique (digest) : {error.digest}
+        </p>
+      ) : null}
+      <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <button type="button" onClick={() => reset()} className="btn-primary">
+          Réessayer
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            window.location.reload();
+          }}
+          className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100"
+        >
+          Recharger la page
+        </button>
+        <Link
+          href="/login"
+          className="text-sm font-medium text-brand-600 underline-offset-4 hover:underline dark:text-brand-400"
+        >
+          Connexion
+        </Link>
+      </div>
+    </div>
+  );
+}
