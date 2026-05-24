@@ -59,11 +59,6 @@ export function isRevenueRollToNextMonthDay(iso: string): boolean {
   return p.d > n;
 }
 
-/** @deprecated Utiliser `isRevenueRollToNextMonthDay` (seuil au jour 26). */
-export function isRevenueEndOfMonthCalendarDay(iso: string): boolean {
-  return isRevenueRollToNextMonthDay(iso);
-}
-
 /** Date analytique pour les encaissements CA (corrections métier, puis jours 27+ → mois suivant). */
 export function effectiveRevenueAnalyticsDateIso(tx: DashboardTx): string {
   if (!isRevenueCategory(tx.category) || tx.amount <= 0) return tx.date;

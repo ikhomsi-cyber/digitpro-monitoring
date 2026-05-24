@@ -60,6 +60,19 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const b = txBlob(tx);
 
   if (
+    b.includes("cesu") ||
+    b.includes("achat cesu") ||
+    b.includes("ticket cesu") ||
+    b.includes("domiserve") ||
+    b.includes("cheque domicile") ||
+    b.includes("chèque domicile") ||
+    b.includes("up cesu") ||
+    b.includes("bimpli")
+  ) {
+    return "CESU";
+  }
+
+  if (
     b.includes("wemind") ||
     b.includes("we mind") ||
     b.includes("mutuelle") ||

@@ -494,6 +494,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                       if (href.startsWith("/dashboard")) {
                         window.history.pushState(null, "", href);
                         window.dispatchEvent(new PopStateEvent("popstate"));
+                        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
                       } else {
                         window.location.assign(href);
                       }
@@ -508,6 +509,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                       if (href.startsWith("/dashboard")) {
                         window.history.pushState(null, "", href);
                         window.dispatchEvent(new PopStateEvent("popstate"));
+                        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
                       } else {
                         window.location.assign(href);
                       }

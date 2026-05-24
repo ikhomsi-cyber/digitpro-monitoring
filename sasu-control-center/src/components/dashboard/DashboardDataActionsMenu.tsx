@@ -239,16 +239,16 @@ export function DashboardDataActionsMenu({
         <Settings2 className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden />
       </button>
       {open ? (
-        <div className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded-2xl border border-ink-200/90 bg-white/95 p-2 text-sm shadow-[0_24px_80px_-24px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/95">
+        <div className="absolute right-0 top-14 z-[80] w-72 overflow-hidden rounded-2xl border border-ink-300 bg-white p-2 text-sm text-ink-900 shadow-[0_30px_90px_-24px_rgba(15,23,42,0.45),0_0_0_1px_rgba(15,23,42,0.04)] dark:border-cyan-100/[0.24] dark:bg-[#06242b] dark:text-cyan-50 dark:shadow-[0_32px_100px_-24px_rgba(0,0,0,0.98),0_0_0_1px_rgba(103,232,249,0.10),inset_0_1px_0_rgba(255,255,255,0.08)]">
           <Link
             href="/parametres"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-ink-800 transition hover:bg-ink-50 dark:text-white/85 dark:hover:bg-cyan-50/[0.08]"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-semibold text-ink-800 transition hover:bg-ink-50 dark:text-cyan-50/92 dark:hover:bg-cyan-50/[0.12]"
             onClick={() => setOpen(false)}
           >
-            <Settings2 className="h-4 w-4 text-ink-500 dark:text-white/45" aria-hidden />
+            <Settings2 className="h-4 w-4 text-ink-500 dark:text-cyan-100/72" aria-hidden />
             Paramètres
           </Link>
-          <div className="my-1 h-px bg-ink-200/80 dark:bg-white/10" />
+          <div className="my-1 h-px bg-ink-200/80 dark:bg-cyan-100/[0.14]" />
           <MenuButton
             icon={CloudDownload}
             label="Synchroniser Qonto (API)"
@@ -280,7 +280,7 @@ export function DashboardDataActionsMenu({
               ) : null}
             </>
           ) : (
-            <p className="px-3 py-2 text-xs leading-relaxed text-ink-500 dark:text-white/45">
+            <p className="px-3 py-2 text-xs leading-relaxed text-ink-500 dark:text-cyan-50/68">
               Powens n’est pas configuré sur cet environnement.
             </p>
           )}
@@ -314,10 +314,10 @@ function MenuButton({
       type="button"
       title={title}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-medium text-ink-800 transition hover:bg-ink-50 disabled:opacity-50 dark:text-white/85 dark:hover:bg-cyan-50/[0.08]"
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-semibold text-ink-800 transition hover:bg-ink-50 disabled:opacity-50 dark:text-cyan-50/90 dark:hover:bg-cyan-50/[0.12] dark:disabled:opacity-45"
       onClick={onClick}
     >
-      <Icon className="h-4 w-4 text-ink-500 dark:text-white/45" aria-hidden />
+      <Icon className="h-4 w-4 text-ink-500 dark:text-cyan-100/70" aria-hidden />
       <span>{label}</span>
     </button>
   );

@@ -1120,31 +1120,6 @@ export async function updateTransaction(id: string, formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function saveSalarySimulation(payload: {
-  salaryNet: number;
-  companyCostEstimate: number;
-  cashAvailableAtTime: number;
-  remainingCashEstimate: number;
-}) {
-  await assertSupabaseWritesEnabled();
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) throw new Error("Supabase not configured (demo mode).");
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { error } = await supabase.from("salary_simulations").insert({
-    salary_net: payload.salaryNet,
-    company_cost_estimate: payload.companyCostEstimate,
-    cash_available_at_time: payload.cashAvailableAtTime,
-    remaining_cash_estimate: payload.remainingCashEstimate
-  });
-  if (error) throw new Error(error.message);
-
-  revalidatePath("/dashboard");
-}
-
 /**
  * Nettoyage manuel des doublons en base :
  *  - recalcule un content_hash canonique (date + label + amount) pour chaque ligne,

@@ -260,12 +260,6 @@ export type ValeurReelleAnalysis = {
   waterfall: ValeurReelleWaterfallStep[];
   vatRecoverableMonthlyRows: ValeurReelleVatMonthlyRow[];
   vatLiability: ValeurReelleVatLiability;
-  /** @deprecated alias */
-  activeRevenueEur: number;
-  /** @deprecated */
-  indirectBenefitsEur: number;
-  /** @deprecated */
-  ambiguousExpensesEur: number;
 };
 
 function toClassification(
@@ -853,9 +847,6 @@ export function analyzeValeurReelle(
       paidTransactions: paidVatTransactions.sort(
         (a, b) => b.date.localeCompare(a.date) || Math.abs(b.amountEur) - Math.abs(a.amountEur)
       )
-    },
-    activeRevenueEur: activeIncomeEur,
-    indirectBenefitsEur: hiddenValueRecoveredEur,
-    ambiguousExpensesEur: mixedExpensesEur
+    }
   };
 }

@@ -17,6 +17,7 @@ import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
 import type {
   ValeurReelleCashTree,
+  ValeurReelleVatLiability,
   ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
@@ -161,7 +162,7 @@ function BreakdownPieChart({
       </div>
       <div className="space-y-3">
         <div className="flex flex-col items-center">
-          <svg viewBox="0 0 200 200" role="img" aria-label="Répartition par catégorie" className="block h-52 w-52">
+          <svg viewBox="0 0 200 200" role="img" aria-label="Répartition par catégorie" className="block h-64 w-64 max-w-full">
             <defs>
               <filter id="breakdown-pie-shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
@@ -184,11 +185,10 @@ function BreakdownPieChart({
                 filter="url(#breakdown-pie-shadow)"
               />
             ))}
-            <circle cx="100" cy="100" r="43" className="fill-white dark:fill-[#101015]" />
-            <text x="100" y="98" textAnchor="middle" className="fill-ink-900 text-[11px] font-bold tabular-nums dark:fill-white">
+            <text x="100" y="97" textAnchor="middle" className="fill-ink-900 text-[13px] font-bold tabular-nums dark:fill-white">
               {fmt.euro(total)}
             </text>
-            <text x="100" y="112" textAnchor="middle" className="fill-ink-400 text-[7px] font-semibold uppercase tracking-[0.14em] dark:fill-white/35">
+            <text x="100" y="114" textAnchor="middle" className="fill-ink-400 text-[8px] font-semibold uppercase tracking-[0.14em] dark:fill-white/45">
               total
             </text>
           </svg>
@@ -486,25 +486,24 @@ function CashFlowTreeVisual({
           })}
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
           {[
             { label: "Frais", value: tree.mandatoryFeesEur, dot: "bg-rose-500" },
             { label: "CSG", value: tree.csgEur, dot: "bg-orange-400" },
             { label: "Perso", value: tree.personalChargesEur, dot: "bg-emerald-500" },
             { label: "BNC", value: tree.bncEur, dot: "bg-sky-500" }
-          ].map((item) => (
-            <div key={item.label} className="rounded-2xl bg-white/40 px-3 py-2 dark:bg-white/[0.03]">
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-500 dark:text-white/40">
-                <span className={clsx("h-2 w-2 rounded-full", item.dot)} aria-hidden />
-                {item.label}
-              </div>
-              <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
-                {percentOfCa(item.value)} %
-              </p>
-              <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-ink-500 dark:text-white/45">
-                {fmt.euro(item.value)}
-              </p>
-            </div>
+          ]
+            .sort((a, b) => b.value - a.value)
+            .map((item) => (
+            <span
+              key={item.label}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.22] dark:bg-[#123f49] dark:text-cyan-50/88 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_22px_-18px_rgba(103,232,249,0.65)]"
+            >
+              <span className={clsx("h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]", item.dot)} aria-hidden />
+              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/70">{item.label}</span>
+              <span className="tabular-nums text-ink-900 dark:text-white">{percentOfCa(item.value)} %</span>
+              <span className="tabular-nums text-ink-600 dark:text-cyan-50/82">{fmt.euro(item.value)}</span>
+            </span>
           ))}
         </div>
       </div>
@@ -600,14 +599,17 @@ function CashFlowTreeVisual({
 
 function RecoverableVatMonthlyBlock({
   rows,
+  paidTransactions,
   fmt
 }: {
   rows: ValeurReelleVatMonthlyRow[];
+  paidTransactions: ValeurReelleVatLiability["paidTransactions"];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
 }) {
   const totalVat = rows.reduce((sum, row) => sum + row.vatEur, 0);
   const totalGross = rows.reduce((sum, row) => sum + row.grossEur, 0);
   const averageVat = rows.length > 0 ? totalVat / rows.length : 0;
+  const [showPaidVatTransactions, setShowPaidVatTransactions] = useState(false);
   const categoryBreakdown = useMemo(() => {
     const map = new Map<string, { amountEur: number; count: number }>();
     for (const row of rows) {
@@ -631,37 +633,83 @@ function RecoverableVatMonthlyBlock({
 
   return (
     <section className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5">
-      <div className="rounded-2xl border border-transparent bg-white/45 px-3 py-3 dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.06]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-              TVA récupérable
-            </p>
-            <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
-              TVA gagnée sur achats
-            </h2>
-            <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
-              Moy. {fmt.euro(averageVat)} / mois · Base TTC {fmt.euro(totalGross)}
-            </p>
-          </div>
-          <p className="shrink-0 text-right font-semibold tabular-nums text-sky-800 dark:text-sky-200">
-            {fmt.euro(totalVat)}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
+            TVA récupérable
+          </p>
+          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
+            TVA gagnée sur achats
+          </h2>
+          <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
+            Moy. {fmt.euro(averageVat)} / mois · Base TTC {fmt.euro(totalGross)}
           </p>
         </div>
-
-        {breakdownRows.length ? (
-          <BreakdownPieChart
-            breakdown={breakdownRows}
-            fmt={fmt}
-            palette={RECOVERABLE_VAT_COLORS}
-            showDetailToggle={false}
-          />
-        ) : (
-          <p className="mt-3 rounded-xl bg-white/45 px-3 py-3 text-xs font-semibold text-ink-500 dark:bg-white/[0.03] dark:text-white/45">
-            Aucune TVA récupérable sur cette période.
-          </p>
-        )}
+        <p className="shrink-0 text-right font-semibold tabular-nums text-sky-800 dark:text-sky-200">
+          {fmt.euro(totalVat)}
+        </p>
       </div>
+
+      {breakdownRows.length ? (
+        <BreakdownPieChart
+          breakdown={breakdownRows}
+          fmt={fmt}
+          palette={RECOVERABLE_VAT_COLORS}
+          showDetailToggle={false}
+        />
+      ) : (
+        <p className="mt-3 rounded-xl bg-white/45 px-3 py-3 text-xs font-semibold text-ink-500 dark:bg-white/[0.03] dark:text-white/45">
+          Aucune TVA récupérable sur cette période.
+        </p>
+      )}
+
+      {paidTransactions.length ? (
+        <div className="mt-4 rounded-2xl border border-ink-200/70 bg-white/55 p-3 dark:border-cyan-100/[0.08] dark:bg-[#06242b]/40" data-private>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
+                Transactions TVA payées
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-ink-500 dark:text-white/35">
+                {paidTransactions.length} ligne{paidTransactions.length > 1 ? "s" : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPaidVatTransactions((prev) => !prev)}
+              className="shrink-0 rounded-full border border-ink-200/80 bg-white/65 px-3 py-1.5 text-[11px] font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-cyan-100/[0.10] dark:bg-white/[0.06] dark:text-white/65 dark:shadow-none dark:hover:bg-white/[0.10] dark:hover:text-white"
+              aria-expanded={showPaidVatTransactions}
+            >
+              {showPaidVatTransactions ? "Masquer" : "Développer"}
+            </button>
+          </div>
+          {showPaidVatTransactions ? (
+            <>
+              <ul className="max-h-56 space-y-2 overflow-y-auto pr-1 text-xs">
+                {paidTransactions.slice(0, 12).map((tx) => (
+                  <li
+                    key={`${tx.id}-${tx.date}`}
+                    className="flex justify-between gap-3 border-b border-ink-200/70 pb-2 last:border-0 last:pb-0 dark:border-cyan-100/[0.06]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-ink-800 dark:text-white/78">{tx.label}</span>
+                      <span className="text-ink-500 dark:text-white/35">{tx.date} · {tx.category}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-white">
+                      {fmt.euro(Math.abs(tx.amountEur))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {paidTransactions.length > 12 ? (
+                <p className="mt-2 text-[11px] font-medium text-ink-500 dark:text-white/38">
+                  + {paidTransactions.length - 12} autres transactions TVA
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -762,6 +810,7 @@ export function ValeurReelleClient({
 
       <RecoverableVatMonthlyBlock
         rows={analysis.vatRecoverableMonthlyRows}
+        paidTransactions={analysis.vatLiability.paidTransactions}
         fmt={fmt}
       />
 

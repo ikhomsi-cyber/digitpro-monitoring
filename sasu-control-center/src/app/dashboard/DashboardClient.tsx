@@ -17,10 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   CalendarClock,
   ChevronDown,
-  CirclePlus,
   Receipt,
-  Search,
-  Settings,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -64,11 +61,13 @@ import {
   TVA_DERIVED_EXPENSE_BUCKET,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
-import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import {
-  isValeurReelleMandatoryFeeLine,
-  isValeurReellePersonalChargeLine
-} from "@/lib/valeur-reelle-analyze";
+  buildSasuExpenseDonutSlices,
+  buildSasuRevenueDonutSlices,
+  buildSasuSimplifiedExpenseSlices,
+  buildSasuSimplifiedSubcategories,
+  sasuSimplifiedExpenseGroup
+} from "@/lib/sasu-analytics";
 
 export type { DashboardTx };
 
@@ -102,8 +101,9 @@ const dashboardIconToneClass: Record<
     "border-amber-200/90 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100/40 dark:border-amber-900/40 dark:bg-amber-950/35 dark:text-amber-200 dark:shadow-none"
 };
 
-/** Catégories dérivées listées sous Total expenses : les plus importantes d’abord (même vue que les %). */
-const TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES = 6;
+const formatDaysCount = new Intl.NumberFormat("fr-FR", {
+  maximumFractionDigits: 1
+});
 
 function DashboardBlockTitle({
   icon: Icon,
@@ -143,6 +143,33 @@ function monthLabelFr(yyyyMm: string) {
   const [y, m] = yyyyMm.split("-").map((x) => Number(x));
   const d = new Date(Date.UTC(y ?? 2000, (m ?? 1) - 1, 1));
   return new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(d);
+}
+
+function compactEuroAxis(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${Math.round(value / 100_000) / 10}M€`;
+  if (abs >= 10_000) return `${Math.round(value / 1000)}k€`;
+  if (abs >= 1000) return `${Math.round(value / 100) / 10}k€`;
+  return `${Math.round(value)}€`;
+}
+
+function smoothSvgPath(points: Array<{ x: number; y: number }>): string {
+  if (!points.length) return "";
+  if (points.length === 1) return `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
+
+  let path = `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i]!;
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return path;
 }
 
 /** Mois civil courant (local), aligné avec les dates des transactions YYYY-MM-DD. */
@@ -225,6 +252,10 @@ export function DashboardClient({
   const [expenseCategoryDetail, setExpenseCategoryDetail] = useState<string | null>(null);
   const [sasuAnalysisMode, setSasuAnalysisMode] = useState<"revenues" | "expenses">("expenses");
   const [sasuBreakdownMode, setSasuBreakdownMode] = useState<"categories" | "simplified">("categories");
+  const [showAllSasuCategoryRows, setShowAllSasuCategoryRows] = useState(false);
+  const [expandedSasuSubcategoryGroups, setExpandedSasuSubcategoryGroups] = useState<Set<string>>(() => new Set());
+  const [sasuMonthlyBreakdownMode, setSasuMonthlyBreakdownMode] = useState<"categories" | "simplified">("categories");
+  const [sasuMonthlyCategoryFilters, setSasuMonthlyCategoryFilters] = useState<string[]>([]);
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
 
@@ -457,8 +488,11 @@ export function DashboardClient({
         .filter((x) => x.total > 0);
     }
     return withTotals
-      .sort((a, b) => b.total - a.total)
-      .slice(0, TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES);
+      .sort((a, b) => {
+        if (a.name === "CESU" && b.name !== "CESU") return -1;
+        if (b.name === "CESU" && a.name !== "CESU") return 1;
+        return b.total - a.total;
+      });
   }, [expenseCategoryBreakdownMain, totalExpensesMonthFilter]);
 
   const VAT_RATE = 0.2;
@@ -508,98 +542,19 @@ export function DashboardClient({
   }, [filteredTx, kpiMode]);
 
   const sasuExpenseDonutSlices = useMemo(() => {
-    const total = Math.max(0, totalExpensesCard);
-    let cursor = 0;
-    return expenseCategoryTotalsForTotalExpensesCard.map((category) => {
-      const pct = total > 0 ? (category.total / total) * 100 : 0;
-      const dash = Math.max(0, pct - 0.8);
-      const slice = {
-        ...category,
-        pct,
-        dash,
-        offset: -cursor,
-        color: expenseCategoryColor(category.name)
-      };
-      cursor += pct;
-      return slice;
-    });
+    return buildSasuExpenseDonutSlices(expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard);
   }, [expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard]);
 
   const sasuRevenueDonutSlices = useMemo(() => {
-    const total = Math.max(0, totalRevenuesHt);
-    let cursor = 0;
-    return revenueCounterpartyTotals.map(({ name, total: totalTtc }) => {
-      const totalHt = totalTtc / (1 + VAT_RATE);
-      const pct = total > 0 ? (totalHt / total) * 100 : 0;
-      const dash = Math.max(0, pct - 0.8);
-      const slice = {
-        name,
-        total: totalHt,
-        pct,
-        dash,
-        offset: -cursor,
-        color: expenseCategoryColor(name)
-      };
-      cursor += pct;
-      return slice;
-    });
+    return buildSasuRevenueDonutSlices(revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE);
   }, [revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE]);
 
   const sasuSimplifiedExpenseSlices = useMemo(() => {
-    let digitPro = 0;
-    let perso = 0;
-    for (const tx of filteredTx) {
-      if (tx.amount >= 0) continue;
-      const bucket = deriveExpenseBucket(tx);
-      const amount = Math.abs(tx.amount);
-      if (isValeurReelleMandatoryFeeLine(tx, bucket)) digitPro += amount;
-      if (isValeurReellePersonalChargeLine(bucket)) perso += amount;
-    }
-    const total = Math.max(0, digitPro + perso);
-    let cursor = 0;
-    return [
-      { name: "Frais DigitPro", total: digitPro, color: "#f59e0b" },
-      { name: "Frais perso", total: perso, color: "#14b8a6" }
-    ]
-      .filter((slice) => slice.total > 0)
-      .map((slice) => {
-        const pct = total > 0 ? (slice.total / total) * 100 : 0;
-        const out = { ...slice, pct, dash: Math.max(0, pct - 0.8), offset: -cursor };
-        cursor += pct;
-        return out;
-      });
+    return buildSasuSimplifiedExpenseSlices(filteredTx);
   }, [filteredTx]);
 
   const sasuSimplifiedSubcategories = useMemo(() => {
-    const groups = new Map<string, Map<string, number>>();
-    groups.set("Frais DigitPro", new Map());
-    groups.set("Frais perso", new Map());
-
-    for (const tx of filteredTx) {
-      if (tx.amount >= 0) continue;
-      const bucket = deriveExpenseBucket(tx);
-      const amount = Math.abs(tx.amount);
-      const label = bucket ?? expenseDashboardGroupingLabel(tx, kpiMode);
-
-      if (isValeurReelleMandatoryFeeLine(tx, bucket)) {
-        const digitPro = groups.get("Frais DigitPro");
-        digitPro?.set(label, (digitPro.get(label) ?? 0) + amount);
-      }
-
-      if (isValeurReellePersonalChargeLine(bucket)) {
-        const perso = groups.get("Frais perso");
-        perso?.set(label, (perso.get(label) ?? 0) + amount);
-      }
-    }
-
-    return Object.fromEntries(
-      Array.from(groups.entries()).map(([groupName, subcategories]) => [
-        groupName,
-        Array.from(subcategories.entries())
-          .map(([name, total]) => ({ name, total }))
-          .sort((a, b) => b.total - a.total)
-      ])
-    ) as Record<string, Array<{ name: string; total: number }>>;
+    return buildSasuSimplifiedSubcategories(filteredTx, kpiMode);
   }, [filteredTx, kpiMode]);
 
   const revenueTransactionsForCounterparty = useMemo(() => {
@@ -640,6 +595,117 @@ export function DashboardClient({
       })),
     [metrics]
   );
+
+  const sasuMonthlyEvolutionBuckets = useMemo(() => {
+    const totals = new Map<string, number>();
+    const monthly = new Map<string, Map<string, number>>();
+    for (const metric of metrics) {
+      monthly.set(metric.month, new Map());
+    }
+
+    for (const tx of periodFilteredTx) {
+      if (!countsTowardDashboardExpenseKpi(tx, kpiMode)) continue;
+      const monthKey = tx.date.slice(0, 7);
+      const monthBucket = monthly.get(monthKey);
+      if (!monthBucket) continue;
+      const name =
+        sasuMonthlyBreakdownMode === "simplified"
+          ? sasuSimplifiedExpenseGroup(tx)
+          : expenseDashboardGroupingLabel(tx, kpiMode);
+      if (!name) continue;
+      const amount = Math.abs(tx.amount);
+      totals.set(name, (totals.get(name) ?? 0) + amount);
+      monthBucket.set(name, (monthBucket.get(name) ?? 0) + amount);
+    }
+
+    return { totals, monthly };
+  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode]);
+
+  const sasuMonthlyEvolutionOptions = useMemo(() => {
+    const { totals } = sasuMonthlyEvolutionBuckets;
+    return Array.from(totals.entries())
+      .map(([name, total]) => ({ name, total }))
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [sasuMonthlyEvolutionBuckets]);
+
+  const sasuMonthlyEvolutionColorByName = useMemo(() => {
+    const total = sum(sasuMonthlyEvolutionOptions.map((item) => item.total));
+    const slices =
+      sasuMonthlyBreakdownMode === "simplified"
+        ? sasuMonthlyEvolutionOptions.map((item) => ({
+            ...item,
+            color: item.name === "Frais DigitPro" ? "#ff8733" : "#11c7cb"
+          }))
+        : buildSasuExpenseDonutSlices(sasuMonthlyEvolutionOptions, total);
+    return new Map(slices.map((slice) => [slice.name, slice.color]));
+  }, [sasuMonthlyBreakdownMode, sasuMonthlyEvolutionOptions]);
+
+  useEffect(() => {
+    setSasuMonthlyCategoryFilters((prev) => {
+      if (!prev.length) return prev;
+      const allowed = new Set(sasuMonthlyEvolutionOptions.map((item) => item.name));
+      const next = prev.filter((name) => allowed.has(name));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [sasuMonthlyEvolutionOptions]);
+
+  const sasuMonthlyEvolutionSeries = useMemo(() => {
+    const optionNames = sasuMonthlyEvolutionOptions.map((item) => item.name);
+    const selectedNames = sasuMonthlyCategoryFilters.length ? sasuMonthlyCategoryFilters : optionNames;
+    const selected = new Set(selectedNames);
+    return metrics.map((metric) => {
+      const monthKey = metric.month;
+      let total = 0;
+      const byCategory: Array<{ name: string; value: number; color: string }> = [];
+      const monthBucket = sasuMonthlyEvolutionBuckets.monthly.get(monthKey);
+      for (const name of selectedNames) {
+        if (!selected.has(name)) continue;
+        const value = monthBucket?.get(name) ?? 0;
+        if (value > 0) {
+          total += value;
+          const color = sasuMonthlyEvolutionColorByName.get(name) ?? "#4f7eea";
+          byCategory.push({ name, value, color });
+        }
+      }
+      return {
+        month: monthLabelFr(monthKey),
+        monthKey,
+        value: Math.round(total * 100) / 100,
+        byCategory
+      };
+    });
+  }, [
+    metrics,
+    sasuMonthlyCategoryFilters,
+    sasuMonthlyEvolutionOptions,
+    sasuMonthlyEvolutionColorByName,
+    sasuMonthlyEvolutionBuckets
+  ]);
+
+  const sasuMonthlyLineNames = useMemo(
+    () =>
+      sasuMonthlyCategoryFilters.length
+        ? sasuMonthlyCategoryFilters
+        : sasuMonthlyEvolutionOptions.slice(0, 4).map((item) => item.name),
+    [sasuMonthlyCategoryFilters, sasuMonthlyEvolutionOptions]
+  );
+
+  const maxSasuMonthlyChartValue = useMemo(() => {
+    let maxValue = 0;
+    for (const month of sasuMonthlyEvolutionSeries) {
+      maxValue = Math.max(maxValue, month.value);
+      for (const category of month.byCategory) {
+        maxValue = Math.max(maxValue, category.value);
+      }
+    }
+    return Math.max(1, maxValue);
+  }, [sasuMonthlyEvolutionSeries]);
+
+  const sasuMonthlyAverage = useMemo(() => {
+    if (!sasuMonthlyEvolutionSeries.length) return 0;
+    return sum(sasuMonthlyEvolutionSeries.map((month) => month.value)) / sasuMonthlyEvolutionSeries.length;
+  }, [sasuMonthlyEvolutionSeries]);
 
   const periodLabel = useMemo(() => {
     return formatDashboardPeriodLabelWithMonth(selectedYears, selectedMonth);
@@ -698,6 +764,17 @@ export function DashboardClient({
     setSelectedMonth(null);
     setSelectedYears([currentSasuYear + delta]);
   }, [currentSasuYear]);
+  const moveSasuPeriod = useCallback((delta: -1 | 1) => {
+    if (!selectedMonth) {
+      moveSasuYear(delta);
+      return;
+    }
+    const index = monthOptions.indexOf(selectedMonth);
+    const nextMonth = index >= 0 ? monthOptions[index - delta] : null;
+    if (!nextMonth) return;
+    setSelectedMonth(nextMonth);
+    setSelectedYears([Number(nextMonth.slice(0, 4))]);
+  }, [monthOptions, moveSasuYear, selectedMonth]);
 
   function toggleYearInFilter(y: number) {
     setSelectedMonth(null);
@@ -778,37 +855,14 @@ export function DashboardClient({
           ) : null}
 
           {dashboardSection === "sasu" ? (
-            <section className="space-y-4">
-              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl sm:p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82"
-                    aria-label="Compte SASU"
-                  >
-                    <Receipt className="h-5 w-5" strokeWidth={1.9} aria-hidden />
-                  </button>
-                  <div className="min-w-0 text-center">
-                    <p className="text-lg font-semibold tracking-tight">Analyse SASU</p>
-                    <p className="mt-0.5 text-[11px] font-medium text-white/48">{periodLabel}</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82">
-                      <Search className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                    </span>
-                    <span className="grid h-10 w-10 place-items-center rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] text-white/82">
-                      <Settings className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-cyan-100/[0.08] bg-cyan-50/[0.045] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <section className="flex flex-col gap-4">
+              <div className="rounded-3xl border border-[#39586a]/70 bg-[#172d3a]/80 p-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => moveSasuYear(-1)}
+                      onClick={() => moveSasuPeriod(-1)}
                       className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
-                      aria-label="Afficher l’année précédente"
+                      aria-label={selectedMonth ? "Afficher le mois précédent" : "Afficher l’année précédente"}
                     >
                       ‹
                     </button>
@@ -817,9 +871,9 @@ export function DashboardClient({
                     </p>
                     <button
                       type="button"
-                      onClick={() => moveSasuYear(1)}
+                      onClick={() => moveSasuPeriod(1)}
                       className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
-                      aria-label="Afficher l’année suivante"
+                      aria-label={selectedMonth ? "Afficher le mois suivant" : "Afficher l’année suivante"}
                     >
                       ›
                     </button>
@@ -835,7 +889,7 @@ export function DashboardClient({
                     showRollingOption={false}
                     showActiveLabel={false}
                   />
-                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/40 p-1">
+                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
                     {[
                       { label: "Entrées", mode: "revenues" as const },
                       { label: "Sorties", mode: "expenses" as const }
@@ -847,7 +901,7 @@ export function DashboardClient({
                         className={clsx(
                           "rounded-xl px-2 py-2 text-center text-xs font-bold transition",
                           sasuAnalysisMode === item.mode
-                            ? "bg-violet-500 text-white shadow-[0_8px_24px_-14px_rgba(139,92,246,0.9)]"
+                            ? "bg-[#4f7eea] text-white shadow-[0_8px_24px_-14px_rgba(79,126,234,0.9)]"
                             : "text-white/40"
                         )}
                       >
@@ -855,10 +909,9 @@ export function DashboardClient({
                       </button>
                     ))}
                   </div>
-                </div>
               </div>
 
-              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl">
+              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
                 {(() => {
                   const currentSlices = sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -872,17 +925,9 @@ export function DashboardClient({
                       : totalExpensesCard;
                   return (
                     <>
-                <div className="mb-2 flex justify-end">
-                  <button
-                    type="button"
-                    className="grid h-7 w-7 place-items-center rounded-full border border-cyan-100/[0.16] text-white/60"
-                    aria-label="Ajouter une catégorie"
-                  >
-                    <CirclePlus className="h-4 w-4" strokeWidth={1.8} aria-hidden />
-                  </button>
-                </div>
-                <div className="mb-4 overflow-hidden rounded-full border border-cyan-100/[0.10] bg-[#06242b]/70 p-1 shadow-inner">
-                  <div className="flex h-5 overflow-hidden rounded-full">
+                <div className="relative mb-4 overflow-hidden rounded-full border border-[#243f51] bg-[#102634] p-1 shadow-inner">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/12 via-transparent to-white/5" aria-hidden />
+                  <div className="relative flex h-5 overflow-hidden rounded-full">
                     {currentSlices.map((slice) => (
                       <span
                         key={`bar-${slice.name}`}
@@ -892,27 +937,35 @@ export function DashboardClient({
                     ))}
                   </div>
                 </div>
-                <div className="relative mx-auto h-56 w-56">
-                  <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
-                    <circle cx="60" cy="60" r="42" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="13" />
+                <div className="relative mx-auto flex h-64 w-64 max-w-full items-center justify-center">
+                  <svg viewBox="0 0 200 200" className="block h-64 w-64 max-w-full" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
+                    <defs>
+                      <filter id="sasu-donut-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
+                      </filter>
+                    </defs>
+                    <circle cx="100" cy="100" r="58" fill="none" stroke="#284556" strokeWidth="16" />
                     {currentSlices.map((slice) => (
                       <circle
                         key={slice.name}
-                        cx="60"
-                        cy="60"
-                        r="42"
+                        cx="100"
+                        cy="100"
+                        r="58"
                         fill="none"
                         stroke={slice.color}
-                        strokeWidth="13"
+                        strokeWidth="16"
                         strokeDasharray={`${slice.dash} ${100 - slice.dash}`}
                         strokeDashoffset={slice.offset}
                         pathLength={100}
+                        strokeLinecap="round"
+                        transform="rotate(-90 100 100)"
+                        filter="url(#sasu-donut-shadow)"
                       />
                     ))}
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
                     <div>
-                      <p className="font-display text-2xl font-bold tabular-nums" data-private>
+                      <p className="font-display text-xl font-bold tabular-nums" data-private>
                         {fmt.euro(currentTotal)}
                       </p>
                       <p className="mt-1 text-sm font-medium text-white/56">
@@ -921,26 +974,13 @@ export function DashboardClient({
                     </div>
                   </div>
                 </div>
-                <div className="mb-3 mt-2 flex max-w-full flex-wrap justify-center gap-1.5">
-                  {currentSlices.slice(0, 6).map((slice) => (
-                    <span
-                      key={`sasu-legend-${slice.name}`}
-                      title={`${slice.name} · ${fmt.euro(slice.total)} · ${fmt.int(slice.pct)} %`}
-                      className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-cyan-100/[0.10] bg-cyan-50/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/72 shadow-sm"
-                    >
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
-                      <span className="truncate">{slice.name}</span>
-                      <span className="shrink-0 text-white/45">· {fmt.euro(slice.total)} · {fmt.int(slice.pct)} %</span>
-                    </span>
-                  ))}
-                </div>
-                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/35 p-1">
+                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
                   <button
                     type="button"
                     onClick={() => setSasuBreakdownMode("categories")}
                     className={clsx(
                       "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
-                      sasuBreakdownMode === "categories" ? "bg-violet-500 text-white" : "text-white/35"
+                      sasuBreakdownMode === "categories" ? "bg-[#8332c2] text-white" : "text-white/45"
                     )}
                   >
                     {sasuAnalysisMode === "revenues" ? "Revenus" : "Catégories"}
@@ -950,7 +990,7 @@ export function DashboardClient({
                     onClick={() => setSasuBreakdownMode("simplified")}
                     className={clsx(
                       "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
-                      sasuBreakdownMode === "simplified" ? "bg-violet-500 text-white" : "text-white/35"
+                      sasuBreakdownMode === "simplified" ? "bg-[#8332c2] text-white" : "text-white/45"
                     )}
                   >
                     Simplifié
@@ -961,7 +1001,246 @@ export function DashboardClient({
                 })()}
               </div>
 
-              <div className="rounded-[2rem] border border-cyan-100/[0.10] bg-[#0b3038]/78 p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)] backdrop-blur-2xl sm:p-5">
+              <div className="order-last rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/42">
+                      Évolution mensuelle
+                    </p>
+                    <h3 className="mt-1 font-display text-lg font-bold tracking-tight text-white">
+                      Dépenses par mois
+                    </h3>
+                    <p className="mt-0.5 text-[11px] font-medium text-white/42">
+                      {periodLabel} · {sasuMonthlyCategoryFilters.length || "toutes"} catégorie
+                      {sasuMonthlyCategoryFilters.length > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[#39586a]/70 bg-[#102634]/80 px-3 py-2 text-right">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/38">Moy. / mois</p>
+                    <p className="mt-0.5 font-display text-base font-bold tabular-nums text-white" data-private>
+                      {fmt.euro(sasuMonthlyAverage)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                    {[
+                      { label: "Catégories", mode: "categories" as const },
+                      { label: "Simplifié", mode: "simplified" as const }
+                    ].map((item) => (
+                      <button
+                        key={item.mode}
+                        type="button"
+                        onClick={() => {
+                          setSasuMonthlyBreakdownMode(item.mode);
+                          setSasuMonthlyCategoryFilters([]);
+                        }}
+                        className={clsx(
+                          "rounded-xl px-3 py-2 text-xs font-bold transition",
+                          sasuMonthlyBreakdownMode === item.mode ? "bg-[#8332c2] text-white" : "text-white/45"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {sasuMonthlyEvolutionOptions.length ? (
+                  <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+                    {sasuMonthlyCategoryFilters.length ? (
+                      <button
+                        type="button"
+                        onClick={() => setSasuMonthlyCategoryFilters([])}
+                        className="shrink-0 rounded-full border border-[#39586a]/70 bg-[#102634]/80 px-3 py-1.5 text-[11px] font-bold text-white/78 transition hover:bg-[#203d4f] hover:text-white"
+                      >
+                        Toutes
+                      </button>
+                    ) : null}
+                    {sasuMonthlyEvolutionOptions.map((item) => {
+                      const active = sasuMonthlyCategoryFilters.includes(item.name);
+                      const color = sasuMonthlyEvolutionColorByName.get(item.name) ?? "#4f7eea";
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() =>
+                            setSasuMonthlyCategoryFilters((prev) =>
+                              prev.includes(item.name)
+                                ? prev.filter((name) => name !== item.name)
+                                : [...prev, item.name]
+                            )
+                          }
+                          className={clsx(
+                            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition",
+                            active
+                              ? "border-white/30 bg-white/12 text-white"
+                              : "border-[#39586a]/70 bg-[#102634]/80 text-white/58 hover:bg-[#203d4f] hover:text-white"
+                          )}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: color }}
+                            aria-hidden
+                          />
+                          {item.name}
+                          <span className="text-white/42">{fmt.euro(item.total)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                <div className="mt-4" data-private>
+                  <div className="relative h-60 overflow-hidden rounded-3xl border border-cyan-100/[0.18] bg-[#0d2b38] px-4 pb-5 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_54px_-34px_rgba(103,232,249,0.75)]">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,126,234,0.24),transparent_45%)]" />
+                    <div className="pointer-events-none absolute inset-4 rounded-2xl bg-[linear-gradient(rgba(255,255,255,0.095)_1px,transparent_1px)] bg-[size:100%_25%]" />
+                    <svg viewBox="0 0 320 170" className="relative z-[1] h-full w-full overflow-visible" role="img" aria-label="Courbe des dépenses mensuelles SASU">
+                      <defs>
+                        <linearGradient id="sasu-monthly-total-area" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4f7eea" stopOpacity="0.34" />
+                          <stop offset="100%" stopColor="#4f7eea" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      {[0, 1, 2, 3].map((tick) => {
+                        const y = 18 + tick * 34;
+                        const value = maxSasuMonthlyChartValue * (1 - tick / 3);
+                        return (
+                          <g key={`grid-${tick}`}>
+                            <line
+                              x1="30"
+                              x2="312"
+                              y1={y}
+                              y2={y}
+                              stroke="rgba(207,250,254,0.18)"
+                              strokeDasharray="4 5"
+                            />
+                            <text
+                              x="0"
+                              y={y + 3}
+                              fill="rgba(236,254,255,0.86)"
+                              style={{ fontSize: 7.5, fontWeight: 800 }}
+                            >
+                              {compactEuroAxis(value)}
+                            </text>
+                          </g>
+                        );
+                      })}
+                      <line x1="30" x2="312" y1="136" y2="136" stroke="rgba(207,250,254,0.38)" strokeWidth="1.2" />
+                      <line x1="30" x2="30" y1="14" y2="136" stroke="rgba(207,250,254,0.38)" strokeWidth="1.2" />
+                      {(() => {
+                        const totalPoints = sasuMonthlyEvolutionSeries.map((month, index) => {
+                          const x =
+                            sasuMonthlyEvolutionSeries.length <= 1
+                              ? 160
+                              : (index / (sasuMonthlyEvolutionSeries.length - 1)) * 276 + 34;
+                          const y = 132 - (month.value / maxSasuMonthlyChartValue) * 112;
+                          return { x, y, value: month.value, month: month.month };
+                        });
+                        const totalPath = smoothSvgPath(totalPoints);
+                        const areaPath = totalPoints.length
+                          ? `${totalPath} L ${totalPoints[totalPoints.length - 1]!.x.toFixed(1)} 136 L ${totalPoints[0]!.x.toFixed(1)} 136 Z`
+                          : "";
+                        return (
+                          <g>
+                            <path d={areaPath} fill="url(#sasu-monthly-total-area)" />
+                            <path
+                              d={totalPath}
+                              fill="none"
+                              stroke="#4f7eea"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </g>
+                        );
+                      })()}
+                      {sasuMonthlyLineNames.map((name) => {
+                        const color = sasuMonthlyEvolutionColorByName.get(name) ?? "#4f7eea";
+                        const points = sasuMonthlyEvolutionSeries.map((month, index) => {
+                          const x =
+                            sasuMonthlyEvolutionSeries.length <= 1
+                              ? 160
+                              : (index / (sasuMonthlyEvolutionSeries.length - 1)) * 276 + 34;
+                          const value = month.byCategory.find((category) => category.name === name)?.value ?? 0;
+                          const y = 132 - (value / maxSasuMonthlyChartValue) * 112;
+                          return { x, y, value, month: month.month };
+                        });
+                        const path = smoothSvgPath(points);
+                        return (
+                          <g key={name}>
+                            <path
+                              d={path}
+                              fill="none"
+                              stroke={color}
+                              strokeWidth="1.85"
+                              strokeOpacity="0.88"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            {points.map((point) => (
+                              <circle
+                                key={`${name}-${point.month}`}
+                                cx={point.x}
+                                cy={point.y}
+                                r={point.value > 0 ? 2.4 : 1.5}
+                                fill={point.value > 0 ? color : "#39586a"}
+                                stroke="#172d3a"
+                                strokeWidth="1.25"
+                              />
+                            ))}
+                          </g>
+                        );
+                      })}
+                      {sasuMonthlyEvolutionSeries.map((month, index) => {
+                        const x =
+                          sasuMonthlyEvolutionSeries.length <= 1
+                            ? 160
+                            : (index / (sasuMonthlyEvolutionSeries.length - 1)) * 276 + 34;
+                        const show =
+                          sasuMonthlyEvolutionSeries.length <= 6
+                            ? true
+                            : index === 0 ||
+                              index === sasuMonthlyEvolutionSeries.length - 1 ||
+                              index % Math.ceil(sasuMonthlyEvolutionSeries.length / 5) === 0;
+                        const [monthPart = "", yearPart = ""] = month.month.split(" ");
+                        return show ? (
+                          <g key={`x-${month.monthKey}`}>
+                            <line
+                              x1={x}
+                              x2={x}
+                              y1="136"
+                              y2="140"
+                              stroke="rgba(207,250,254,0.34)"
+                              strokeWidth="1"
+                            />
+                            <text
+                              x={x}
+                              y="151"
+                              textAnchor="middle"
+                              fill="rgba(236,254,255,0.88)"
+                              style={{ fontSize: 7.5, fontWeight: 800 }}
+                            >
+                              {monthPart.replace(".", "")}
+                            </text>
+                            {index === 0 || monthPart.toLowerCase().startsWith("janv") ? (
+                              <text
+                                x={x}
+                                y="162"
+                                textAnchor="middle"
+                              fill="rgba(236,254,255,0.58)"
+                              style={{ fontSize: 6.5, fontWeight: 700 }}
+                              >
+                                {yearPart}
+                              </text>
+                            ) : null}
+                          </g>
+                        ) : null;
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
                 <div className="space-y-1" data-private>
                   {(sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -969,21 +1248,55 @@ export function DashboardClient({
                       ? sasuSimplifiedExpenseSlices
                       : sasuExpenseDonutSlices
                   ).length ? (
-                    (sasuAnalysisMode === "revenues"
-                      ? sasuRevenueDonutSlices
-                      : sasuBreakdownMode === "simplified"
-                        ? sasuSimplifiedExpenseSlices
-                        : sasuExpenseDonutSlices
-                    ).map(({ name, total }) => {
+                    (() => {
+                      const rows =
+                        sasuAnalysisMode === "revenues"
+                          ? sasuRevenueDonutSlices
+                          : sasuBreakdownMode === "simplified"
+                            ? sasuSimplifiedExpenseSlices
+                            : sasuExpenseDonutSlices;
+                      const visibleRows = showAllSasuCategoryRows ? rows : rows.slice(0, 5);
+                      const remainingRows = Math.max(0, rows.length - visibleRows.length);
+                      return (
+                        <>
+                    {visibleRows.map(({ name, total, color }) => {
                       const baseTotal = sasuAnalysisMode === "revenues" ? totalRevenuesHt : totalExpensesCard;
                       const pct = baseTotal > 0 ? Math.round((total / baseTotal) * 100) : 0;
-                      const color = expenseCategoryColor(name);
                       const CatIcon = categoryGlyph(name);
                       const simplified = sasuAnalysisMode === "expenses" && sasuBreakdownMode === "simplified";
                       const open = sasuAnalysisMode === "revenues" ? revenueCounterpartyDetail === name : expenseCategoryDetail === name;
+                      const currentCategoryTransactions = filteredTx.filter((tx) => {
+                        if (sasuAnalysisMode === "revenues") {
+                          return isRevenueCategory(tx.category) && tx.amount > 0 && revenueCounterpartyDisplayName(tx) === name;
+                        }
+                        if (simplified) {
+                          return tx.amount < 0;
+                        }
+                        return tx.amount < 0 && expenseDashboardGroupingLabel(tx, kpiMode) === name;
+                      });
                       const detailTransactions =
                         sasuAnalysisMode === "revenues" ? revenueTransactionsForCounterparty : expenseTransactionsForCategory;
                       const subcategories = simplified ? sasuSimplifiedSubcategories[name] ?? [] : [];
+                      const subcategoriesExpanded = expandedSasuSubcategoryGroups.has(name);
+                      const billableRevenue = sasuAnalysisMode === "revenues" && isCounterpartyBillableDaysAtTjm(name);
+                      const categoryRevenueTransactions = billableRevenue
+                        ? filteredTx.filter((tx) =>
+                            isRevenueCategory(tx.category) &&
+                            tx.amount > 0 &&
+                            revenueCounterpartyDisplayName(tx) === name
+                          )
+                        : [];
+                      const billedDaysForRevenue = billableRevenue
+                        ? categoryRevenueTransactions.reduce((sum, tx) => {
+                            const tjmHt = resolveBillableTjmForClientMonth(
+                              billableActivity.billableRatePeriods,
+                              name,
+                              tx.date.slice(0, 7),
+                              BILLABLE_CLIENT_TJM_HT
+                            );
+                            return sum + (tx.amount / (1 + VAT_RATE)) / tjmHt;
+                          }, 0)
+                        : 0;
                       return (
                         <div key={name} className="border-b border-cyan-100/[0.08] py-3 last:border-0">
                           <button
@@ -1009,7 +1322,10 @@ export function DashboardClient({
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-white/88">{name}</span>
                               <span className="mt-0.5 block text-xs font-medium text-white/48">
-                                {pct} % · {sasuAnalysisMode === "revenues" ? "revenu SASU" : simplified ? "synthèse" : "catégorie"}
+                                {pct} % · {currentCategoryTransactions.length} transaction{currentCategoryTransactions.length > 1 ? "s" : ""}
+                                {sasuAnalysisMode === "revenues" && billableRevenue
+                                  ? ` · ${formatDaysCount.format(billedDaysForRevenue)} j facturés`
+                                  : null}
                               </span>
                             </span>
                             <span className="shrink-0 text-right">
@@ -1019,65 +1335,109 @@ export function DashboardClient({
                           </button>
                           {subcategories.length ? (
                             <div className="ml-[3.25rem] mt-2 space-y-1.5">
-                              {subcategories.slice(0, 5).map((subcategory) => {
-                                const subPct = total > 0 ? Math.round((subcategory.total / total) * 100) : 0;
-                                return (
-                                  <div
-                                    key={`${name}-${subcategory.name}`}
-                                    className="flex items-center justify-between gap-3 rounded-xl bg-cyan-50/[0.04] px-3 py-2 text-xs"
-                                  >
-                                    <span className="min-w-0 truncate text-white/62">
-                                      {subcategory.name} · {subPct} %
-                                    </span>
-                                    <span className="shrink-0 font-semibold tabular-nums text-white/78">
-                                      {fmt.euro(subcategory.total)}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                              {subcategories.length > 5 ? (
-                                <p className="px-3 text-[11px] font-medium text-white/38">
-                                  + {subcategories.length - 5} autres sous-catégories
-                                </p>
-                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExpandedSasuSubcategoryGroups((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(name)) next.delete(name);
+                                    else next.add(name);
+                                    return next;
+                                  });
+                                }}
+                                className="w-full rounded-xl border border-[#39586a]/60 bg-[#102634]/70 px-3 py-2 text-left text-[11px] font-bold text-white/62 transition hover:bg-[#203d4f] hover:text-white"
+                                aria-expanded={subcategoriesExpanded}
+                              >
+                                {subcategoriesExpanded
+                                  ? "Masquer les sous-catégories"
+                                  : `Afficher ${subcategories.length} sous-catégorie${subcategories.length > 1 ? "s" : ""}`}
+                              </button>
+                              {subcategoriesExpanded
+                                ? subcategories.map((subcategory) => {
+                                    const subPct = total > 0 ? Math.round((subcategory.total / total) * 100) : 0;
+                                    return (
+                                      <div
+                                        key={`${name}-${subcategory.name}`}
+                                        className="flex items-center justify-between gap-3 rounded-xl bg-[#102634]/80 px-3 py-2 text-xs"
+                                      >
+                                        <span className="min-w-0 truncate text-white/70">
+                                          {subcategory.name} · {subPct} %
+                                        </span>
+                                        <span className="shrink-0 font-semibold tabular-nums text-white/86">
+                                          {fmt.euro(subcategory.total)}
+                                        </span>
+                                      </div>
+                                    );
+                                  })
+                                : null}
                             </div>
                           ) : null}
                           {open ? (
-                            <div className="mt-3 rounded-2xl border border-cyan-100/[0.08] bg-[#06242b]/40 p-3">
+                            <div className="ml-[3.25rem] mt-2 rounded-2xl border border-cyan-100/[0.10] bg-cyan-50/[0.04] p-3">
                               {detailTransactions.length ? (
-                                <ul className="max-h-52 space-y-2 overflow-y-auto pr-1 text-xs">
-                                  {detailTransactions.map((tx) => (
-                                    <li key={tx.id} className="flex justify-between gap-3 border-b border-cyan-100/[0.06] pb-2 last:border-0 last:pb-0">
-                                      <span className="min-w-0">
-                                        <span className="block truncate text-white/78">{tx.label}</span>
-                                        <span className="text-white/35">{tx.date}</span>
-                                      </span>
-                                      <span className="shrink-0 font-semibold tabular-nums text-white">
-                                        {fmt.euro(sasuAnalysisMode === "revenues" ? tx.amount / (1 + VAT_RATE) : Math.abs(tx.amount))}
-                                      </span>
-                                    </li>
-                                  ))}
-                                </ul>
+                                <div className="space-y-2">
+                                  {detailTransactions.slice(0, 8).map((tx) => {
+                                    const txTjmHt =
+                                      sasuAnalysisMode === "revenues"
+                                        ? resolveBillableTjmForClientMonth(
+                                            billableActivity.billableRatePeriods,
+                                            name,
+                                            tx.date.slice(0, 7),
+                                            BILLABLE_CLIENT_TJM_HT
+                                          )
+                                        : 0;
+                                    const txBilledDays =
+                                      sasuAnalysisMode === "revenues" && billableRevenue
+                                        ? (tx.amount / (1 + VAT_RATE)) / txTjmHt
+                                        : 0;
+                                    return (
+                                      <div
+                                        key={tx.id}
+                                        className="flex items-start justify-between gap-3 border-b border-cyan-100/[0.06] pb-2 text-xs last:border-0 last:pb-0"
+                                      >
+                                        <span className="min-w-0">
+                                          <span className="block font-mono text-[10px] text-white/36">{tx.date}</span>
+                                          <span className="block truncate text-white/76">{tx.label}</span>
+                                          {sasuAnalysisMode === "revenues" && billableRevenue ? (
+                                            <span className="mt-0.5 block text-[10px] font-medium text-white/42">
+                                              {formatDaysCount.format(txBilledDays)} j facturés · TJM {fmt.euro(txTjmHt)} HT
+                                            </span>
+                                          ) : null}
+                                        </span>
+                                        <span className="shrink-0 font-semibold tabular-nums text-white">
+                                          {fmt.euro(Math.abs(tx.amount))}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               ) : (
-                                <p className="text-xs text-white/45">
-                                  {sasuAnalysisMode === "revenues" ? "Aucun revenu pour cette catégorie." : "Aucune opération pour cette catégorie."}
-                                </p>
+                                <p className="text-xs text-white/42">Aucune opération disponible.</p>
                               )}
                             </div>
                           ) : null}
                         </div>
                       );
-                    })
+                    })}
+                    {remainingRows > 0 || showAllSasuCategoryRows ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllSasuCategoryRows((prev) => !prev)}
+                        className="mt-2 w-full rounded-2xl border border-cyan-100/[0.10] bg-cyan-50/[0.05] px-4 py-3 text-sm font-bold text-white/68 transition hover:bg-cyan-50/[0.09] hover:text-white"
+                      >
+                        {showAllSasuCategoryRows ? "Replier les catégories" : `Afficher ${remainingRows} autres catégories`}
+                      </button>
+                    ) : null}
+                    </>
+                      );
+                    })()
                   ) : (
-                    <p className="py-6 text-center text-sm text-white/45">
-                      {sasuAnalysisMode === "revenues" ? "Aucun revenu sur cette période." : "Aucune dépense sur cette période."}
-                    </p>
+                    <p className="py-10 text-center text-sm font-medium text-white/42">Aucune donnée sur cette période.</p>
                   )}
-                </div>
+                  </div>
               </div>
             </section>
           ) : null}
-
           {dashboardSection === "private" ? (
       <section className="space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
@@ -1506,18 +1866,16 @@ export function DashboardClient({
                   <>
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
                       {totalExpensesMonthFilter
-                        ? `Top ${TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES} catégories · ce mois`
-                        : `Top ${TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES} catégories · total période et moy. / mois (période écoulée)`}
+                        ? "Catégories · ce mois"
+                        : "Catégories · total période et moy. / mois (période écoulée)"}
                     </p>
                     <p className="text-[10px] leading-snug text-ink-500 dark:text-ink-400">
-                      Les {TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES}{" "}
-                      {kpiMode === "personal" ? "catégories Bankin les plus élevées" : "buckets les plus élevés"}{" "}
-                      pour la vue en cours.
+                      Toutes les {kpiMode === "personal" ? "catégories Bankin" : "catégories"} de la vue en cours.
                       Cliquez une ligne pour afficher les opérations (même logique que la répartition).
                     </p>
                     <ul
                       className="max-h-[min(28rem,70vh)] space-y-1 overflow-y-auto pr-0.5 text-xs"
-                      aria-label={`Top ${TOTAL_EXPENSES_CARD_TOP_DERIVED_CATEGORIES} catégories de dépenses`}
+                      aria-label="Catégories de dépenses"
                     >
                       {expenseCategoryTotalsForTotalExpensesCard.map(({ name, total }) => {
                         const pct =

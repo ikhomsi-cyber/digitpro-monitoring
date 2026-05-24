@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   Smartphone,
   UtensilsCrossed,
+  UserRound,
   Zap
 } from "lucide-react";
 import { MoroccoFlagIcon } from "@/lib/icons/morocco-flag-icon";
@@ -36,6 +37,8 @@ export function categoryGlyph(category: string): LucideIcon {
   if (n === "qonto") return Landmark;
   if (n === "assurance") return Shield;
   if (n === "mutuelle") return HeartPulse;
+  if (n === "retraite" || n.includes("retraite")) return Shield;
+  if (n.includes("frais perso") || n.includes("perso")) return UserRound;
   if (n.includes("mobile et internet")) return Smartphone;
   if ((n.includes("indemnit") && n.includes("kilomet")) || /\bik\b/.test(n)) return Car;
   if (n.includes("repas d'affaire") || n.includes("repas d affaire")) return UtensilsCrossed;

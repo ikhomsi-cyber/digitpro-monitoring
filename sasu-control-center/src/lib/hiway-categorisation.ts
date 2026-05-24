@@ -133,7 +133,7 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
   if (!text) return null;
   const aliases: Array<[HiwayExpenseCategory, string[]]> = [
     ["Indemnités kilométriques", ["indemnites kilometriques", "travel expenses", "frais de voyage", "mileage", "note ik"]],
-    ["CESU", ["cesu"]],
+    ["CESU", ["cesu", "achat cesu", "ticket cesu", "cheque domicile", "chèque domicile", "domiserve", "up cesu", "bimpli cesu"]],
     ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
     ["Abonnement Hiway", ["abonnement hiway"]],
     ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
@@ -164,7 +164,15 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   if (label.includes("dgfip")) return "Non catégorisé";
   if (source.includes("urssaf") || source.includes("cgss")) return "Urssaf";
   if (textLooksLikeIk(source)) return "Indemnités kilométriques";
-  if (source.includes("cesu") || source.includes("pluxee") || source.includes("edenred")) return "CESU";
+  if (
+    source.includes("cesu") ||
+    source.includes("pluxee") ||
+    source.includes("edenred") ||
+    source.includes("domiserve") ||
+    source.includes("cheque domicile") ||
+    source.includes("chèque domicile") ||
+    source.includes("bimpli")
+  ) return "CESU";
   if (source.includes("hiway")) {
     return source.includes("compta") || source.includes("expert") || source.includes("admin")
       ? "Hiway compta"

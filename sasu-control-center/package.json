@@ -9,12 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ai-sdk/groq": "^3.0.39",
-    "@ai-sdk/openai": "^3.0.63",
-    "@ai-sdk/react": "^3.0.178",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.3",
-    "ai": "^6.0.176",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.542.0",

@@ -119,38 +119,6 @@ export const VALEUR_REELLE_GROUP_META: Record<ValeurReelleGroup, ValeurReelleGro
   }
 };
 
-/** @deprecated Utiliser VALEUR_REELLE_GROUP_META via GROUP_BY_KIND */
-export const VALEUR_REELLE_KIND_META: Record<
-  ValeurReelleKind,
-  {
-    label: string;
-    shortLabel: string;
-    tone: ValeurReelleTone;
-    emoji: string;
-    description: string;
-  }
-> = Object.fromEntries(
-  Object.values(VALEUR_REELLE_GROUP_META).map((m) => [
-    m.kind,
-    {
-      label: m.label,
-      shortLabel: m.shortLabel,
-      tone: m.tone,
-      emoji: m.emoji,
-      description: m.description
-    }
-  ])
-) as Record<
-  ValeurReelleKind,
-  {
-    label: string;
-    shortLabel: string;
-    tone: ValeurReelleTone;
-    emoji: string;
-    description: string;
-  }
->;
-
 export function groupMetaForKind(kind: ValeurReelleKind): ValeurReelleGroupMeta {
   return VALEUR_REELLE_GROUP_META[GROUP_BY_KIND[kind]];
 }
@@ -248,12 +216,6 @@ export const HIDDEN_VALUE_RECOVERY_PERCENT: Record<HiddenValueCategory, number> 
   Énergie: 22
 };
 
-/** @deprecated Utiliser HIDDEN_VALUE_CATEGORY_META */
-export const HIDDEN_VALUE_DISPLAY_GROUPS = HIDDEN_VALUE_CATEGORIES.map((label) => ({
-  label,
-  emoji: HIDDEN_VALUE_CATEGORY_META[label].emoji
-}));
-
 /** Catégories revenus passifs (groupe 3). */
 export const PASSIVE_INCOME_CATEGORIES = [
   "Loyer France",
@@ -336,7 +298,20 @@ export const REPAS_DIRIGEANT_KEYWORDS = [
   "ilias"
 ] as const;
 
-export const CESU_KEYWORDS = ["cesu", "pluxee", "edenred", "cheque emploi", "emploi familial"] as const;
+export const CESU_KEYWORDS = [
+  "cesu",
+  "achat cesu",
+  "ticket cesu",
+  "pluxee",
+  "edenred",
+  "domiserve",
+  "cheque domicile",
+  "chèque domicile",
+  "cheque emploi",
+  "emploi familial",
+  "up cesu",
+  "bimpli"
+] as const;
 
 export const CADEAUX_CLIENTELE_KEYWORDS = [
   "cadeau client",
@@ -581,10 +556,6 @@ export function resolveHiddenValueCategory(
   return null;
 }
 
-/** @deprecated alias */
-export const resolveHiddenValueDisplayGroup = resolveHiddenValueCategory;
-export type HiddenValueDisplayGroup = HiddenValueCategory;
-
 export function resolveRealExpenseCategory(
   bucket: DerivedExpenseBucket,
   blob: string,
@@ -658,10 +629,6 @@ export function resolveRealExpenseCategory(
 
   return "Divers";
 }
-
-/** @deprecated */
-export const resolveRealExpenseDisplayGroup = resolveRealExpenseCategory;
-export type RealExpenseDisplayGroup = RealExpenseCategory;
 
 export function resolvePassiveIncomeCategory(
   blob: string,

@@ -172,18 +172,18 @@ export function ActivityOverviewPremium({
           </div>
 
           <dl className="grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07]">
-              <dt className="flex items-center gap-1 text-[10px] font-semibold text-ink-500 dark:text-white/55">
-                <Target className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-cyan-100/[0.18] dark:bg-cyan-50/[0.12] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <dt className="flex items-center gap-1 text-[10px] font-bold text-ink-500 dark:text-cyan-50/72">
+                <Target className="h-3 w-3 shrink-0 text-ink-400 dark:text-cyan-100/75" aria-hidden />
                 Reste à facturer
               </dt>
-              <dd className="mt-1 font-display text-sm font-semibold tabular-nums text-ink-900 dark:text-white/92">
+              <dd className="mt-1 font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                 {fmt.euro(kpis.resteAFacturer)}
               </dd>
             </div>
-            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07]">
-              <dt className="text-[10px] font-semibold text-ink-500 dark:text-white/55">Projection fin de mois</dt>
-              <dd className="mt-1 font-display text-sm font-semibold tabular-nums text-emerald-800 dark:text-emerald-200">
+            <div className="rounded-2xl border border-ink-200/70 bg-white/60 px-3 py-2.5 dark:border-emerald-100/[0.18] dark:bg-emerald-300/[0.11] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <dt className="text-[10px] font-bold text-ink-500 dark:text-emerald-50/72">Projection fin de mois</dt>
+              <dd className="mt-1 font-display text-base font-bold tabular-nums text-emerald-800 dark:text-emerald-100">
                 {fmt.euro(kpis.projectionFinMois)}
               </dd>
             </div>

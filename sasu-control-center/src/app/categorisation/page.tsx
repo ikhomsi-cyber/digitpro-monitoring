@@ -5,6 +5,11 @@ import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
 import { Logo } from "@/components/ui/Logo";
 import { BANKIN_UNCATEGORIZED_CATEGORY } from "@/lib/bankin/categorize";
 import { buildBankinReferenceCategoryList } from "@/lib/bankin/reference-categories";
+import {
+  mapCategorisationCandidateRows,
+  normalizeCategory,
+  type CategorisationCandidateRow
+} from "@/lib/categorisation-candidates";
 import { CategorisationClient, type CategorisationTx } from "./CategorisationClient";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
@@ -13,40 +18,6 @@ import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preferenc
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 
 export const dynamic = "force-dynamic";
-
-type TxRow = {
-  id: string;
-  date: string;
-  label: string | null;
-  amount: number | string;
-  company: string | null;
-  bank_name: string | null;
-  category: string | null;
-  import_sessions?: { format: string | null } | null;
-};
-
-function normalizeCategory(raw: unknown): string {
-  return String(raw ?? "").trim();
-}
-
-function isCardPowensLabel(raw: string): boolean {
-  const label = raw
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
-  return /\b(cb|carte|card)\b/.test(label);
-}
-
-function isLikelyNdfDigitProCandidate(raw: string): boolean {
-  const label = raw
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
-  if (/\b(quick|domino|dominos|tacos|boucherie|boucheries|auchan|grand frais|carrefour)\b/.test(label)) {
-    return false;
-  }
-  return /\b(repas|dejeuner|dej|restaurant|resto|brasserie|bistrot|cafe|burger|pizza|sushi|monoprix|franprix)\b/.test(label);
-}
 
 export default async function CategorisationPage() {
   const envMode = getSupabaseRuntimeMode();
@@ -97,19 +68,7 @@ export default async function CategorisationPage() {
       categories = buildBankinReferenceCategoryList(
         (categoryRes.data ?? []).map((row) => normalizeCategory((row as { category?: unknown }).category))
       );
-      transactions = ((txRes.data ?? []) as unknown as TxRow[])
-        .map((row) => ({
-          id: String(row.id),
-          date: String(row.date).slice(0, 10),
-          label: String(row.label ?? ""),
-          amount: Number(row.amount),
-          company: String(row.company ?? "").trim(),
-          bankName: row.bank_name ? String(row.bank_name).trim() : null
-        }))
-        .filter((tx) => {
-          const blob = `${tx.label} ${tx.company}`;
-          return isCardPowensLabel(blob) && isLikelyNdfDigitProCandidate(blob);
-        });
+      transactions = mapCategorisationCandidateRows((txRes.data ?? []) as unknown as CategorisationCandidateRow[]);
     }
   }
 

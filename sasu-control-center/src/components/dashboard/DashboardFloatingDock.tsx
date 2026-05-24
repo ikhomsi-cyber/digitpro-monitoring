@@ -77,6 +77,7 @@ export function DashboardFloatingDock() {
     event.preventDefault();
     window.history.pushState(null, "", href);
     window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   };
 
   return (
@@ -154,6 +155,7 @@ export function DashboardDesktopSidebar() {
     event.preventDefault();
     window.history.pushState(null, "", href);
     window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   };
 
   return (
