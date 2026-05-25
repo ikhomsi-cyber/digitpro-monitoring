@@ -76,7 +76,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   const realTjmSharePct = activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
   const tjmRepartitionTotalEur = Math.max(
     1,
-    stats.tjmRepartitionMois.bncEur + stats.tjmRepartitionMois.fraisPersoEur
+    stats.tjmRepartitionMois.caHtEur
   );
   const yearToDate = useMemo(() => {
     const now = new Date();
@@ -198,7 +198,9 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         sublabelTone: "positive",
         tjmRepartition: [
           { label: "BNC", value: stats.tjmRepartitionMois.bncEur, colorClass: "bg-sky-400", textClass: "text-sky-700 dark:text-sky-300" },
-          { label: "Frais perso", value: stats.tjmRepartitionMois.fraisPersoEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" }
+          { label: "Perso", value: stats.tjmRepartitionMois.fraisPersoEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" },
+          { label: "CSG", value: stats.tjmRepartitionMois.csgEur, colorClass: "bg-orange-400", textClass: "text-orange-700 dark:text-orange-300" },
+          { label: "Frais", value: stats.tjmRepartitionMois.fraisDigitProEur, colorClass: "bg-rose-500", textClass: "text-rose-700 dark:text-rose-300" }
         ],
         icon: CalendarCheck2,
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
@@ -364,8 +366,8 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                   </p>
                 ) : null}
                 {t.tjmRepartition ? (
-                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-1.5 dark:border-violet-400/15 dark:bg-white/[0.025]">
-                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-1.5 dark:border-cyan-100/[0.14] dark:bg-cyan-50/[0.045]">
+                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
                       {t.tjmRepartition.map((part) => (
                         <div
                           key={part.label}
@@ -378,18 +380,18 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                     <div className="mt-1.5 space-y-1 text-[10px] font-bold">
                       {t.tjmRepartition.map((part) => {
                         const pct = (part.value / tjmRepartitionTotalEur) * 100;
-                        const dailyValue = realTjmBeforeIncomeTaxEur * (pct / 100);
+                        const dailyValue = activeTjmHt * (pct / 100);
                         return (
                           <span
                             key={part.label}
-                            className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-white/45 px-1.5 py-1 dark:bg-white/[0.035]"
+                            className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1.5 dark:bg-white/[0.075]"
                           >
                             <span className={`inline-flex min-w-0 items-center gap-1.5 ${part.textClass}`}>
                               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${part.colorClass}`} />
-                              <span className="truncate">{part.label}</span>
+                              <span className="shrink-0">{part.label}</span>
                               <span className="shrink-0 tabular-nums">{fmt.int(pct)}%</span>
                             </span>
-                            <span className="shrink-0 tabular-nums text-ink-500 dark:text-white/45">
+                            <span className="shrink-0 tabular-nums text-ink-800 dark:text-white/80">
                               {fmt.euro(dailyValue)}
                             </span>
                           </span>

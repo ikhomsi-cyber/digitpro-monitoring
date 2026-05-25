@@ -71,6 +71,8 @@ import {
 
 export type { DashboardTx };
 
+type DashboardSection = "full" | "activite" | "valeur" | "sasu" | "private" | "categorisation";
+
 const DASHBOARD_SECTION_SLIDE_VARIANTS = {
   initial: { opacity: 0, scale: 0.995, filter: "blur(2px)" },
   animate: {
@@ -86,6 +88,70 @@ const DASHBOARD_SECTION_SLIDE_VARIANTS = {
     transition: { duration: 0.1, ease: [0.4, 0, 1, 1] as const }
   }
 };
+
+function DashboardSectionLoadingSkeleton({ section, dark }: { section: DashboardSection; dark: boolean }) {
+  const rows = section === "full" ? 3 : section === "categorisation" ? 5 : 4;
+  const pulseSoftClass = dark ? "bg-cyan-100/[0.18]" : "bg-ink-200/80";
+  const pulseStrongClass = dark ? "bg-cyan-50/[0.24]" : "bg-ink-200/90";
+  const pulseMutedClass = dark ? "bg-cyan-50/[0.13]" : "bg-ink-100";
+  const panelClass = dark
+    ? "border-cyan-100/[0.12] bg-cyan-50/[0.065] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]"
+    : "border-ink-100/80 bg-white/60";
+  return (
+    <section
+      className={clsx(
+        "relative space-y-5 overflow-hidden rounded-[2rem] border p-4 backdrop-blur-xl sm:p-6",
+        dark
+          ? "border-cyan-100/[0.16] bg-[#08272f]/94 shadow-[0_28px_90px_-34px_rgba(0,22,28,0.95),inset_0_1px_0_rgba(255,255,255,0.10)]"
+          : "border-ink-200/70 bg-white/70 shadow-[0_24px_80px_-34px_rgba(15,23,42,0.28)]"
+      )}
+      aria-label="Chargement de la section"
+      aria-busy="true"
+    >
+      <div className={clsx("pointer-events-none absolute inset-x-8 -top-12 h-32 rounded-full blur-3xl", dark ? "bg-cyan-300/18" : "bg-cyan-300/8")} aria-hidden />
+      <div className={clsx("pointer-events-none absolute -bottom-16 right-8 h-36 w-64 rounded-full blur-3xl", dark ? "bg-emerald-300/12" : "bg-emerald-300/8")} aria-hidden />
+
+      <div className="relative flex items-center justify-between gap-4">
+        <div className="space-y-2">
+          <div className={clsx("h-3 w-28 animate-pulse rounded-full", pulseSoftClass)} />
+          <div className={clsx("h-7 w-52 animate-pulse rounded-full", pulseStrongClass)} />
+        </div>
+        <div className={clsx("hidden h-10 w-28 animate-pulse rounded-full sm:block", dark ? "bg-cyan-50/[0.16]" : "bg-ink-100")} />
+      </div>
+
+      <div className="relative grid gap-3 sm:grid-cols-3">
+        {[0, 1, 2].map((item) => (
+          <div
+            key={item}
+            className={clsx("rounded-2xl border p-4", dark ? "border-cyan-100/[0.12] bg-cyan-50/[0.075] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]" : "border-ink-100/80 bg-white/65")}
+          >
+            <div className={clsx("mb-5 h-3 w-24 animate-pulse rounded-full", pulseSoftClass)} />
+            <div className={clsx("h-8 w-32 animate-pulse rounded-full", pulseStrongClass)} />
+          </div>
+        ))}
+      </div>
+
+      <div className="relative grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className={clsx("rounded-3xl border p-4", panelClass)}>
+          <div className={clsx("mb-5 h-4 w-40 animate-pulse rounded-full", pulseSoftClass)} />
+          <div className="space-y-3">
+            {Array.from({ length: rows }).map((_, item) => (
+              <div key={item} className="flex items-center gap-3">
+                <div className={clsx("h-9 w-9 animate-pulse rounded-full", dark ? "bg-cyan-50/[0.20]" : "bg-ink-200/80")} />
+                <div className={clsx("h-3 flex-1 animate-pulse rounded-full", pulseMutedClass)} />
+                <div className={clsx("h-3 w-16 animate-pulse rounded-full", pulseSoftClass)} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className={clsx("rounded-3xl border p-4", panelClass)}>
+          <div className={clsx("mx-auto mb-5 h-36 w-36 animate-pulse rounded-full", dark ? "bg-cyan-50/[0.14] ring-1 ring-cyan-100/[0.08]" : "bg-ink-100")} />
+          <div className={clsx("mx-auto h-3 w-40 animate-pulse rounded-full", pulseSoftClass)} />
+        </div>
+      </div>
+    </section>
+  );
+}
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -216,9 +282,11 @@ export function DashboardClient({
     if (s === "categorisation") return "categorisation" as const;
     return "full" as const;
   }, [searchParams]);
+  const [isSectionLoading, setIsSectionLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   /** Ordre des pilules périmètre : gauche → droite (pour le sens du slide). */
-  const sectionOrder: Record<typeof dashboardSection, number> = {
+  const sectionOrder: Record<DashboardSection, number> = {
     full: 0,
     activite: 1,
     valeur: 2,
@@ -227,15 +295,28 @@ export function DashboardClient({
     categorisation: 5
   };
   const prevSectionRef = useRef(dashboardSection);
-  const slideDirRef = useRef(1);
   if (prevSectionRef.current !== dashboardSection) {
-    const from = sectionOrder[prevSectionRef.current];
-    const to = sectionOrder[dashboardSection];
-    slideDirRef.current = to >= from ? 1 : -1;
+    void sectionOrder;
   }
   useLayoutEffect(() => {
     prevSectionRef.current = dashboardSection;
   }, [dashboardSection]);
+  useEffect(() => {
+    setIsSectionLoading(true);
+    const loadingTimer = window.setTimeout(() => {
+      setIsSectionLoading(false);
+    }, 140);
+
+    return () => window.clearTimeout(loadingTimer);
+  }, [dashboardSection]);
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncDarkMode = () => setIsDarkMode(root.classList.contains("dark"));
+    syncDarkMode();
+    const observer = new MutationObserver(syncDarkMode);
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   const [heroStatsReady, setHeroStatsReady] = useState(demoMode);
@@ -815,7 +896,6 @@ export function DashboardClient({
       <AnimatePresence initial={false} mode="sync">
         <motion.div
           key={dashboardSection}
-          custom={slideDirRef.current}
           variants={DASHBOARD_SECTION_SLIDE_VARIANTS}
           initial="initial"
           animate="animate"
@@ -823,6 +903,10 @@ export function DashboardClient({
           className="space-y-6 will-change-transform sm:space-y-8"
           style={{ contain: "layout paint" }}
         >
+      {isSectionLoading ? (
+        <DashboardSectionLoadingSkeleton section={dashboardSection} dark={isDarkMode} />
+      ) : (
+        <>
       {dashboardSection === "full" ? (
         <DashboardPremiumHero
           stats={currentHeroStats}
@@ -2031,6 +2115,8 @@ export function DashboardClient({
       </section>
           ) : null}
 
+        </>
+      )}
         </>
       )}
 

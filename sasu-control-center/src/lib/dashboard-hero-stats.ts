@@ -56,8 +56,11 @@ export type DashboardHeroStats = {
   depensesPersoMoisEur: number;
   netDansMaPocheMoisEur: number;
   tjmRepartitionMois: {
+    caHtEur: number;
     bncEur: number;
     fraisPersoEur: number;
+    csgEur: number;
+    fraisDigitProEur: number;
   };
   detteCsgDepuisDebutEur: number;
   detteTvaDepuisDebutEur: number;
@@ -78,8 +81,11 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const currentYear = now.getFullYear();
   const valueAnalysis = analyzeValeurReelle(transactions, { years: null, month: currentMonth, now });
   const tjmRepartitionMois = {
+    caHtEur: Math.max(0, valueAnalysis.cashTree.caFactureEur),
     bncEur: Math.max(0, valueAnalysis.cashTree.bncEur),
-    fraisPersoEur: Math.max(0, valueAnalysis.cashTree.personalChargesEur)
+    fraisPersoEur: Math.max(0, valueAnalysis.cashTree.personalChargesEur),
+    csgEur: Math.max(0, valueAnalysis.cashTree.csgEur),
+    fraisDigitProEur: Math.max(0, valueAnalysis.cashTree.mandatoryFeesEur)
   };
   const allYears = Array.from(
     new Set(
@@ -148,8 +154,11 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     depensesPersoMoisEur,
     netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur,
     tjmRepartitionMois: {
+      caHtEur: Math.round(tjmRepartitionMois.caHtEur * 100) / 100,
       bncEur: Math.round(tjmRepartitionMois.bncEur * 100) / 100,
-      fraisPersoEur: Math.round(tjmRepartitionMois.fraisPersoEur * 100) / 100
+      fraisPersoEur: Math.round(tjmRepartitionMois.fraisPersoEur * 100) / 100,
+      csgEur: Math.round(tjmRepartitionMois.csgEur * 100) / 100,
+      fraisDigitProEur: Math.round(tjmRepartitionMois.fraisDigitProEur * 100) / 100
     },
     detteCsgDepuisDebutEur,
     detteTvaDepuisDebutEur,
