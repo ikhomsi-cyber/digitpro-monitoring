@@ -192,11 +192,11 @@ function BreakdownPieChart({
               total
             </text>
           </svg>
-          <div className="mb-3 flex max-w-full flex-wrap justify-center gap-1.5">
+          <div className="mb-3 grid w-full max-w-md grid-cols-2 gap-1.5">
             {slices.slice(0, 6).map((slice) => (
               <span
                 key={`compact-legend-${slice.row.label}`}
-                className="group/legend relative inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                className="group/legend relative inline-flex min-w-0 items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
                 title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
@@ -210,7 +210,7 @@ function BreakdownPieChart({
               </span>
             ))}
             {slices.length > 6 ? (
-              <span className="inline-flex items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
+              <span className="inline-flex min-w-0 items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
                 +{slices.length - 6}
               </span>
             ) : null}

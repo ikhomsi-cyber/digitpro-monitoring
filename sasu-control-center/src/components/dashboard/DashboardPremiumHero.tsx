@@ -361,7 +361,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                   </p>
                 ) : null}
                 {t.tjmRepartition ? (
-                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-2 dark:border-violet-400/15 dark:bg-white/[0.025]">
+                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-1.5 dark:border-violet-400/15 dark:bg-white/[0.025]">
                     <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
                       {t.tjmRepartition.map((part) => (
                         <div
@@ -372,18 +372,21 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                         />
                       ))}
                     </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-[8px] font-bold">
+                    <div className="mt-1.5 space-y-1 text-[10px] font-bold">
                       {t.tjmRepartition.map((part) => {
                         const pct = (part.value / tjmRepartitionTotalEur) * 100;
                         const dailyValue = activeTjmHt * (pct / 100);
                         return (
-                          <span key={part.label} className={`min-w-0 ${part.textClass}`}>
-                            <span className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full ${part.colorClass}`} />
-                              <span>{part.label}</span>
-                              <span className="tabular-nums">{fmt.int(pct)}%</span>
+                          <span
+                            key={part.label}
+                            className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-white/45 px-1.5 py-1 dark:bg-white/[0.035]"
+                          >
+                            <span className={`inline-flex min-w-0 items-center gap-1.5 ${part.textClass}`}>
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${part.colorClass}`} />
+                              <span className="truncate">{part.label}</span>
+                              <span className="shrink-0 tabular-nums">{fmt.int(pct)}%</span>
                             </span>
-                            <span className="mt-0.5 block truncate tabular-nums text-ink-500 dark:text-white/40">
+                            <span className="shrink-0 tabular-nums text-ink-500 dark:text-white/45">
                               {fmt.euro(dailyValue)}
                             </span>
                           </span>
