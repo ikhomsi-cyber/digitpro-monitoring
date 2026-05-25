@@ -72,19 +72,19 @@ import {
 export type { DashboardTx };
 
 const DASHBOARD_SECTION_SLIDE_VARIANTS = {
-  initial: (dir: number) => ({ opacity: 0.72, x: `${dir * 34}%`, scale: 0.985 }),
+  initial: { opacity: 0, scale: 0.995, filter: "blur(2px)" },
   animate: {
     opacity: 1,
-    x: 0,
     scale: 1,
-    transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const }
+    filter: "blur(0px)",
+    transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] as const }
   },
-  exit: (dir: number) => ({
-    opacity: 0.58,
-    x: `${dir * -24}%`,
-    scale: 0.99,
-    transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as const }
-  })
+  exit: {
+    opacity: 0,
+    scale: 0.998,
+    filter: "blur(1px)",
+    transition: { duration: 0.1, ease: [0.4, 0, 1, 1] as const }
+  }
 };
 
 const dashboardIconToneClass: Record<
