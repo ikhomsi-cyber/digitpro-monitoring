@@ -72,18 +72,18 @@ import {
 export type { DashboardTx };
 
 const DASHBOARD_SECTION_SLIDE_VARIANTS = {
-  initial: (dir: number) => ({ opacity: 0, x: dir * 18, filter: "blur(3px)" }),
+  initial: (dir: number) => ({ opacity: 0.72, x: `${dir * 34}%`, scale: 0.985 }),
   animate: {
     opacity: 1,
     x: 0,
-    filter: "blur(0px)",
-    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const }
+    scale: 1,
+    transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const }
   },
   exit: (dir: number) => ({
-    opacity: 0,
-    x: dir * -12,
-    filter: "blur(2px)",
-    transition: { duration: 0.12, ease: [0.4, 0, 1, 1] as const }
+    opacity: 0.58,
+    x: `${dir * -24}%`,
+    scale: 0.99,
+    transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as const }
   })
 };
 
@@ -260,6 +260,7 @@ export function DashboardClient({
   const [sasuMonthlyCategoryFilters, setSasuMonthlyCategoryFilters] = useState<string[]>([]);
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
+  const shouldComputeSasuPanel = dashboardSection === "sasu" || dashboardSection === "private";
 
   useEffect(() => {
     setTransactions(initialTransactions);
@@ -544,20 +545,24 @@ export function DashboardClient({
   }, [filteredTx, kpiMode]);
 
   const sasuExpenseDonutSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuExpenseDonutSlices(expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard);
-  }, [expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard]);
+  }, [expenseCategoryTotalsForTotalExpensesCard, shouldComputeSasuPanel, totalExpensesCard]);
 
   const sasuRevenueDonutSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuRevenueDonutSlices(revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE);
-  }, [revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE]);
+  }, [revenueCounterpartyTotals, shouldComputeSasuPanel, totalRevenuesHt, VAT_RATE]);
 
   const sasuSimplifiedExpenseSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuSimplifiedExpenseSlices(filteredTx);
-  }, [filteredTx]);
+  }, [filteredTx, shouldComputeSasuPanel]);
 
   const sasuSimplifiedSubcategories = useMemo(() => {
+    if (!shouldComputeSasuPanel) return {};
     return buildSasuSimplifiedSubcategories(filteredTx, kpiMode);
-  }, [filteredTx, kpiMode]);
+  }, [filteredTx, kpiMode, shouldComputeSasuPanel]);
 
   const revenueTransactionsForCounterparty = useMemo(() => {
     if (!revenueCounterpartyDetail) return [];
@@ -601,6 +606,7 @@ export function DashboardClient({
   const sasuMonthlyEvolutionBuckets = useMemo(() => {
     const totals = new Map<string, number>();
     const monthly = new Map<string, Map<string, number>>();
+    if (!shouldComputeSasuPanel) return { totals, monthly };
     for (const metric of metrics) {
       monthly.set(metric.month, new Map());
     }
@@ -621,7 +627,7 @@ export function DashboardClient({
     }
 
     return { totals, monthly };
-  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode]);
+  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode, shouldComputeSasuPanel]);
 
   const sasuMonthlyEvolutionOptions = useMemo(() => {
     const { totals } = sasuMonthlyEvolutionBuckets;
@@ -653,6 +659,7 @@ export function DashboardClient({
   }, [sasuMonthlyEvolutionOptions]);
 
   const sasuMonthlyEvolutionSeries = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     const optionNames = sasuMonthlyEvolutionOptions.map((item) => item.name);
     const selectedNames = sasuMonthlyCategoryFilters.length ? sasuMonthlyCategoryFilters : optionNames;
     const selected = new Set(selectedNames);
@@ -682,7 +689,8 @@ export function DashboardClient({
     sasuMonthlyCategoryFilters,
     sasuMonthlyEvolutionOptions,
     sasuMonthlyEvolutionColorByName,
-    sasuMonthlyEvolutionBuckets
+    sasuMonthlyEvolutionBuckets,
+    shouldComputeSasuPanel
   ]);
 
   const sasuMonthlyLineNames = useMemo(
@@ -802,17 +810,6 @@ export function DashboardClient({
     });
   }, []);
 
-  if (dashboardSection === "full") {
-    return (
-      <DashboardPremiumHero
-        stats={currentHeroStats}
-        statsReady={heroStatsReady}
-        contextMessage={heroContextMessage}
-        showContextBanner={showContextBanner}
-      />
-    );
-  }
-
   return (
     <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
       <AnimatePresence initial={false} mode="sync">
@@ -826,6 +823,14 @@ export function DashboardClient({
           className="space-y-6 will-change-transform sm:space-y-8"
           style={{ contain: "layout paint" }}
         >
+      {dashboardSection === "full" ? (
+        <DashboardPremiumHero
+          stats={currentHeroStats}
+          statsReady={heroStatsReady}
+          contextMessage={heroContextMessage}
+          showContextBanner={showContextBanner}
+        />
+      ) : null}
       {dashboardSection === "activite" ? (
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}

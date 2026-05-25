@@ -76,7 +76,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   const realTjmSharePct = activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
   const tjmRepartitionTotalEur = Math.max(
     1,
-    stats.tjmRepartitionMois.bncEur + stats.tjmRepartitionMois.ikEur + stats.tjmRepartitionMois.ndfEur
+    stats.tjmRepartitionMois.bncEur + stats.tjmRepartitionMois.fraisPersoEur
   );
   const yearToDate = useMemo(() => {
     const now = new Date();
@@ -198,8 +198,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         sublabelTone: "positive",
         tjmRepartition: [
           { label: "BNC", value: stats.tjmRepartitionMois.bncEur, colorClass: "bg-sky-400", textClass: "text-sky-700 dark:text-sky-300" },
-          { label: "IK", value: stats.tjmRepartitionMois.ikEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" },
-          { label: "NDF", value: stats.tjmRepartitionMois.ndfEur, colorClass: "bg-violet-400", textClass: "text-violet-700 dark:text-violet-300" }
+          { label: "Frais perso", value: stats.tjmRepartitionMois.fraisPersoEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" }
         ],
         icon: CalendarCheck2,
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
@@ -379,7 +378,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                     <div className="mt-1.5 space-y-1 text-[10px] font-bold">
                       {t.tjmRepartition.map((part) => {
                         const pct = (part.value / tjmRepartitionTotalEur) * 100;
-                        const dailyValue = activeTjmHt * (pct / 100);
+                        const dailyValue = realTjmBeforeIncomeTaxEur * (pct / 100);
                         return (
                           <span
                             key={part.label}

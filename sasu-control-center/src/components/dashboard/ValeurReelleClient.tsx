@@ -497,12 +497,12 @@ function CashFlowTreeVisual({
             .map((item) => (
             <span
               key={item.label}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.22] dark:bg-[#123f49] dark:text-cyan-50/88 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_22px_-18px_rgba(103,232,249,0.65)]"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.28] dark:bg-cyan-50/[0.09] dark:text-cyan-50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_22px_-18px_rgba(103,232,249,0.75)]"
             >
               <span className={clsx("h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]", item.dot)} aria-hidden />
-              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/70">{item.label}</span>
+              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/82">{item.label}</span>
               <span className="tabular-nums text-ink-900 dark:text-white">{percentOfCa(item.value)} %</span>
-              <span className="tabular-nums text-ink-600 dark:text-cyan-50/82">{fmt.euro(item.value)}</span>
+              <span className="rounded-full bg-ink-900/5 px-1.5 py-0.5 tabular-nums text-ink-700 dark:bg-white/[0.10] dark:text-white">{fmt.euro(item.value)}</span>
             </span>
           ))}
         </div>
