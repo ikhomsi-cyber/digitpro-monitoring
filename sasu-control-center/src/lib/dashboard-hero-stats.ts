@@ -16,6 +16,8 @@ import {
   analyzeValeurReelle
 } from "@/lib/valeur-reelle-analyze";
 
+const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
+
 function isCsgExpenseLine(tx: DashboardTx): boolean {
   const blob = `${tx.label ?? ""} ${tx.category ?? ""} ${tx.company ?? ""}`
     .normalize("NFD")
@@ -126,7 +128,9 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
 
   const soldeQontoEur = computeLatestQontoBalanceEur(transactions, "pro");
   const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
-  const detteTvaDepuisDebutEur = Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur);
+  const detteTvaDepuisDebutEur =
+    Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
+    100;
   const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
   const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);
 

@@ -1,3 +1,5 @@
+import { AppPageLoader } from "@/components/ui/AppPageLoader";
+
 export default function CategorisationLoading() {
-  return null;
+  return <AppPageLoader message="Chargement de la catégorisation…" />;
 }

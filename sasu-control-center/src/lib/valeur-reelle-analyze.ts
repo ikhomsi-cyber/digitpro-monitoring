@@ -38,7 +38,7 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
-export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.02;
+export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0;
 
 export function applyFiscalDebtSafetyMargin(amountEur: number): number {
   if (!Number.isFinite(amountEur) || amountEur <= 0) return amountEur;
@@ -348,6 +348,7 @@ export function valeurReelleExpenseCategoryLabel(
   bucket: DerivedExpenseBucket | null
 ): ValeurReelleExpenseCategory {
   if (bucket === "Urssaf") return "Urssaf";
+  if (bucket === "Qonto") return "Frais bancaires";
   return categorizeHiwayExpense({ ...tx, category: tx.category || bucket || "" });
 }
 
@@ -360,6 +361,10 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
     bucket === "Repas dirigeant" ||
     bucket === "iCloud IA Store"
   );
+}
+
+function isCsgSocialReintegrationLine(bucket: DerivedExpenseBucket | null): boolean {
+  return bucket === "Urssaf";
 }
 
 function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null): { label: string; rate: number } | null {
@@ -530,6 +535,7 @@ export function analyzeValeurReelle(
   let ndfIkGrossEur = 0;
   let ndfIkRecoveredEur = 0;
   let mandatoryFeesEur = 0;
+  let csgSocialReintegrationsEur = 0;
   let personalChargesEur = 0;
   let bncPaidEur = 0;
   let paidVatEur = 0;
@@ -563,6 +569,9 @@ export function analyzeValeurReelle(
       const feeLabel = valeurReelleExpenseCategoryLabel(tx, bucket);
       const feeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
       mandatoryFeesEur += feeAmountEur;
+      if (isCsgSocialReintegrationLine(bucket)) {
+        csgSocialReintegrationsEur += feeAmountEur;
+      }
       addBreakdownRow(mandatoryFeesBreakdown, feeLabel, feeAmountEur, breakdownTransaction(tx, feeAmountEur, amtAbs));
       mandatoryFeeTransactions.push({
         date: tx.date,
@@ -714,7 +723,9 @@ export function analyzeValeurReelle(
   const chargesEtCsgEur = digitProChargesEur;
   const bncBrutEur = Math.max(0, caFactureEur - digitProChargesEur);
   const bncEur = bncPaidEur;
-  const csgBaseEur = Math.max(0, caFactureEur - mandatoryFeesEur - personalChargesEur);
+  const csgOperatingExpensesEur = mandatoryFeesEur + personalChargesEur;
+  const csgOperatingResultEur = caFactureEur - csgOperatingExpensesEur;
+  const csgBaseEur = Math.max(0, csgOperatingResultEur + csgSocialReintegrationsEur);
   const csgEur = applyFiscalDebtSafetyMargin(Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100);
   const bncRestantApresChargesEur = bncBrutEur;
   const impotEstimeEur = Math.round(bncBrutEur * DEFAULT_IR_ON_BNC_RATE * 100) / 100;

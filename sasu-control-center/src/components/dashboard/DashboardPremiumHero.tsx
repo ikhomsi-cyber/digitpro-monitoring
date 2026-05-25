@@ -241,23 +241,27 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       },
       {
         label: "Dettes fiscales",
-        value: fmt.euro(stats.detteTotaleDepuisDebutEur),
-        valueNote: {
-          text:
-          (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur
-            ? "✅ Solde suffisant pour couvrir la dette"
-            : `🛑 Il manque ${fmt.euro(stats.resteAVerserApresCashEur)} pour couvrir la dette`,
-          tone: (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur ? "positive" : "negative"
-        },
+        value: statsReady ? fmt.euro(stats.detteTotaleDepuisDebutEur) : "Calcul en cours",
+        valueNote: statsReady
+          ? {
+              text:
+                (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur
+                  ? "✅ Solde suffisant pour couvrir la dette"
+                  : `🛑 Il manque ${fmt.euro(stats.resteAVerserApresCashEur)} pour couvrir la dette`,
+              tone: (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur ? "positive" : "negative"
+            }
+          : undefined,
         icon: Landmark,
         iconClassName: "text-orange-200 bg-orange-500/12 border-orange-300/20",
         href: "/dashboard?panel=valeur-reelle",
         ariaLabel: "Ouvrir la page Valeur pour voir les dettes fiscales",
         wide: true,
-        breakdown: [
-          { label: "CSG", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
-          { label: "TVA", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
-        ]
+        breakdown: statsReady
+          ? [
+              { label: "CSG", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
+              { label: "TVA", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
+            ]
+          : undefined
       }
     ],
     [

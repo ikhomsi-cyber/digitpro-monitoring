@@ -103,6 +103,7 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const mk = fold(mapped);
   if (mk === "bnc" || mapped === "BNC") return "BNC";
   if (mk === "tva" || mapped === "TVA") return labelStartsWithDgfipTva(tx) ? "TVA" : "Autres";
+  if (mapped === QONTO_CATEGORY_LABEL) return QONTO_CATEGORY_LABEL;
   if (mapped === IMPOT_CATEGORY_LABEL || mk === "impot") {
     return IMPOT_CATEGORY_LABEL;
   }

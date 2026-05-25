@@ -72,16 +72,18 @@ import {
 export type { DashboardTx };
 
 const DASHBOARD_SECTION_SLIDE_VARIANTS = {
-  initial: (dir: number) => ({ opacity: 0, x: dir * 56 }),
+  initial: (dir: number) => ({ opacity: 0, x: dir * 18, filter: "blur(3px)" }),
   animate: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const }
+    filter: "blur(0px)",
+    transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as const }
   },
   exit: (dir: number) => ({
     opacity: 0,
-    x: dir * -56,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+    x: dir * -12,
+    filter: "blur(2px)",
+    transition: { duration: 0.12, ease: [0.4, 0, 1, 1] as const }
   })
 };
 
@@ -813,7 +815,7 @@ export function DashboardClient({
 
   return (
     <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
-      <AnimatePresence initial={false} mode="popLayout">
+      <AnimatePresence initial={false} mode="sync">
         <motion.div
           key={dashboardSection}
           custom={slideDirRef.current}
@@ -821,7 +823,8 @@ export function DashboardClient({
           initial="initial"
           animate="animate"
           exit="exit"
-          className="space-y-6 sm:space-y-8"
+          className="space-y-6 will-change-transform sm:space-y-8"
+          style={{ contain: "layout paint" }}
         >
       {dashboardSection === "activite" ? (
         <BillableDaysCalendarBlock
@@ -856,7 +859,7 @@ export function DashboardClient({
 
           {dashboardSection === "sasu" ? (
             <section className="flex flex-col gap-4">
-              <div className="rounded-3xl border border-[#39586a]/70 bg-[#172d3a]/80 p-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="rounded-3xl border border-cyan-100/[0.12] bg-[#0b3038] p-3 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)]">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <button
                       type="button"
@@ -889,7 +892,7 @@ export function DashboardClient({
                     showRollingOption={false}
                     showActiveLabel={false}
                   />
-                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-cyan-100/[0.10] bg-white/[0.04] p-1">
                     {[
                       { label: "Entrées", mode: "revenues" as const },
                       { label: "Sorties", mode: "expenses" as const }
@@ -911,7 +914,7 @@ export function DashboardClient({
                   </div>
               </div>
 
-              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+              <div className="rounded-[2rem] border border-cyan-100/[0.12] bg-[#0b3038] p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
                 {(() => {
                   const currentSlices = sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -925,7 +928,7 @@ export function DashboardClient({
                       : totalExpensesCard;
                   return (
                     <>
-                <div className="relative mb-4 overflow-hidden rounded-full border border-[#243f51] bg-[#102634] p-1 shadow-inner">
+                <div className="relative mb-4 overflow-hidden rounded-full border border-cyan-100/[0.10] bg-white/[0.04] p-1 shadow-inner">
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/12 via-transparent to-white/5" aria-hidden />
                   <div className="relative flex h-5 overflow-hidden rounded-full">
                     {currentSlices.map((slice) => (
@@ -974,7 +977,7 @@ export function DashboardClient({
                     </div>
                   </div>
                 </div>
-                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-cyan-100/[0.10] bg-white/[0.04] p-1">
                   <button
                     type="button"
                     onClick={() => setSasuBreakdownMode("categories")}
@@ -1001,7 +1004,7 @@ export function DashboardClient({
                 })()}
               </div>
 
-              <div className="order-last rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
+              <div className="order-last rounded-[2rem] border border-cyan-100/[0.12] bg-[#0b3038] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/42">
@@ -1015,13 +1018,13 @@ export function DashboardClient({
                       {sasuMonthlyCategoryFilters.length > 1 ? "s" : ""}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-[#39586a]/70 bg-[#102634]/80 px-3 py-2 text-right">
+                  <div className="rounded-2xl border border-cyan-100/[0.10] bg-white/[0.04] px-3 py-2 text-right">
                     <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/38">Moy. / mois</p>
                     <p className="mt-0.5 font-display text-base font-bold tabular-nums text-white" data-private>
                       {fmt.euro(sasuMonthlyAverage)}
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                  <div className="grid grid-cols-2 rounded-2xl border border-cyan-100/[0.10] bg-white/[0.04] p-1">
                     {[
                       { label: "Catégories", mode: "categories" as const },
                       { label: "Simplifié", mode: "simplified" as const }
@@ -1045,12 +1048,14 @@ export function DashboardClient({
                 </div>
 
                 {sasuMonthlyEvolutionOptions.length ? (
-                  <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+                  <div className="relative mt-3 overflow-hidden rounded-2xl border border-cyan-100/[0.10] bg-white/[0.04] px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-[1] w-10 bg-gradient-to-l from-[#0b3038] to-transparent" aria-hidden />
+                    <div className="flex gap-2 overflow-x-auto pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {sasuMonthlyCategoryFilters.length ? (
                       <button
                         type="button"
                         onClick={() => setSasuMonthlyCategoryFilters([])}
-                        className="shrink-0 rounded-full border border-[#39586a]/70 bg-[#102634]/80 px-3 py-1.5 text-[11px] font-bold text-white/78 transition hover:bg-[#203d4f] hover:text-white"
+                        className="shrink-0 rounded-full border border-white/12 bg-white/[0.08] px-3 py-2 text-[11px] font-bold text-white/82 transition hover:bg-white/[0.12] hover:text-white"
                       >
                         Toutes
                       </button>
@@ -1070,22 +1075,23 @@ export function DashboardClient({
                             )
                           }
                           className={clsx(
-                            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition",
+                            "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-bold leading-none shadow-sm transition",
                             active
-                              ? "border-white/30 bg-white/12 text-white"
-                              : "border-[#39586a]/70 bg-[#102634]/80 text-white/58 hover:bg-[#203d4f] hover:text-white"
+                              ? "border-white/24 bg-white/[0.15] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                              : "border-white/[0.08] bg-white/[0.055] text-white/70 hover:border-white/16 hover:bg-white/[0.09] hover:text-white"
                           )}
                         >
                           <span
-                            className="h-2 w-2 rounded-full"
+                            className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_14px_currentColor]"
                             style={{ backgroundColor: color }}
                             aria-hidden
                           />
-                          {item.name}
-                          <span className="text-white/42">{fmt.euro(item.total)}</span>
+                          <span className="max-w-[11rem] truncate">{item.name}</span>
+                          <span className="rounded-full bg-white/[0.07] px-2 py-0.5 text-white/68">{fmt.euro(item.total)}</span>
                         </button>
                       );
                     })}
+                    </div>
                   </div>
                 ) : null}
 
@@ -1240,7 +1246,7 @@ export function DashboardClient({
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
+              <div className="rounded-[2rem] border border-cyan-100/[0.12] bg-[#0b3038] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl sm:p-5">
                 <div className="space-y-1" data-private>
                   {(sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices

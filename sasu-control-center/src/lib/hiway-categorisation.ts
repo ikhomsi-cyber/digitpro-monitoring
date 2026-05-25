@@ -143,7 +143,7 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
     ["Abonnement internet & mobile", ["abonnement internet mobile", "abonnement internet & mobile", "mobile et internet"]],
     ["Repas du dirigeant", ["repas du dirigeant", "repas dirigeant", "repas ilias", "repas ilia", "restauration pro", "dejeuner", "déjeuner", "frais de nourriture et boissons", "food and drink"]],
     ["Assurances", ["assurances", "assurance", "axa sogarep", "sogarep"]],
-    ["Frais bancaires", ["frais bancaires", "qonto solo", "solo basic", "solo_basic"]],
+    ["Frais bancaires", ["frais bancaires", "qonto", "qonto solo", "solo basic", "solo_basic"]],
     ["Matériels et fournitures", ["materiels et fournitures", "matériels et fournitures", "materiel", "matériel", "fournitures"]],
     ["Paiement TVA", ["paiement tva", "tva"]],
     ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
@@ -160,7 +160,8 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   const mapped = mapHiwayExpenseCategory(tx.category);
 
   if (labelStartsWithDgfipTva(tx)) return "Paiement TVA";
-  if (mapped && mapped !== "Non catégorisé" && mapped !== "Frais bancaires") return mapped;
+  if (mapped === "Frais bancaires") return "Frais bancaires";
+  if (mapped && mapped !== "Non catégorisé") return mapped;
   if (label.includes("dgfip")) return "Non catégorisé";
   if (source.includes("urssaf") || source.includes("cgss")) return "Urssaf";
   if (textLooksLikeIk(source)) return "Indemnités kilométriques";
@@ -186,9 +187,8 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   if (textLooksLikeRepasAffaires(source)) return "Repas d’affaires";
   if (textLooksLikeRepasDirigeant(source) || source.includes("note de frais") || /\bndf\b/.test(source)) return "Repas du dirigeant";
   if (source.includes("sogarep") || /\baxa\b/.test(source) || source.includes("assurance")) return "Assurances";
-  if (source.includes("solo_basic") || source.includes("solo basic") || source.includes("qonto solo")) return "Frais bancaires";
+  if (source.includes("qonto") || source.includes("solo_basic") || source.includes("solo basic") || source.includes("qonto solo")) return "Frais bancaires";
   if (source.includes("materiel") || source.includes("matériel") || source.includes("fourniture")) return "Matériels et fournitures";
   if (textLooksLikeSoftware(source)) return "Abonnement logiciel";
-  if (mapped === "Frais bancaires") return "Non catégorisé";
   return mapped ?? "Non catégorisé";
 }
