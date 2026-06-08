@@ -10,7 +10,11 @@ import {
   MUTUELLE_CATEGORY_LABEL,
   QONTO_CATEGORY_LABEL
 } from "@/lib/expense-category-map";
-import { categorizeHiwayExpense, labelStartsWithDgfipTva } from "@/lib/hiway-categorisation";
+import {
+  categorizeHiwayExpense,
+  labelStartsWithDgfipTva,
+  mapHiwayExpenseCategory
+} from "@/lib/hiway-categorisation";
 
 /** Libellés affichés pour la répartition des dépenses (règles métier + libellé / société / catégorie). */
 export const DERIVED_EXPENSE_BUCKETS = [
@@ -50,6 +54,75 @@ function txBlob(tx: DashboardTx): string {
   return fold(`${tx.label} ${tx.company} ${tx.category}`);
 }
 
+function hiwayCategoryToBucket(hiway: ReturnType<typeof categorizeHiwayExpense>): DerivedExpenseBucket {
+  switch (hiway) {
+    case "Indemnités kilométriques":
+      return IK_CATEGORY_LABEL;
+    case "CESU":
+      return "CESU";
+    case "Repas d’affaires":
+      return "Repas d'affaire";
+    case "Repas du dirigeant":
+      return "Repas dirigeant";
+    case "Abonnement Hiway":
+    case "Hiway compta":
+      return COMPTA_ADMIN_BUCKET_LABEL;
+    case "Urssaf":
+      return "Urssaf";
+    case "Mutuelle":
+      return MUTUELLE_CATEGORY_LABEL;
+    case "Retraite":
+      return "Retraite";
+    case "Abonnement internet & mobile":
+      return "Mobile et Internet";
+    case "Assurances":
+      return ASSURANCE_CATEGORY_LABEL;
+    case "Frais bancaires":
+      return QONTO_CATEGORY_LABEL;
+    case "Matériels et fournitures":
+      return MATERIEL_CATEGORY_LABEL;
+    case "Paiement TVA":
+      return "TVA";
+    case "Impôt":
+      return IMPOT_CATEGORY_LABEL;
+    case "Abonnement logiciel":
+      return ICLOUD_IA_STORE_CATEGORY_LABEL;
+    default:
+      return "Autres";
+  }
+}
+
+/** Résout le bucket uniquement depuis la catégorie stockée (choix manuel). */
+export function deriveExpenseBucketFromStoredCategory(category: string): DerivedExpenseBucket {
+  const mapped = mapExpenseCategoryLabel(category);
+  const mk = fold(mapped);
+
+  if (mapped === "NDF" || mapped === "NDF DigitPro") return "NDF";
+  if (mk === "bnc" || mapped === "BNC") return "BNC";
+  if (mk === "tva" || mapped === "TVA") return "TVA";
+  if (mapped === QONTO_CATEGORY_LABEL) return QONTO_CATEGORY_LABEL;
+  if (mapped === IMPOT_CATEGORY_LABEL || mk === "impot") return IMPOT_CATEGORY_LABEL;
+  if (mapped === IK_CATEGORY_LABEL) return IK_CATEGORY_LABEL;
+  if (mapped === MUTUELLE_CATEGORY_LABEL) return MUTUELLE_CATEGORY_LABEL;
+  if (mapped === "CESU") return "CESU";
+  if (mapped === "Repas d'affaire") return "Repas d'affaire";
+  if (mapped === "Repas dirigeant") return "Repas dirigeant";
+  if (mapped === "Mobile et Internet") return "Mobile et Internet";
+  if (mapped === ICLOUD_IA_STORE_CATEGORY_LABEL) return ICLOUD_IA_STORE_CATEGORY_LABEL;
+  if (mapped === "Retraite") return "Retraite";
+  if (mapped === ASSURANCE_CATEGORY_LABEL) return ASSURANCE_CATEGORY_LABEL;
+  if (mapped === MATERIEL_CATEGORY_LABEL) return MATERIEL_CATEGORY_LABEL;
+  if (mapped === COMPTA_ADMIN_BUCKET_LABEL) return COMPTA_ADMIN_BUCKET_LABEL;
+  if (mapped === "Urssaf") return "Urssaf";
+
+  const hiway = mapHiwayExpenseCategory(mapped) ?? mapHiwayExpenseCategory(category);
+  if (hiway && hiway !== "Non catégorisé") {
+    return hiwayCategoryToBucket(hiway);
+  }
+
+  return "Autres";
+}
+
 /**
  * Catégorie d’affichage pour une dépense (montant &lt; 0).
  * Ordre des règles : plus spécifique d’abord.
@@ -58,6 +131,20 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   if (tx.amount >= 0) return "Autres";
 
   const b = txBlob(tx);
+
+  if (
+    b.includes("impot-pas") ||
+    b.includes("impot pas") ||
+    b.includes("pasdsn") ||
+    b.includes("pas-dsn") ||
+    (b.includes("impot") && b.includes("pas") && b.includes("dsn"))
+  ) {
+    return IMPOT_CATEGORY_LABEL;
+  }
+
+  if (tx.categoryManual) {
+    return deriveExpenseBucketFromStoredCategory(tx.category);
+  }
 
   if (
     b.includes("cesu") ||
@@ -103,41 +190,14 @@ export function deriveExpenseBucket(tx: DashboardTx): DerivedExpenseBucket {
   const mk = fold(mapped);
   if (mk === "bnc" || mapped === "BNC") return "BNC";
   if (mk === "tva" || mapped === "TVA") return labelStartsWithDgfipTva(tx) ? "TVA" : "Autres";
+  if (mapped === QONTO_CATEGORY_LABEL) return QONTO_CATEGORY_LABEL;
   if (mapped === IMPOT_CATEGORY_LABEL || mk === "impot") {
     return IMPOT_CATEGORY_LABEL;
   }
 
-  switch (categorizeHiwayExpense(tx)) {
-    case "Indemnités kilométriques":
-      return IK_CATEGORY_LABEL;
-    case "CESU":
-      return "CESU";
-    case "Repas d’affaires":
-      return "Repas d'affaire";
-    case "Repas du dirigeant":
-      return "Repas dirigeant";
-    case "Abonnement Hiway":
-    case "Hiway compta":
-      return COMPTA_ADMIN_BUCKET_LABEL;
-    case "Urssaf":
-      return "Urssaf";
-    case "Mutuelle":
-      return MUTUELLE_CATEGORY_LABEL;
-    case "Retraite":
-      return "Retraite";
-    case "Abonnement internet & mobile":
-      return "Mobile et Internet";
-    case "Assurances":
-      return ASSURANCE_CATEGORY_LABEL;
-    case "Frais bancaires":
-      return QONTO_CATEGORY_LABEL;
-    case "Matériels et fournitures":
-      return MATERIEL_CATEGORY_LABEL;
-    case "Paiement TVA":
-      return labelStartsWithDgfipTva(tx) ? "TVA" : "Autres";
-    case "Abonnement logiciel":
-      return ICLOUD_IA_STORE_CATEGORY_LABEL;
-    default:
-      return "Autres";
+  const hiway = categorizeHiwayExpense(tx);
+  if (hiway === "Paiement TVA") {
+    return labelStartsWithDgfipTva(tx) ? "TVA" : "Autres";
   }
+  return hiwayCategoryToBucket(hiway);
 }

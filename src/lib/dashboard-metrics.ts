@@ -1,6 +1,7 @@
 import { importDedupePayload } from "./import-dedupe-payload";
 import { bankinSubcategoryLabel } from "./bankin/categorize";
 import { deriveExpenseBucket } from "./derived-expense-bucket";
+import { dashboardSasuExpenseAmountHt } from "./recoverable-expense-vat";
 import { getFrenchPublicHolidaysForYear } from "./fr-public-holidays";
 import { isRevenueCategory } from "./revenue-category";
 import { revenueAnalyticsDateOverride } from "./transaction-analytics-overrides";
@@ -21,6 +22,8 @@ export type DashboardTx = {
   importFormat?: string | null;
   /** Périmètre des transactions : pro (SASU) vs personal (privé). */
   scope?: "pro" | "personal";
+  /** Catégorie fixée manuellement par l'utilisateur — prioritaire sur les heuristiques. */
+  categoryManual?: boolean;
 };
 
 /**
@@ -545,7 +548,7 @@ export function computeExpenseCategoryMonthlyBreakdown(
  */
 export function computeDerivedExpenseCategoryMonthlyBreakdown(
   filteredTxs: DashboardTx[],
-  opts: { years: number[] | null; expenseInclude?: (tx: DashboardTx) => boolean },
+  opts: { years: number[] | null; expenseInclude?: (tx: DashboardTx) => boolean; useExpenseHt?: boolean },
   now = new Date()
 ): ExpenseCategoryMonthlyBreakdown {
   const monthKeys = analyticsMonthKeysForDashboard(opts.years, now);
@@ -561,7 +564,7 @@ export function computeDerivedExpenseCategoryMonthlyBreakdown(
     const bucket = perMonth.get(mk);
     if (!bucket) continue;
     const cat = deriveExpenseBucket(tx);
-    const amt = Math.abs(tx.amount);
+    const amt = opts.useExpenseHt ? dashboardSasuExpenseAmountHt(tx) : Math.abs(tx.amount);
     bucket.set(cat, (bucket.get(cat) ?? 0) + amt);
     catTotals.set(cat, (catTotals.get(cat) ?? 0) + amt);
   }
@@ -640,7 +643,8 @@ export function getAnalyticsMonthKeys(yearMode: number | null, now = new Date())
  */
 export function computeMetricsFromTransactions(
   transactions: DashboardTx[],
-  now = new Date()
+  now = new Date(),
+  opts?: { useExpenseHt?: boolean }
 ): MonthlyFinanceMetric[] {
   const months = last12MonthsKeys(now);
   const map = new Map<string, { revenue: number; expenses: number }>();
@@ -657,7 +661,7 @@ export function computeMetricsFromTransactions(
       const bucketKey = toYYYYMM(tx.date);
       const bucket = map.get(bucketKey);
       if (!bucket) continue;
-      bucket.expenses += Math.abs(tx.amount);
+      bucket.expenses += opts?.useExpenseHt ? dashboardSasuExpenseAmountHt(tx) : Math.abs(tx.amount);
     }
   }
 
@@ -843,7 +847,9 @@ export function computeDashboardMonthlyMetrics(
         if (countsTowardDashboardExpenseTotal(tx)) {
           const key = tx.date.slice(0, 7);
           const bucket = revenueExpenses.get(key);
-          if (bucket) bucket.expenses += Math.abs(tx.amount);
+          if (bucket) {
+            bucket.expenses += dashboardSasuExpenseAmountHt(tx);
+          }
         }
       }
     }
@@ -853,5 +859,5 @@ export function computeDashboardMonthlyMetrics(
     const months = last12MonthsKeys(now);
     return computePersonalMetricsFromTransactions(filteredTxs, months);
   }
-  return computeMetricsFromTransactions(filteredTxs, now);
+  return computeMetricsFromTransactions(filteredTxs, now, { useExpenseHt: true });
 }

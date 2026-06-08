@@ -20,6 +20,7 @@ export type SupabaseTxRow = {
   bank_name?: string | null;
   import_sessions?: { format?: string | null } | null;
   scope?: "pro" | "personal" | null;
+  category_manual?: boolean | null;
 };
 
 function transactionSelectMissingColumn(errMsg: string, column: string): boolean {
@@ -73,7 +74,8 @@ function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {
     company: String(row.company ?? "").trim(),
     bankName: row.bank_name == null ? null : String(row.bank_name).trim(),
     importFormat: row.import_sessions?.format == null ? null : String(row.import_sessions.format).trim(),
-    scope: row.scope === "personal" ? "personal" : "pro"
+    scope: row.scope === "personal" ? "personal" : "pro",
+    categoryManual: row.category_manual === true
   }));
 }
 
@@ -84,7 +86,9 @@ export async function loadAllUserTransactionsFromSupabase(
   client: SupabaseServerClient
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
   const selectVariants = [
+    "id,date,label,category,category_manual,amount,balance,company,bank_name,scope,import_sessions(format)",
     "id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)",
+    "id,date,label,category,category_manual,amount,balance,company,bank_name,scope",
     "id,date,label,category,amount,balance,company,bank_name,scope",
     "id,date,label,category,amount,balance,company,scope",
     "id,date,label,category,amount,company,bank_name,scope",
@@ -108,6 +112,9 @@ export async function loadAllUserTransactionsFromSupabase(
     if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) {
       continue;
     }
+    if (transactionSelectMissingColumn(err, "category_manual") && selectStr.includes("category_manual")) {
+      continue;
+    }
     return { transactions: [], errorMessage: err };
   }
   return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };
@@ -118,7 +125,9 @@ export async function loadRecentUserTransactionsFromSupabase(
   limit = 2000
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
   const selectVariants = [
+    "id,date,label,category,category_manual,amount,balance,company,bank_name,scope,import_sessions(format)",
     "id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)",
+    "id,date,label,category,category_manual,amount,balance,company,bank_name,scope",
     "id,date,label,category,amount,balance,company,bank_name,scope",
     "id,date,label,category,amount,balance,company,scope",
     "id,date,label,category,amount,company,bank_name,scope",
@@ -144,6 +153,7 @@ export async function loadRecentUserTransactionsFromSupabase(
     if (transactionSelectMissingColumn(err, "balance") && selectStr.includes("balance")) continue;
     if (transactionSelectMissingColumn(err, "scope") && selectStr.includes("scope")) continue;
     if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) continue;
+    if (transactionSelectMissingColumn(err, "category_manual") && selectStr.includes("category_manual")) continue;
     return { transactions: [], errorMessage: err };
   }
   return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };

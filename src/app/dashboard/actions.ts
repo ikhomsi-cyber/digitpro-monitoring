@@ -207,21 +207,39 @@ function dedupeImportRows(rows: ImportTx[]): {
   return { unique, skippedInFile };
 }
 
-async function fetchExistingIdsByContentHashes(
+type ExistingImportRow = {
+  id: string;
+  categoryManual: boolean;
+};
+
+async function fetchExistingRowsByContentHashes(
   client: SupabaseServer,
   hashes: string[]
-): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
+): Promise<Map<string, ExistingImportRow>> {
+  const map = new Map<string, ExistingImportRow>();
   const chunkSize = 120;
+  let categoryManualSupported = true;
+
   for (let i = 0; i < hashes.length; i += chunkSize) {
     const slice = hashes.slice(i, i + chunkSize);
-    const { data, error } = await client
-      .from("transactions")
-      .select("id,content_hash")
-      .in("content_hash", slice);
-    if (error) throw new Error(error.message);
+    const query = categoryManualSupported
+      ? client.from("transactions").select("id,content_hash,category_manual").in("content_hash", slice)
+      : client.from("transactions").select("id,content_hash").in("content_hash", slice);
+    const { data, error } = await query;
+    if (error) {
+      if (categoryManualSupported && isMissingColumnError(error, "category_manual")) {
+        categoryManualSupported = false;
+        i -= chunkSize;
+        continue;
+      }
+      throw new Error(error.message);
+    }
     for (const row of data ?? []) {
-      if (row.content_hash && row.id) map.set(row.content_hash, row.id);
+      if (!row.content_hash || !row.id) continue;
+      map.set(row.content_hash, {
+        id: row.id,
+        categoryManual: categoryManualSupported && "category_manual" in row && row.category_manual === true
+      });
     }
   }
   return map;
@@ -427,17 +445,17 @@ export async function importTransactions(
 
   const { unique: prepared, skippedInFile } = dedupeImportRows(importRows);
   const hashes = prepared.map((p) => p.content_hash);
-  const existingIds = await fetchExistingIdsByContentHashes(client, hashes);
+  const existingRows = await fetchExistingRowsByContentHashes(client, hashes);
 
   type PreparedRow = (typeof prepared)[number];
 
   const toInsert: PreparedRow[] = [];
-  const toMerge: Array<{ id: string } & PreparedRow> = [];
+  const toMerge: Array<{ id: string; categoryManual: boolean } & PreparedRow> = [];
 
   for (const p of prepared) {
-    const existingId = existingIds.get(p.content_hash);
-    if (existingId) {
-      toMerge.push({ ...p, id: existingId });
+    const existing = existingRows.get(p.content_hash);
+    if (existing) {
+      toMerge.push({ ...p, id: existing.id, categoryManual: existing.categoryManual });
     } else {
       toInsert.push(p);
     }
@@ -547,7 +565,7 @@ export async function importTransactions(
     await Promise.all(
       slice.map(async (row) => {
         const baseUpdate = {
-          category: row.category,
+          ...(row.categoryManual ? {} : { category: row.category }),
           ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
           import_session_id: importSessionId
         } as const;
@@ -558,7 +576,7 @@ export async function importTransactions(
         if (res.error && bankNameSupported && isMissingColumnError(res.error, "bank_name")) {
           bankNameSupported = false;
           const retryBaseUpdate = {
-            category: row.category,
+            ...(row.categoryManual ? {} : { category: row.category }),
             import_session_id: importSessionId
           };
           const retryFullUpdate = balanceSupported
@@ -569,7 +587,7 @@ export async function importTransactions(
         if (res.error && balanceSupported && isMissingColumnError(res.error, "balance")) {
           balanceSupported = false;
           const retryBaseUpdate = {
-            category: row.category,
+            ...(row.categoryManual ? {} : { category: row.category }),
             ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
             import_session_id: importSessionId
           };
@@ -1110,11 +1128,28 @@ export async function updateTransaction(id: string, formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase
-    .from("transactions")
-    .update({ date, label, category: mapExpenseCategoryLabel(category), amount, company })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  const mappedCategory = mapExpenseCategoryLabel(category);
+  let updateError = (
+    await supabase
+      .from("transactions")
+      .update({ date, label, category: mappedCategory, amount, company, category_manual: true })
+      .eq("id", id)
+  ).error;
+
+  if (
+    updateError &&
+    /category_manual/i.test(updateError.message) &&
+    /(could not find|schema cache|does not exist)/i.test(updateError.message)
+  ) {
+    updateError = (
+      await supabase
+        .from("transactions")
+        .update({ date, label, category: mappedCategory, amount, company })
+        .eq("id", id)
+    ).error;
+  }
+
+  if (updateError) throw new Error(updateError.message);
 
   await syncMonthlyMetricsFromDb(supabase);
   revalidatePath("/dashboard");

@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { BriefcaseBusiness, CalendarCheck2, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck2, ChartArea, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { BncYearAreaChart } from "@/components/dashboard/BncYearAreaChart";
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import { countAgendaWorkDaysInMonth } from "@/lib/billable-calendar-metrics";
 
@@ -29,6 +30,7 @@ type Tile = {
   suffix?: string;
   valueNote?: { text: string; tone: "positive" | "negative" };
   sublabel?: string;
+  sublabelValue?: string;
   sublabelTone?: "positive" | "negative" | "neutral" | "warning";
   metrics?: TileMetric[];
   icon: typeof TrendingUp;
@@ -44,6 +46,7 @@ type Tile = {
     remainingAmountEur: number;
   };
   tjmRepartition?: Array<{ label: string; value: number; colorClass: string; textClass: string }>;
+  bncAreaChart?: boolean;
 };
 
 export function DashboardPremiumHero({ stats, statsReady, contextMessage, showContextBanner }: Props) {
@@ -76,7 +79,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   const realTjmSharePct = activeTjmHt > 0 ? Math.round((realTjmBeforeIncomeTaxEur / activeTjmHt) * 100) : 0;
   const tjmRepartitionTotalEur = Math.max(
     1,
-    stats.tjmRepartitionMois.bncEur + stats.tjmRepartitionMois.ikEur + stats.tjmRepartitionMois.ndfEur
+    stats.tjmRepartitionMois.caHtEur
   );
   const yearToDate = useMemo(() => {
     const now = new Date();
@@ -152,6 +155,8 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     };
   }, [invoicesToCollect.days, yearToDate]);
 
+  const bncYear = stats.bncYearMonthly[0]?.month.slice(0, 4) ?? String(new Date().getFullYear());
+
   const tiles: Tile[] = useMemo(
     () => [
       {
@@ -170,9 +175,10 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—",
         sublabel: statsReady
           ? remunerationDisponibleEur >= 0
-            ? `💸 Rémunération à verser ${fmt.euro(remunerationDisponibleEur)}`
-            : `🛑 Dette ${fmt.euro(Math.abs(remunerationDisponibleEur))}`
+            ? "💸 Rémunération à verser"
+            : "🛑 Dette"
           : undefined,
+        sublabelValue: statsReady ? fmt.euro(Math.abs(remunerationDisponibleEur)) : undefined,
         sublabelTone: remunerationDisponibleEur >= 0 ? "positive" : "negative",
         icon: WalletCards,
         iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
@@ -198,13 +204,24 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         sublabelTone: "positive",
         tjmRepartition: [
           { label: "BNC", value: stats.tjmRepartitionMois.bncEur, colorClass: "bg-sky-400", textClass: "text-sky-700 dark:text-sky-300" },
-          { label: "IK", value: stats.tjmRepartitionMois.ikEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" },
-          { label: "NDF", value: stats.tjmRepartitionMois.ndfEur, colorClass: "bg-violet-400", textClass: "text-violet-700 dark:text-violet-300" }
+          { label: "Perso", value: stats.tjmRepartitionMois.fraisPersoEur, colorClass: "bg-emerald-400", textClass: "text-emerald-700 dark:text-emerald-300" },
+          { label: "CSG", value: stats.tjmRepartitionMois.csgEur, colorClass: "bg-orange-400", textClass: "text-orange-700 dark:text-orange-300" },
+          { label: "Frais", value: stats.tjmRepartitionMois.fraisDigitProEur, colorClass: "bg-rose-500", textClass: "text-rose-700 dark:text-rose-300" }
         ],
         icon: CalendarCheck2,
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
         href: "/parametres",
         ariaLabel: "Ouvrir le paramétrage des TJM"
+      },
+      {
+        label: "BNC versés",
+        value: fmt.euro(stats.bncYearTotalEur),
+        sublabel: `Année ${bncYear}`,
+        sublabelTone: "neutral",
+        icon: ChartArea,
+        iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20",
+        wide: true,
+        bncAreaChart: true
       },
       {
         label: `Depuis janvier ${yearToDate.year}`,
@@ -241,23 +258,27 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       },
       {
         label: "Dettes fiscales",
-        value: fmt.euro(stats.detteTotaleDepuisDebutEur),
-        valueNote: {
-          text:
-          (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur
-            ? "✅ Solde suffisant pour couvrir la dette"
-            : `🛑 Il manque ${fmt.euro(stats.resteAVerserApresCashEur)} pour couvrir la dette`,
-          tone: (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur ? "positive" : "negative"
-        },
+        value: statsReady ? fmt.euro(stats.detteTotaleDepuisDebutEur) : "Calcul en cours",
+        valueNote: statsReady
+          ? {
+              text:
+                (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur
+                  ? "✅ Solde suffisant pour couvrir la dette"
+                  : `🛑 Il manque ${fmt.euro(stats.resteAVerserApresCashEur)} pour couvrir la dette`,
+              tone: (stats.soldeQontoEur ?? 0) >= stats.detteTotaleDepuisDebutEur ? "positive" : "negative"
+            }
+          : undefined,
         icon: Landmark,
         iconClassName: "text-orange-200 bg-orange-500/12 border-orange-300/20",
         href: "/dashboard?panel=valeur-reelle",
         ariaLabel: "Ouvrir la page Valeur pour voir les dettes fiscales",
         wide: true,
-        breakdown: [
-          { label: "CSG", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
-          { label: "TVA", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
-        ]
+        breakdown: statsReady
+          ? [
+              { label: "CSG", value: stats.detteCsgDepuisDebutEur, colorClass: "bg-orange-300" },
+              { label: "TVA", value: stats.detteTvaDepuisDebutEur, colorClass: "bg-cyan-300" }
+            ]
+          : undefined
       }
     ],
     [
@@ -272,6 +293,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       realTjmSharePct,
       remainingBillableDays,
       remunerationDisponibleEur,
+      bncYear,
       stats,
       statsReady,
       yearToDate
@@ -347,7 +369,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                 </dd>
                 {t.sublabel ? (
                   <p
-                    className={`mt-1 truncate whitespace-nowrap text-[11px] font-bold ${
+                    className={`mt-1 flex items-center justify-between gap-1.5 text-[11px] font-bold leading-tight ${
                       t.sublabelTone === "positive"
                         ? "text-emerald-700 dark:text-emerald-300"
                         : t.sublabelTone === "negative"
@@ -357,12 +379,15 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                             : "text-ink-500 dark:text-white/40"
                     }`}
                   >
-                    {t.sublabel}
+                    <span className={t.sublabelValue ? "min-w-0 truncate" : "min-w-0"}>{t.sublabel}</span>
+                    {t.sublabelValue ? (
+                      <span className="shrink-0 tabular-nums">{t.sublabelValue}</span>
+                    ) : null}
                   </p>
                 ) : null}
                 {t.tjmRepartition ? (
-                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-2 dark:border-violet-400/15 dark:bg-white/[0.025]">
-                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-white/10">
+                  <div className="mt-2 rounded-xl border border-violet-200/60 bg-white/45 p-1.5 dark:border-cyan-100/[0.14] dark:bg-cyan-50/[0.045]">
+                    <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
                       {t.tjmRepartition.map((part) => (
                         <div
                           key={part.label}
@@ -372,18 +397,21 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                         />
                       ))}
                     </div>
-                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-[8px] font-bold">
+                    <div className="mt-1.5 space-y-1 text-[10px] font-bold">
                       {t.tjmRepartition.map((part) => {
                         const pct = (part.value / tjmRepartitionTotalEur) * 100;
                         const dailyValue = activeTjmHt * (pct / 100);
                         return (
-                          <span key={part.label} className={`min-w-0 ${part.textClass}`}>
-                            <span className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full ${part.colorClass}`} />
-                              <span>{part.label}</span>
-                              <span className="tabular-nums">{fmt.int(pct)}%</span>
+                          <span
+                            key={part.label}
+                            className="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-white/60 px-2 py-1.5 dark:bg-white/[0.075]"
+                          >
+                            <span className={`inline-flex min-w-0 items-center gap-1.5 ${part.textClass}`}>
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${part.colorClass}`} />
+                              <span className="shrink-0">{part.label}</span>
+                              <span className="shrink-0 tabular-nums">{fmt.int(pct)}%</span>
                             </span>
-                            <span className="mt-0.5 block truncate tabular-nums text-ink-500 dark:text-white/40">
+                            <span className="shrink-0 tabular-nums text-ink-800 dark:text-white/80">
                               {fmt.euro(dailyValue)}
                             </span>
                           </span>
@@ -450,6 +478,11 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                         ) : null}
                       </div>
                     ))}
+                  </div>
+                ) : null}
+                {t.bncAreaChart ? (
+                  <div className="mt-3">
+                    <BncYearAreaChart monthly={stats.bncYearMonthly} formatEuro={fmt.euro} />
                   </div>
                 ) : null}
                 {t.breakdown ? (

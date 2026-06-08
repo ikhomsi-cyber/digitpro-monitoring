@@ -10,10 +10,13 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   buildDashboardMonthOptions,
   buildDashboardYearOptions,
+  calendarDaysElapsedInCurrentMonth,
+  defaultDashboardPeriodFilter,
   toggleDashboardYearInFilter
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
+import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
 import type {
   ValeurReelleCashTree,
@@ -102,7 +105,6 @@ function BreakdownPieChart({
   const [showDetails, setShowDetails] = useState(false);
   const [openCategoryLabel, setOpenCategoryLabel] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [hiddenTransactionIds, setHiddenTransactionIds] = useState<Set<string>>(() => new Set());
   const total = breakdown.reduce((sum, row) => sum + Math.abs(row.amountEur), 0);
   if (total <= 0) return null;
 
@@ -134,7 +136,6 @@ function BreakdownPieChart({
       const body = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string };
       if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Impossible d’enregistrer");
       toast.success("Catégorie mise à jour");
-      setHiddenTransactionIds((prev) => new Set(prev).add(transactionId));
       onRecategorized?.(transactionId, category);
     } catch (error) {
       toast.error("Catégorisation impossible", {
@@ -192,11 +193,11 @@ function BreakdownPieChart({
               total
             </text>
           </svg>
-          <div className="mb-3 flex max-w-full flex-wrap justify-center gap-1.5">
+          <div className="mb-3 grid w-full max-w-md grid-cols-2 gap-1.5">
             {slices.slice(0, 6).map((slice) => (
               <span
                 key={`compact-legend-${slice.row.label}`}
-                className="group/legend relative inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
+                className="group/legend relative inline-flex min-w-0 items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
                 title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
@@ -210,7 +211,7 @@ function BreakdownPieChart({
               </span>
             ))}
             {slices.length > 6 ? (
-              <span className="inline-flex items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
+              <span className="inline-flex min-w-0 items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
                 +{slices.length - 6}
               </span>
             ) : null}
@@ -229,7 +230,7 @@ function BreakdownPieChart({
         {showDetails && showDetailToggle ? (
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {slices.map((slice) => {
-            const transactions = (slice.row.transactions ?? []).filter((tx) => !hiddenTransactionIds.has(tx.id));
+            const transactions = slice.row.transactions ?? [];
             const hasTransactions = transactions.length > 0;
             const isOpen = openCategoryLabel === slice.row.label;
             const showHtTtc = shouldShowHtTtc(slice.row.label);
@@ -340,22 +341,28 @@ function CashFlowTreeVisual({
   tree,
   fmt,
   billableDays,
+  daysElapsedInMonth,
   periodLabel,
   onRecategorized
 }: {
   tree: ValeurReelleCashTree;
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   billableDays: number;
+  /** Mois en cours uniquement : jours civils déjà passés (base jauge + gain/jour). */
+  daysElapsedInMonth: number | null;
   periodLabel: string;
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
-  const formattedBillableDays = new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 1
-  }).format(billableDays);
+  const gainDayDenominator =
+    daysElapsedInMonth != null && daysElapsedInMonth > 0 ? daysElapsedInMonth : billableDays;
+  const formattedGainDayDenominator = new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: daysElapsedInMonth != null ? 0 : 1
+  }).format(gainDayDenominator);
   const reelParJour =
-    billableDays > 0
-      ? Math.round(((tree.bncEur + tree.personalChargesEur) / billableDays) * 100) / 100
+    gainDayDenominator > 0
+      ? Math.round(((tree.bncEur + tree.personalChargesEur) / gainDayDenominator) * 100) / 100
       : null;
+  const useDailyGaugePace = daysElapsedInMonth != null && daysElapsedInMonth > 0;
   const percentOfCa = (amount: number) =>
     tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
@@ -435,7 +442,9 @@ function CashFlowTreeVisual({
               {fmt.euro(reelParJour)}
             </p>
             <p className="text-[10px] text-ink-500 dark:text-white/40">
-              {formattedBillableDays} jour{billableDays > 1 ? "s" : ""} facturé{billableDays > 1 ? "s" : ""}
+              {daysElapsedInMonth != null
+                ? `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""}`
+                : `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`}
             </p>
           </div>
         ) : (
@@ -452,6 +461,11 @@ function CashFlowTreeVisual({
               Répartition du CA HT
             </p>
             <p className="mt-1 text-sm font-semibold text-ink-900 dark:text-white">Jauge de valeur</p>
+            {useDailyGaugePace ? (
+              <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
+                {`Rythme / jour sur ${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""} dans le mois`}
+              </p>
+            ) : null}
           </div>
           <div className="text-right">
             <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
@@ -497,12 +511,16 @@ function CashFlowTreeVisual({
             .map((item) => (
             <span
               key={item.label}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.22] dark:bg-[#123f49] dark:text-cyan-50/88 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_22px_-18px_rgba(103,232,249,0.65)]"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.28] dark:bg-cyan-50/[0.09] dark:text-cyan-50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_22px_-18px_rgba(103,232,249,0.75)]"
             >
               <span className={clsx("h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]", item.dot)} aria-hidden />
-              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/70">{item.label}</span>
+              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/82">{item.label}</span>
               <span className="tabular-nums text-ink-900 dark:text-white">{percentOfCa(item.value)} %</span>
-              <span className="tabular-nums text-ink-600 dark:text-cyan-50/82">{fmt.euro(item.value)}</span>
+              <span className="rounded-full bg-ink-900/5 px-1.5 py-0.5 tabular-nums text-ink-700 dark:bg-white/[0.10] dark:text-white">
+                {useDailyGaugePace
+                  ? `${fmt.euro(Math.round((item.value / gainDayDenominator) * 100) / 100)}/j`
+                  : fmt.euro(item.value)}
+              </span>
             </span>
           ))}
         </div>
@@ -724,14 +742,22 @@ export function ValeurReelleClient({
   loadError: string | null;
 }) {
   const fmt = useDashboardDisplayFormat();
-  const [selectedYears, setSelectedYears] = useState<number[] | null>(() => [new Date().getFullYear()]);
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [localCategoryOverrides, setLocalCategoryOverrides] = useState<Record<string, string>>({});
+  const [selectedYears, setSelectedYears] = useState<number[] | null>(
+    () => defaultDashboardPeriodFilter().selectedYears
+  );
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(
+    () => defaultDashboardPeriodFilter().selectedMonth
+  );
+  const [localCategoryOverrides, setLocalCategoryOverrides] = useState<
+    Record<string, { category: string; categoryManual: true }>
+  >({});
   const transactions = useMemo(
     () =>
       initialTransactions.map((tx) => {
-        const category = localCategoryOverrides[tx.id];
-        return category ? { ...tx, category } : tx;
+        const override = localCategoryOverrides[tx.id];
+        return override
+          ? { ...tx, category: override.category, categoryManual: true }
+          : tx;
       }),
     [initialTransactions, localCategoryOverrides]
   );
@@ -763,7 +789,10 @@ export function ValeurReelleClient({
   );
 
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
-    setLocalCategoryOverrides((prev) => ({ ...prev, [transactionId]: category }));
+    setLocalCategoryOverrides((prev) => ({
+      ...prev,
+      [transactionId]: { category: mapExpenseCategoryLabel(category), categoryManual: true }
+    }));
   }, []);
 
   const billableActivity = useBillableActivityOptional();
@@ -774,6 +803,11 @@ export function ValeurReelleClient({
       return Math.round((analysis.cashTree.caFactureEur / tjmHt) * 10) / 10;
     },
     [analysis.cashTree.caFactureEur, billableActivity?.tjmHt]
+  );
+
+  const daysElapsedInMonth = useMemo(
+    () => calendarDaysElapsedInCurrentMonth(selectedMonth),
+    [selectedMonth]
   );
 
   return (
@@ -804,6 +838,7 @@ export function ValeurReelleClient({
         tree={analysis.cashTree}
         fmt={fmt}
         billableDays={billableDaysInPeriod}
+        daysElapsedInMonth={daysElapsedInMonth}
         periodLabel={analysis.periodLabel}
         onRecategorized={handleRecategorized}
       />

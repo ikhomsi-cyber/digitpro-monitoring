@@ -16,6 +16,8 @@ import {
   analyzeValeurReelle
 } from "@/lib/valeur-reelle-analyze";
 
+const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
+
 function isCsgExpenseLine(tx: DashboardTx): boolean {
   const blob = `${tx.label ?? ""} ${tx.category ?? ""} ${tx.company ?? ""}`
     .normalize("NFD")
@@ -54,15 +56,68 @@ export type DashboardHeroStats = {
   depensesPersoMoisEur: number;
   netDansMaPocheMoisEur: number;
   tjmRepartitionMois: {
+    caHtEur: number;
     bncEur: number;
-    ikEur: number;
-    ndfEur: number;
+    fraisPersoEur: number;
+    csgEur: number;
+    fraisDigitProEur: number;
   };
   detteCsgDepuisDebutEur: number;
   detteTvaDepuisDebutEur: number;
   detteTotaleDepuisDebutEur: number;
   resteAVerserApresCashEur: number;
+  /** BNC versés (virements sortants libellé « BNC ») par mois civil, année en cours. */
+  bncYearMonthly: Array<{ month: string; monthLabel: string; bncEur: number }>;
+  bncYearTotalEur: number;
 };
+
+function foldTxLabel(raw: string): string {
+  return (raw ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+}
+
+/** Virement sortant pro dont le libellé contient « BNC » (aligné analyse Valeur réelle). */
+function isOutgoingBncPayment(tx: DashboardTx): boolean {
+  if ((tx.scope ?? "pro") !== "pro") return false;
+  return tx.amount < 0 && /\bbnc\b/.test(foldTxLabel(tx.label));
+}
+
+function computeBncPaidYearMonthly(
+  transactions: readonly DashboardTx[],
+  now = new Date()
+): { year: number; monthly: DashboardHeroStats["bncYearMonthly"]; totalEur: number } {
+  const year = now.getFullYear();
+  const currentMonth0 = now.getMonth();
+  const byMonth = new Map<string, number>();
+
+  for (let m0 = 0; m0 <= currentMonth0; m0++) {
+    byMonth.set(`${year}-${String(m0 + 1).padStart(2, "0")}`, 0);
+  }
+
+  for (const tx of transactions) {
+    if (!isOutgoingBncPayment(tx)) continue;
+    const monthKey = transactionAnalyticsDayIso(tx).slice(0, 7);
+    if (!monthKey.startsWith(`${year}-`)) continue;
+    const month0 = Number(monthKey.slice(5, 7)) - 1;
+    if (month0 > currentMonth0) continue;
+    byMonth.set(monthKey, (byMonth.get(monthKey) ?? 0) + Math.abs(tx.amount));
+  }
+
+  const monthly = Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, bncEur]) => ({
+      month,
+      monthLabel: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(
+        new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+      ),
+      bncEur: Math.round(bncEur * 100) / 100
+    }));
+
+  const totalEur = Math.round(monthly.reduce((sum, row) => sum + row.bncEur, 0) * 100) / 100;
+  return { year, monthly, totalEur };
+}
 
 /**
  * KPIs du hero : dernier mois de la série « 12 mois glissants » (aligné `last12MonthsKeys` + `computeMetricsFromTransactions`),
@@ -76,14 +131,13 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const currentYear = now.getFullYear();
   const valueAnalysis = analyzeValeurReelle(transactions, { years: null, month: currentMonth, now });
-  const tjmRepartitionMois = valueAnalysis.cashTree.personalChargesBreakdown.reduce(
-    (acc, row) => {
-      if (row.label === "Indemnités kilométriques") acc.ikEur += row.amountEur;
-      if (row.label === "Repas du dirigeant" || row.label === "Repas d’affaires") acc.ndfEur += row.amountEur;
-      return acc;
-    },
-    { bncEur: Math.max(0, valueAnalysis.cashTree.bncEur), ikEur: 0, ndfEur: 0 }
-  );
+  const tjmRepartitionMois = {
+    caHtEur: Math.max(0, valueAnalysis.cashTree.caFactureEur),
+    bncEur: Math.max(0, valueAnalysis.cashTree.bncEur),
+    fraisPersoEur: Math.max(0, valueAnalysis.cashTree.personalChargesEur),
+    csgEur: Math.max(0, valueAnalysis.cashTree.csgEur),
+    fraisDigitProEur: Math.max(0, valueAnalysis.cashTree.mandatoryFeesEur)
+  };
   const allYears = Array.from(
     new Set(
       proTxs
@@ -126,9 +180,12 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
 
   const soldeQontoEur = computeLatestQontoBalanceEur(transactions, "pro");
   const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
-  const detteTvaDepuisDebutEur = Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur);
+  const detteTvaDepuisDebutEur =
+    Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
+    100;
   const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
   const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);
+  const bncYear = computeBncPaidYearMonthly(proTxs, now);
 
   return {
     caMensuelEur: last.revenue,
@@ -149,13 +206,17 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     depensesPersoMoisEur,
     netDansMaPocheMoisEur: valueAnalysis.cashTree.bncEur + valueAnalysis.cashTree.personalChargesEur,
     tjmRepartitionMois: {
+      caHtEur: Math.round(tjmRepartitionMois.caHtEur * 100) / 100,
       bncEur: Math.round(tjmRepartitionMois.bncEur * 100) / 100,
-      ikEur: Math.round(tjmRepartitionMois.ikEur * 100) / 100,
-      ndfEur: Math.round(tjmRepartitionMois.ndfEur * 100) / 100
+      fraisPersoEur: Math.round(tjmRepartitionMois.fraisPersoEur * 100) / 100,
+      csgEur: Math.round(tjmRepartitionMois.csgEur * 100) / 100,
+      fraisDigitProEur: Math.round(tjmRepartitionMois.fraisDigitProEur * 100) / 100
     },
     detteCsgDepuisDebutEur,
     detteTvaDepuisDebutEur,
     detteTotaleDepuisDebutEur,
-    resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100)
+    resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100),
+    bncYearMonthly: bncYear.monthly,
+    bncYearTotalEur: bncYear.totalEur
   };
 }

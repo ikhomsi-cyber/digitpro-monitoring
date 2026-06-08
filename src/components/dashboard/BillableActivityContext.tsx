@@ -49,6 +49,7 @@ type BillableActivityContextValue = {
   overviewMonthTitle: string;
   overviewKpis: ActivityOverviewKpis;
   overviewWorkdayGauge: ActivityWorkdayGauge;
+  overviewTjmEnVigueurHt: number;
 };
 
 const BillableActivityContext = createContext<BillableActivityContextValue | null>(null);
@@ -123,8 +124,8 @@ export function BillableActivityProvider({
   const sortedIsos = useMemo(() => [...selected].sort(), [selected]);
 
   const overview = useMemo(
-    () => computeCurrentMonthOverview(selected, tjmHt),
-    [selected, tjmHt]
+    () => computeCurrentMonthOverview(selected, billableRatePeriods, tjmHt),
+    [billableRatePeriods, selected, tjmHt]
   );
 
   const value = useMemo<BillableActivityContextValue>(
@@ -138,7 +139,8 @@ export function BillableActivityProvider({
       sortedIsos,
       overviewMonthTitle: overview.monthTitle,
       overviewKpis: overview.kpis,
-      overviewWorkdayGauge: overview.workdayGauge
+      overviewWorkdayGauge: overview.workdayGauge,
+      overviewTjmEnVigueurHt: overview.tjmEnVigueurHt
     }),
     [tjmHt, billableRatePeriods, persistToSupabase, selected, hydrated, sortedIsos, overview]
   );

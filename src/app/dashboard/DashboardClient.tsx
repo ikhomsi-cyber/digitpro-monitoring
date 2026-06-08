@@ -3,9 +3,7 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -35,7 +33,32 @@ import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { categoryGlyph } from "@/lib/category-glyph";
 import { counterpartyLogoHref } from "@/lib/counterparty-logo";
-import { buildDashboardMonthOptions, formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
+import {
+  buildDashboardMonthOptions,
+  defaultDashboardPeriodFilter,
+  formatDashboardPeriodLabelWithMonth
+} from "@/lib/dashboard-period";
+import {
+  dashboardAnalysisShell,
+  dashboardChartSurface,
+  dashboardDonutTrack,
+  dashboardEmptyState,
+  dashboardEyebrow,
+  dashboardFilterPill,
+  dashboardGaugeTrack,
+  dashboardInsetPanel,
+  dashboardPanelSub,
+  dashboardPanelTitle,
+  dashboardPeriodNavBtn,
+  dashboardPeriodTitle,
+  dashboardPremiumPanel,
+  dashboardRowAmount,
+  dashboardRowDivider,
+  dashboardRowMeta,
+  dashboardRowTitle,
+  dashboardSegmentBtn,
+  dashboardSegmentShell
+} from "@/lib/dashboard-surfaces";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
   BILLABLE_CLIENT_TJM_HT,
@@ -52,6 +75,7 @@ import {
   computePersonalRevenueYearProjection,
   computeRevenueYearToDateProjection,
   countsTowardDashboardExpenseKpi,
+  countsTowardDashboardExpenseTotal,
   countsTowardPersonalRevenueKpi,
   expenseCategoryColor,
   expenseDashboardGroupingLabel,
@@ -68,21 +92,22 @@ import {
   buildSasuSimplifiedSubcategories,
   sasuSimplifiedExpenseGroup
 } from "@/lib/sasu-analytics";
+import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 
 export type { DashboardTx };
 
 const DASHBOARD_SECTION_SLIDE_VARIANTS = {
-  initial: (dir: number) => ({ opacity: 0, x: dir * 56 }),
+  initial: { opacity: 0, y: 8 },
   animate: {
     opacity: 1,
-    x: 0,
-    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const }
+    y: 0,
+    transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] as const }
   },
-  exit: (dir: number) => ({
+  exit: {
     opacity: 0,
-    x: dir * -56,
-    transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
-  })
+    y: -8,
+    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] as const }
+  }
 };
 
 const dashboardIconToneClass: Record<
@@ -214,38 +239,23 @@ export function DashboardClient({
     if (s === "categorisation") return "categorisation" as const;
     return "full" as const;
   }, [searchParams]);
-
-  /** Ordre des pilules périmètre : gauche → droite (pour le sens du slide). */
-  const sectionOrder: Record<typeof dashboardSection, number> = {
-    full: 0,
-    activite: 1,
-    valeur: 2,
-    sasu: 3,
-    private: 4,
-    categorisation: 5
-  };
-  const prevSectionRef = useRef(dashboardSection);
-  const slideDirRef = useRef(1);
-  if (prevSectionRef.current !== dashboardSection) {
-    const from = sectionOrder[prevSectionRef.current];
-    const to = sectionOrder[dashboardSection];
-    slideDirRef.current = to >= from ? 1 : -1;
-  }
-  useLayoutEffect(() => {
-    prevSectionRef.current = dashboardSection;
-  }, [dashboardSection]);
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
-  const [heroStatsReady, setHeroStatsReady] = useState(demoMode);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
     initialDashboardScope === "personal" ? "personal" : "pro"
   );
   /** null = fenêtre glissante 12 mois ; sinon une ou plusieurs années civiles */
-  const [selectedYears, setSelectedYears] = useState<number[] | null>(null);
+  const [selectedYears, setSelectedYears] = useState<number[] | null>(
+    () => defaultDashboardPeriodFilter().selectedYears
+  );
   /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM. */
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(
+    () => defaultDashboardPeriodFilter().selectedMonth
+  );
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) pour la carte Total expenses. */
-  const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
+  const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(
+    () => defaultDashboardPeriodFilter().selectedMonth
+  );
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
   const [revenueCounterpartyDetail, setRevenueCounterpartyDetail] = useState<string | null>(null);
   /** Catégorie dérivée sélectionnée dans Total expenses (liste des opérations). */
@@ -258,48 +268,12 @@ export function DashboardClient({
   const [sasuMonthlyCategoryFilters, setSasuMonthlyCategoryFilters] = useState<string[]>([]);
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
+  const shouldComputeSasuPanel = dashboardSection === "sasu" || dashboardSection === "private";
 
   useEffect(() => {
     setTransactions(initialTransactions);
     setCurrentHeroStats(heroStats);
-    setHeroStatsReady(demoMode);
-  }, [syncKey, initialTransactions, heroStats, demoMode]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const initialCount = initialTransactions.length;
-    if (initialCount === 0 || initialCount >= 10_000) return;
-
-    const timer = window.setTimeout(() => {
-      void fetch("/api/dashboard/transactions", { cache: "no-store" })
-        .then(async (res) => {
-          if (!res.ok) return null;
-          return (await res.json()) as {
-            ok?: boolean;
-            transactions?: DashboardTx[];
-            heroStats?: DashboardHeroStats;
-          };
-        })
-        .then((payload) => {
-          if (cancelled || !payload?.ok || !Array.isArray(payload.transactions)) return;
-          if (payload.transactions.length > initialCount) {
-            setTransactions(payload.transactions);
-          }
-          if (payload.heroStats) {
-            setCurrentHeroStats(payload.heroStats);
-            setHeroStatsReady(true);
-          }
-        })
-        .catch(() => {
-          // Le lot initial suffit pour afficher l'app ; l'historique complet est opportuniste.
-        });
-    }, 350);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [heroStats, initialTransactions]);
+  }, [syncKey, initialTransactions, heroStats]);
 
   useEffect(() => {
     setRevenueCounterpartyDetail(null);
@@ -327,12 +301,6 @@ export function DashboardClient({
       setScope("pro");
     }
   }, [pathname, searchParams]);
-
-  useEffect(() => {
-    if (dashboardSection !== "sasu") return;
-    setSelectedMonth(null);
-    setSelectedYears((prev) => prev ?? [new Date().getFullYear()]);
-  }, [dashboardSection]);
 
   /** Retour webview Powens : query après redirection depuis /api/powens/callback */
   useEffect(() => {
@@ -442,7 +410,10 @@ export function DashboardClient({
             expenseInclude: (tx) => countsTowardDashboardExpenseKpi(tx, "personal"),
             expenseGroup: "personal"
           })
-        : computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, { years: selectedYears }),
+        : computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, {
+            years: selectedYears,
+            useExpenseHt: true
+          }),
     [filteredTx, selectedYears, kpiMode]
   );
 
@@ -464,6 +435,17 @@ export function DashboardClient({
     }
     return sum(metrics.map((x) => x.expenses));
   }, [metrics, totalExpensesMonthFilter]);
+
+  const totalExpensesCardTtc = useMemo(() => {
+    if (kpiMode !== "sasu") return totalExpensesCard;
+    let ttc = 0;
+    for (const tx of filteredTx) {
+      if (!countsTowardDashboardExpenseTotal(tx)) continue;
+      if (totalExpensesMonthFilter && tx.date.slice(0, 7) !== totalExpensesMonthFilter) continue;
+      ttc += Math.abs(tx.amount);
+    }
+    return ttc;
+  }, [filteredTx, kpiMode, totalExpensesCard, totalExpensesMonthFilter]);
 
   const expenseCategoryTotalsForTotalExpensesCard = useMemo(() => {
     const cats = expenseCategoryBreakdownMain.categories;
@@ -542,20 +524,24 @@ export function DashboardClient({
   }, [filteredTx, kpiMode]);
 
   const sasuExpenseDonutSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuExpenseDonutSlices(expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard);
-  }, [expenseCategoryTotalsForTotalExpensesCard, totalExpensesCard]);
+  }, [expenseCategoryTotalsForTotalExpensesCard, shouldComputeSasuPanel, totalExpensesCard]);
 
   const sasuRevenueDonutSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuRevenueDonutSlices(revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE);
-  }, [revenueCounterpartyTotals, totalRevenuesHt, VAT_RATE]);
+  }, [revenueCounterpartyTotals, shouldComputeSasuPanel, totalRevenuesHt, VAT_RATE]);
 
   const sasuSimplifiedExpenseSlices = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     return buildSasuSimplifiedExpenseSlices(filteredTx);
-  }, [filteredTx]);
+  }, [filteredTx, shouldComputeSasuPanel]);
 
   const sasuSimplifiedSubcategories = useMemo(() => {
-    return buildSasuSimplifiedSubcategories(filteredTx, kpiMode);
-  }, [filteredTx, kpiMode]);
+    if (!shouldComputeSasuPanel) return {};
+    return buildSasuSimplifiedSubcategories(filteredTx);
+  }, [filteredTx, kpiMode, shouldComputeSasuPanel]);
 
   const revenueTransactionsForCounterparty = useMemo(() => {
     if (!revenueCounterpartyDetail) return [];
@@ -599,6 +585,7 @@ export function DashboardClient({
   const sasuMonthlyEvolutionBuckets = useMemo(() => {
     const totals = new Map<string, number>();
     const monthly = new Map<string, Map<string, number>>();
+    if (!shouldComputeSasuPanel) return { totals, monthly };
     for (const metric of metrics) {
       monthly.set(metric.month, new Map());
     }
@@ -613,13 +600,13 @@ export function DashboardClient({
           ? sasuSimplifiedExpenseGroup(tx)
           : expenseDashboardGroupingLabel(tx, kpiMode);
       if (!name) continue;
-      const amount = Math.abs(tx.amount);
+      const amount = kpiMode === "sasu" ? dashboardSasuExpenseAmountHt(tx) : Math.abs(tx.amount);
       totals.set(name, (totals.get(name) ?? 0) + amount);
       monthBucket.set(name, (monthBucket.get(name) ?? 0) + amount);
     }
 
     return { totals, monthly };
-  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode]);
+  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode, shouldComputeSasuPanel]);
 
   const sasuMonthlyEvolutionOptions = useMemo(() => {
     const { totals } = sasuMonthlyEvolutionBuckets;
@@ -651,6 +638,7 @@ export function DashboardClient({
   }, [sasuMonthlyEvolutionOptions]);
 
   const sasuMonthlyEvolutionSeries = useMemo(() => {
+    if (!shouldComputeSasuPanel) return [];
     const optionNames = sasuMonthlyEvolutionOptions.map((item) => item.name);
     const selectedNames = sasuMonthlyCategoryFilters.length ? sasuMonthlyCategoryFilters : optionNames;
     const selected = new Set(selectedNames);
@@ -680,7 +668,8 @@ export function DashboardClient({
     sasuMonthlyCategoryFilters,
     sasuMonthlyEvolutionOptions,
     sasuMonthlyEvolutionColorByName,
-    sasuMonthlyEvolutionBuckets
+    sasuMonthlyEvolutionBuckets,
+    shouldComputeSasuPanel
   ]);
 
   const sasuMonthlyLineNames = useMemo(
@@ -716,7 +705,7 @@ export function DashboardClient({
     if (kpiMode === "personal") {
       base = "Dépenses perso (import Bankin), hors virements internes";
     } else {
-      base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET}`;
+      base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET} · HT (TVA récupérable déduite quand applicable)`;
     }
     let s: string;
     if (totalExpensesMonthFilter) {
@@ -800,29 +789,25 @@ export function DashboardClient({
     });
   }, []);
 
-  if (dashboardSection === "full") {
-    return (
-      <DashboardPremiumHero
-        stats={currentHeroStats}
-        statsReady={heroStatsReady}
-        contextMessage={heroContextMessage}
-        showContextBanner={showContextBanner}
-      />
-    );
-  }
-
   return (
-    <main id="dashboard-main" className="mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
+    <main id="dashboard-main" className="relative mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div
           key={dashboardSection}
-          custom={slideDirRef.current}
           variants={DASHBOARD_SECTION_SLIDE_VARIANTS}
           initial="initial"
           animate="animate"
           exit="exit"
-          className="space-y-6 sm:space-y-8"
+          className="w-full space-y-6 will-change-[opacity,transform] sm:space-y-8"
         >
+      {dashboardSection === "full" ? (
+        <DashboardPremiumHero
+          stats={currentHeroStats}
+          statsReady
+          contextMessage={heroContextMessage}
+          showContextBanner={showContextBanner}
+        />
+      ) : null}
       {dashboardSection === "activite" ? (
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
@@ -856,23 +841,23 @@ export function DashboardClient({
 
           {dashboardSection === "sasu" ? (
             <section className="flex flex-col gap-4">
-              <div className="rounded-3xl border border-[#39586a]/70 bg-[#172d3a]/80 p-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className={dashboardAnalysisShell}>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => moveSasuPeriod(-1)}
-                      className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
+                      className={dashboardPeriodNavBtn}
                       aria-label={selectedMonth ? "Afficher le mois précédent" : "Afficher l’année précédente"}
                     >
                       ‹
                     </button>
-                    <p className="text-sm font-bold">
+                    <p className={dashboardPeriodTitle}>
                       {selectedMonth ? monthLabelFr(selectedMonth) : currentSasuYear}
                     </p>
                     <button
                       type="button"
                       onClick={() => moveSasuPeriod(1)}
-                      className="grid h-7 w-7 place-items-center rounded-full border border-white/10 text-white/60 transition hover:border-white/20 hover:text-white"
+                      className={dashboardPeriodNavBtn}
                       aria-label={selectedMonth ? "Afficher le mois suivant" : "Afficher l’année suivante"}
                     >
                       ›
@@ -889,7 +874,7 @@ export function DashboardClient({
                     showRollingOption={false}
                     showActiveLabel={false}
                   />
-                  <div className="mt-3 grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                  <div className={clsx(dashboardSegmentShell("mt-3 grid-cols-2"))}>
                     {[
                       { label: "Entrées", mode: "revenues" as const },
                       { label: "Sorties", mode: "expenses" as const }
@@ -898,12 +883,7 @@ export function DashboardClient({
                         type="button"
                         key={item.label}
                         onClick={() => setSasuAnalysisMode(item.mode)}
-                        className={clsx(
-                          "rounded-xl px-2 py-2 text-center text-xs font-bold transition",
-                          sasuAnalysisMode === item.mode
-                            ? "bg-[#4f7eea] text-white shadow-[0_8px_24px_-14px_rgba(79,126,234,0.9)]"
-                            : "text-white/40"
-                        )}
+                        className={dashboardSegmentBtn(sasuAnalysisMode === item.mode)}
                       >
                         {item.label}
                       </button>
@@ -911,7 +891,7 @@ export function DashboardClient({
                   </div>
               </div>
 
-              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-5 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+              <div className={dashboardPremiumPanel}>
                 {(() => {
                   const currentSlices = sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -925,8 +905,8 @@ export function DashboardClient({
                       : totalExpensesCard;
                   return (
                     <>
-                <div className="relative mb-4 overflow-hidden rounded-full border border-[#243f51] bg-[#102634] p-1 shadow-inner">
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/12 via-transparent to-white/5" aria-hidden />
+                <div className={dashboardGaugeTrack}>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/70 via-transparent to-white/20 dark:from-white/12 dark:to-white/5" aria-hidden />
                   <div className="relative flex h-5 overflow-hidden rounded-full">
                     {currentSlices.map((slice) => (
                       <span
@@ -937,14 +917,14 @@ export function DashboardClient({
                     ))}
                   </div>
                 </div>
-                <div className="relative mx-auto flex h-64 w-64 max-w-full items-center justify-center">
+                <div className={clsx("relative mx-auto flex h-64 w-64 max-w-full items-center justify-center", dashboardDonutTrack)}>
                   <svg viewBox="0 0 200 200" className="block h-64 w-64 max-w-full" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
                     <defs>
                       <filter id="sasu-donut-shadow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
                       </filter>
                     </defs>
-                    <circle cx="100" cy="100" r="58" fill="none" stroke="#284556" strokeWidth="16" />
+                    <circle cx="100" cy="100" r="58" fill="none" stroke="currentColor" strokeWidth="16" />
                     {currentSlices.map((slice) => (
                       <circle
                         key={slice.name}
@@ -965,33 +945,27 @@ export function DashboardClient({
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
                     <div>
-                      <p className="font-display text-xl font-bold tabular-nums" data-private>
+                      <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white" data-private>
                         {fmt.euro(currentTotal)}
                       </p>
-                      <p className="mt-1 text-sm font-medium text-white/56">
-                        {sasuAnalysisMode === "revenues" ? "Revenus HT" : "Dépenses"}
+                      <p className="mt-1 text-sm font-medium text-ink-500 dark:text-white/56">
+                        {sasuAnalysisMode === "revenues" ? "Revenus HT" : "Dépenses HT"}
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                <div className={clsx(dashboardSegmentShell("mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2"))}>
                   <button
                     type="button"
                     onClick={() => setSasuBreakdownMode("categories")}
-                    className={clsx(
-                      "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
-                      sasuBreakdownMode === "categories" ? "bg-[#8332c2] text-white" : "text-white/45"
-                    )}
+                    className={dashboardSegmentBtn(sasuBreakdownMode === "categories")}
                   >
                     {sasuAnalysisMode === "revenues" ? "Revenus" : "Catégories"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setSasuBreakdownMode("simplified")}
-                    className={clsx(
-                      "rounded-xl px-3 py-2 text-center text-xs font-bold transition",
-                      sasuBreakdownMode === "simplified" ? "bg-[#8332c2] text-white" : "text-white/45"
-                    )}
+                    className={dashboardSegmentBtn(sasuBreakdownMode === "simplified")}
                   >
                     Simplifié
                   </button>
@@ -1001,27 +975,27 @@ export function DashboardClient({
                 })()}
               </div>
 
-              <div className="order-last rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
+              <div className={clsx(dashboardPremiumPanel, "order-last")}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/42">
+                    <p className={dashboardEyebrow}>
                       Évolution mensuelle
                     </p>
-                    <h3 className="mt-1 font-display text-lg font-bold tracking-tight text-white">
+                    <h3 className={clsx("mt-1", dashboardPanelTitle)}>
                       Dépenses par mois
                     </h3>
-                    <p className="mt-0.5 text-[11px] font-medium text-white/42">
+                    <p className={clsx("mt-0.5", dashboardPanelSub)}>
                       {periodLabel} · {sasuMonthlyCategoryFilters.length || "toutes"} catégorie
                       {sasuMonthlyCategoryFilters.length > 1 ? "s" : ""}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-[#39586a]/70 bg-[#102634]/80 px-3 py-2 text-right">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-white/38">Moy. / mois</p>
-                    <p className="mt-0.5 font-display text-base font-bold tabular-nums text-white" data-private>
+                  <div className={clsx(dashboardInsetPanel, "px-3 py-2 text-right")}>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink-400 dark:text-white/38">Moy. / mois</p>
+                    <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-white" data-private>
                       {fmt.euro(sasuMonthlyAverage)}
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 rounded-2xl border border-[#39586a]/70 bg-[#122733]/70 p-1">
+                  <div className={dashboardSegmentShell("grid-cols-2")}>
                     {[
                       { label: "Catégories", mode: "categories" as const },
                       { label: "Simplifié", mode: "simplified" as const }
@@ -1033,10 +1007,7 @@ export function DashboardClient({
                           setSasuMonthlyBreakdownMode(item.mode);
                           setSasuMonthlyCategoryFilters([]);
                         }}
-                        className={clsx(
-                          "rounded-xl px-3 py-2 text-xs font-bold transition",
-                          sasuMonthlyBreakdownMode === item.mode ? "bg-[#8332c2] text-white" : "text-white/45"
-                        )}
+                        className={dashboardSegmentBtn(sasuMonthlyBreakdownMode === item.mode)}
                       >
                         {item.label}
                       </button>
@@ -1045,12 +1016,14 @@ export function DashboardClient({
                 </div>
 
                 {sasuMonthlyEvolutionOptions.length ? (
-                  <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
+                  <div className={clsx(dashboardInsetPanel, "relative mt-3 overflow-hidden px-2 py-2 shadow-[inset_0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]")}>
+                    <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-[1] w-10 bg-gradient-to-l from-white to-transparent dark:from-[#0b3038]" aria-hidden />
+                    <div className="flex gap-2 overflow-x-auto pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {sasuMonthlyCategoryFilters.length ? (
                       <button
                         type="button"
                         onClick={() => setSasuMonthlyCategoryFilters([])}
-                        className="shrink-0 rounded-full border border-[#39586a]/70 bg-[#102634]/80 px-3 py-1.5 text-[11px] font-bold text-white/78 transition hover:bg-[#203d4f] hover:text-white"
+                        className="shrink-0 rounded-full border border-ink-200 bg-ink-50 px-3 py-2 text-[11px] font-bold text-ink-700 transition hover:bg-ink-100 hover:text-ink-900 dark:border-white/12 dark:bg-white/[0.08] dark:text-white/82 dark:hover:bg-white/[0.12] dark:hover:text-white"
                       >
                         Toutes
                       </button>
@@ -1069,30 +1042,26 @@ export function DashboardClient({
                                 : [...prev, item.name]
                             )
                           }
-                          className={clsx(
-                            "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition",
-                            active
-                              ? "border-white/30 bg-white/12 text-white"
-                              : "border-[#39586a]/70 bg-[#102634]/80 text-white/58 hover:bg-[#203d4f] hover:text-white"
-                          )}
+                          className={dashboardFilterPill(active)}
                         >
                           <span
-                            className="h-2 w-2 rounded-full"
+                            className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_14px_currentColor]"
                             style={{ backgroundColor: color }}
                             aria-hidden
                           />
-                          {item.name}
-                          <span className="text-white/42">{fmt.euro(item.total)}</span>
+                          <span className="max-w-[11rem] truncate">{item.name}</span>
+                          <span className="rounded-full bg-ink-100 px-2 py-0.5 text-ink-600 dark:bg-white/[0.07] dark:text-white/68">{fmt.euro(item.total)}</span>
                         </button>
                       );
                     })}
+                    </div>
                   </div>
                 ) : null}
 
                 <div className="mt-4" data-private>
-                  <div className="relative h-60 overflow-hidden rounded-3xl border border-cyan-100/[0.18] bg-[#0d2b38] px-4 pb-5 pt-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_54px_-34px_rgba(103,232,249,0.75)]">
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,126,234,0.24),transparent_45%)]" />
-                    <div className="pointer-events-none absolute inset-4 rounded-2xl bg-[linear-gradient(rgba(255,255,255,0.095)_1px,transparent_1px)] bg-[size:100%_25%]" />
+                  <div className={dashboardChartSurface}>
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(79,126,234,0.12),transparent_45%)] dark:bg-[radial-gradient(circle_at_50%_0%,rgba(79,126,234,0.24),transparent_45%)]" />
+                    <div className="pointer-events-none absolute inset-4 rounded-2xl bg-[linear-gradient(rgba(148,163,184,0.22)_1px,transparent_1px)] bg-[size:100%_25%] dark:bg-[linear-gradient(rgba(255,255,255,0.095)_1px,transparent_1px)]" />
                     <svg viewBox="0 0 320 170" className="relative z-[1] h-full w-full overflow-visible" role="img" aria-label="Courbe des dépenses mensuelles SASU">
                       <defs>
                         <linearGradient id="sasu-monthly-total-area" x1="0" y1="0" x2="0" y2="1">
@@ -1110,13 +1079,13 @@ export function DashboardClient({
                               x2="312"
                               y1={y}
                               y2={y}
-                              stroke="rgba(207,250,254,0.18)"
+                              stroke="var(--chart-grid)"
                               strokeDasharray="4 5"
                             />
                             <text
                               x="0"
                               y={y + 3}
-                              fill="rgba(236,254,255,0.86)"
+                              fill="var(--chart-label)"
                               style={{ fontSize: 7.5, fontWeight: 800 }}
                             >
                               {compactEuroAxis(value)}
@@ -1124,8 +1093,8 @@ export function DashboardClient({
                           </g>
                         );
                       })}
-                      <line x1="30" x2="312" y1="136" y2="136" stroke="rgba(207,250,254,0.38)" strokeWidth="1.2" />
-                      <line x1="30" x2="30" y1="14" y2="136" stroke="rgba(207,250,254,0.38)" strokeWidth="1.2" />
+                      <line x1="30" x2="312" y1="136" y2="136" stroke="var(--chart-axis)" strokeWidth="1.2" />
+                      <line x1="30" x2="30" y1="14" y2="136" stroke="var(--chart-axis)" strokeWidth="1.2" />
                       {(() => {
                         const totalPoints = sasuMonthlyEvolutionSeries.map((month, index) => {
                           const x =
@@ -1182,8 +1151,8 @@ export function DashboardClient({
                                 cx={point.x}
                                 cy={point.y}
                                 r={point.value > 0 ? 2.4 : 1.5}
-                                fill={point.value > 0 ? color : "#39586a"}
-                                stroke="#172d3a"
+                                fill={point.value > 0 ? color : "#94a3b8"}
+                                stroke="var(--chart-dot-stroke)"
                                 strokeWidth="1.25"
                               />
                             ))}
@@ -1209,14 +1178,14 @@ export function DashboardClient({
                               x2={x}
                               y1="136"
                               y2="140"
-                              stroke="rgba(207,250,254,0.34)"
+                              stroke="var(--chart-axis)"
                               strokeWidth="1"
                             />
                             <text
                               x={x}
                               y="151"
                               textAnchor="middle"
-                              fill="rgba(236,254,255,0.88)"
+                              fill="var(--chart-label)"
                               style={{ fontSize: 7.5, fontWeight: 800 }}
                             >
                               {monthPart.replace(".", "")}
@@ -1226,7 +1195,7 @@ export function DashboardClient({
                                 x={x}
                                 y="162"
                                 textAnchor="middle"
-                              fill="rgba(236,254,255,0.58)"
+                              fill="var(--chart-label-muted)"
                               style={{ fontSize: 6.5, fontWeight: 700 }}
                               >
                                 {yearPart}
@@ -1240,7 +1209,7 @@ export function DashboardClient({
                 </div>
               </div>
 
-              <div className="rounded-[2rem] border border-[#39586a]/70 bg-[#172d3a] p-4 text-white shadow-[0_24px_80px_-28px_rgba(0,0,0,0.72),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-5">
+              <div className={dashboardPremiumPanel}>
                 <div className="space-y-1" data-private>
                   {(sasuAnalysisMode === "revenues"
                     ? sasuRevenueDonutSlices
@@ -1260,17 +1229,26 @@ export function DashboardClient({
                       return (
                         <>
                     {visibleRows.map(({ name, total, color }) => {
-                      const baseTotal = sasuAnalysisMode === "revenues" ? totalRevenuesHt : totalExpensesCard;
+                      const simplified = sasuAnalysisMode === "expenses" && sasuBreakdownMode === "simplified";
+                      const simplifiedExpenseTotal = sasuSimplifiedExpenseSlices.reduce(
+                        (sum, slice) => sum + slice.total,
+                        0
+                      );
+                      const baseTotal =
+                        sasuAnalysisMode === "revenues"
+                          ? totalRevenuesHt
+                          : simplified
+                            ? simplifiedExpenseTotal
+                            : totalExpensesCard;
                       const pct = baseTotal > 0 ? Math.round((total / baseTotal) * 100) : 0;
                       const CatIcon = categoryGlyph(name);
-                      const simplified = sasuAnalysisMode === "expenses" && sasuBreakdownMode === "simplified";
                       const open = sasuAnalysisMode === "revenues" ? revenueCounterpartyDetail === name : expenseCategoryDetail === name;
                       const currentCategoryTransactions = filteredTx.filter((tx) => {
                         if (sasuAnalysisMode === "revenues") {
                           return isRevenueCategory(tx.category) && tx.amount > 0 && revenueCounterpartyDisplayName(tx) === name;
                         }
                         if (simplified) {
-                          return tx.amount < 0;
+                          return sasuSimplifiedExpenseGroup(tx) === name;
                         }
                         return tx.amount < 0 && expenseDashboardGroupingLabel(tx, kpiMode) === name;
                       });
@@ -1298,7 +1276,7 @@ export function DashboardClient({
                           }, 0)
                         : 0;
                       return (
-                        <div key={name} className="border-b border-cyan-100/[0.08] py-3 last:border-0">
+                        <div key={name} className={dashboardRowDivider}>
                           <button
                             type="button"
                             onClick={() => {
@@ -1320,8 +1298,8 @@ export function DashboardClient({
                               <CatIcon className="h-5 w-5" strokeWidth={2} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold text-white/88">{name}</span>
-                              <span className="mt-0.5 block text-xs font-medium text-white/48">
+                              <span className={dashboardRowTitle}>{name}</span>
+                              <span className={dashboardRowMeta}>
                                 {pct} % · {currentCategoryTransactions.length} transaction{currentCategoryTransactions.length > 1 ? "s" : ""}
                                 {sasuAnalysisMode === "revenues" && billableRevenue
                                   ? ` · ${formatDaysCount.format(billedDaysForRevenue)} j facturés`
@@ -1329,8 +1307,8 @@ export function DashboardClient({
                               </span>
                             </span>
                             <span className="shrink-0 text-right">
-                              <span className="block text-sm font-semibold tabular-nums text-white">{fmt.euro(total)}</span>
-                              {!simplified ? <span className="text-white/28">›</span> : null}
+                              <span className={dashboardRowAmount}>{fmt.euro(total)}</span>
+                              {!simplified ? <span className="text-ink-300 dark:text-white/28">›</span> : null}
                             </span>
                           </button>
                           {subcategories.length ? (
@@ -1345,7 +1323,7 @@ export function DashboardClient({
                                     return next;
                                   });
                                 }}
-                                className="w-full rounded-xl border border-[#39586a]/60 bg-[#102634]/70 px-3 py-2 text-left text-[11px] font-bold text-white/62 transition hover:bg-[#203d4f] hover:text-white"
+                                className="w-full rounded-xl border border-ink-200/80 bg-ink-50/80 px-3 py-2 text-left text-[11px] font-bold text-ink-600 transition hover:bg-ink-100 hover:text-ink-900 dark:border-[#39586a]/60 dark:bg-[#102634]/70 dark:text-white/62 dark:hover:bg-[#203d4f] dark:hover:text-white"
                                 aria-expanded={subcategoriesExpanded}
                               >
                                 {subcategoriesExpanded
@@ -1358,12 +1336,12 @@ export function DashboardClient({
                                     return (
                                       <div
                                         key={`${name}-${subcategory.name}`}
-                                        className="flex items-center justify-between gap-3 rounded-xl bg-[#102634]/80 px-3 py-2 text-xs"
+                                        className="flex items-center justify-between gap-3 rounded-xl bg-ink-50/90 px-3 py-2 text-xs dark:bg-[#102634]/80"
                                       >
-                                        <span className="min-w-0 truncate text-white/70">
+                                        <span className="min-w-0 truncate text-ink-600 dark:text-white/70">
                                           {subcategory.name} · {subPct} %
                                         </span>
-                                        <span className="shrink-0 font-semibold tabular-nums text-white/86">
+                                        <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-white/86">
                                           {fmt.euro(subcategory.total)}
                                         </span>
                                       </div>
@@ -1373,7 +1351,7 @@ export function DashboardClient({
                             </div>
                           ) : null}
                           {open ? (
-                            <div className="ml-[3.25rem] mt-2 rounded-2xl border border-cyan-100/[0.10] bg-cyan-50/[0.04] p-3">
+                            <div className={clsx("ml-[3.25rem] mt-2 p-3", dashboardInsetPanel)}>
                               {detailTransactions.length ? (
                                 <div className="space-y-2">
                                   {detailTransactions.slice(0, 8).map((tx) => {
@@ -1393,26 +1371,36 @@ export function DashboardClient({
                                     return (
                                       <div
                                         key={tx.id}
-                                        className="flex items-start justify-between gap-3 border-b border-cyan-100/[0.06] pb-2 text-xs last:border-0 last:pb-0"
+                                        className="flex items-start justify-between gap-3 border-b border-ink-200/60 pb-2 text-xs last:border-0 last:pb-0 dark:border-cyan-100/[0.06]"
                                       >
                                         <span className="min-w-0">
-                                          <span className="block font-mono text-[10px] text-white/36">{tx.date}</span>
-                                          <span className="block truncate text-white/76">{tx.label}</span>
+                                          <span className="block font-mono text-[10px] text-ink-400 dark:text-white/36">{tx.date}</span>
+                                          <span className="block truncate text-ink-700 dark:text-white/76">{tx.label}</span>
                                           {sasuAnalysisMode === "revenues" && billableRevenue ? (
-                                            <span className="mt-0.5 block text-[10px] font-medium text-white/42">
+                                            <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
                                               {formatDaysCount.format(txBilledDays)} j facturés · TJM {fmt.euro(txTjmHt)} HT
                                             </span>
                                           ) : null}
                                         </span>
-                                        <span className="shrink-0 font-semibold tabular-nums text-white">
-                                          {fmt.euro(Math.abs(tx.amount))}
+                                        <span className="shrink-0 text-right font-semibold tabular-nums text-ink-900 dark:text-white">
+                                          {fmt.euro(
+                                            sasuAnalysisMode === "expenses"
+                                              ? dashboardSasuExpenseAmountHt(tx)
+                                              : Math.abs(tx.amount)
+                                          )}
+                                          {sasuAnalysisMode === "expenses" &&
+                                          dashboardSasuExpenseAmountHt(tx) !== Math.abs(tx.amount) ? (
+                                            <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
+                                              TTC {fmt.euro(Math.abs(tx.amount))}
+                                            </span>
+                                          ) : null}
                                         </span>
                                       </div>
                                     );
                                   })}
                                 </div>
                               ) : (
-                                <p className="text-xs text-white/42">Aucune opération disponible.</p>
+                                <p className="text-xs text-ink-500 dark:text-white/42">Aucune opération disponible.</p>
                               )}
                             </div>
                           ) : null}
@@ -1423,7 +1411,7 @@ export function DashboardClient({
                       <button
                         type="button"
                         onClick={() => setShowAllSasuCategoryRows((prev) => !prev)}
-                        className="mt-2 w-full rounded-2xl border border-cyan-100/[0.10] bg-cyan-50/[0.05] px-4 py-3 text-sm font-bold text-white/68 transition hover:bg-cyan-50/[0.09] hover:text-white"
+                        className="mt-2 w-full rounded-2xl border border-ink-200/80 bg-ink-50/80 px-4 py-3 text-sm font-bold text-ink-600 transition hover:bg-ink-100 hover:text-ink-900 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.05] dark:text-white/68 dark:hover:bg-cyan-50/[0.09] dark:hover:text-white"
                       >
                         {showAllSasuCategoryRows ? "Replier les catégories" : `Afficher ${remainingRows} autres catégories`}
                       </button>
@@ -1432,7 +1420,7 @@ export function DashboardClient({
                       );
                     })()
                   ) : (
-                    <p className="py-10 text-center text-sm font-medium text-white/42">Aucune donnée sur cette période.</p>
+                    <p className={dashboardEmptyState}>Aucune donnée sur cette période.</p>
                   )}
                   </div>
               </div>
@@ -1772,6 +1760,9 @@ export function DashboardClient({
             <CardBody className="flex flex-1 flex-col pt-0">
               <CardValue>
                 <span data-private>{fmt.euro(totalExpensesCard)}</span>
+                {kpiMode === "sasu" ? (
+                  <span className="ml-2 align-middle text-xs font-medium text-ink-500">HT</span>
+                ) : null}
               </CardValue>
               <div className="mt-3 flex items-start gap-2.5 text-sm text-ink-500 dark:text-ink-400">
                 <span
@@ -1781,9 +1772,17 @@ export function DashboardClient({
                   <Receipt className="h-4 w-4" strokeWidth={2.2} />
                 </span>
                 <span className="leading-snug">
-                  <span className="font-medium text-ink-700 dark:text-ink-200">Synthèse des dépenses</span>
+                  <span className="font-medium text-ink-700 dark:text-ink-200">
+                    {kpiMode === "sasu" ? "Synthèse des dépenses HT" : "Synthèse des dépenses"}
+                  </span>
                   <span className="block text-xs font-normal text-ink-500 dark:text-ink-400">
-                    Total sur la période · graphique ci-dessous
+                    {kpiMode === "sasu" ? (
+                      <>
+                        Équivalent TTC <span data-private>{fmt.euro(totalExpensesCardTtc)}</span> · graphique ci-dessous
+                      </>
+                    ) : (
+                      "Total sur la période · graphique ci-dessous"
+                    )}
                   </span>
                 </span>
               </div>
@@ -1796,7 +1795,7 @@ export function DashboardClient({
                 ariaLabel={
                   kpiMode === "personal"
                     ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
-                    : `Évolution des dépenses par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
+                    : `Évolution des dépenses HT par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
                 }
               />
               <div
@@ -1969,7 +1968,10 @@ export function DashboardClient({
                                     className="max-h-52 space-y-1 overflow-y-auto text-[11px]"
                                     aria-label={`Opérations pour ${name}`}
                                   >
-                                    {expenseTransactionsForCategory.map((tx) => (
+                                    {expenseTransactionsForCategory.map((tx) => {
+                                      const gross = Math.abs(tx.amount);
+                                      const ht = kpiMode === "sasu" ? dashboardSasuExpenseAmountHt(tx) : gross;
+                                      return (
                                       <li
                                         key={tx.id}
                                         className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-b border-ink-100 py-1.5 last:border-0 dark:border-ink-800"
@@ -1992,11 +1994,17 @@ export function DashboardClient({
                                             </span>
                                           ) : null}
                                         </span>
-                                        <span className="shrink-0 font-medium tabular-nums text-rose-800 dark:text-rose-300">
-                                          {fmt.euro(Math.abs(tx.amount))}
+                                        <span className="shrink-0 text-right font-medium tabular-nums text-rose-800 dark:text-rose-300">
+                                          {fmt.euro(ht)}
+                                          {kpiMode === "sasu" && ht !== gross ? (
+                                            <span className="block text-[10px] font-normal text-ink-400">
+                                              TTC {fmt.euro(gross)}
+                                            </span>
+                                          ) : null}
                                         </span>
                                       </li>
-                                    ))}
+                                    );
+                                    })}
                                   </ul>
                                 ) : (
                                   <p className="text-[11px] text-ink-500 dark:text-ink-400">

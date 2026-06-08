@@ -10,6 +10,7 @@ create table if not exists public.transactions (
   date date not null,
   label text not null,
   category text not null,
+  category_manual boolean not null default false,
   amount numeric not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
