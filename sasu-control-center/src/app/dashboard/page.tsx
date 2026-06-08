@@ -11,7 +11,7 @@ import {
   isDashboardDemoPreferenceActive
 } from "@/lib/dashboard-demo-preference";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { loadRecentUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
+import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
@@ -113,7 +113,7 @@ export default async function DashboardPage({
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
     const [transactionsRes, boundsRes, billableRes] = await Promise.all([
-      loadRecentUserTransactionsFromSupabase(supabase),
+      loadAllUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
         ? loadBillableActivitySettings(supabase, user.id)

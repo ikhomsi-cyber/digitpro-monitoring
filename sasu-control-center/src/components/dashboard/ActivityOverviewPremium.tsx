@@ -92,12 +92,14 @@ export function ActivityOverviewPremium({
   monthTitle,
   kpis,
   workdayGauge,
+  tjmHt,
   ctaMode = "expand",
   onOpenCalendar
 }: {
   monthTitle: string;
   kpis: ActivityOverviewKpis;
   workdayGauge: ActivityWorkdayGauge;
+  tjmHt?: number;
   ctaMode?: "expand" | "navigate" | "hidden";
   onOpenCalendar?: () => void;
 }) {
@@ -130,7 +132,7 @@ export function ActivityOverviewPremium({
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-2.5 py-1 text-[10px] font-semibold text-emerald-800 dark:border-teal-200/[0.16] dark:bg-teal-200/[0.08] dark:text-teal-100/85">
           <BriefcaseBusiness className="h-3 w-3" aria-hidden />
-          TJM · HT
+          TJM · HT{typeof tjmHt === "number" && Number.isFinite(tjmHt) ? ` · ${fmt.euro(tjmHt)}` : ""}
         </span>
       </div>
 

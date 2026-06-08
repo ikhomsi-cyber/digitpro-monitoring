@@ -39,6 +39,30 @@ body {
     background-attachment: fixed;
   }
 
+  .dashboard-chart-surface {
+    --chart-grid: rgba(148, 163, 184, 0.38);
+    --chart-axis: rgba(100, 116, 139, 0.45);
+    --chart-label: rgba(51, 65, 85, 0.88);
+    --chart-label-muted: rgba(100, 116, 139, 0.72);
+    --chart-fade: #ffffff;
+    --chart-dot-stroke: #e2e8f0;
+  }
+  .dark .dashboard-chart-surface {
+    --chart-grid: rgba(207, 250, 254, 0.18);
+    --chart-axis: rgba(207, 250, 254, 0.38);
+    --chart-label: rgba(236, 254, 255, 0.86);
+    --chart-label-muted: rgba(236, 254, 255, 0.58);
+    --chart-fade: #0b3038;
+    --chart-dot-stroke: #172d3a;
+  }
+
+  kbd {
+    @apply inline-flex min-w-[1.4rem] items-center justify-center rounded-md border border-ink-300/70 bg-ink-50 px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none text-ink-600;
+  }
+  .dark kbd {
+    @apply border-white/15 bg-white/[0.08] text-white/70;
+  }
+
   .premium-cta {
     @apply rounded-full px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition;
     background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);

@@ -1,11 +1,12 @@
 import {
-  expenseDashboardGroupingLabel,
+  countsTowardDashboardExpenseTotal,
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import {
-  isValeurReelleMandatoryFeeLine,
-  isValeurReellePersonalChargeLine
+  resolveSasuSimplifiedExpenseGroup,
+  sasuSimplifiedSubcategoryLabel
 } from "@/lib/valeur-reelle-analyze";
 
 export type SasuDonutSlice = {
@@ -80,11 +81,12 @@ export function buildSasuSimplifiedExpenseSlices(transactions: readonly Dashboar
   let perso = 0;
 
   for (const tx of transactions) {
-    if (tx.amount >= 0) continue;
+    if (!countsTowardDashboardExpenseTotal(tx)) continue;
     const bucket = deriveExpenseBucket(tx);
-    const amount = Math.abs(tx.amount);
-    if (isValeurReelleMandatoryFeeLine(tx, bucket)) digitPro += amount;
-    if (isValeurReellePersonalChargeLine(bucket)) perso += amount;
+    const group = resolveSasuSimplifiedExpenseGroup(tx, bucket);
+    const amount = dashboardSasuExpenseAmountHt(tx);
+    if (group === "Frais DigitPro") digitPro += amount;
+    else if (group === "Frais perso") perso += amount;
   }
 
   const total = Math.max(0, digitPro + perso);
@@ -103,28 +105,21 @@ export function buildSasuSimplifiedExpenseSlices(transactions: readonly Dashboar
 }
 
 export function buildSasuSimplifiedSubcategories(
-  transactions: readonly DashboardTx[],
-  kpiMode: "personal" | "sasu"
+  transactions: readonly DashboardTx[]
 ): Record<string, Array<{ name: string; total: number }>> {
   const groups = new Map<string, Map<string, number>>();
   groups.set("Frais DigitPro", new Map());
   groups.set("Frais perso", new Map());
 
   for (const tx of transactions) {
-    if (tx.amount >= 0) continue;
+    if (!countsTowardDashboardExpenseTotal(tx)) continue;
     const bucket = deriveExpenseBucket(tx);
-    const amount = Math.abs(tx.amount);
-    const label = bucket ?? expenseDashboardGroupingLabel(tx, kpiMode);
-
-    if (isValeurReelleMandatoryFeeLine(tx, bucket)) {
-      const digitPro = groups.get("Frais DigitPro");
-      digitPro?.set(label, (digitPro.get(label) ?? 0) + amount);
-    }
-
-    if (isValeurReellePersonalChargeLine(bucket)) {
-      const perso = groups.get("Frais perso");
-      perso?.set(label, (perso.get(label) ?? 0) + amount);
-    }
+    const group = resolveSasuSimplifiedExpenseGroup(tx, bucket);
+    if (!group) continue;
+    const amount = dashboardSasuExpenseAmountHt(tx);
+    const label = sasuSimplifiedSubcategoryLabel(tx, bucket);
+    const subcategories = groups.get(group);
+    subcategories?.set(label, (subcategories.get(label) ?? 0) + amount);
   }
 
   return Object.fromEntries(
@@ -138,9 +133,7 @@ export function buildSasuSimplifiedSubcategories(
 }
 
 export function sasuSimplifiedExpenseGroup(tx: DashboardTx): "Frais DigitPro" | "Frais perso" | null {
-  if (tx.amount >= 0) return null;
+  if (!countsTowardDashboardExpenseTotal(tx)) return null;
   const bucket = deriveExpenseBucket(tx);
-  if (isValeurReelleMandatoryFeeLine(tx, bucket)) return "Frais DigitPro";
-  if (isValeurReellePersonalChargeLine(bucket)) return "Frais perso";
-  return null;
+  return resolveSasuSimplifiedExpenseGroup(tx, bucket);
 }

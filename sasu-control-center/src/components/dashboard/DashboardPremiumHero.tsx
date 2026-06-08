@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { BriefcaseBusiness, CalendarCheck2, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck2, ChartArea, Landmark, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { BncYearAreaChart } from "@/components/dashboard/BncYearAreaChart";
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import { countAgendaWorkDaysInMonth } from "@/lib/billable-calendar-metrics";
 
@@ -29,6 +30,7 @@ type Tile = {
   suffix?: string;
   valueNote?: { text: string; tone: "positive" | "negative" };
   sublabel?: string;
+  sublabelValue?: string;
   sublabelTone?: "positive" | "negative" | "neutral" | "warning";
   metrics?: TileMetric[];
   icon: typeof TrendingUp;
@@ -44,6 +46,7 @@ type Tile = {
     remainingAmountEur: number;
   };
   tjmRepartition?: Array<{ label: string; value: number; colorClass: string; textClass: string }>;
+  bncAreaChart?: boolean;
 };
 
 export function DashboardPremiumHero({ stats, statsReady, contextMessage, showContextBanner }: Props) {
@@ -152,6 +155,8 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     };
   }, [invoicesToCollect.days, yearToDate]);
 
+  const bncYear = stats.bncYearMonthly[0]?.month.slice(0, 4) ?? String(new Date().getFullYear());
+
   const tiles: Tile[] = useMemo(
     () => [
       {
@@ -170,9 +175,10 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         value: stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—",
         sublabel: statsReady
           ? remunerationDisponibleEur >= 0
-            ? `💸 Rémunération à verser ${fmt.euro(remunerationDisponibleEur)}`
-            : `🛑 Dette ${fmt.euro(Math.abs(remunerationDisponibleEur))}`
+            ? "💸 Rémunération à verser"
+            : "🛑 Dette"
           : undefined,
+        sublabelValue: statsReady ? fmt.euro(Math.abs(remunerationDisponibleEur)) : undefined,
         sublabelTone: remunerationDisponibleEur >= 0 ? "positive" : "negative",
         icon: WalletCards,
         iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20"
@@ -206,6 +212,16 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         iconClassName: "text-violet-200 bg-violet-500/12 border-violet-300/20",
         href: "/parametres",
         ariaLabel: "Ouvrir le paramétrage des TJM"
+      },
+      {
+        label: "BNC versés",
+        value: fmt.euro(stats.bncYearTotalEur),
+        sublabel: `Année ${bncYear}`,
+        sublabelTone: "neutral",
+        icon: ChartArea,
+        iconClassName: "text-sky-300 bg-sky-500/12 border-sky-400/20",
+        wide: true,
+        bncAreaChart: true
       },
       {
         label: `Depuis janvier ${yearToDate.year}`,
@@ -277,6 +293,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
       realTjmSharePct,
       remainingBillableDays,
       remunerationDisponibleEur,
+      bncYear,
       stats,
       statsReady,
       yearToDate
@@ -352,7 +369,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                 </dd>
                 {t.sublabel ? (
                   <p
-                    className={`mt-1 truncate whitespace-nowrap text-[11px] font-bold ${
+                    className={`mt-1 flex items-center justify-between gap-1.5 text-[11px] font-bold leading-tight ${
                       t.sublabelTone === "positive"
                         ? "text-emerald-700 dark:text-emerald-300"
                         : t.sublabelTone === "negative"
@@ -362,7 +379,10 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                             : "text-ink-500 dark:text-white/40"
                     }`}
                   >
-                    {t.sublabel}
+                    <span className={t.sublabelValue ? "min-w-0 truncate" : "min-w-0"}>{t.sublabel}</span>
+                    {t.sublabelValue ? (
+                      <span className="shrink-0 tabular-nums">{t.sublabelValue}</span>
+                    ) : null}
                   </p>
                 ) : null}
                 {t.tjmRepartition ? (
@@ -458,6 +478,11 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                         ) : null}
                       </div>
                     ))}
+                  </div>
+                ) : null}
+                {t.bncAreaChart ? (
+                  <div className="mt-3">
+                    <BncYearAreaChart monthly={stats.bncYearMonthly} formatEuro={fmt.euro} />
                   </div>
                 ) : null}
                 {t.breakdown ? (

@@ -15,6 +15,7 @@ export const HIWAY_EXPENSE_CATEGORIES = [
   "Frais bancaires",
   "Matériels et fournitures",
   "Paiement TVA",
+  "Impôt",
   "Non catégorisé",
   "Abonnement logiciel"
 ] as const;
@@ -146,14 +147,33 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
     ["Frais bancaires", ["frais bancaires", "qonto", "qonto solo", "solo basic", "solo_basic"]],
     ["Matériels et fournitures", ["materiels et fournitures", "matériels et fournitures", "materiel", "matériel", "fournitures"]],
     ["Paiement TVA", ["paiement tva", "tva"]],
+    ["Impôt", ["impot", "impôt", "impot-pas", "impot pas", "pasdsn", "pas-dsn", "impot sur le revenu"]],
     ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
     ["Abonnement logiciel", ["abonnement logiciel", "icloud ia store", "apple.com bill", "cursor ai powered ide"]]
   ];
   return aliases.find(([, keys]) => keys.some((key) => text === foldHiwayText(key) || text.includes(foldHiwayText(key))))?.[0] ?? null;
 }
 
-export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company" | "category" | "amount">): HiwayExpenseCategory {
+function resolveManualHiwayCategory(category: string): HiwayExpenseCategory | null {
+  const mapped = mapHiwayExpenseCategory(category);
+  if (mapped && mapped !== "Non catégorisé") return mapped;
+  const normalized = mapHiwayExpenseCategory(
+    category
+      .replace(/\s[›>]\s.+$/u, "")
+      .trim()
+  );
+  if (normalized && normalized !== "Non catégorisé") return normalized;
+  return null;
+}
+
+export function categorizeHiwayExpense(
+  tx: Pick<DashboardTx, "label" | "company" | "category" | "amount" | "categoryManual">
+): HiwayExpenseCategory {
   if (tx.amount >= 0) return "Non catégorisé";
+
+  if (tx.categoryManual) {
+    return resolveManualHiwayCategory(tx.category) ?? "Non catégorisé";
+  }
 
   const label = labelText(tx);
   const source = sourceText(tx);
@@ -162,7 +182,7 @@ export function categorizeHiwayExpense(tx: Pick<DashboardTx, "label" | "company"
   if (labelStartsWithDgfipTva(tx)) return "Paiement TVA";
   if (mapped === "Frais bancaires") return "Frais bancaires";
   if (mapped && mapped !== "Non catégorisé") return mapped;
-  if (label.includes("dgfip")) return "Non catégorisé";
+  if (label.includes("dgfip")) return "Impôt";
   if (source.includes("urssaf") || source.includes("cgss")) return "Urssaf";
   if (textLooksLikeIk(source)) return "Indemnités kilométriques";
   if (

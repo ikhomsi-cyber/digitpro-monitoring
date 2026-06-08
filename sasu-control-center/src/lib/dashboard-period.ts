@@ -86,3 +86,26 @@ export function toggleDashboardYearInFilter(
     return Array.from(next).sort((a, b) => b - a);
   };
 }
+
+/** Mois civil courant (YYYY-MM), fuseau local. */
+export function dashboardMonthKeyNowLocal(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Filtre par défaut : mois civil en cours (toutes les pages avec fenêtre d’analyse). */
+export function defaultDashboardPeriodFilter(now = new Date()): {
+  selectedMonth: string;
+  selectedYears: number[];
+} {
+  return {
+    selectedMonth: dashboardMonthKeyNowLocal(now),
+    selectedYears: [now.getFullYear()]
+  };
+}
+
+/** Jours civils écoulés dans le mois (1 → jour courant inclus), uniquement si `monthKey` est le mois en cours. */
+export function calendarDaysElapsedInCurrentMonth(monthKey: string | null, now = new Date()): number | null {
+  if (!monthKey || monthKey !== dashboardMonthKeyNowLocal(now)) return null;
+  const day = now.getDate();
+  return day > 0 ? day : null;
+}

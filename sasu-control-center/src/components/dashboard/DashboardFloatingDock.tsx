@@ -85,7 +85,14 @@ export function DashboardFloatingDock() {
       className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] animate-floatIn px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
       aria-label="Navigation principale"
     >
-      <div className="pointer-events-auto mx-auto flex max-w-[27rem] items-center justify-between gap-1 rounded-[1.85rem] border border-cyan-100/[0.10] bg-[#082a31]/88 px-2 py-2 text-white shadow-[0_18px_60px_-22px_rgba(0,18,24,0.88),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+      <div
+        className={clsx(
+          "pointer-events-auto mx-auto flex max-w-[27rem] items-center justify-between gap-1 rounded-[1.85rem] border px-2 py-2 backdrop-blur-2xl",
+          "border-ink-200/90 bg-white/94 text-ink-900 shadow-[0_18px_60px_-22px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.9)]",
+          "dark:border-cyan-100/[0.10] dark:bg-[#082a31]/88 dark:text-white",
+          "dark:shadow-[0_18px_60px_-22px_rgba(0,18,24,0.88),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        )}
+      >
         {TABS.map((tab) => {
           const active = tab.isActive(ctx);
           const Icon = tab.icon;
@@ -98,18 +105,23 @@ export function DashboardFloatingDock() {
               onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
               className={clsx(
                 "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
-                active ? "bg-white/[0.10] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" : "hover:bg-white/[0.055]"
+                active
+                  ? "bg-brand-50 shadow-sm dark:bg-white/[0.10] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                  : "hover:bg-ink-50 dark:hover:bg-white/[0.055]"
               )}
             >
               {active ? (
-                <span className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-cyan-200/10 blur-sm" aria-hidden />
+                <span
+                  className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-brand-200/35 blur-sm dark:bg-cyan-200/10"
+                  aria-hidden
+                />
               ) : null}
               <span
                 className={clsx(
                   "relative z-[1] flex h-8 w-8 items-center justify-center rounded-full transition",
                   active
-                    ? "bg-white/[0.16] text-white shadow-[0_10px_26px_-18px_rgba(255,255,255,0.7)]"
-                    : "text-white/72"
+                    ? "bg-brand-500/12 text-brand-700 shadow-[0_8px_20px_-14px_rgba(59,130,246,0.55)] dark:bg-white/[0.16] dark:text-white dark:shadow-[0_10px_26px_-18px_rgba(255,255,255,0.7)]"
+                    : "text-ink-500 dark:text-white/72"
                 )}
               >
                 <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={active ? 2.45 : 2.05} aria-hidden />
@@ -118,7 +130,7 @@ export function DashboardFloatingDock() {
               <span
                 className={clsx(
                   "relative z-[1] mt-1 max-w-[4.2rem] truncate text-center text-[10px] font-bold leading-none tracking-tight",
-                  active ? "text-white" : "text-white/72"
+                  active ? "text-brand-800 dark:text-white" : "text-ink-500 dark:text-white/72"
                 )}
               >
                 {tab.label}

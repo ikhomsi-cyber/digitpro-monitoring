@@ -9,6 +9,13 @@ import {
 } from "@/lib/dashboard-metrics";
 import { formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
 import { deriveExpenseBucket, type DerivedExpenseBucket } from "@/lib/derived-expense-bucket";
+import {
+  amountNetOfRecoverableVat,
+  recoverableVatRule,
+  vatIncludedInGross
+} from "@/lib/recoverable-expense-vat";
+
+export { amountNetOfRecoverableVat } from "@/lib/recoverable-expense-vat";
 import { categorizeHiwayExpense, HIWAY_EXPENSE_CATEGORIES, type HiwayExpenseCategory } from "@/lib/hiway-categorisation";
 import { matchesLoyersRecusSubcategory } from "@/lib/lmnp-analyze";
 import { isRevenueCategory } from "@/lib/revenue-category";
@@ -17,6 +24,7 @@ import {
   formatRealExpenseSublabel,
   blobMatchesMixedExpense,
   hiddenValueRecoveryRatio,
+  isDsnPasImpôtBlob,
   isRetraiteExpense,
   KIND_BY_GROUP,
   LEASING_KEYWORDS,
@@ -304,8 +312,53 @@ function materializeRows(rows: Map<string, BreakdownAccumulatorValue>): ValeurRe
     .sort((a, b) => Math.abs(b.amountEur) - Math.abs(a.amountEur));
 }
 
+export type SasuSimplifiedExpenseGroup = "Frais DigitPro" | "Frais perso";
+
+export function isDsnPasImpôtLine(tx: DashboardTx): boolean {
+  return isDsnPasImpôtBlob(txBlob(tx));
+}
+
+export function isSasuRetraiteExpenseLine(tx: DashboardTx, bucket: DerivedExpenseBucket | null): boolean {
+  if (!bucket || isDsnPasImpôtLine(tx)) return false;
+  return isRetraiteExpense(bucket, txBlob(tx), fold(bankinSubcategoryLabel(tx.category)), tx.category);
+}
+
+/**
+ * Partition exclusive alignée sur la vue Catégories : perso d'abord, tout le reste KPI → DigitPro.
+ */
+export function resolveSasuSimplifiedExpenseGroup(
+  tx: DashboardTx,
+  bucket: DerivedExpenseBucket | null
+): SasuSimplifiedExpenseGroup | null {
+  if (tx.amount >= 0 || !bucket) return null;
+  if (isValeurReellePersonalChargeLine(bucket)) return "Frais perso";
+  return "Frais DigitPro";
+}
+
+/** Libellé sous-catégorie simplifié = même bucket que la vue Catégories. */
+export function sasuSimplifiedSubcategoryLabel(tx: DashboardTx, bucket: DerivedExpenseBucket): string {
+  if (isDsnPasImpôtLine(tx) || bucket === "Impôt") return "Impôt";
+  if (isSasuRetraiteExpenseLine(tx, bucket)) return "Retraite";
+  return bucket;
+}
+
 export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedExpenseBucket | null): boolean {
   if (bucket === "TVA") return false;
+  if (isDsnPasImpôtLine(tx)) return true;
+  if (isSasuRetraiteExpenseLine(tx, bucket)) return true;
+  if (tx.categoryManual) {
+    return (
+      bucket === "Compta & admin." ||
+      bucket === "Impôt" ||
+      bucket === "Urssaf" ||
+      bucket === "Retraite" ||
+      bucket === "Mobile et Internet" ||
+      bucket === "Qonto" ||
+      bucket === "Assurance" ||
+      bucket === "Matériel" ||
+      bucket === "Autres"
+    );
+  }
   const b = txBlob(tx);
   return (
     b.includes("hiway") ||
@@ -319,6 +372,7 @@ export function isValeurReelleMandatoryFeeLine(tx: DashboardTx, bucket: DerivedE
     bucket === "Compta & admin." ||
     bucket === "Impôt" ||
     bucket === "Urssaf" ||
+    bucket === "Retraite" ||
     bucket === "Mobile et Internet" ||
     bucket === "Qonto" ||
     bucket === "Assurance" ||
@@ -347,6 +401,12 @@ export function valeurReelleExpenseCategoryLabel(
   tx: DashboardTx,
   bucket: DerivedExpenseBucket | null
 ): ValeurReelleExpenseCategory {
+  if (isDsnPasImpôtLine(tx) || bucket === "Impôt") return "Impôt";
+  if (bucket && isRetraiteExpense(bucket, txBlob(tx), fold(bankinSubcategoryLabel(tx.category)), tx.category)) {
+    return "Retraite";
+  }
+  if (bucket === "TVA") return "Paiement TVA";
+  if (bucket === "Retraite") return "Retraite";
   if (bucket === "Urssaf") return "Urssaf";
   if (bucket === "Qonto") return "Frais bancaires";
   return categorizeHiwayExpense({ ...tx, category: tx.category || bucket || "" });
@@ -359,50 +419,13 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
     bucket === "CESU" ||
     bucket === "Repas d'affaire" ||
     bucket === "Repas dirigeant" ||
+    bucket === "Mutuelle" ||
     bucket === "iCloud IA Store"
   );
 }
 
 function isCsgSocialReintegrationLine(bucket: DerivedExpenseBucket | null): boolean {
   return bucket === "Urssaf";
-}
-
-function recoverableVatRule(tx: DashboardTx, bucket: DerivedExpenseBucket | null): { label: string; rate: number } | null {
-  const b = txBlob(tx);
-  if (
-    bucket === "Urssaf" ||
-    bucket === "Impôt" ||
-    bucket === "Indemnités kilométriques" ||
-    bucket === "CESU" ||
-    bucket === "BNC" ||
-    bucket === "TVA"
-  ) {
-    return null;
-  }
-  if (b.includes("hiway") || bucket === "Compta & admin.") return { label: "Hiway / admin", rate: 0.2 };
-  if (b.includes("wemind") || b.includes("we mind") || bucket === "Mutuelle") return null;
-  if (bucket === "NDF" || bucket === "Repas dirigeant" || bucket === "Repas d'affaire") {
-    return { label: "Repas & NDF", rate: 0.1 };
-  }
-  if (bucket === "iCloud IA Store" || b.includes("logiciel") || b.includes("software") || b.includes("cursor")) {
-    return { label: "Logiciels & Apple", rate: 0.2 };
-  }
-  if (bucket === "Mobile et Internet") return { label: "Télécom", rate: 0.2 };
-  if (bucket === "Qonto") return { label: "Qonto", rate: 0.2 };
-  if (bucket === "Matériel") return { label: "Matériel", rate: 0.2 };
-  if (bucket === "Assurance") return null;
-  return null;
-}
-
-function vatIncludedInGross(grossEur: number, rate: number): number {
-  if (!Number.isFinite(grossEur) || grossEur <= 0 || !Number.isFinite(rate) || rate <= 0) return 0;
-  return Math.round((grossEur * rate / (1 + rate)) * 100) / 100;
-}
-
-export function amountNetOfRecoverableVat(tx: DashboardTx, bucket: DerivedExpenseBucket | null, grossEur: number): number {
-  const rule = recoverableVatRule(tx, bucket);
-  if (!rule) return grossEur;
-  return Math.max(0, Math.round((grossEur - vatIncludedInGross(grossEur, rule.rate)) * 100) / 100);
 }
 
 function materializeVatMonthlyRows(
@@ -565,7 +588,12 @@ export function analyzeValeurReelle(
       paidVatEur += amtAbs;
       paidVatTransactions.push(breakdownTransaction(tx, amtAbs));
     }
-    if (isProScope(tx) && tx.amount < 0 && isValeurReelleMandatoryFeeLine(tx, bucket)) {
+    if (
+      isProScope(tx) &&
+      tx.amount < 0 &&
+      bucket !== "BNC" &&
+      (isValeurReelleMandatoryFeeLine(tx, bucket) || isSasuRetraiteExpenseLine(tx, bucket))
+    ) {
       const feeLabel = valeurReelleExpenseCategoryLabel(tx, bucket);
       const feeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
       mandatoryFeesEur += feeAmountEur;

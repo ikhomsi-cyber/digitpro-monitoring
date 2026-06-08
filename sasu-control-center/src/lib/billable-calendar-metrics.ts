@@ -1,4 +1,8 @@
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
+import {
+  resolveBillableTjmForClientMonth,
+  type BillableRatePeriod
+} from "@/lib/billable-client-days";
 import type {
   ActivityOverviewKpis,
   ActivityWorkdayGauge
@@ -200,19 +204,50 @@ export function computeCalendarStickyKpis(
 
 export function computeCurrentMonthOverview(
   selected: ReadonlySet<string>,
-  tjmHt: number,
+  billableRatePeriods: readonly BillableRatePeriod[],
+  fallbackTjmHt: number,
   refDate = new Date()
 ): {
   monthTitle: string;
   kpis: ActivityOverviewKpis;
   workdayGauge: ActivityWorkdayGauge;
+  tjmEnVigueurHt: number;
 } {
   const y = refDate.getFullYear();
   const m0 = refDate.getMonth();
+  const monthKey = monthKeyFromYm(y, m0);
+  const tjmEnVigueurHt = resolveBillableTjmForClientMonth(
+    billableRatePeriods,
+    billableRatePeriods[0]?.clientName ?? "",
+    monthKey,
+    fallbackTjmHt
+  );
   const gauge = computeTjmWorkdayGauge(selected, y, m0, refDate);
   return {
     monthTitle: monthTitleFr(y, m0),
-    kpis: computeCalendarStickyKpis(selected, tjmHt, y, m0, refDate),
-    workdayGauge: gauge
+    kpis: computeCalendarStickyKpis(selected, tjmEnVigueurHt, y, m0, refDate),
+    workdayGauge: gauge,
+    tjmEnVigueurHt
   };
+}
+
+/** CA HT estimé sur l’activité agenda (jours ouvrés cochés × TJM), pas l’encaissé. */
+export function computeMonthActivityCaHt(
+  selected: ReadonlySet<string>,
+  billableRatePeriods: readonly BillableRatePeriod[],
+  fallbackTjmHt: number,
+  monthKey: string,
+  refDate = new Date()
+): { caHtEur: number; billableDays: number; tjmHt: number } {
+  const [y, m] = monthKey.split("-").map((part) => Number(part));
+  const month0 = (m || 1) - 1;
+  const tjmHt = resolveBillableTjmForClientMonth(
+    billableRatePeriods,
+    billableRatePeriods[0]?.clientName ?? "",
+    monthKey,
+    fallbackTjmHt
+  );
+  const gauge = computeTjmWorkdayGauge(selected, y, month0, refDate);
+  const caHtEur = Math.round(gauge.countedBillable * tjmHt * 100) / 100;
+  return { caHtEur, billableDays: gauge.countedBillable, tjmHt };
 }

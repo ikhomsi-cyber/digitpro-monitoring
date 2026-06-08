@@ -31,6 +31,7 @@ export type Database = {
           date: string; // YYYY-MM-DD
           label: string;
           category: string;
+          category_manual: boolean;
           amount: number;
           balance: number | null;
           company: string;
@@ -48,6 +49,7 @@ export type Database = {
           date: string;
           label: string;
           category: string;
+          category_manual?: boolean;
           amount: number;
           balance?: number | null;
           company?: string;
@@ -60,6 +62,7 @@ export type Database = {
           date: string;
           label: string;
           category: string;
+          category_manual: boolean;
           amount: number;
           balance: number | null;
           company: string;

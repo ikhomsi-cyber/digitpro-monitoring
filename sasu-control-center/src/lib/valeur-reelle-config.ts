@@ -393,13 +393,25 @@ export const RETRAITE_KEYWORDS = [
   "frais de personnel"
 ] as const;
 
+export function isDsnPasImpôtBlob(blob: string): boolean {
+  const b = foldValeurReelleText(blob);
+  return (
+    b.includes("impot-pas") ||
+    b.includes("impot pas") ||
+    b.includes("pasdsn") ||
+    b.includes("pas-dsn") ||
+    (b.includes("impot") && b.includes("pas") && b.includes("dsn"))
+  );
+}
+
 export function isRetraiteExpense(
   bucket: DerivedExpenseBucket,
   blob: string,
   subcategory: string,
   category: string
 ): boolean {
-  if (bucket === "BNC") return true;
+  if (bucket === "BNC") return false;
+  if (isDsnPasImpôtBlob(`${category} ${subcategory} ${blob}`)) return false;
   const cat = foldValeurReelleText(`${category} ${subcategory} ${blob}`);
   return RETRAITE_KEYWORDS.some((kw) => cat.includes(kw) || blob.includes(kw));
 }

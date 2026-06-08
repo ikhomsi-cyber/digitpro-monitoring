@@ -24,13 +24,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Transaction ou catégorie manquante." }, { status: 400 });
   }
 
-  const { error } = await supabase
-    .from("transactions")
-    .update({ category: mapExpenseCategoryLabel(category) })
-    .eq("id", transactionId)
-    .eq("user_id", user.id);
+  const mappedCategory = mapExpenseCategoryLabel(category);
+  let updateError = (
+    await supabase
+      .from("transactions")
+      .update({ category: mappedCategory, category_manual: true })
+      .eq("id", transactionId)
+      .eq("user_id", user.id)
+  ).error;
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+  if (
+    updateError &&
+    /category_manual/i.test(updateError.message) &&
+    /(could not find|schema cache|does not exist)/i.test(updateError.message)
+  ) {
+    updateError = (
+      await supabase
+        .from("transactions")
+        .update({ category: mappedCategory })
+        .eq("id", transactionId)
+        .eq("user_id", user.id)
+    ).error;
+  }
+
+  if (updateError) return NextResponse.json({ ok: false, error: updateError.message }, { status: 400 });
 
   revalidatePath("/categorisation");
   revalidatePath("/dashboard");

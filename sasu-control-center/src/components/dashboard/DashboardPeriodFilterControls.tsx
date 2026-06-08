@@ -3,7 +3,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Calendar, CalendarDays, CalendarRange } from "lucide-react";
 import { clsx } from "clsx";
-import { formatDashboardMonthLabel } from "@/lib/dashboard-period";
+import { dashboardMonthKeyNowLocal, formatDashboardMonthLabel } from "@/lib/dashboard-period";
 
 /** 12 mois glissants vs années civiles — même logique que la section analytics SASU. */
 export function DashboardPeriodFilterControls({
@@ -78,11 +78,14 @@ export function DashboardPeriodFilterControls({
             type="button"
             aria-pressed={monthModeActive}
             onClick={() => {
-              setSelectedYears((prev) => prev ?? null);
+              setSelectedYears((prev) => prev ?? [new Date().getFullYear()]);
+              const currentMonth = dashboardMonthKeyNowLocal();
               setSelectedMonth((prev) =>
                 prev && availableMonthOptions.includes(prev)
                   ? prev
-                  : availableMonthOptions[0] ?? new Date().toISOString().slice(0, 7)
+                  : availableMonthOptions.includes(currentMonth)
+                    ? currentMonth
+                    : availableMonthOptions[0] ?? currentMonth
               );
             }}
             className={clsx(

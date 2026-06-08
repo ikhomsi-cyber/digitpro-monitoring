@@ -66,7 +66,58 @@ export type DashboardHeroStats = {
   detteTvaDepuisDebutEur: number;
   detteTotaleDepuisDebutEur: number;
   resteAVerserApresCashEur: number;
+  /** BNC versés (virements sortants libellé « BNC ») par mois civil, année en cours. */
+  bncYearMonthly: Array<{ month: string; monthLabel: string; bncEur: number }>;
+  bncYearTotalEur: number;
 };
+
+function foldTxLabel(raw: string): string {
+  return (raw ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+}
+
+/** Virement sortant pro dont le libellé contient « BNC » (aligné analyse Valeur réelle). */
+function isOutgoingBncPayment(tx: DashboardTx): boolean {
+  if ((tx.scope ?? "pro") !== "pro") return false;
+  return tx.amount < 0 && /\bbnc\b/.test(foldTxLabel(tx.label));
+}
+
+function computeBncPaidYearMonthly(
+  transactions: readonly DashboardTx[],
+  now = new Date()
+): { year: number; monthly: DashboardHeroStats["bncYearMonthly"]; totalEur: number } {
+  const year = now.getFullYear();
+  const currentMonth0 = now.getMonth();
+  const byMonth = new Map<string, number>();
+
+  for (let m0 = 0; m0 <= currentMonth0; m0++) {
+    byMonth.set(`${year}-${String(m0 + 1).padStart(2, "0")}`, 0);
+  }
+
+  for (const tx of transactions) {
+    if (!isOutgoingBncPayment(tx)) continue;
+    const monthKey = transactionAnalyticsDayIso(tx).slice(0, 7);
+    if (!monthKey.startsWith(`${year}-`)) continue;
+    const month0 = Number(monthKey.slice(5, 7)) - 1;
+    if (month0 > currentMonth0) continue;
+    byMonth.set(monthKey, (byMonth.get(monthKey) ?? 0) + Math.abs(tx.amount));
+  }
+
+  const monthly = Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, bncEur]) => ({
+      month,
+      monthLabel: new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(
+        new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1)
+      ),
+      bncEur: Math.round(bncEur * 100) / 100
+    }));
+
+  const totalEur = Math.round(monthly.reduce((sum, row) => sum + row.bncEur, 0) * 100) / 100;
+  return { year, monthly, totalEur };
+}
 
 /**
  * KPIs du hero : dernier mois de la série « 12 mois glissants » (aligné `last12MonthsKeys` + `computeMetricsFromTransactions`),
@@ -134,6 +185,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     100;
   const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
   const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);
+  const bncYear = computeBncPaidYearMonthly(proTxs, now);
 
   return {
     caMensuelEur: last.revenue,
@@ -163,6 +215,8 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     detteCsgDepuisDebutEur,
     detteTvaDepuisDebutEur,
     detteTotaleDepuisDebutEur,
-    resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100)
+    resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100),
+    bncYearMonthly: bncYear.monthly,
+    bncYearTotalEur: bncYear.totalEur
   };
 }

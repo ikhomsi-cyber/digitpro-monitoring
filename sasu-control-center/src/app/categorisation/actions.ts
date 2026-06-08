@@ -18,12 +18,30 @@ export async function updatePowensTransactionCategory(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase
-    .from("transactions")
-    .update({ category: mapExpenseCategoryLabel(category) })
-    .eq("id", id)
-    .eq("user_id", user.id);
-  if (error) throw new Error(error.message);
+  const mappedCategory = mapExpenseCategoryLabel(category);
+  let updateError = (
+    await supabase
+      .from("transactions")
+      .update({ category: mappedCategory, category_manual: true })
+      .eq("id", id)
+      .eq("user_id", user.id)
+  ).error;
+
+  if (
+    updateError &&
+    /category_manual/i.test(updateError.message) &&
+    /(could not find|schema cache|does not exist)/i.test(updateError.message)
+  ) {
+    updateError = (
+      await supabase
+        .from("transactions")
+        .update({ category: mappedCategory })
+        .eq("id", id)
+        .eq("user_id", user.id)
+    ).error;
+  }
+
+  if (updateError) throw new Error(updateError.message);
 
   revalidatePath("/categorisation");
   revalidatePath("/dashboard");
