@@ -78,7 +78,7 @@ export function ParametresClient({ periods }: { periods: BillableRatePeriod[] })
               name="clientName"
               required
               placeholder="Ex. Hiway, Qonto, Client final"
-              className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-black/25 dark:text-white"
+              className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white"
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
@@ -88,7 +88,7 @@ export function ParametresClient({ periods }: { periods: BillableRatePeriod[] })
                 name="startDate"
                 type="date"
                 required
-                className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-3 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-black/25 dark:text-white"
+                className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-3 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white"
               />
             </label>
             <label className="block">
@@ -96,7 +96,7 @@ export function ParametresClient({ periods }: { periods: BillableRatePeriod[] })
               <input
                 name="endDate"
                 type="date"
-                className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-3 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-black/25 dark:text-white"
+                className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-3 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white"
               />
             </label>
           </div>
@@ -109,7 +109,7 @@ export function ParametresClient({ periods }: { periods: BillableRatePeriod[] })
               step="1"
               required
               placeholder="620"
-              className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-white/10 dark:bg-black/25 dark:text-white"
+              className="mt-1 h-12 w-full rounded-2xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-900 outline-none focus:border-emerald-500 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white"
             />
           </label>
           <button type="submit" className="btn-primary min-h-12 w-full" disabled={isPending}>

@@ -12,14 +12,14 @@ const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: stri
 
 export default function SignupPage() {
   return (
-    <div className="grid min-h-dvh grid-cols-1 lg:grid-cols-2">
+    <div className="premium-dashboard-page grid min-h-dvh grid-cols-1 lg:grid-cols-2">
       <aside
         aria-hidden="true"
-        className="relative hidden overflow-hidden bg-ink-100 lg:flex lg:flex-col lg:items-center lg:justify-center lg:px-12 lg:py-16"
+        className="relative hidden overflow-hidden border-r border-ink-200/70 bg-gradient-to-br from-ink-50 via-white to-emerald-50/40 dark:border-white/[0.06] dark:from-transparent dark:via-transparent dark:to-transparent lg:flex lg:flex-col lg:items-center lg:justify-center lg:px-12 lg:py-16"
       >
-        <div className="pointer-events-none absolute -left-32 -top-32 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(0,113,227,0.18),transparent_65%)]" />
-        <div className="pointer-events-none absolute -right-32 bottom-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(0,113,227,0.10),transparent_65%)]" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:linear-gradient(rgba(0,0,0,1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,1)_1px,transparent_1px)] [background-size:40px_40px]" />
+        <div className="pointer-events-none absolute -left-32 -top-32 h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.18),transparent_65%)] dark:bg-[radial-gradient(circle,rgba(45,212,191,0.22),transparent_65%)]" />
+        <div className="pointer-events-none absolute -right-32 bottom-0 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(20,184,166,0.12),transparent_65%)] dark:bg-[radial-gradient(circle,rgba(14,116,144,0.28),transparent_65%)]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:linear-gradient(rgba(0,0,0,1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,1)_1px,transparent_1px)] [background-size:40px_40px] dark:opacity-[0.05] dark:[background-image:linear-gradient(rgba(255,255,255,1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,1)_1px,transparent_1px)]" />
 
         <div className="relative flex w-full max-w-md flex-col items-center">
           <Logo
@@ -31,19 +31,19 @@ export default function SignupPage() {
             {FEATURES.map((f) => (
               <li
                 key={f.label}
-                className="flex items-center gap-3 rounded-2xl border border-ink-200 bg-white/80 px-4 py-3 backdrop-blur-sm"
+                className="flex items-center gap-3 rounded-2xl border border-ink-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:shadow-none"
               >
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-50 text-brand-600">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300">
                   <f.icon className="h-4 w-4" />
                 </span>
-                <span className="text-sm font-medium text-ink-800">{f.label}</span>
-                <CheckCircle2 className="ml-auto h-4 w-4 text-brand-500" aria-hidden />
+                <span className="text-sm font-medium text-ink-800 dark:text-white/80">{f.label}</span>
+                <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500 dark:text-emerald-400" aria-hidden />
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="absolute bottom-6 left-0 right-0 text-center text-xs text-ink-500">
+        <div className="absolute bottom-6 left-0 right-0 text-center text-xs text-ink-500 dark:text-white/40">
           © {new Date().getFullYear()} DigitPro · Iliass KHOMSI
         </div>
       </aside>
@@ -60,10 +60,10 @@ export default function SignupPage() {
 
           <div className="text-center lg:text-left">
             <div className="h-eyebrow">On y va</div>
-            <h1 className="mt-2 font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl">
+            <h1 className="mt-2 font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
               Créer un compte.
             </h1>
-            <p className="mt-3 text-base text-ink-600">
+            <p className="mt-3 text-base text-ink-600 dark:text-white/55">
               Démarrez avec une configuration Supabase simple.
             </p>
           </div>
@@ -73,16 +73,19 @@ export default function SignupPage() {
               <AuthForm mode="signup" />
             </Suspense>
 
-            <div className="mt-8 text-center text-sm text-ink-600 lg:text-left">
+            <div className="mt-8 text-center text-sm text-ink-600 dark:text-white/55 lg:text-left">
               Déjà un compte ?{" "}
-              <Link className="btn-link" href="/login">
+              <Link
+                className="font-semibold text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                href="/login"
+              >
                 Se connecter ›
               </Link>
             </div>
           </div>
         </div>
 
-        <footer className="mx-auto mt-6 w-full max-w-sm text-center text-xs text-ink-500 lg:hidden">
+        <footer className="mx-auto mt-6 w-full max-w-sm text-center text-xs text-ink-500 dark:text-white/40 lg:hidden">
           © {new Date().getFullYear()} DigitPro · Iliass KHOMSI
         </footer>
       </main>

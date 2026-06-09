@@ -1403,3 +1403,44 @@ export async function replaceBillableWorkDays(isoDates: string[], tjmHt: number)
 
   revalidatePath("/dashboard");
 }
+
+/** Enregistre l'objectif annuel de CA HT (table `user_billable_settings`). */
+export async function updateAnnualRevenueTarget(targetHtEur: number | null): Promise<void> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  if (targetHtEur != null && (!Number.isFinite(targetHtEur) || targetHtEur <= 0 || targetHtEur > 100_000_000)) {
+    throw new Error("Objectif annuel invalide");
+  }
+
+  const { data: existing } = await supabase
+    .from("user_billable_settings")
+    .select("tjm_ht")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const { error: upsertErr } = await supabase.from("user_billable_settings").upsert(
+    {
+      user_id: user.id,
+      tjm_ht: Number(existing?.tjm_ht) > 0 ? Number(existing?.tjm_ht) : 820,
+      annual_revenue_target_ht: targetHtEur == null ? null : Math.round(targetHtEur * 100) / 100
+    },
+    { onConflict: "user_id" }
+  );
+  if (upsertErr) {
+    const msg = upsertErr.message ?? "";
+    if (/annual_revenue_target_ht|user_billable_settings|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Colonne « annual_revenue_target_ht » introuvable : appliquez la migration Supabase (20260609180000_annual_revenue_target.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  revalidatePath("/dashboard");
+}

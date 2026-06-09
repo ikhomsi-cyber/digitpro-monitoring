@@ -52,7 +52,7 @@ export function DashboardTopNav({
 
   return (
     <nav
-      className="sticky top-[env(safe-area-inset-top)] relative z-40 mx-auto mt-2 max-w-6xl overflow-visible rounded-[1.75rem] border border-ink-200/80 bg-white/80 px-3 py-3 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.18] dark:bg-[#06242b] dark:shadow-[0_18px_70px_-24px_rgba(0,22,28,0.92),inset_0_1px_0_rgba(255,255,255,0.10)] sm:px-4 sm:py-3.5"
+      className="sticky top-[env(safe-area-inset-top)] relative z-40 mx-auto mt-2 w-full overflow-visible rounded-[1.75rem] border border-ink-200/80 bg-white/80 px-3 py-3 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.18] dark:bg-[#06242b] dark:shadow-[0_18px_70px_-24px_rgba(0,22,28,0.92),inset_0_1px_0_rgba(255,255,255,0.10)] sm:px-4 sm:py-3.5"
       aria-label="DigitPro — navigation principale"
     >
       <div className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(circle_at_50%_-50%,rgba(45,212,191,0.20),transparent_52%)] dark:block" aria-hidden />

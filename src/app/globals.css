@@ -74,33 +74,33 @@ body {
     @apply outline-none ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
   }
   .surface-card {
-    @apply rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/80;
+    @apply rounded-2xl border border-ink-200 bg-white dark:border-cyan-100/[0.12] dark:bg-[#0b3038];
   }
   /** Card placed on the gray section bg — subtle white card */
   .surface-glass {
-    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/80 dark:shadow-none;
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/[0.86] dark:shadow-none dark:backdrop-blur-xl;
   }
 
-  /** Section that uses the signature Apple light-gray bg */
+  /** Section that uses the signature light-gray bg */
   .section-alt {
-    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-ink-900/60;
+    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-white/[0.04];
   }
 
-  /** Pill primary button (Apple CTA) */
+  /** Pill primary button — premium emerald CTA */
   .btn-primary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:focus-visible:ring-offset-[#06242b];
   }
-  /** Pill secondary button (white pill on gray) */
+  /** Pill secondary button (white pill / subtle dark) */
   .btn-secondary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 transition hover:border-ink-400 hover:bg-ink-50 dark:border-cyan-100/[0.16] dark:bg-white/[0.05] dark:text-white dark:hover:bg-white/[0.09];
   }
   /** Tertiary text-link "Learn more ›" */
   .btn-link {
-    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300;
+    @apply inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white/80;
   }
 
   /** Skeleton with shimmer */

@@ -19,6 +19,21 @@ export function isPrimaryBankCompany(company: string | null | undefined): boolea
 }
 
 /**
+ * Solde Qonto pour le dashboard : priorité au solde live API, sinon repli sur la dernière
+ * colonne `balance` des transactions importées / synchronisées.
+ */
+export function resolveQontoBalanceEur(
+  transactions: readonly DashboardTx[],
+  liveBalanceEur: number | null | undefined,
+  scope: "pro" | "personal" = "pro"
+): number | null {
+  if (liveBalanceEur != null && Number.isFinite(liveBalanceEur)) {
+    return Math.round(liveBalanceEur * 100) / 100;
+  }
+  return computeLatestQontoBalanceEur(transactions, scope);
+}
+
+/**
  * Dernier solde connu issu des transactions (colonne `balance` à l’import Qonto / sync).
  * Priorité aux lignes dont `company` matche Qonto ; sinon dernière ligne avec solde sur le périmètre.
  */

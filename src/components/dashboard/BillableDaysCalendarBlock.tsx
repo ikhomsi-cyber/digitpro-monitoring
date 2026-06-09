@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronDown,
@@ -17,12 +17,14 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import {
-  computeCalendarStickyKpis,
   computeTjmWorkdayGauge,
   isBillableWorkdayIso,
+  listBillableIsosInMonth,
+  moveFocusIsoInMonth,
   monthTitleFr,
   toBillableIso,
-  workedDaysChartPeriodLabel
+  workedDaysChartPeriodLabel,
+  type CalendarMonthCell
 } from "@/lib/billable-calendar-metrics";
 import {
   indemniteKmPerWorkDayEur
@@ -30,8 +32,14 @@ import {
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
+import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
+import { ActivityAnnualForecastCard } from "@/components/dashboard/ActivityAnnualForecastCard";
+import { ActivityBillingPaceWidget } from "@/components/dashboard/ActivityBillingPaceWidget";
+import { ActivityTjmPerformanceCard } from "@/components/dashboard/ActivityTjmPerformanceCard";
+import { ActivityProductivitySummary } from "@/components/dashboard/ActivityProductivitySummary";
+import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
 import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
@@ -39,6 +47,7 @@ import {
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import {
   cleanNdfMerchantLabel,
+  ndfDigitProAmountHtEur,
   summarizeNdfDigitProForMonth
 } from "@/lib/ndf-digitpro";
 
@@ -58,7 +67,7 @@ const BillableInvoiceWorkedDaysChart = dynamic(
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
 
-function monthMatrix(year: number, month0: number): ({ day: number } | null)[] {
+function monthMatrix(year: number, month0: number): CalendarMonthCell[] {
   const first = new Date(year, month0, 1);
   const last = new Date(year, month0 + 1, 0);
   const startPad = (first.getDay() + 6) % 7;
@@ -163,13 +172,24 @@ function BudgetGauge({
   );
 }
 
+const EMPTY_TJM_REPARTITION: DashboardHeroStats["tjmRepartitionMois"] = {
+  caHtEur: 0,
+  bncEur: 0,
+  fraisPersoEur: 0,
+  csgEur: 0,
+  fraisDigitProEur: 0
+};
+
 export function BillableDaysCalendarBlock({
   treasuryTransactions,
-  treasuryScope
+  treasuryScope,
+  tjmRepartitionMois = EMPTY_TJM_REPARTITION
 }: {
   /** Mouvements pour le bloc trésorerie (solde, CA, TVA). */
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
+  /** Répartition TJM du hero pour estimer le revenu personnel projeté. */
+  tjmRepartitionMois?: DashboardHeroStats["tjmRepartitionMois"];
 }) {
   const {
     selected,
@@ -180,7 +200,9 @@ export function BillableDaysCalendarBlock({
     overviewMonthTitle,
     overviewKpis,
     overviewWorkdayGauge,
-    overviewTjmEnVigueurHt
+    overviewTjmEnVigueurHt,
+    annualRevenueTargetHt,
+    sortedIsos
   } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -189,24 +211,6 @@ export function BillableDaysCalendarBlock({
   const matrix = useMemo(() => monthMatrix(viewYear, viewMonth0), [viewYear, viewMonth0]);
 
   const publicHolidays = useMemo(() => getFrenchPublicHolidaysForYear(viewYear), [viewYear]);
-
-  const countInMonth = useMemo(() => {
-    const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
-    let n = 0;
-    for (const d of selected) {
-      if (d.startsWith(prefix)) n++;
-    }
-    return n;
-  }, [selected, viewYear, viewMonth0]);
-
-  const countInYear = useMemo(() => {
-    const prefix = `${viewYear}-`;
-    let n = 0;
-    for (const d of selected) {
-      if (d.startsWith(prefix)) n++;
-    }
-    return n;
-  }, [selected, viewYear]);
 
   const viewedMonthKey = useMemo(
     () => `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`,
@@ -222,30 +226,6 @@ export function BillableDaysCalendarBlock({
       ),
     [billableRatePeriods, viewedMonthKey, tjmHt]
   );
-
-  const revenueMonthHt = countInMonth * viewedMonthTjmHt;
-  const revenueYearHt = useMemo(() => {
-    if (!countInYear) return 0;
-    const monthRateCache = new Map<string, number>();
-    let total = 0;
-    const yearPrefix = `${viewYear}-`;
-    for (const iso of selected) {
-      if (!iso.startsWith(yearPrefix)) continue;
-      const monthKey = iso.slice(0, 7);
-      let rate = monthRateCache.get(monthKey);
-      if (rate == null) {
-        rate = resolveBillableTjmForClientMonth(
-          billableRatePeriods,
-          billableRatePeriods[0]?.clientName ?? "",
-          monthKey,
-          tjmHt
-        );
-        monthRateCache.set(monthKey, rate);
-      }
-      total += rate;
-    }
-    return Math.round(total * 100) / 100;
-  }, [billableRatePeriods, countInYear, selected, tjmHt, viewYear]);
 
   /**
    * Mois affiché dans le calendrier (viewYear / viewMonth0) : jours pris en compte pour brut + IK.
@@ -324,11 +304,15 @@ export function BillableDaysCalendarBlock({
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
 
   const [ndfListOpen, setNdfListOpen] = useState(false);
-
-  const calendarStickyKpis = useMemo(
-    () => computeCalendarStickyKpis(selected, viewedMonthTjmHt, viewYear, viewMonth0),
-    [selected, viewedMonthTjmHt, viewYear, viewMonth0]
-  );
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    active: boolean;
+    mode: "add" | "remove";
+    moved: boolean;
+    startIso: string;
+  }>({ active: false, mode: "add", moved: false, startIso: "" });
+  const [focusedIso, setFocusedIso] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const toggleDay = useCallback(
     (iso: string) => {
@@ -342,6 +326,62 @@ export function BillableDaysCalendarBlock({
     [setSelected]
   );
 
+  const applyDayPaint = useCallback(
+    (iso: string, mode: "add" | "remove") => {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (mode === "add") next.add(iso);
+        else next.delete(iso);
+        return next;
+      });
+    },
+    [setSelected]
+  );
+
+  const selectAllBillableInMonth = useCallback(() => {
+    const billableIsos = listBillableIsosInMonth(viewYear, viewMonth0, publicHolidays);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const iso of billableIsos) next.add(iso);
+      return next;
+    });
+  }, [publicHolidays, setSelected, viewMonth0, viewYear]);
+
+  const handleDayPointerDown = useCallback(
+    (iso: string, event: React.PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const mode = selected.has(iso) ? "remove" : "add";
+      dragRef.current = { active: true, mode, moved: false, startIso: iso };
+      setIsDragging(true);
+      setFocusedIso(iso);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [selected]
+  );
+
+  const handleDayPointerEnter = useCallback(
+    (iso: string) => {
+      if (!dragRef.current.active) return;
+      dragRef.current.moved = true;
+      applyDayPaint(iso, dragRef.current.mode);
+      setFocusedIso(iso);
+    },
+    [applyDayPaint]
+  );
+
+  const endDrag = useCallback(
+    (iso?: string) => {
+      if (!dragRef.current.active) return;
+      if (!dragRef.current.moved && (iso ?? dragRef.current.startIso)) {
+        toggleDay(iso ?? dragRef.current.startIso);
+      }
+      dragRef.current = { active: false, mode: "add", moved: false, startIso: "" };
+      setIsDragging(false);
+    },
+    [toggleDay]
+  );
+
   const clearMonth = useCallback(() => {
     const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
     setSelected((prev) => {
@@ -353,28 +393,140 @@ export function BillableDaysCalendarBlock({
     });
   }, [setSelected, viewYear, viewMonth0]);
 
-  const goPrevMonth = () => {
+  const goPrevMonth = useCallback(() => {
     if (viewMonth0 === 0) {
       setViewMonth0(11);
       setViewYear((y) => y - 1);
     } else setViewMonth0((m) => m - 1);
-  };
+  }, [viewMonth0]);
 
-  const goNextMonth = () => {
+  const goNextMonth = useCallback(() => {
     if (viewMonth0 === 11) {
       setViewMonth0(0);
       setViewYear((y) => y + 1);
     } else setViewMonth0((m) => m + 1);
-  };
+  }, [viewMonth0]);
 
-  const goToday = () => {
+  const goToday = useCallback(() => {
     const t = new Date();
     setViewYear(t.getFullYear());
     setViewMonth0(t.getMonth());
-  };
+    setFocusedIso(toBillableIso(t.getFullYear(), t.getMonth(), t.getDate()));
+  }, []);
 
   const clock = new Date();
   const todayIsoLive = toBillableIso(clock.getFullYear(), clock.getMonth(), clock.getDate());
+
+  useEffect(() => {
+    if (focusedIso == null) setFocusedIso(todayIsoLive);
+  }, [focusedIso, todayIsoLive]);
+
+  useEffect(() => {
+    const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
+    if (focusedIso?.startsWith(prefix)) return;
+    setFocusedIso(`${prefix}01`);
+  }, [focusedIso, viewMonth0, viewYear]);
+
+  useEffect(() => {
+    const onPointerUp = () => endDrag();
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+    return () => {
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [endDrag]);
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        target.isContentEditable
+      );
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) return;
+
+      const inCalendar =
+        calendarRef.current?.contains(document.activeElement) ||
+        calendarRef.current?.contains(event.target as Node);
+
+      if (event.altKey && event.key === "ArrowLeft") {
+        event.preventDefault();
+        goPrevMonth();
+        return;
+      }
+
+      if (event.altKey && event.key === "ArrowRight") {
+        event.preventDefault();
+        goNextMonth();
+        return;
+      }
+
+      if (inCalendar && focusedIso) {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          setFocusedIso(moveFocusIsoInMonth(focusedIso, "ArrowLeft", viewYear, viewMonth0));
+          return;
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          setFocusedIso(moveFocusIsoInMonth(focusedIso, "ArrowRight", viewYear, viewMonth0));
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setFocusedIso(moveFocusIsoInMonth(focusedIso, "ArrowUp", viewYear, viewMonth0));
+          return;
+        }
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setFocusedIso(moveFocusIsoInMonth(focusedIso, "ArrowDown", viewYear, viewMonth0));
+          return;
+        }
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          toggleDay(focusedIso);
+          return;
+        }
+      }
+
+      if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        goToday();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "a" && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        selectAllBillableInMonth();
+        return;
+      }
+
+      if (event.key === "Delete" || (event.key === "Backspace" && inCalendar)) {
+        event.preventDefault();
+        clearMonth();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    clearMonth,
+    focusedIso,
+    goNextMonth,
+    goPrevMonth,
+    goToday,
+    selectAllBillableInMonth,
+    toggleDay,
+    viewMonth0,
+    viewYear
+  ]);
 
   const invoiceWorkedDaysSeries = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return [];
@@ -483,6 +635,30 @@ export function BillableDaysCalendarBlock({
         ctaMode="hidden"
       />
 
+      <ActivityAnnualForecastCard
+        selected={selected}
+        sortedWorkDayIsos={sortedIsos}
+        billableRatePeriods={billableRatePeriods}
+        fallbackTjmHt={tjmHt}
+        currentTjmHt={overviewTjmEnVigueurHt}
+        annualRevenueTargetHt={annualRevenueTargetHt}
+      />
+
+      <ActivityTjmPerformanceCard
+        selected={selected}
+        billableRatePeriods={billableRatePeriods}
+        fallbackTjmHt={tjmHt}
+        currentTjmHt={overviewTjmEnVigueurHt}
+      />
+
+      <ActivityBillingPaceWidget
+        selected={selected}
+        billableRatePeriods={billableRatePeriods}
+        fallbackTjmHt={tjmHt}
+        currentTjmHt={overviewTjmEnVigueurHt}
+        tjmRepartition={tjmRepartitionMois}
+      />
+
     <Card variant="solid" className="overflow-hidden">
       <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-cyan-100/[0.12] dark:bg-[#06242b]/70 dark:bg-none">
         <div className="flex items-start gap-3">
@@ -502,14 +678,19 @@ export function BillableDaysCalendarBlock({
           </div>
         </div>
       </CardHeader>
-      <CardBody className="relative px-4 pb-28 pt-4 sm:px-6 md:pb-10">
+      <CardBody className="relative px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4 lg:shrink-0">
           {/* Calendrier compact */}
           <div className="flex shrink-0 flex-col items-center sm:items-start">
             <div
-              className="w-full max-w-[260px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-cyan-100/[0.06] sm:p-3.5"
+              ref={calendarRef}
+              tabIndex={0}
+              className={clsx(
+                "w-full max-w-[300px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-cyan-100/[0.06] sm:p-3.5",
+                isDragging && "select-none touch-none"
+              )}
               role="group"
               aria-label={`Calendrier ${monthTitleFr(viewYear, viewMonth0)}`}
             >
@@ -579,6 +760,7 @@ export function BillableDaysCalendarBlock({
                   const pastMissed = billable && !on && !isHoliday && !isSchoolVacation && iso < todayIsoLive;
                   const futurePlanned = billable && !on && !isHoliday && !isSchoolVacation && iso >= todayIsoLive;
                   const heat = billable ? Math.min(1, 0.15 + (on ? 0.55 : pastMissed ? 0.35 : futurePlanned ? 0.25 : 0.12)) : 0;
+                  const isFocused = focusedIso === iso;
 
                   return (
                     <button
@@ -586,13 +768,19 @@ export function BillableDaysCalendarBlock({
                       type="button"
                       aria-pressed={on}
                       title={dayTitle}
+                      tabIndex={isFocused ? 0 : -1}
                       aria-label={`${iso}${ariaExtra ? `, ${ariaExtra}` : ""}${
                         on ? ", sélectionné" : ""
-                      }${isToday ? ", aujourd’hui" : ""}`}
-                      onClick={() => toggleDay(iso)}
+                      }${isToday ? ", aujourd’hui" : ""}${isFocused ? ", focus clavier" : ""}`}
+                      onPointerDown={(event) => handleDayPointerDown(iso, event)}
+                      onPointerEnter={() => handleDayPointerEnter(iso)}
+                      onPointerUp={() => endDrag(iso)}
+                      onFocus={() => setFocusedIso(iso)}
                       style={heat > 0 ? { boxShadow: `inset 0 0 0 999px rgba(16,185,129,${heat * 0.12})` } : undefined}
                       className={clsx(
                         "relative flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-semibold tabular-nums transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#0a0a0a]",
+                        isFocused && "z-[2] ring-2 ring-emerald-300/80 ring-offset-1 dark:ring-emerald-400/70",
+                        isDragging && "cursor-crosshair",
                         on
                           ? clsx(
                               "bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)] dark:from-emerald-500 dark:to-emerald-700",
@@ -654,6 +842,16 @@ export function BillableDaysCalendarBlock({
             >
               Effacer ce mois
             </button>
+            <p className="mt-2 max-w-[300px] rounded-xl border border-ink-200/70 bg-ink-50/60 px-2.5 py-2 text-[9px] leading-relaxed text-ink-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/45">
+              <span className="font-bold text-ink-600 dark:text-white/60">Glisser</span> pour sélectionner
+              plusieurs jours ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">Flèches</span> naviguer ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">Espace</span> basculer ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">A</span> tout sélectionner ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">T</span> aujourd’hui ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">Alt+←→</span> mois ·{" "}
+              <span className="font-bold text-ink-600 dark:text-white/60">Suppr</span> effacer
+            </p>
             <div className="mt-2 flex max-w-[238px] flex-wrap justify-center gap-x-3 gap-y-1 text-[9px] leading-snug text-ink-500 dark:text-white/50 sm:justify-start">
               <span className="inline-flex items-center gap-1">
                 <span
@@ -836,8 +1034,13 @@ export function BillableDaysCalendarBlock({
                                       </span>
                                       <span className="text-[9px] text-ink-400 dark:text-white/35">{tx.date}</span>
                                     </span>
-                                    <span className="text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                                      {fmt.euro(Math.abs(tx.amount))}
+                                    <span className="text-right">
+                                      <span className="block text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                        {fmt.euro(Math.abs(tx.amount))}
+                                      </span>
+                                      <span className="block text-[9px] font-medium tabular-nums text-ink-400 dark:text-white/40">
+                                        {fmt.euro(ndfDigitProAmountHtEur(tx))} HT
+                                      </span>
                                     </span>
                                   </li>
                                 ))}
@@ -865,43 +1068,15 @@ export function BillableDaysCalendarBlock({
 
           </div>
 
-          {/* Synthèse */}
           <div className="min-w-0 w-full flex-1 lg:min-w-[280px]">
-            <div className="flex h-full flex-col justify-center rounded-2xl border border-emerald-200/50 bg-gradient-to-br from-emerald-50/80 via-white to-analyze-50/30 p-3.5 dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/86 dark:bg-none sm:p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-400/75">
-                Estimation CA HT
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-2">
-                <div className="rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07] dark:shadow-none">
-                  <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">TJM / jour</p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-ink-50">
-                    {fmt.euro(viewedMonthTjmHt)}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.07] dark:shadow-none">
-                  <p className="text-[10px] font-medium text-ink-500 dark:text-ink-400">
-                    Mois · {countInMonth} j.
-                  </p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-emerald-800 dark:text-emerald-300">
-                    {fmt.euro(revenueMonthHt)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-emerald-100/90 bg-emerald-50/50 px-3 py-2.5 shadow-sm dark:border-emerald-500/20 dark:bg-emerald-950/20 dark:shadow-none sm:col-span-1">
-                  <p className="text-[10px] font-medium text-emerald-900/70 dark:text-emerald-300/80">
-                    Année {viewYear} · {countInYear} j.
-                  </p>
-                  <p className="mt-0.5 font-display text-base font-bold tabular-nums text-emerald-900 dark:text-emerald-200">
-                    {fmt.euro(revenueYearHt)}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-[10px] leading-relaxed text-ink-500 dark:text-ink-400">
-                {persistToSupabase
-                  ? "Données synchronisées avec votre compte (Supabase). Total année = jours cochés en "
-                  : "Données enregistrées localement (mode démo ou lecture seule). Total année = jours cochés en "}
-                {viewYear}.
-              </p>
-            </div>
+            <ActivityProductivitySummary
+              selected={selected}
+              viewYear={viewYear}
+              billableRatePeriods={billableRatePeriods}
+              fallbackTjmHt={tjmHt}
+              currentTjmHt={overviewTjmEnVigueurHt}
+              persistToSupabase={persistToSupabase}
+            />
           </div>
         </div>
 
@@ -991,25 +1166,7 @@ export function BillableDaysCalendarBlock({
           </div>
         ) : null}
 
-          <div
-            className="sticky bottom-0 z-[8] mt-6 isolate rounded-[1.5rem] border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.16] dark:bg-[#06242b] dark:text-white dark:shadow-[0_12px_48px_-10px_rgba(0,22,28,0.75),inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-1 dark:ring-cyan-100/[0.10]"
-          >
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-              {[
-                { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
-                { k: "CA estimé", v: fmt.euro(calendarStickyKpis.caEstime) },
-                { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
-                { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
-              ].map((row) => (
-                <div key={`sticky-${row.k}`} className="min-w-0 rounded-2xl border border-transparent px-2 py-1.5 dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.06]">
-                  <dt className="truncate text-[10px] font-bold text-ink-600 dark:text-cyan-50/70">{row.k}</dt>
-                  <dd className="mt-0.5 truncate font-display text-sm font-extrabold tabular-nums text-ink-950 dark:text-white sm:text-base">
-                    {row.v}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          <HiwayInvoicesBlock />
       </CardBody>
     </Card>
     </div>

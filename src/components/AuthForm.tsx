@@ -88,46 +88,49 @@ export function AuthForm({ mode }: { mode: Mode }) {
     });
   }
 
+  const fieldClass = clsx(
+    "mt-2 w-full rounded-2xl border px-4 py-3 text-base outline-none transition",
+    "border-ink-300 bg-white text-ink-900 placeholder:text-ink-400",
+    "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25",
+    "dark:border-white/[0.12] dark:bg-white/[0.05] dark:text-white dark:placeholder:text-white/35",
+    "dark:focus:border-emerald-400/70 dark:focus:ring-emerald-400/25"
+  );
+  const labelClass = "text-sm font-semibold text-ink-700 dark:text-white/70";
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="text-sm font-medium text-ink-700">Email</label>
+        <label className={labelClass}>Email</label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={clsx(
-            "mt-2 w-full rounded-xl border border-ink-300 bg-white px-4 py-3 text-base text-ink-900 outline-none transition",
-            "focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          )}
+          className={fieldClass}
           placeholder="vous@exemple.fr"
         />
       </div>
 
       <div>
-        <label className="text-sm font-medium text-ink-700">Mot de passe</label>
+        <label className={labelClass}>Mot de passe</label>
         <input
           type="password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={clsx(
-            "mt-2 w-full rounded-xl border border-ink-300 bg-white px-4 py-3 text-base text-ink-900 outline-none transition",
-            "focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          )}
+          className={fieldClass}
           placeholder="••••••••"
         />
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-400/25 dark:bg-rose-500/10 dark:text-rose-200">
           {error}
         </div>
       ) : null}
 
       {info ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200">
           {info}
         </div>
       ) : null}
@@ -136,8 +139,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
         type="submit"
         disabled={isPending || !supabaseReady}
         className={clsx(
-          "btn-primary w-full text-base",
-          (isPending || !supabaseReady) && "opacity-60"
+          "premium-cta w-full text-base",
+          (isPending || !supabaseReady) && "cursor-not-allowed opacity-60"
         )}
       >
         {mode === "login" ? "Se connecter" : "Créer un compte"}

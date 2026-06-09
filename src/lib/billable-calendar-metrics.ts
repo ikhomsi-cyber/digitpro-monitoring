@@ -19,6 +19,47 @@ export function monthTitleFr(year: number, month0: number): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+/** Tous les jours civils d'un mois (ISO). */
+export function listMonthDayIsos(year: number, month0: number): string[] {
+  const lastDay = new Date(year, month0 + 1, 0).getDate();
+  const out: string[] = [];
+  for (let day = 1; day <= lastDay; day++) {
+    out.push(toBillableIso(year, month0, day));
+  }
+  return out;
+}
+
+/** Jours ouvrés facturables d'un mois (lun–ven, hors fériés). */
+export function listBillableIsosInMonth(
+  year: number,
+  month0: number,
+  holidays: ReadonlyMap<string, string>
+): string[] {
+  return listMonthDayIsos(year, month0).filter((iso) => isBillableWorkdayIso(iso, holidays));
+}
+
+export function offsetBillableIsoByDays(iso: string, deltaDays: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + deltaDays);
+  return toBillableIso(dt.getFullYear(), dt.getMonth(), dt.getDate());
+}
+
+export function moveFocusIsoInMonth(
+  iso: string,
+  direction: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown",
+  year: number,
+  month0: number
+): string {
+  const delta =
+    direction === "ArrowLeft" ? -1 : direction === "ArrowRight" ? 1 : direction === "ArrowUp" ? -7 : 7;
+  const next = offsetBillableIsoByDays(iso, delta);
+  const prefix = `${year}-${String(month0 + 1).padStart(2, "0")}-`;
+  return next.startsWith(prefix) ? next : iso;
+}
+
+export type CalendarMonthCell = { day: number } | null;
+
 /** Lun–ven, hors jours fériés France métropolitaine. */
 export function isBillableWorkdayIso(
   iso: string,

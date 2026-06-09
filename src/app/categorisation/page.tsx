@@ -29,14 +29,16 @@ export default async function CategorisationPage() {
 
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <Logo className="mx-auto mb-8" />
-        <h1 className="h-display">Connexion requise</h1>
-        <p className="mt-4 text-ink-600 dark:text-ink-300">Connectez-vous pour catégoriser les transactions Powens.</p>
-        <div className="mt-8">
-          <Link href={`/login?next=${encodeURIComponent("/categorisation")}`} className="btn-primary">
-            Connexion
-          </Link>
+      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <Logo className="mx-auto mb-8" />
+          <h1 className="h-display">Connexion requise</h1>
+          <p className="mt-4 text-ink-600 dark:text-white/55">Connectez-vous pour catégoriser les transactions Powens.</p>
+          <div className="mt-8">
+            <Link href={`/login?next=${encodeURIComponent("/categorisation")}`} className="premium-cta inline-flex">
+              Connexion
+            </Link>
+          </div>
         </div>
       </div>
     );

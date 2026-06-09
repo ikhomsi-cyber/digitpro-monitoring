@@ -1,6 +1,7 @@
 import "server-only";
 
 import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -11,10 +12,13 @@ export async function loadDashboardHeroStatsFromSupabase(
   client: SupabaseServerClient,
   now = new Date()
 ): Promise<{ stats: DashboardHeroStats | null; errorMessage: string | null }> {
-  const { transactions, errorMessage } = await loadAllUserTransactionsFromSupabase(client);
+  const [{ transactions, errorMessage }, qontoLiveBalanceEur] = await Promise.all([
+    loadAllUserTransactionsFromSupabase(client),
+    loadQontoLiveBalanceEur()
+  ]);
   if (errorMessage) return { stats: null, errorMessage };
   return {
-    stats: computeDashboardHeroStats(transactions, now),
+    stats: computeDashboardHeroStats(transactions, now, { qontoLiveBalanceEur }),
     errorMessage: null
   };
 }
@@ -38,6 +42,7 @@ export async function loadTransactionYearBounds(
 export async function loadBillableActivitySettings(client: SupabaseServerClient, userId: string): Promise<{
   initialBillableWorkDays: string[];
   initialBillableTjmHt: number | null;
+  initialAnnualRevenueTargetHt: number | null;
   billableRatePeriods: BillableRatePeriod[];
 }> {
   const [daysRes, setRes, ratesRes] = await Promise.all([
@@ -48,7 +53,7 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
       .order("work_date", { ascending: true }),
     client
       .from("user_billable_settings")
-      .select("tjm_ht")
+      .select("tjm_ht,annual_revenue_target_ht")
       .eq("user_id", userId)
       .maybeSingle(),
     client
@@ -63,11 +68,21 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
     : [];
 
   let initialBillableTjmHt: number | null = null;
+  let initialAnnualRevenueTargetHt: number | null = null;
   if (!setRes.error && setRes.data != null) {
-    const raw = (setRes.data as { tjm_ht: number | string }).tjm_ht;
+    const row = setRes.data as {
+      tjm_ht: number | string;
+      annual_revenue_target_ht?: number | string | null;
+    };
+    const raw = row.tjm_ht;
     const n = Number(raw);
     if (Number.isFinite(n) && n > 0 && n !== BILLABLE_CLIENT_TJM_HT) initialBillableTjmHt = n;
     else if (Number.isFinite(n) && n > 0) initialBillableTjmHt = n;
+    const targetRaw = row.annual_revenue_target_ht;
+    if (targetRaw != null) {
+      const target = Number(targetRaw);
+      if (Number.isFinite(target) && target > 0) initialAnnualRevenueTargetHt = target;
+    }
   }
 
   const billableRatePeriods: BillableRatePeriod[] = !ratesRes.error && ratesRes.data
@@ -87,5 +102,5 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
       })
     : [];
 
-  return { initialBillableWorkDays, initialBillableTjmHt, billableRatePeriods };
+  return { initialBillableWorkDays, initialBillableTjmHt, initialAnnualRevenueTargetHt, billableRatePeriods };
 }

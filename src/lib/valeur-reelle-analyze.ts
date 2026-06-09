@@ -140,6 +140,16 @@ export type ValeurReelleVatLiability = {
   paidTransactions: BreakdownTransaction[];
 };
 
+export type ValeurReelleVatSavingsKpis = {
+  referenceMonthKey: string;
+  referenceYear: number;
+  monthsElapsed: number;
+  monthEur: number;
+  ytdEur: number;
+  annualProjectionEur: number;
+  averageMonthlyEur: number;
+};
+
 export type ValeurReelleWaterfallStep = {
   id: string;
   label: string;
@@ -440,6 +450,51 @@ function materializeVatMonthlyRows(
       breakdown: materializeRows(v.breakdown)
     }))
     .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+}
+
+function roundVatEur(amountEur: number): number {
+  return Math.round(amountEur * 100) / 100;
+}
+
+/**
+ * KPIs Économies TVA : mois de référence, cumul depuis janvier et projection annuelle.
+ * La projection annualise la moyenne mensuelle YTD : (YTD / mois écoulés) × 12.
+ */
+export function computeVatSavingsKpis(
+  monthlyRows: readonly ValeurReelleVatMonthlyRow[],
+  options?: { referenceMonthKey?: string | null; now?: Date }
+): ValeurReelleVatSavingsKpis {
+  const now = options?.now ?? new Date();
+  const referenceMonthKey =
+    options?.referenceMonthKey ??
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const referenceYear = Number(referenceMonthKey.slice(0, 4));
+  const monthsElapsed = Number(referenceMonthKey.slice(5, 7));
+
+  const yearRows = monthlyRows.filter((row) => row.monthKey.startsWith(`${referenceYear}-`));
+
+  const monthEur = roundVatEur(
+    yearRows.find((row) => row.monthKey === referenceMonthKey)?.vatEur ?? 0
+  );
+
+  const ytdEur = roundVatEur(
+    yearRows
+      .filter((row) => row.monthKey <= referenceMonthKey)
+      .reduce((sum, row) => sum + row.vatEur, 0)
+  );
+
+  const averageMonthlyEur = monthsElapsed > 0 ? roundVatEur(ytdEur / monthsElapsed) : 0;
+  const annualProjectionEur = roundVatEur(averageMonthlyEur * 12);
+
+  return {
+    referenceMonthKey,
+    referenceYear,
+    monthsElapsed,
+    monthEur,
+    ytdEur,
+    annualProjectionEur,
+    averageMonthlyEur
+  };
 }
 
 export function classifyValeurReelleTransaction(tx: DashboardTx): ValeurReelleClassification & {

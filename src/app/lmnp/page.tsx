@@ -19,14 +19,16 @@ export default async function LmnpPage() {
 
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <Logo className="mx-auto mb-8" />
-        <h1 className="h-display">Connexion requise</h1>
-        <p className="mt-4 text-ink-600 dark:text-ink-300">Connectez-vous pour accéder à l’analyse LMNP.</p>
-        <div className="mt-8">
-          <Link href={`/login?next=${encodeURIComponent(LMNP_ON_DASHBOARD)}`} className="btn-primary">
-            Connexion <ArrowUpRight className="h-4 w-4" />
-          </Link>
+      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <Logo className="mx-auto mb-8" />
+          <h1 className="h-display">Connexion requise</h1>
+          <p className="mt-4 text-ink-600 dark:text-white/55">Connectez-vous pour accéder à l’analyse LMNP.</p>
+          <div className="mt-8">
+            <Link href={`/login?next=${encodeURIComponent(LMNP_ON_DASHBOARD)}`} className="premium-cta inline-flex">
+              Connexion <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
     );

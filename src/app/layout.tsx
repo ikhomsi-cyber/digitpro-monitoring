@@ -48,9 +48,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           toastOptions={{
             classNames: {
               toast:
-                "rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-700 dark:bg-ink-900 dark:shadow-none",
-              title: "font-semibold text-ink-900 dark:text-ink-50",
-              description: "text-ink-600 dark:text-ink-400"
+                "rounded-2xl border border-ink-200 bg-white shadow-card dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72)]",
+              title: "font-semibold text-ink-900 dark:text-white",
+              description: "text-ink-600 dark:text-white/55"
             }
           }}
         />

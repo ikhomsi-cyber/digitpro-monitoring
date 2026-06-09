@@ -31,14 +31,16 @@ export default async function ParametresPage() {
 
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <Logo className="mx-auto mb-8" />
-        <h1 className="h-display">Connexion requise</h1>
-        <p className="mt-4 text-ink-600 dark:text-ink-300">Connectez-vous pour modifier les paramètres.</p>
-        <div className="mt-8">
-          <Link href={`/login?next=${encodeURIComponent("/parametres")}`} className="btn-primary">
-            Connexion
-          </Link>
+      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <Logo className="mx-auto mb-8" />
+          <h1 className="h-display">Connexion requise</h1>
+          <p className="mt-4 text-ink-600 dark:text-white/55">Connectez-vous pour modifier les paramètres.</p>
+          <div className="mt-8">
+            <Link href={`/login?next=${encodeURIComponent("/parametres")}`} className="premium-cta inline-flex">
+              Connexion
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -82,7 +84,7 @@ export default async function ParametresPage() {
 
         <AppSectionNav />
 
-        <header className="mt-5 rounded-[2rem] border border-ink-200 bg-white p-5 shadow-[0_16px_60px_-28px_rgba(0,0,0,0.28)] dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#101412] dark:via-[#080a09] dark:to-[#050505] sm:p-7">
+        <header className="mt-5 rounded-[2rem] border border-ink-200 bg-white p-5 shadow-[0_16px_60px_-28px_rgba(0,0,0,0.28)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:shadow-[0_32px_100px_-24px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-7">
           <Link
             href="/dashboard"
             className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-ink-500 transition hover:text-ink-900 dark:text-white/45 dark:hover:text-white"

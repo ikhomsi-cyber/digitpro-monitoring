@@ -105,7 +105,7 @@ export function LMNPClient({
         </Link>
       </div>
 
-      <header className="flex flex-col gap-2 border-b border-ink-200 pb-6 dark:border-ink-800">
+      <header className="flex flex-col gap-2 border-b border-ink-200 pb-6 dark:border-cyan-100/[0.12]">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200/80 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/50 dark:text-sky-300">
             <Building2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />
@@ -187,8 +187,8 @@ export function LMNPClient({
         </Card>
       </div>
 
-      <Card variant="solid" className="border-ink-200/90 dark:border-ink-700">
-        <CardHeader className="border-b border-ink-100 pb-3 dark:border-ink-800">
+      <Card variant="solid" className="border-ink-200/90 dark:border-cyan-100/[0.12]">
+        <CardHeader className="border-b border-ink-100 pb-3 dark:border-cyan-100/[0.08]">
           <CardTitle className="text-base">Paramètres pris en compte</CardTitle>
           <p className="mt-1 text-xs text-ink-600 dark:text-ink-400">
             Achat le <span className="font-medium">{analysis.purchaseDateIso}</span> · Prix (somme débits « Appart
@@ -203,13 +203,13 @@ export function LMNPClient({
           <p>
             Les <strong>loyers reçus</strong> sont les encaissements positifs dont la sous-catégorie Bankin correspond à{" "}
             <strong>Loyers Reçus</strong> / « Loyers Recus » (voir{" "}
-            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-ink-800">LMNP_LOYERS_RECUS_MARKERS</code>
+            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-white/[0.06]">LMNP_LOYERS_RECUS_MARKERS</code>
             ). Pour les <strong>graphiques et totaux par mois</strong>, un loyer encaissé après le jour{" "}
             {LMNP_LOYER_ANALYTIC_MONTH_AFTER_DAY} est rattaché au <strong>mois suivant</strong> (voir{" "}
-            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-ink-800">effectiveLmnpLoyerAnalyticMonthKey</code>
+            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-white/[0.06]">effectiveLmnpLoyerAnalyticMonthKey</code>
             ). L’<strong>achat</strong> (prix + lignes du tableau) : débits en sous-catégorie{" "}
             <strong>Appart Argenteuil</strong> (voir{" "}
-            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-ink-800">LMNP_APPART_ARGENTEUIL_MARKERS</code>
+            <code className="rounded bg-ink-100 px-1 text-xs dark:bg-white/[0.06]">LMNP_APPART_ARGENTEUIL_MARKERS</code>
             ). Les <strong>autres dépenses</strong> LMNP restent basées sur charges typiques + Argenteuil / LMNP ; les
             débits déjà en « Appart Argenteuil » sont comptés comme achat, pas comme charges.
           </p>
@@ -223,8 +223,8 @@ export function LMNPClient({
       </Card>
 
       {chartData.length > 0 ? (
-        <Card variant="solid" className="border-ink-200/90 dark:border-ink-700">
-          <CardHeader className="border-b border-ink-100 pb-3 dark:border-ink-800">
+        <Card variant="solid" className="border-ink-200/90 dark:border-cyan-100/[0.12]">
+          <CardHeader className="border-b border-ink-100 pb-3 dark:border-cyan-100/[0.08]">
             <CardTitle className="text-base">Loyers vs dépenses par mois</CardTitle>
             <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
               Loyers : jour bancaire <strong>strictement après le {LMNP_LOYER_ANALYTIC_MONTH_AFTER_DAY}</strong> du mois
@@ -265,8 +265,8 @@ export function LMNPClient({
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card variant="solid" className="min-h-0 border-ink-200/90 dark:border-ink-700 lg:col-span-2">
-          <CardHeader className="border-b border-ink-100 pb-3 dark:border-ink-800">
+        <Card variant="solid" className="min-h-0 border-ink-200/90 dark:border-cyan-100/[0.12] lg:col-span-2">
+          <CardHeader className="border-b border-ink-100 pb-3 dark:border-cyan-100/[0.08]">
             <CardTitle className="text-base">
               Depuis l’achat — loyers (« Loyers Reçus ») & achat (« Appart Argenteuil ») (
               {(analysis.loyersRecusTx.length + analysis.achatAppartTx.length).toString()} mouvement
@@ -300,7 +300,7 @@ export function LMNPClient({
                       </thead>
                       <tbody>
                         {analysis.loyersRecusTx.map((t) => (
-                          <tr key={t.id} className="border-t border-ink-100 dark:border-ink-800">
+                          <tr key={t.id} className="border-t border-ink-100 dark:border-cyan-100/[0.08]">
                             <td className="py-1.5 pr-2 tabular-nums text-ink-600 dark:text-ink-400">{t.date}</td>
                             <td className="max-w-[10rem] truncate py-1.5 text-ink-800 dark:text-ink-100" title={t.label}>
                               {t.label}
@@ -333,7 +333,7 @@ export function LMNPClient({
                       </thead>
                       <tbody>
                         {analysis.achatAppartTx.map((t) => (
-                          <tr key={t.id} className="border-t border-ink-100 dark:border-ink-800">
+                          <tr key={t.id} className="border-t border-ink-100 dark:border-cyan-100/[0.08]">
                             <td className="py-1.5 pr-2 tabular-nums text-ink-600 dark:text-ink-400">{t.date}</td>
                             <td className="max-w-[10rem] truncate py-1.5 text-ink-800 dark:text-ink-100" title={t.label}>
                               {t.label}
@@ -355,8 +355,8 @@ export function LMNPClient({
           </CardBody>
         </Card>
 
-        <Card variant="solid" className="min-h-0 border-ink-200/90 dark:border-ink-700 lg:col-span-2">
-          <CardHeader className="border-b border-ink-100 pb-3 dark:border-ink-800">
+        <Card variant="solid" className="min-h-0 border-ink-200/90 dark:border-cyan-100/[0.12] lg:col-span-2">
+          <CardHeader className="border-b border-ink-100 pb-3 dark:border-cyan-100/[0.08]">
             <CardTitle className="text-base">Autres dépenses LMNP ({analysis.depensesTx.length})</CardTitle>
           </CardHeader>
           <CardBody className="max-h-80 overflow-y-auto pt-3">
@@ -373,7 +373,7 @@ export function LMNPClient({
                 </thead>
                 <tbody>
                   {analysis.depensesTx.map((t) => (
-                    <tr key={t.id} className="border-t border-ink-100 dark:border-ink-800">
+                    <tr key={t.id} className="border-t border-ink-100 dark:border-cyan-100/[0.08]">
                       <td className="py-1.5 pr-2 tabular-nums text-ink-600 dark:text-ink-400">{t.date}</td>
                       <td className="max-w-[12rem] truncate py-1.5 text-ink-800 dark:text-ink-100" title={t.label}>
                         {t.label}

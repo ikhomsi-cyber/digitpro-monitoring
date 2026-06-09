@@ -812,6 +812,7 @@ export function DashboardClient({
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
+          tjmRepartitionMois={currentHeroStats.tjmRepartitionMois}
         />
       ) : null}
       {dashboardSection === "valeur" ? (
@@ -840,8 +841,8 @@ export function DashboardClient({
           ) : null}
 
           {dashboardSection === "sasu" ? (
-            <section className="flex flex-col gap-4">
-              <div className={dashboardAnalysisShell}>
+            <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
+              <div className={clsx(dashboardAnalysisShell, "xl:col-span-2")}>
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <button
                       type="button"
@@ -975,7 +976,7 @@ export function DashboardClient({
                 })()}
               </div>
 
-              <div className={clsx(dashboardPremiumPanel, "order-last")}>
+              <div className={clsx(dashboardPremiumPanel, "order-last xl:col-span-2")}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className={dashboardEyebrow}>
@@ -1375,7 +1376,7 @@ export function DashboardClient({
                                       >
                                         <span className="min-w-0">
                                           <span className="block font-mono text-[10px] text-ink-400 dark:text-white/36">{tx.date}</span>
-                                          <span className="block truncate text-ink-700 dark:text-white/76">{tx.label}</span>
+                                          <span className="block truncate text-ink-700 dark:text-white">{tx.label}</span>
                                           {sasuAnalysisMode === "revenues" && billableRevenue ? (
                                             <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
                                               {formatDaysCount.format(txBilledDays)} j facturés · TJM {fmt.euro(txTjmHt)} HT

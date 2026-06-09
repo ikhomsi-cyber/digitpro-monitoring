@@ -1,5 +1,7 @@
 import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import { amountNetOfRecoverableVat } from "@/lib/recoverable-expense-vat";
 
 /** Libellé métier de la note de frais DigitPro (tag manuel depuis l'onglet Catégorisation). */
 export const NDF_DIGITPRO_CATEGORY = "NDF DigitPro";
@@ -14,6 +16,13 @@ export function isNdfDigitProTx(tx: DashboardTx): boolean {
 }
 
 /** Nettoie un libellé bancaire (retire CB / dates / numéros) pour un affichage lisible. */
+/** Montant HT d’une NDF DigitPro (TVA repas 10 % déduite quand récupérable). */
+export function ndfDigitProAmountHtEur(tx: DashboardTx): number {
+  const grossEur = Math.abs(tx.amount);
+  const bucket = deriveExpenseBucket(tx);
+  return amountNetOfRecoverableVat(tx, bucket, grossEur);
+}
+
 export function cleanNdfMerchantLabel(raw: string): string {
   return (
     raw

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
+import { CalendarDays, LineChart, PiggyBank, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
@@ -10,20 +11,34 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   buildDashboardMonthOptions,
   buildDashboardYearOptions,
-  calendarDaysElapsedInCurrentMonth,
   defaultDashboardPeriodFilter,
   toggleDashboardYearInFilter
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
-import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
+import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
+import { dashboardMonthKeyNowLocal } from "@/lib/dashboard-period";
+import { ValeurReelleDailyValueCard } from "@/components/dashboard/ValeurReelleDailyValueCard";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
-import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
+import {
+  analyzeValeurReelle,
+  computeVatSavingsKpis,
+  VALEUR_REELLE_EXPENSE_CATEGORIES,
+  type ValeurReelleVatSavingsKpis
+} from "@/lib/valeur-reelle-analyze";
+import {
+  estimateCurrentMonthGainPerWorkDay,
+  type GainPerWorkDayEstimate
+} from "@/lib/valeur-reelle-gain-per-day";
 import type {
   ValeurReelleCashTree,
   ValeurReelleVatLiability,
   ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
+import { ValeurReellePer100AllocationCard } from "@/components/dashboard/ValeurReellePer100AllocationCard";
+import { ValeurReelleMonthlyTrendChart } from "@/components/dashboard/ValeurReelleMonthlyTrendChart";
+import { ValeurReelleWaterfallChart } from "@/components/dashboard/ValeurReelleWaterfallChart";
+import { buildValeurReelleMonthlyTrendSeries } from "@/lib/valeur-reelle-monthly-trend";
 
 const MANDATORY_FEES_COLORS = [
   "#fb7185",
@@ -48,13 +63,73 @@ const PERSONAL_CHARGES_COLORS = [
 ];
 
 const RECOVERABLE_VAT_COLORS = [
-  "#38bdf8",
-  "#22d3ee",
-  "#60a5fa",
+  "#10b981",
+  "#14b8a6",
   "#2dd4bf",
-  "#7dd3fc",
-  "#67e8f9"
+  "#34d399",
+  "#5eead4",
+  "#6ee7b7"
 ];
+
+function formatVatReferenceMonthLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  if (!year || !month) return monthKey;
+  return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
+    new Date(year, month - 1, 1)
+  );
+}
+
+function VatSavingsMetricTile({
+  label,
+  value,
+  sublabel,
+  icon: Icon,
+  emphasized = false
+}: {
+  label: string;
+  value: string;
+  sublabel?: string;
+  icon: typeof LineChart;
+  emphasized?: boolean;
+}) {
+  return (
+    <div
+      className={clsx(
+        "rounded-2xl border px-4 py-3.5",
+        emphasized
+          ? "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/10"
+          : "border-ink-200/75 bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.04]"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <Icon
+          className={clsx(
+            "h-3.5 w-3.5",
+            emphasized ? "text-emerald-600 dark:text-emerald-300" : "text-ink-500 dark:text-white/45"
+          )}
+          strokeWidth={2}
+          aria-hidden
+        />
+        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
+          {label}
+        </p>
+      </div>
+      <p
+        className={clsx(
+          "mt-2 font-display font-bold tabular-nums",
+          emphasized
+            ? "text-xl text-emerald-900 dark:text-emerald-100 sm:text-2xl"
+            : "text-lg text-ink-900 dark:text-white sm:text-xl"
+        )}
+      >
+        {value}
+      </p>
+      {sublabel ? (
+        <p className="mt-1 text-[10px] font-medium text-ink-500 dark:text-white/40">{sublabel}</p>
+      ) : null}
+    </div>
+  );
+}
 
 function cleanTransactionLabel(raw: string, company?: string): string {
   const cleaned = (raw || "")
@@ -341,28 +416,35 @@ function CashFlowTreeVisual({
   tree,
   fmt,
   billableDays,
-  daysElapsedInMonth,
+  gainPerWorkDayEstimate,
   periodLabel,
+  tjmHt,
   onRecategorized
 }: {
   tree: ValeurReelleCashTree;
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   billableDays: number;
-  /** Mois en cours uniquement : jours civils déjà passés (base jauge + gain/jour). */
-  daysElapsedInMonth: number | null;
+  /** Mois en cours : estimation historique + jours ouvrés cochés jusqu'à aujourd'hui. */
+  gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   periodLabel: string;
+  tjmHt: number;
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
-  const gainDayDenominator =
-    daysElapsedInMonth != null && daysElapsedInMonth > 0 ? daysElapsedInMonth : billableDays;
+  const isCurrentMonthEstimate = gainPerWorkDayEstimate != null;
+  const gainDayDenominator = isCurrentMonthEstimate
+    ? gainPerWorkDayEstimate.workedDays
+    : billableDays;
   const formattedGainDayDenominator = new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: daysElapsedInMonth != null ? 0 : 1
+    maximumFractionDigits: isCurrentMonthEstimate ? 0 : 1
   }).format(gainDayDenominator);
-  const reelParJour =
-    gainDayDenominator > 0
-      ? Math.round(((tree.bncEur + tree.personalChargesEur) / gainDayDenominator) * 100) / 100
+  const netDisponibleReel = tree.bncEur + tree.personalChargesEur;
+  const netDisponiblePctCa =
+    tree.caFactureEur > 0 ? Math.round((netDisponibleReel / tree.caFactureEur) * 1000) / 10 : null;
+  const reelParJour = isCurrentMonthEstimate
+    ? gainPerWorkDayEstimate.gainPerDayEur
+    : gainDayDenominator > 0
+      ? Math.round((netDisponibleReel / gainDayDenominator) * 100) / 100
       : null;
-  const useDailyGaugePace = daysElapsedInMonth != null && daysElapsedInMonth > 0;
   const percentOfCa = (amount: number) =>
     tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
@@ -426,104 +508,63 @@ function CashFlowTreeVisual({
       transition={{ duration: 0.45 }}
       className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-emerald-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5"
     >
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-        <motion.div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-            Combien je gagne vraiment
+      <div className="mb-5 rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-50/60 via-white/80 to-white/40 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-emerald-400/20 dark:from-emerald-500/[0.12] dark:via-[#0b3038]/40 dark:to-[#06242b]/30 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-5 sm:py-6">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/40">
+          {periodLabel}
+        </p>
+        <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">
+          Net disponible réel
+        </p>
+        <p className="mt-1 font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight tabular-nums text-ink-950 dark:text-white sm:text-5xl md:text-6xl">
+          {fmt.euro(netDisponibleReel)}
+        </p>
+        {netDisponiblePctCa != null ? (
+          <p className="mt-2 text-sm font-semibold tabular-nums text-ink-700 dark:text-white/75">
+            <span className="text-emerald-700 dark:text-emerald-300">{netDisponiblePctCa} %</span>
+            {" "}du CA HT
           </p>
-          <p className="mt-1 text-xs text-ink-600 dark:text-white/50">{periodLabel}</p>
-        </motion.div>
+        ) : null}
         {reelParJour != null ? (
-          <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
-              = gain / jour
-            </p>
-            <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white">
-              {fmt.euro(reelParJour)}
-            </p>
-            <p className="text-[10px] text-ink-500 dark:text-white/40">
-              {daysElapsedInMonth != null
-                ? `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""}`
-                : `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`}
-            </p>
-          </div>
+          <p className="mt-3 text-sm font-medium text-ink-600 dark:text-white/60">
+            <span className="font-semibold text-ink-700 dark:text-white/75">Gain moyen :</span>{" "}
+            <span className="font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
+              {fmt.euro(reelParJour)}/jour
+            </span>
+            <span className="text-[11px] text-ink-500 dark:text-white/40">
+              {" "}
+              ·{" "}
+              {isCurrentMonthEstimate ? (
+                gainPerWorkDayEstimate.workedDays > 0 ? (
+                  <>
+                    {formattedGainDayDenominator} jour{gainDayDenominator > 1 ? "s" : ""} travaillé
+                    {gainDayDenominator > 1 ? "s" : ""}
+                    {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé sur historique" : null}
+                  </>
+                ) : (
+                  "estimation sur historique"
+                )
+              ) : (
+                `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`
+              )}
+            </span>
+          </p>
         ) : (
-          <p className="max-w-[12rem] text-right text-[10px] leading-snug text-ink-500 dark:text-white/40">
-            Cochez vos jours travaillés sur le dashboard pour le réel / jour.
+          <p className="mt-3 text-[11px] font-medium leading-snug text-ink-500 dark:text-white/40">
+            Cochez vos jours travaillés sur le dashboard pour le gain moyen / jour.
           </p>
         )}
       </div>
 
+      <ValeurReelleDailyValueCard
+        tree={tree}
+        fmt={fmt}
+        tjmHt={tjmHt}
+        billableDays={billableDays}
+        gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+      />
+
       <div className="mb-4">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
-              Répartition du CA HT
-            </p>
-            <p className="mt-1 text-sm font-semibold text-ink-900 dark:text-white">Jauge de valeur</p>
-            {useDailyGaugePace ? (
-              <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
-                {`Rythme / jour sur ${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""} dans le mois`}
-              </p>
-            ) : null}
-          </div>
-          <div className="text-right">
-            <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
-              {fmt.euro(tree.caFactureEur)}
-            </p>
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-400 dark:text-white/35">
-              100 % CA HT
-            </p>
-          </div>
-        </div>
-        <div className="relative overflow-hidden rounded-full border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-cyan-100/[0.10] dark:bg-[#06242b]/70">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-white/10 dark:from-white/10" aria-hidden />
-          <div className="relative flex h-5 overflow-hidden rounded-full">
-          {[
-            { key: "mandatory", value: tree.mandatoryFeesEur, color: "from-rose-400 to-rose-600" },
-            { key: "csg", value: tree.csgEur, color: "from-orange-300 to-amber-500" },
-            { key: "personal", value: tree.personalChargesEur, color: "from-emerald-400 to-teal-500" },
-            { key: "bnc", value: tree.bncEur, color: "from-sky-400 to-blue-600" }
-          ].map((segment) => {
-            const width = Math.max(0, Math.min(100, percentOfCa(segment.value)));
-            return width > 0 ? (
-              <motion.span
-                key={segment.key}
-                initial={{ width: 0 }}
-                animate={{ width: `${width}%` }}
-                transition={{ duration: 0.7, delay: 0.08 }}
-                className={clsx("h-full bg-gradient-to-r", segment.color)}
-                style={{ width: `${width}%` }}
-                aria-hidden
-              />
-            ) : null;
-          })}
-          </div>
-        </div>
-        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
-          {[
-            { label: "Frais", value: tree.mandatoryFeesEur, dot: "bg-rose-500" },
-            { label: "CSG", value: tree.csgEur, dot: "bg-orange-400" },
-            { label: "Perso", value: tree.personalChargesEur, dot: "bg-emerald-500" },
-            { label: "BNC", value: tree.bncEur, dot: "bg-sky-500" }
-          ]
-            .sort((a, b) => b.value - a.value)
-            .map((item) => (
-            <span
-              key={item.label}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink-200/70 bg-white/55 px-2 py-1 text-[9px] font-bold text-ink-600 shadow-sm dark:border-cyan-100/[0.28] dark:bg-cyan-50/[0.09] dark:text-cyan-50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_8px_22px_-18px_rgba(103,232,249,0.75)]"
-            >
-              <span className={clsx("h-2 w-2 rounded-full shadow-[0_0_10px_currentColor]", item.dot)} aria-hidden />
-              <span className="uppercase tracking-[0.08em] dark:text-cyan-50/82">{item.label}</span>
-              <span className="tabular-nums text-ink-900 dark:text-white">{percentOfCa(item.value)} %</span>
-              <span className="rounded-full bg-ink-900/5 px-1.5 py-0.5 tabular-nums text-ink-700 dark:bg-white/[0.10] dark:text-white">
-                {useDailyGaugePace
-                  ? `${fmt.euro(Math.round((item.value / gainDayDenominator) * 100) / 100)}/j`
-                  : fmt.euro(item.value)}
-              </span>
-            </span>
-          ))}
-        </div>
+        <ValeurReelleWaterfallChart tree={tree} fmt={fmt} />
       </div>
 
       <div className="space-y-2 text-[12px] leading-relaxed sm:text-[13px]">
@@ -617,16 +658,15 @@ function CashFlowTreeVisual({
 
 function RecoverableVatMonthlyBlock({
   rows,
+  kpis,
   paidTransactions,
   fmt
 }: {
   rows: ValeurReelleVatMonthlyRow[];
+  kpis: ValeurReelleVatSavingsKpis;
   paidTransactions: ValeurReelleVatLiability["paidTransactions"];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
 }) {
-  const totalVat = rows.reduce((sum, row) => sum + row.vatEur, 0);
-  const totalGross = rows.reduce((sum, row) => sum + row.grossEur, 0);
-  const averageVat = rows.length > 0 ? totalVat / rows.length : 0;
   const [showPaidVatTransactions, setShowPaidVatTransactions] = useState(false);
   const categoryBreakdown = useMemo(() => {
     const map = new Map<string, { amountEur: number; count: number }>();
@@ -648,36 +688,74 @@ function RecoverableVatMonthlyBlock({
     amountEur: item.amountEur,
     count: item.count
   }));
+  const referenceMonthLabel = formatVatReferenceMonthLabel(kpis.referenceMonthKey);
 
   return (
-    <section className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-500 dark:text-white/45">
-            TVA récupérable
+    <section className="rounded-[2rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/50 p-4 shadow-[0_20px_60px_-28px_rgba(16,185,129,0.28)] dark:border-emerald-300/15 dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72)] sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-emerald-300/20 dark:bg-emerald-500/12 dark:text-emerald-300">
+            <Sparkles className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700/85 dark:text-emerald-300/80">
+              Économies TVA
+            </p>
+            <h2 className="mt-1 font-display text-lg font-semibold text-ink-900 dark:text-white sm:text-xl">
+              Chaque achat pro vous fait gagner de la TVA
+            </h2>
+            <p className="mt-1 text-[11px] text-ink-600 dark:text-white/50">
+              TVA récupérable sur vos dépenses éligibles · {referenceMonthLabel}
+            </p>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-emerald-200/70 bg-white/70 px-3 py-2 text-right dark:border-white/10 dark:bg-white/[0.05]">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
+            Moyenne mensuelle
           </p>
-          <h2 className="mt-1 font-display text-lg font-bold tracking-tight text-ink-950 dark:text-white sm:text-xl">
-            TVA gagnée sur achats
-          </h2>
-          <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
-            Moy. {fmt.euro(averageVat)} / mois · Base TTC {fmt.euro(totalGross)}
+          <p className="mt-0.5 text-sm font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
+            {fmt.euro(kpis.averageMonthlyEur)}
           </p>
         </div>
-        <p className="shrink-0 text-right font-semibold tabular-nums text-sky-800 dark:text-sky-200">
-          {fmt.euro(totalVat)}
-        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <VatSavingsMetricTile
+          label="Ce mois"
+          value={fmt.euro(kpis.monthEur)}
+          sublabel={referenceMonthLabel}
+          icon={CalendarDays}
+        />
+        <VatSavingsMetricTile
+          label="Depuis janvier"
+          value={fmt.euro(kpis.ytdEur)}
+          sublabel={`${kpis.monthsElapsed} mois · ${kpis.referenceYear}`}
+          icon={PiggyBank}
+          emphasized
+        />
+        <VatSavingsMetricTile
+          label="Projection annuelle"
+          value={fmt.euro(kpis.annualProjectionEur)}
+          sublabel={`Moy. ${fmt.euro(kpis.averageMonthlyEur)} × 12`}
+          icon={LineChart}
+        />
       </div>
 
       {breakdownRows.length ? (
-        <BreakdownPieChart
-          breakdown={breakdownRows}
-          fmt={fmt}
-          palette={RECOVERABLE_VAT_COLORS}
-          showDetailToggle={false}
-        />
+        <div className="mt-5">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700/80 dark:text-emerald-300/70">
+            Répartition par catégorie
+          </p>
+          <BreakdownPieChart
+            breakdown={breakdownRows}
+            fmt={fmt}
+            palette={RECOVERABLE_VAT_COLORS}
+            showDetailToggle={false}
+          />
+        </div>
       ) : (
-        <p className="mt-3 rounded-xl bg-white/45 px-3 py-3 text-xs font-semibold text-ink-500 dark:bg-white/[0.03] dark:text-white/45">
-          Aucune TVA récupérable sur cette période.
+        <p className="mt-5 rounded-xl border border-emerald-200/50 bg-emerald-50/40 px-3 py-3 text-xs font-semibold text-emerald-800/80 dark:border-emerald-400/15 dark:bg-emerald-500/8 dark:text-emerald-200/80">
+          Aucune économie TVA sur cette période — vos achats éligibles apparaîtront ici.
         </p>
       )}
 
@@ -788,6 +866,23 @@ export function ValeurReelleClient({
     [selectedMonth, selectedYears, transactions]
   );
 
+  const vatYearMonthlyRows = useMemo(() => {
+    const refMonth = selectedMonth ?? dashboardMonthKeyNowLocal();
+    const year = Number(refMonth.slice(0, 4));
+    const yearsForVat =
+      selectedYears != null && selectedYears.length > 0
+        ? selectedYears.includes(year)
+          ? [year]
+          : [selectedYears[0]!]
+        : [year];
+    return analyzeValeurReelle(transactions, { years: yearsForVat, month: null }).vatRecoverableMonthlyRows;
+  }, [selectedMonth, selectedYears, transactions]);
+
+  const vatSavingsKpis = useMemo(
+    () => computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: selectedMonth }),
+    [selectedMonth, vatYearMonthlyRows]
+  );
+
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
     setLocalCategoryOverrides((prev) => ({
       ...prev,
@@ -805,9 +900,36 @@ export function ValeurReelleClient({
     [analysis.cashTree.caFactureEur, billableActivity?.tjmHt]
   );
 
-  const daysElapsedInMonth = useMemo(
-    () => calendarDaysElapsedInCurrentMonth(selectedMonth),
-    [selectedMonth]
+  const gainPerWorkDayEstimate = useMemo(
+    () => {
+      if (!selectedMonth) return null;
+      return estimateCurrentMonthGainPerWorkDay(
+        transactions,
+        analysis.cashTree,
+        billableActivity?.selected ?? new Set<string>(),
+        selectedMonth
+      );
+    },
+    [analysis.cashTree, billableActivity?.selected, selectedMonth, transactions]
+  );
+
+  const tjmHtForPeriod = useMemo(() => {
+    const monthKey = selectedMonth ?? dashboardMonthKeyNowLocal();
+    return resolveBillableTjmForClientMonth(
+      billableActivity?.billableRatePeriods ?? [],
+      billableActivity?.billableRatePeriods[0]?.clientName ?? "",
+      monthKey,
+      billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT
+    );
+  }, [billableActivity?.billableRatePeriods, billableActivity?.tjmHt, selectedMonth]);
+
+  const monthlyTrendSeries = useMemo(
+    () =>
+      buildValeurReelleMonthlyTrendSeries(transactions, {
+        years: selectedYears,
+        month: selectedMonth
+      }),
+    [selectedMonth, selectedYears, transactions]
   );
 
   return (
@@ -838,16 +960,22 @@ export function ValeurReelleClient({
         tree={analysis.cashTree}
         fmt={fmt}
         billableDays={billableDaysInPeriod}
-        daysElapsedInMonth={daysElapsedInMonth}
+        gainPerWorkDayEstimate={gainPerWorkDayEstimate}
         periodLabel={analysis.periodLabel}
+        tjmHt={tjmHtForPeriod}
         onRecategorized={handleRecategorized}
       />
 
       <RecoverableVatMonthlyBlock
         rows={analysis.vatRecoverableMonthlyRows}
+        kpis={vatSavingsKpis}
         paidTransactions={analysis.vatLiability.paidTransactions}
         fmt={fmt}
       />
+
+      <ValeurReellePer100AllocationCard tree={analysis.cashTree} fmt={fmt} />
+
+      <ValeurReelleMonthlyTrendChart series={monthlyTrendSeries} />
 
     </div>
   );

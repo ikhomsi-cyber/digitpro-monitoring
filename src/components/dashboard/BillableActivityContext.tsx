@@ -11,7 +11,7 @@ import {
   type ReactNode
 } from "react";
 import { toast } from "sonner";
-import { replaceBillableWorkDays } from "@/app/dashboard/actions";
+import { replaceBillableWorkDays, updateAnnualRevenueTarget } from "@/app/dashboard/actions";
 import { computeCurrentMonthOverview } from "@/lib/billable-calendar-metrics";
 import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import type {
@@ -20,6 +20,7 @@ import type {
 } from "@/components/dashboard/ActivityOverviewPremium";
 
 const STORAGE_KEY = "digitpro:billable-work-days-iso";
+const ANNUAL_TARGET_STORAGE_KEY = "digitpro:annual-revenue-target-ht";
 
 function parseStored(raw: string | null): Set<string> {
   if (!raw) return new Set();
@@ -50,6 +51,8 @@ type BillableActivityContextValue = {
   overviewKpis: ActivityOverviewKpis;
   overviewWorkdayGauge: ActivityWorkdayGauge;
   overviewTjmEnVigueurHt: number;
+  annualRevenueTargetHt: number | null;
+  setAnnualRevenueTargetHt: React.Dispatch<React.SetStateAction<number | null>>;
 };
 
 const BillableActivityContext = createContext<BillableActivityContextValue | null>(null);
@@ -59,26 +62,36 @@ export function BillableActivityProvider({
   tjmHt,
   billableRatePeriods = [],
   persistToSupabase,
-  initialWorkDayIsos
+  initialWorkDayIsos,
+  initialAnnualRevenueTargetHt = null
 }: {
   children: ReactNode;
   tjmHt: number;
   billableRatePeriods?: readonly BillableRatePeriod[];
   persistToSupabase: boolean;
   initialWorkDayIsos: string[];
+  initialAnnualRevenueTargetHt?: number | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() =>
     persistToSupabase ? new Set(initialWorkDayIsos) : new Set()
   );
   const [hydrated, setHydrated] = useState(false);
+  const [annualRevenueTargetHt, setAnnualRevenueTargetHt] = useState<number | null>(
+    initialAnnualRevenueTargetHt
+  );
   const [, startTransition] = useTransition();
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   const lastPersistedRef = useRef<string | null>(null);
+  const lastTargetPersistedRef = useRef<number | null | undefined>(undefined);
 
   const serverDaysKey = useMemo(
     () => [...initialWorkDayIsos].sort().join("|"),
     [initialWorkDayIsos]
+  );
+  const serverTargetKey = useMemo(
+    () => (initialAnnualRevenueTargetHt == null ? "" : String(initialAnnualRevenueTargetHt)),
+    [initialAnnualRevenueTargetHt]
   );
 
   useEffect(() => {
@@ -89,14 +102,53 @@ export function BillableActivityProvider({
       setSelected(parseStored(localStorage.getItem(STORAGE_KEY)));
       lastPersistedRef.current = null;
     }
+    if (persistToSupabase) {
+      setAnnualRevenueTargetHt(initialAnnualRevenueTargetHt);
+    } else if (typeof window !== "undefined") {
+      const raw = localStorage.getItem(ANNUAL_TARGET_STORAGE_KEY);
+      const parsed = raw != null ? Number(raw) : NaN;
+      setAnnualRevenueTargetHt(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+    }
     setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `serverDaysKey` résume `initialWorkDayIsos`.
-  }, [persistToSupabase, serverDaysKey, tjmHt]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clés serveur résument les props initiales.
+  }, [persistToSupabase, serverDaysKey, serverTargetKey, tjmHt, initialAnnualRevenueTargetHt]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected].sort()));
   }, [selected, hydrated, persistToSupabase]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
+    if (annualRevenueTargetHt == null) {
+      localStorage.removeItem(ANNUAL_TARGET_STORAGE_KEY);
+    } else {
+      localStorage.setItem(ANNUAL_TARGET_STORAGE_KEY, String(annualRevenueTargetHt));
+    }
+  }, [annualRevenueTargetHt, hydrated, persistToSupabase]);
+
+  useEffect(() => {
+    if (!hydrated || !persistToSupabase) return;
+    if (lastTargetPersistedRef.current === undefined) {
+      lastTargetPersistedRef.current = annualRevenueTargetHt;
+      return;
+    }
+    if (lastTargetPersistedRef.current === annualRevenueTargetHt) return;
+    const t = setTimeout(() => {
+      startTransition(() => {
+        void updateAnnualRevenueTarget(annualRevenueTargetHt)
+          .then(() => {
+            lastTargetPersistedRef.current = annualRevenueTargetHt;
+          })
+          .catch((e) => {
+            toast.error("Enregistrement de l'objectif annuel impossible", {
+              description: e instanceof Error ? e.message : undefined
+            });
+          });
+      });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [annualRevenueTargetHt, hydrated, persistToSupabase]);
 
   useEffect(() => {
     if (!hydrated || !persistToSupabase) return;
@@ -140,9 +192,11 @@ export function BillableActivityProvider({
       overviewMonthTitle: overview.monthTitle,
       overviewKpis: overview.kpis,
       overviewWorkdayGauge: overview.workdayGauge,
-      overviewTjmEnVigueurHt: overview.tjmEnVigueurHt
+      overviewTjmEnVigueurHt: overview.tjmEnVigueurHt,
+      annualRevenueTargetHt,
+      setAnnualRevenueTargetHt
     }),
-    [tjmHt, billableRatePeriods, persistToSupabase, selected, hydrated, sortedIsos, overview]
+    [tjmHt, billableRatePeriods, persistToSupabase, selected, hydrated, sortedIsos, overview, annualRevenueTargetHt]
   );
 
   return (

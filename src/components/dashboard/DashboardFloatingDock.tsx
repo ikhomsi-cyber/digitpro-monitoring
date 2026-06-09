@@ -106,13 +106,13 @@ export function DashboardFloatingDock() {
               className={clsx(
                 "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
                 active
-                  ? "bg-brand-50 shadow-sm dark:bg-white/[0.10] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                  ? "bg-emerald-50 shadow-sm dark:bg-emerald-500/[0.14] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                   : "hover:bg-ink-50 dark:hover:bg-white/[0.055]"
               )}
             >
               {active ? (
                 <span
-                  className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-brand-200/35 blur-sm dark:bg-cyan-200/10"
+                  className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-emerald-200/40 blur-sm dark:bg-emerald-300/10"
                   aria-hidden
                 />
               ) : null}
@@ -120,7 +120,7 @@ export function DashboardFloatingDock() {
                 className={clsx(
                   "relative z-[1] flex h-8 w-8 items-center justify-center rounded-full transition",
                   active
-                    ? "bg-brand-500/12 text-brand-700 shadow-[0_8px_20px_-14px_rgba(59,130,246,0.55)] dark:bg-white/[0.16] dark:text-white dark:shadow-[0_10px_26px_-18px_rgba(255,255,255,0.7)]"
+                    ? "bg-emerald-500/12 text-emerald-700 shadow-[0_8px_20px_-14px_rgba(16,185,129,0.55)] dark:bg-emerald-500/20 dark:text-white dark:shadow-[0_10px_26px_-18px_rgba(45,212,191,0.7)]"
                     : "text-ink-500 dark:text-white/72"
                 )}
               >
@@ -130,7 +130,7 @@ export function DashboardFloatingDock() {
               <span
                 className={clsx(
                   "relative z-[1] mt-1 max-w-[4.2rem] truncate text-center text-[10px] font-bold leading-none tracking-tight",
-                  active ? "text-brand-800 dark:text-white" : "text-ink-500 dark:text-white/72"
+                  active ? "text-emerald-800 dark:text-white" : "text-ink-500 dark:text-white/72"
                 )}
               >
                 {tab.label}
@@ -171,12 +171,12 @@ export function DashboardDesktopSidebar() {
   };
 
   return (
-    <aside className="fixed left-4 top-4 z-50 hidden h-[calc(100dvh-2rem)] w-24 flex-col rounded-[2rem] border border-white/10 bg-black/45 p-3 shadow-[0_24px_90px_-28px_rgba(0,0,0,0.75)] backdrop-blur-2xl lg:flex">
+    <aside className="fixed left-4 top-4 z-50 hidden h-[calc(100dvh-2rem)] w-24 flex-col rounded-[2rem] border border-ink-200/70 bg-white/85 p-3 shadow-[0_24px_70px_-30px_rgba(15,23,42,0.28)] backdrop-blur-2xl dark:border-white/10 dark:bg-[#06242b]/85 dark:shadow-[0_24px_90px_-28px_rgba(0,0,0,0.75)] lg:flex">
       <div className="flex h-full flex-col items-center">
         <Link
           href="/dashboard"
           onClick={navigateWithinDashboard("/dashboard")}
-          className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-400/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_28px_rgba(16,185,129,0.18)]"
+          className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-300/50 bg-emerald-50 text-emerald-600 shadow-sm transition dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-100 dark:shadow-[0_0_28px_rgba(16,185,129,0.18)]"
           aria-label="Dashboard"
         >
           <House className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -196,8 +196,8 @@ export function DashboardDesktopSidebar() {
                 className={clsx(
                   "group flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center transition",
                   active
-                    ? "border-emerald-400/45 bg-emerald-500/[0.16] text-white shadow-[0_0_26px_rgba(16,185,129,0.18)]"
-                    : "border-white/8 bg-white/[0.035] text-white/48 hover:bg-white/[0.07] hover:text-white/78"
+                    ? "border-emerald-300/60 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-400/45 dark:bg-emerald-500/[0.16] dark:text-white dark:shadow-[0_0_26px_rgba(16,185,129,0.18)]"
+                    : "border-ink-200/70 bg-white/60 text-ink-500 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-800 dark:border-white/8 dark:bg-white/[0.035] dark:text-white/48 dark:hover:bg-white/[0.07] dark:hover:text-white/78"
                 )}
               >
                 <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.25 : 1.85} aria-hidden />

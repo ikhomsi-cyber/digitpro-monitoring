@@ -1,4 +1,4 @@
-import { computeLatestQontoBalanceEur } from "@/lib/bank";
+import { resolveQontoBalanceEur } from "@/lib/bank";
 import {
   countsTowardDashboardExpenseTotal,
   computeDashboardMonthlyMetrics,
@@ -36,7 +36,7 @@ export type DashboardHeroStats = {
    * (même clé mois et mêmes règles de date analytique que le graphique / carte revenus du dashboard).
    */
   caMensuelEur: number;
-  /** Dernier solde compte (colonne balance import Qonto), périmètre pro. */
+  /** Solde compte Qonto pro (API live si dispo, sinon dernière balance importée). */
   soldeQontoEur: number | null;
   /**
    * Dépenses TTC du **même mois** : même agrégation que la carte « Total expenses » (sorties hors BNC et TVA),
@@ -69,7 +69,91 @@ export type DashboardHeroStats = {
   /** BNC versés (virements sortants libellé « BNC ») par mois civil, année en cours. */
   bncYearMonthly: Array<{ month: string; monthLabel: string; bncEur: number }>;
   bncYearTotalEur: number;
+  /** Valeurs du mois civil précédent pour les indicateurs de tendance MoM. */
+  momKpis: DashboardHeroMomKpis | null;
 };
+
+export type DashboardHeroMomKpis = {
+  previousMonthKey: string;
+  caMensuelEur: number;
+  depensesQontoSasuMoisEur: number;
+  netDansMaPocheMoisEur: number;
+  /** Solde estimé en fin de mois précédent (solde actuel − flux net du mois en cours + flux net M−1). */
+  soldeQontoApproxEur: number | null;
+  tjmRepartitionMois: DashboardHeroStats["tjmRepartitionMois"];
+  detteTotaleDepuisDebutEur: number;
+};
+
+function transactionsUpToDate(transactions: readonly DashboardTx[], endIso: string): DashboardTx[] {
+  return transactions.filter((tx) => tx.date.slice(0, 10) <= endIso);
+}
+
+function computeMomKpis(
+  transactions: DashboardTx[],
+  monthly: Array<{ month: string; revenue: number; expenses: number }>,
+  soldeQontoEur: number | null,
+  allYears: number[],
+  now: Date
+): DashboardHeroMomKpis | null {
+  if (monthly.length < 2) return null;
+
+  const prev = monthly[monthly.length - 2]!;
+  const last = monthly[monthly.length - 1]!;
+  const prevValueAnalysis = analyzeValeurReelle(transactions, {
+    years: null,
+    month: prev.month,
+    now
+  });
+  const prevTjmRepartitionMois = {
+    caHtEur: Math.max(0, prevValueAnalysis.cashTree.caFactureEur),
+    bncEur: Math.max(0, prevValueAnalysis.cashTree.bncEur),
+    fraisPersoEur: Math.max(0, prevValueAnalysis.cashTree.personalChargesEur),
+    csgEur: Math.max(0, prevValueAnalysis.cashTree.csgEur),
+    fraisDigitProEur: Math.max(0, prevValueAnalysis.cashTree.mandatoryFeesEur)
+  };
+
+  const endPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  const endPrevMonthIso = endPrevMonth.toISOString().slice(0, 10);
+  const prevAllTimeValueAnalysis = analyzeValeurReelle(
+    transactionsUpToDate(transactions, endPrevMonthIso),
+    {
+      years: allYears.length ? allYears : [now.getFullYear()],
+      now: endPrevMonth
+    }
+  );
+  const prevDetteCsg = Math.max(0, prevAllTimeValueAnalysis.cashTree.csgEur);
+  const prevDetteTva =
+    Math.round(
+      Math.max(0, prevAllTimeValueAnalysis.vatLiability.remainingVatEur) *
+        (1 + VAT_DEBT_SAFETY_MARGIN_RATE) *
+        100
+    ) / 100;
+  const prevDetteTotale = Math.round((prevDetteCsg + prevDetteTva) * 100) / 100;
+
+  const currentNet = last.revenue - last.expenses;
+  const prevNet = prev.revenue - prev.expenses;
+  const soldeQontoApproxEur =
+    soldeQontoEur != null
+      ? Math.round((soldeQontoEur - currentNet + prevNet) * 100) / 100
+      : null;
+
+  return {
+    previousMonthKey: prev.month,
+    caMensuelEur: prev.revenue,
+    depensesQontoSasuMoisEur: prev.expenses,
+    netDansMaPocheMoisEur:
+      prevValueAnalysis.cashTree.bncEur + prevValueAnalysis.cashTree.personalChargesEur,
+    soldeQontoApproxEur,
+    tjmRepartitionMois: {
+      caHtEur: Math.round(prevTjmRepartitionMois.caHtEur * 100) / 100,
+      bncEur: Math.round(prevTjmRepartitionMois.bncEur * 100) / 100,
+      fraisPersoEur: Math.round(prevTjmRepartitionMois.fraisPersoEur * 100) / 100,
+      csgEur: Math.round(prevTjmRepartitionMois.csgEur * 100) / 100,
+      fraisDigitProEur: Math.round(prevTjmRepartitionMois.fraisDigitProEur * 100) / 100
+    },
+    detteTotaleDepuisDebutEur: prevDetteTotale
+  };
+}
 
 function foldTxLabel(raw: string): string {
   return (raw ?? "")
@@ -123,7 +207,16 @@ function computeBncPaidYearMonthly(
  * KPIs du hero : dernier mois de la série « 12 mois glissants » (aligné `last12MonthsKeys` + `computeMetricsFromTransactions`),
  * périmètre SASU (`scope` pro) après le même filtre fenêtre que le tableau de bord.
  */
-export function computeDashboardHeroStats(transactions: DashboardTx[], now = new Date()): DashboardHeroStats {
+export type ComputeDashboardHeroStatsOptions = {
+  /** Solde courant renvoyé par l’API Qonto (prioritaire sur la balance des transactions). */
+  qontoLiveBalanceEur?: number | null;
+};
+
+export function computeDashboardHeroStats(
+  transactions: DashboardTx[],
+  now = new Date(),
+  options: ComputeDashboardHeroStatsOptions = {}
+): DashboardHeroStats {
   const proTxs = transactions.filter((t) => (t.scope ?? "pro") === "pro");
   const windowed = filterDashboardTransactions(proTxs, { years: null }, now);
   const monthly = computeMetricsFromTransactions(windowed, now);
@@ -178,7 +271,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     }
   }
 
-  const soldeQontoEur = computeLatestQontoBalanceEur(transactions, "pro");
+  const soldeQontoEur = resolveQontoBalanceEur(transactions, options.qontoLiveBalanceEur, "pro");
   const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
   const detteTvaDepuisDebutEur =
     Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
@@ -186,6 +279,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
   const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
   const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);
   const bncYear = computeBncPaidYearMonthly(proTxs, now);
+  const momKpis = computeMomKpis(transactions, monthly, soldeQontoEur, allYears, now);
 
   return {
     caMensuelEur: last.revenue,
@@ -217,6 +311,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     detteTotaleDepuisDebutEur,
     resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100),
     bncYearMonthly: bncYear.monthly,
-    bncYearTotalEur: bncYear.totalEur
+    bncYearTotalEur: bncYear.totalEur,
+    momKpis
   };
 }

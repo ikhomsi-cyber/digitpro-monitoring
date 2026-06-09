@@ -24,6 +24,7 @@ import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 import {
   loadBillableActivitySettings,
   loadTransactionYearBounds
@@ -81,14 +82,16 @@ export default async function DashboardPage({
   // If Supabase exists but user isn't logged in, show login prompt.
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <Logo className="mx-auto mb-8" />
-        <div className="h-eyebrow">Session expirée</div>
-        <h1 className="mt-2 h-display">Veuillez vous reconnecter.</h1>
-        <div className="mt-8">
-          <Link href="/login" className="btn-primary">
-            Aller à la connexion <ArrowUpRight className="h-4 w-4" />
-          </Link>
+      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <Logo className="mx-auto mb-8" />
+          <div className="h-eyebrow">Session expirée</div>
+          <h1 className="mt-2 h-display">Veuillez vous reconnecter.</h1>
+          <div className="mt-8">
+            <Link href="/login" className="premium-cta inline-flex">
+              Aller à la connexion <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -109,10 +112,12 @@ export default async function DashboardPage({
   let transactionYearBounds: { minYear: number; maxYear: number } | null = null;
   let initialBillableWorkDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
+  let initialAnnualRevenueTargetHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
+  let qontoLiveBalanceEur: number | null = null;
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [transactionsRes, boundsRes, billableRes] = await Promise.all([
+    const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
       loadAllUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
@@ -120,14 +125,18 @@ export default async function DashboardPage({
         : Promise.resolve({
             initialBillableWorkDays: [],
             initialBillableTjmHt: null,
+            initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
-          })
+          }),
+      loadQontoLiveBalanceEur()
     ]);
+    qontoLiveBalanceEur = liveBalance;
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
     transactionYearBounds = boundsRes;
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
+    initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
     if (transactionsRes.errorMessage) {
       console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
@@ -142,7 +151,9 @@ export default async function DashboardPage({
   const powensCloudEnabled = isPowensCloudConfigured();
   const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
   const powensPrimaryAxis = powensPrimaryImportAxis();
-  const heroStats = computeDashboardHeroStats(transactions);
+  const heroStats = computeDashboardHeroStats(transactions, new Date(), {
+    qontoLiveBalanceEur: dataMode === "SUPABASE" ? qontoLiveBalanceEur : null
+  });
   const heroContextMessage =
     envMode === "DEMO"
       ? "Aucune configuration Supabase détectée : données de démonstration uniquement."
@@ -161,9 +172,10 @@ export default async function DashboardPage({
       billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
       initialWorkDayIsos={initialBillableWorkDays}
+      initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <DashboardDesktopSidebar />
-    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-auto lg:px-8">
+    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}

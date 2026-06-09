@@ -77,7 +77,25 @@ type BankAccount = {
   currency?: string;
   status?: string;
   main?: boolean;
+  balance?: string | number;
+  balance_cents?: number;
+  authorized_balance?: string | number;
 };
+
+export function isQontoApiConfigured(): boolean {
+  return Boolean(getEnv("QONTO_LOGIN") && getEnv("QONTO_SECRET_KEY"));
+}
+
+function parseQontoAccountBalanceEur(account: BankAccount): number | null {
+  if (account.balance_cents != null && Number.isFinite(Number(account.balance_cents))) {
+    return Number(account.balance_cents) / 100;
+  }
+  if (account.balance != null) {
+    const n = Number(account.balance);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
 
 type OrganizationResponse = {
   organization?: {
@@ -229,4 +247,24 @@ export async function fetchQontoTransactionsForImport(): Promise<QontoSyncResult
   const summary = `${company}${iban ? ` · ${iban.slice(0, 4)}…${iban.slice(-4)}` : bankAccountId ? ` · ${bankAccountId.slice(0, 8)}…` : ""}`;
 
   return { rows, bankAccountSummary: summary };
+}
+
+/**
+ * Solde courant du compte Qonto configuré (GET /v2/organization, repli GET /v2/bank_accounts/:id).
+ */
+export async function fetchQontoBankAccountBalanceEur(): Promise<number> {
+  const orgJson = await qontoFetchJson<OrganizationResponse>("/v2/organization");
+  const accounts = orgJson.organization?.bank_accounts ?? [];
+  const account = pickBankAccount(accounts);
+
+  const fromList = parseQontoAccountBalanceEur(account);
+  if (fromList != null) return Math.round(fromList * 100) / 100;
+
+  if (account.id) {
+    const detail = await qontoFetchJson<{ bank_account?: BankAccount }>(`/v2/bank_accounts/${account.id}`);
+    const fromDetail = detail.bank_account ? parseQontoAccountBalanceEur(detail.bank_account) : null;
+    if (fromDetail != null) return Math.round(fromDetail * 100) / 100;
+  }
+
+  throw new Error("Solde Qonto indisponible dans la réponse API (vérifiez les droits organization.read).");
 }
