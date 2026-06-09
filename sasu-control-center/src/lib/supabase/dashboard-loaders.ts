@@ -1,6 +1,7 @@
 import "server-only";
 
 import { computeDashboardHeroStats, type DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -11,10 +12,13 @@ export async function loadDashboardHeroStatsFromSupabase(
   client: SupabaseServerClient,
   now = new Date()
 ): Promise<{ stats: DashboardHeroStats | null; errorMessage: string | null }> {
-  const { transactions, errorMessage } = await loadAllUserTransactionsFromSupabase(client);
+  const [{ transactions, errorMessage }, qontoLiveBalanceEur] = await Promise.all([
+    loadAllUserTransactionsFromSupabase(client),
+    loadQontoLiveBalanceEur()
+  ]);
   if (errorMessage) return { stats: null, errorMessage };
   return {
-    stats: computeDashboardHeroStats(transactions, now),
+    stats: computeDashboardHeroStats(transactions, now, { qontoLiveBalanceEur }),
     errorMessage: null
   };
 }

@@ -10,7 +10,6 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   buildDashboardMonthOptions,
   buildDashboardYearOptions,
-  calendarDaysElapsedInCurrentMonth,
   defaultDashboardPeriodFilter,
   toggleDashboardYearInFilter
 } from "@/lib/dashboard-period";
@@ -18,6 +17,10 @@ import { useBillableActivityOptional } from "@/components/dashboard/BillableActi
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeValeurReelle, VALEUR_REELLE_EXPENSE_CATEGORIES } from "@/lib/valeur-reelle-analyze";
+import {
+  estimateCurrentMonthGainPerWorkDay,
+  type GainPerWorkDayEstimate
+} from "@/lib/valeur-reelle-gain-per-day";
 import type {
   ValeurReelleCashTree,
   ValeurReelleVatLiability,
@@ -341,28 +344,32 @@ function CashFlowTreeVisual({
   tree,
   fmt,
   billableDays,
-  daysElapsedInMonth,
+  gainPerWorkDayEstimate,
   periodLabel,
   onRecategorized
 }: {
   tree: ValeurReelleCashTree;
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   billableDays: number;
-  /** Mois en cours uniquement : jours civils déjà passés (base jauge + gain/jour). */
-  daysElapsedInMonth: number | null;
+  /** Mois en cours : estimation historique + jours ouvrés cochés jusqu'à aujourd'hui. */
+  gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   periodLabel: string;
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
-  const gainDayDenominator =
-    daysElapsedInMonth != null && daysElapsedInMonth > 0 ? daysElapsedInMonth : billableDays;
+  const isCurrentMonthEstimate = gainPerWorkDayEstimate != null;
+  const gainDayDenominator = isCurrentMonthEstimate
+    ? gainPerWorkDayEstimate.workedDays
+    : billableDays;
   const formattedGainDayDenominator = new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: daysElapsedInMonth != null ? 0 : 1
+    maximumFractionDigits: isCurrentMonthEstimate ? 0 : 1
   }).format(gainDayDenominator);
-  const reelParJour =
-    gainDayDenominator > 0
+  const reelParJour = isCurrentMonthEstimate
+    ? gainPerWorkDayEstimate.gainPerDayEur
+    : gainDayDenominator > 0
       ? Math.round(((tree.bncEur + tree.personalChargesEur) / gainDayDenominator) * 100) / 100
       : null;
-  const useDailyGaugePace = daysElapsedInMonth != null && daysElapsedInMonth > 0;
+  const useDailyGaugePace =
+    isCurrentMonthEstimate ? gainPerWorkDayEstimate.workedDays > 0 : billableDays > 0;
   const percentOfCa = (amount: number) =>
     tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
@@ -442,9 +449,19 @@ function CashFlowTreeVisual({
               {fmt.euro(reelParJour)}
             </p>
             <p className="text-[10px] text-ink-500 dark:text-white/40">
-              {daysElapsedInMonth != null
-                ? `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""}`
-                : `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`}
+              {isCurrentMonthEstimate ? (
+                gainPerWorkDayEstimate.workedDays > 0 ? (
+                  <>
+                    {formattedGainDayDenominator} jour{gainDayDenominator > 1 ? "s" : ""} travaillé
+                    {gainDayDenominator > 1 ? "s" : ""}
+                    {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé sur historique" : null}
+                  </>
+                ) : (
+                  "Estimation sur historique — cochez vos jours travaillés"
+                )
+              ) : (
+                `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`
+              )}
             </p>
           </div>
         ) : (
@@ -463,7 +480,9 @@ function CashFlowTreeVisual({
             <p className="mt-1 text-sm font-semibold text-ink-900 dark:text-white">Jauge de valeur</p>
             {useDailyGaugePace ? (
               <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
-                {`Rythme / jour sur ${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} écoulé${gainDayDenominator > 1 ? "s" : ""} dans le mois`}
+                {isCurrentMonthEstimate
+                  ? `Rythme / jour sur ${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} travaillé${gainDayDenominator > 1 ? "s" : ""} ce mois`
+                  : `Rythme / jour sur ${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`}
               </p>
             ) : null}
           </div>
@@ -805,9 +824,17 @@ export function ValeurReelleClient({
     [analysis.cashTree.caFactureEur, billableActivity?.tjmHt]
   );
 
-  const daysElapsedInMonth = useMemo(
-    () => calendarDaysElapsedInCurrentMonth(selectedMonth),
-    [selectedMonth]
+  const gainPerWorkDayEstimate = useMemo(
+    () => {
+      if (!selectedMonth) return null;
+      return estimateCurrentMonthGainPerWorkDay(
+        transactions,
+        analysis.cashTree,
+        billableActivity?.selected ?? new Set<string>(),
+        selectedMonth
+      );
+    },
+    [analysis.cashTree, billableActivity?.selected, selectedMonth, transactions]
   );
 
   return (
@@ -838,7 +865,7 @@ export function ValeurReelleClient({
         tree={analysis.cashTree}
         fmt={fmt}
         billableDays={billableDaysInPeriod}
-        daysElapsedInMonth={daysElapsedInMonth}
+        gainPerWorkDayEstimate={gainPerWorkDayEstimate}
         periodLabel={analysis.periodLabel}
         onRecategorized={handleRecategorized}
       />

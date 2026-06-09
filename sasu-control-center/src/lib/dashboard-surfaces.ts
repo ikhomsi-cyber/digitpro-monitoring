@@ -51,7 +51,7 @@ export const dashboardDonutTrack = "text-ink-200 dark:text-[#284556]";
 
 export const dashboardRowDivider = "border-b border-ink-200/70 py-3 last:border-0 dark:border-cyan-100/[0.08]";
 
-export const dashboardRowTitle = "block truncate text-sm font-semibold text-ink-800 dark:text-white/88";
+export const dashboardRowTitle = "block truncate text-sm font-semibold text-ink-800 dark:text-white";
 
 export const dashboardRowMeta = "mt-0.5 block text-xs font-medium text-ink-500 dark:text-white/48";
 

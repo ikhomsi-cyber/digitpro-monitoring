@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -14,7 +15,10 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  const res = await loadAllUserTransactionsFromSupabase(supabase);
+  const [res, qontoLiveBalanceEur] = await Promise.all([
+    loadAllUserTransactionsFromSupabase(supabase),
+    loadQontoLiveBalanceEur()
+  ]);
   if (res.errorMessage) {
     return NextResponse.json({ ok: false, error: res.errorMessage }, { status: 400 });
   }
@@ -22,6 +26,6 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     transactions: res.transactions,
-    heroStats: computeDashboardHeroStats(res.transactions)
+    heroStats: computeDashboardHeroStats(res.transactions, new Date(), { qontoLiveBalanceEur })
   });
 }

@@ -1375,7 +1375,7 @@ export function DashboardClient({
                                       >
                                         <span className="min-w-0">
                                           <span className="block font-mono text-[10px] text-ink-400 dark:text-white/36">{tx.date}</span>
-                                          <span className="block truncate text-ink-700 dark:text-white/76">{tx.label}</span>
+                                          <span className="block truncate text-ink-700 dark:text-white">{tx.label}</span>
                                           {sasuAnalysisMode === "revenues" && billableRevenue ? (
                                             <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
                                               {formatDaysCount.format(txBilledDays)} j facturés · TJM {fmt.euro(txTjmHt)} HT

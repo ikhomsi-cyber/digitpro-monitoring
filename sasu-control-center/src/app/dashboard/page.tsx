@@ -24,6 +24,7 @@ import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 import {
   loadBillableActivitySettings,
   loadTransactionYearBounds
@@ -110,9 +111,10 @@ export default async function DashboardPage({
   let initialBillableWorkDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
+  let qontoLiveBalanceEur: number | null = null;
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [transactionsRes, boundsRes, billableRes] = await Promise.all([
+    const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
       loadAllUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
@@ -121,8 +123,10 @@ export default async function DashboardPage({
             initialBillableWorkDays: [],
             initialBillableTjmHt: null,
             billableRatePeriods: []
-          })
+          }),
+      loadQontoLiveBalanceEur()
     ]);
+    qontoLiveBalanceEur = liveBalance;
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
     transactionYearBounds = boundsRes;
@@ -142,7 +146,9 @@ export default async function DashboardPage({
   const powensCloudEnabled = isPowensCloudConfigured();
   const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
   const powensPrimaryAxis = powensPrimaryImportAxis();
-  const heroStats = computeDashboardHeroStats(transactions);
+  const heroStats = computeDashboardHeroStats(transactions, new Date(), {
+    qontoLiveBalanceEur: dataMode === "SUPABASE" ? qontoLiveBalanceEur : null
+  });
   const heroContextMessage =
     envMode === "DEMO"
       ? "Aucune configuration Supabase détectée : données de démonstration uniquement."

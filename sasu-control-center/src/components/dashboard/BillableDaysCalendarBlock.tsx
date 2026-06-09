@@ -17,7 +17,6 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import {
-  computeCalendarStickyKpis,
   computeTjmWorkdayGauge,
   isBillableWorkdayIso,
   monthTitleFr,
@@ -32,6 +31,7 @@ import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
+import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
 import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
@@ -39,6 +39,7 @@ import {
 import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import {
   cleanNdfMerchantLabel,
+  ndfDigitProAmountHtEur,
   summarizeNdfDigitProForMonth
 } from "@/lib/ndf-digitpro";
 
@@ -325,11 +326,6 @@ export function BillableDaysCalendarBlock({
 
   const [ndfListOpen, setNdfListOpen] = useState(false);
 
-  const calendarStickyKpis = useMemo(
-    () => computeCalendarStickyKpis(selected, viewedMonthTjmHt, viewYear, viewMonth0),
-    [selected, viewedMonthTjmHt, viewYear, viewMonth0]
-  );
-
   const toggleDay = useCallback(
     (iso: string) => {
       setSelected((prev) => {
@@ -502,7 +498,7 @@ export function BillableDaysCalendarBlock({
           </div>
         </div>
       </CardHeader>
-      <CardBody className="relative px-4 pb-28 pt-4 sm:px-6 md:pb-10">
+      <CardBody className="relative px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4 lg:shrink-0">
@@ -836,8 +832,13 @@ export function BillableDaysCalendarBlock({
                                       </span>
                                       <span className="text-[9px] text-ink-400 dark:text-white/35">{tx.date}</span>
                                     </span>
-                                    <span className="text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-                                      {fmt.euro(Math.abs(tx.amount))}
+                                    <span className="text-right">
+                                      <span className="block text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                        {fmt.euro(Math.abs(tx.amount))}
+                                      </span>
+                                      <span className="block text-[9px] font-medium tabular-nums text-ink-400 dark:text-white/40">
+                                        {fmt.euro(ndfDigitProAmountHtEur(tx))} HT
+                                      </span>
                                     </span>
                                   </li>
                                 ))}
@@ -991,25 +992,7 @@ export function BillableDaysCalendarBlock({
           </div>
         ) : null}
 
-          <div
-            className="sticky bottom-0 z-[8] mt-6 isolate rounded-[1.5rem] border border-ink-200/80 bg-white/95 px-3 py-3 text-ink-900 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.12)] backdrop-blur-xl dark:border-cyan-100/[0.16] dark:bg-[#06242b] dark:text-white dark:shadow-[0_12px_48px_-10px_rgba(0,22,28,0.75),inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-1 dark:ring-cyan-100/[0.10]"
-          >
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-              {[
-                { k: "Jours travaillés", v: String(calendarStickyKpis.jours) },
-                { k: "CA estimé", v: fmt.euro(calendarStickyKpis.caEstime) },
-                { k: "Reste à facturer", v: fmt.euro(calendarStickyKpis.resteAFacturer) },
-                { k: "Projection fin de mois", v: fmt.euro(calendarStickyKpis.projectionFinMois) }
-              ].map((row) => (
-                <div key={`sticky-${row.k}`} className="min-w-0 rounded-2xl border border-transparent px-2 py-1.5 dark:border-cyan-100/[0.08] dark:bg-cyan-50/[0.06]">
-                  <dt className="truncate text-[10px] font-bold text-ink-600 dark:text-cyan-50/70">{row.k}</dt>
-                  <dd className="mt-0.5 truncate font-display text-sm font-extrabold tabular-nums text-ink-950 dark:text-white sm:text-base">
-                    {row.v}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          <HiwayInvoicesBlock />
       </CardBody>
     </Card>
     </div>

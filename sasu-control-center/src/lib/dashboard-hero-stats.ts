@@ -1,4 +1,4 @@
-import { computeLatestQontoBalanceEur } from "@/lib/bank";
+import { resolveQontoBalanceEur } from "@/lib/bank";
 import {
   countsTowardDashboardExpenseTotal,
   computeDashboardMonthlyMetrics,
@@ -36,7 +36,7 @@ export type DashboardHeroStats = {
    * (même clé mois et mêmes règles de date analytique que le graphique / carte revenus du dashboard).
    */
   caMensuelEur: number;
-  /** Dernier solde compte (colonne balance import Qonto), périmètre pro. */
+  /** Solde compte Qonto pro (API live si dispo, sinon dernière balance importée). */
   soldeQontoEur: number | null;
   /**
    * Dépenses TTC du **même mois** : même agrégation que la carte « Total expenses » (sorties hors BNC et TVA),
@@ -123,7 +123,16 @@ function computeBncPaidYearMonthly(
  * KPIs du hero : dernier mois de la série « 12 mois glissants » (aligné `last12MonthsKeys` + `computeMetricsFromTransactions`),
  * périmètre SASU (`scope` pro) après le même filtre fenêtre que le tableau de bord.
  */
-export function computeDashboardHeroStats(transactions: DashboardTx[], now = new Date()): DashboardHeroStats {
+export type ComputeDashboardHeroStatsOptions = {
+  /** Solde courant renvoyé par l’API Qonto (prioritaire sur la balance des transactions). */
+  qontoLiveBalanceEur?: number | null;
+};
+
+export function computeDashboardHeroStats(
+  transactions: DashboardTx[],
+  now = new Date(),
+  options: ComputeDashboardHeroStatsOptions = {}
+): DashboardHeroStats {
   const proTxs = transactions.filter((t) => (t.scope ?? "pro") === "pro");
   const windowed = filterDashboardTransactions(proTxs, { years: null }, now);
   const monthly = computeMetricsFromTransactions(windowed, now);
@@ -178,7 +187,7 @@ export function computeDashboardHeroStats(transactions: DashboardTx[], now = new
     }
   }
 
-  const soldeQontoEur = computeLatestQontoBalanceEur(transactions, "pro");
+  const soldeQontoEur = resolveQontoBalanceEur(transactions, options.qontoLiveBalanceEur, "pro");
   const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
   const detteTvaDepuisDebutEur =
     Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /

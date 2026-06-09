@@ -130,6 +130,79 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      hiway_invoices: {
+        Row: {
+          id: string;
+          user_id: string;
+          gmail_message_id: string;
+          sent_date: string;
+          subject: string;
+          client: string | null;
+          amount_ht_eur: number | null;
+          amount_kind: string;
+          billed_days: number | null;
+          tjm_ht_eur: number | null;
+          synced_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          gmail_message_id: string;
+          sent_date: string;
+          subject: string;
+          client?: string | null;
+          amount_ht_eur?: number | null;
+          amount_kind?: string;
+          billed_days?: number | null;
+          tjm_ht_eur?: number | null;
+          synced_at?: string;
+        };
+        Update: Partial<{
+          sent_date: string;
+          subject: string;
+          client: string | null;
+          amount_ht_eur: number | null;
+          amount_kind: string;
+          billed_days: number | null;
+          tjm_ht_eur: number | null;
+          synced_at: string;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
+      gmail_oauth_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          email: string | null;
+          refresh_token: string;
+          access_token: string | null;
+          token_expiry: string | null;
+          scope: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          email?: string | null;
+          refresh_token: string;
+          access_token?: string | null;
+          token_expiry?: string | null;
+          scope?: string | null;
+        };
+        Update: Partial<{
+          email: string | null;
+          refresh_token: string;
+          access_token: string | null;
+          token_expiry: string | null;
+          scope: string | null;
+          updated_at: string;
+        }>;
+        Relationships: [];
+      };
       salary_simulations: {
         Row: {
           id: string;
