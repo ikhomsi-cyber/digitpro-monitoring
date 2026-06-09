@@ -37,7 +37,6 @@ import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { ActivityAnnualForecastCard } from "@/components/dashboard/ActivityAnnualForecastCard";
 import { ActivityBillingPaceWidget } from "@/components/dashboard/ActivityBillingPaceWidget";
-import { ActivityTjmPerformanceCard } from "@/components/dashboard/ActivityTjmPerformanceCard";
 import { ActivityProductivitySummary } from "@/components/dashboard/ActivityProductivitySummary";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
 import {
@@ -642,13 +641,6 @@ export function BillableDaysCalendarBlock({
         fallbackTjmHt={tjmHt}
         currentTjmHt={overviewTjmEnVigueurHt}
         annualRevenueTargetHt={annualRevenueTargetHt}
-      />
-
-      <ActivityTjmPerformanceCard
-        selected={selected}
-        billableRatePeriods={billableRatePeriods}
-        fallbackTjmHt={tjmHt}
-        currentTjmHt={overviewTjmEnVigueurHt}
       />
 
       <ActivityBillingPaceWidget
