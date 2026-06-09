@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  /**
+   * Le lint tourne en local (`npm run lint`) et en CI, pas pendant le build de
+   * production : évite l'échec de chargement de « next/core-web-vitals » sur Vercel
+   * (ESLint 9 + config legacy) qui polluait les logs sans bloquer le déploiement.
+   */
+  eslint: {
+    ignoreDuringBuilds: true
+  },
   /** Évite erreurs de chunk / `.call` avec certains builds Recharts + App Router. */
   transpilePackages: ["recharts"],
   webpack(config) {
