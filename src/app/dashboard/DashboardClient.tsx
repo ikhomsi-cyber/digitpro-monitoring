@@ -24,6 +24,7 @@ import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
+import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { DashboardCategorisationPanel } from "@/app/dashboard/DashboardCategorisationPanel";
@@ -791,6 +792,7 @@ export function DashboardClient({
 
   return (
     <main id="dashboard-main" className="relative mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
+      <SectionThemeSync />
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div
           key={dashboardSection}

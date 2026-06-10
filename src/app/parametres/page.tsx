@@ -31,7 +31,7 @@ export default async function ParametresPage() {
 
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+      <div data-page="parametres" className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
         <div className="mx-auto max-w-2xl text-center">
           <Logo className="mx-auto mb-8" />
           <h1 className="h-display">Connexion requise</h1>
@@ -70,7 +70,7 @@ export default async function ParametresPage() {
 
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
-      <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
+      <div data-page="parametres" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
         <DashboardTopNav
           envMode={envMode}
           dataMode={envMode}

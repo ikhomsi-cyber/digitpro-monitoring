@@ -19,7 +19,7 @@ export default async function LmnpPage() {
 
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+      <div data-page="lmnp" className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
         <div className="mx-auto max-w-2xl text-center">
           <Logo className="mx-auto mb-8" />
           <h1 className="h-display">Connexion requise</h1>

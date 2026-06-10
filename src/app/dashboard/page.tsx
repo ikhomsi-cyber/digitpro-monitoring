@@ -175,7 +175,7 @@ export default async function DashboardPage({
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <DashboardDesktopSidebar />
-    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
+    <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}

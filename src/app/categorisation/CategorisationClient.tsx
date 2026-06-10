@@ -494,7 +494,7 @@ export function CategorisationClient({
   return (
     <div className="min-h-[calc(100dvh-8rem)]">
       {/* En-tête */}
-      <header className="rounded-[2rem] border border-ink-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-5 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:from-[#0b3038] dark:via-[#0b3038] dark:to-[#0b3038] dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-6">
+      <header className="rounded-[2rem] border border-ink-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-5 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-6">
         <div className="flex items-start gap-3">
           <span
             className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/12 text-emerald-700 dark:text-emerald-200"

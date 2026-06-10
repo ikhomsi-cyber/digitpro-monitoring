@@ -101,11 +101,23 @@ const config: Config = {
         floatIn: {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        /** Respiration douce du logo pendant le chargement. */
+        breathe: {
+          "0%, 100%": { opacity: "0.7", transform: "scale(0.985)" },
+          "50%": { opacity: "1", transform: "scale(1.015)" }
+        },
+        /** Barre de progression indéterminée (slide). */
+        loaderBar: {
+          "0%": { transform: "translateX(-110%)" },
+          "100%": { transform: "translateX(360%)" }
         }
       },
       animation: {
         shimmer: "shimmer 1.4s linear infinite",
-        floatIn: "floatIn 0.4s ease-out both"
+        floatIn: "floatIn 0.4s ease-out both",
+        breathe: "breathe 2.6s ease-in-out infinite",
+        loaderBar: "loaderBar 1.25s cubic-bezier(0.65,0,0.35,1) infinite"
       },
       letterSpacing: {
         tightest: "-0.02em",
