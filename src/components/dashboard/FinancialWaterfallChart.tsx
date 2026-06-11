@@ -10,6 +10,7 @@ import {
 } from "@/lib/financial-waterfall";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -18,13 +19,13 @@ type Props = {
   trend?: KpiTrend | null;
 };
 
-const STEP_COLORS: Record<string, { fill: string; stroke: string }> = {
-  revenue: { fill: "#34d399", stroke: "#10b981" },
-  vat: { fill: "#38bdf8", stroke: "#0ea5e9" },
-  expenses: { fill: "#fb7185", stroke: "#f43f5e" },
-  csg: { fill: "#fb923c", stroke: "#f97316" },
-  personal: { fill: "#a78bfa", stroke: "#8b5cf6" },
-  remaining: { fill: "#2dd4bf", stroke: "#14b8a6" }
+const STEP_META: Record<string, { fill: string; stroke: string; labelFr: string }> = {
+  revenue: { fill: "#34d399", stroke: "#10b981", labelFr: "Revenu TTC" },
+  vat: { fill: "#38bdf8", stroke: "#0ea5e9", labelFr: "TVA" },
+  expenses: { fill: "#fb7185", stroke: "#f43f5e", labelFr: "Frais pro" },
+  csg: { fill: "#fb923c", stroke: "#f97316", labelFr: "CSG" },
+  personal: { fill: "#a78bfa", stroke: "#8b5cf6", labelFr: "Retraits perso" },
+  remaining: { fill: "#2dd4bf", stroke: "#14b8a6", labelFr: "Trésorerie restante" }
 };
 
 function barGeometry(
@@ -44,12 +45,20 @@ function barGeometry(
   const bottomValue = step.kind === "start" || step.kind === "total" ? 0 : step.cumulativeEur;
   const yTop = chartH - scale(topValue);
   const yBottom = chartH - scale(bottomValue);
-  const height = Math.max(2, yBottom - yTop);
-  return { x, y: yTop, width: barW, height, connectorY: chartH - scale(prevCumulative) };
+  const minH = step.kind === "total" ? 10 : 3;
+  const height = Math.max(minH, yBottom - yTop);
+  return { x, y: yTop, width: barW, height };
+}
+
+function formatDelta(step: FinancialWaterfallStep, formatEuro: (n: number) => string): string {
+  if (step.deltaEur >= 0) return formatEuro(step.deltaEur);
+  return `−${formatEuro(Math.abs(step.deltaEur))}`;
 }
 
 export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }: Props) {
   const model = useMemo(() => buildFinancialWaterfall(stats), [stats]);
+
+  const revenueTtc = Math.max(1, model.steps[0]?.cumulativeEur ?? 1);
 
   const maxValue = useMemo(
     () => Math.max(1, model.steps[0]?.cumulativeEur ?? 1),
@@ -57,17 +66,17 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
   );
 
   const chartW = 520;
-  const chartH = 168;
-  const gap = 10;
+  const chartH = 148;
+  const gap = 8;
   const barW = (chartW - gap * (model.steps.length + 1)) / model.steps.length;
 
   const geometries = useMemo(
     () =>
       model.steps.map((step, index) => {
-        const prevCumulative =
-          index === 0 ? 0 : (model.steps[index - 1]?.cumulativeEur ?? 0);
+        const prevCumulative = index === 0 ? 0 : (model.steps[index - 1]?.cumulativeEur ?? 0);
         return {
           step,
+          meta: STEP_META[step.id] ?? STEP_META.remaining,
           geom: barGeometry(step, prevCumulative, index, maxValue, chartW, chartH, gap, barW),
           prevCumulative
         };
@@ -76,7 +85,7 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
   );
 
   return (
-    <div className="flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none">
+    <div className="flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none sm:px-5 sm:py-5">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -85,26 +94,22 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
             </p>
             <KpiTrendBadge trend={trend} />
           </div>
-          <p className="mt-0.5 text-[10px] font-medium capitalize text-ink-400 dark:text-white/35">
+          <p className="mt-0.5 text-xs font-medium capitalize text-ink-500 dark:text-white/50">
             {model.periodLabel}
           </p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sky-200/80 bg-sky-50 text-sky-600 dark:border-sky-300/20 dark:bg-sky-500/12 dark:text-sky-300"
-          aria-hidden
-        >
-          <Waves className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={Waves} tone="sky" size="md" />
       </div>
 
       {statsReady ? (
         <>
-          <div className="mt-3 overflow-x-auto">
+          {/* Graphique — barres uniquement, sans texte SVG */}
+          <div className="mt-4 overflow-x-auto">
             <svg
-              viewBox={`0 0 ${chartW} ${chartH + 36}`}
-              className="w-full min-w-[320px]"
+              viewBox={`0 0 ${chartW} ${chartH + 4}`}
+              className="w-full min-w-[300px]"
               role="img"
-              aria-label="Waterfall financier du mois"
+              aria-label="Cascade financière du mois"
             >
               <line
                 x1={gap}
@@ -114,8 +119,7 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
                 className="stroke-ink-300/50 dark:stroke-white/20"
                 strokeWidth="1"
               />
-              {geometries.map(({ step, geom }, index) => {
-                const colors = STEP_COLORS[step.id] ?? STEP_COLORS.remaining;
+              {geometries.map(({ step, meta, geom }, index) => {
                 const prevGeom = index > 0 ? geometries[index - 1] : null;
                 const connectorY =
                   index > 0 && step.kind === "decrease"
@@ -130,9 +134,9 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
                         x2={geom.x + geom.width / 2}
                         y1={connectorY}
                         y2={connectorY}
-                        className="stroke-ink-300/40 dark:stroke-white/20"
-                        strokeWidth="1"
-                        strokeDasharray="4 3"
+                        className="stroke-ink-300/40 dark:stroke-white/25"
+                        strokeWidth="1.5"
+                        strokeDasharray="5 4"
                       />
                     ) : null}
                     <rect
@@ -140,65 +144,76 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
                       y={geom.y}
                       width={geom.width}
                       height={geom.height}
-                      rx="6"
-                      fill={colors.fill}
-                      fillOpacity={step.kind === "total" ? 0.92 : 0.82}
-                      stroke={colors.stroke}
+                      rx="5"
+                      fill={meta.fill}
+                      fillOpacity={step.kind === "total" ? 0.95 : 0.88}
+                      stroke={meta.stroke}
                       strokeWidth="1.2"
                     />
-                    <text
-                      x={geom.x + geom.width / 2}
-                      y={chartH + 14}
-                      textAnchor="middle"
-                      className="fill-ink-500 text-[8px] font-bold dark:fill-white/45"
-                    >
-                      {step.label}
-                    </text>
-                    <text
-                      x={geom.x + geom.width / 2}
-                      y={chartH + 26}
-                      textAnchor="middle"
-                      className="fill-ink-800 text-[8.5px] font-bold tabular-nums dark:fill-white/80"
-                    >
-                      {step.deltaEur >= 0
-                        ? formatEuro(step.deltaEur)
-                        : `−${formatEuro(Math.abs(step.deltaEur))}`}
-                    </text>
                   </g>
                 );
               })}
             </svg>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200/70 bg-white/55 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
-              = Remaining cash
+          {/* Détail ligne par ligne — montants lisibles */}
+          <ul className="mt-4 space-y-1.5">
+            {geometries
+              .filter(({ step }) => step.kind !== "total")
+              .map(({ step, meta }) => {
+                const pct =
+                  step.kind === "decrease" && revenueTtc > 0
+                    ? (Math.abs(step.deltaEur) / revenueTtc) * 100
+                    : null;
+
+                return (
+                  <li
+                    key={`row-${step.id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-ink-50/60 px-3 py-2.5 dark:bg-white/[0.04]"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: meta.fill }}
+                        aria-hidden
+                      />
+                      <span className="truncate text-sm font-semibold text-ink-700 dark:text-white/80">
+                        {meta.labelFr}
+                      </span>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span
+                        className={clsx(
+                          "block text-base font-bold tabular-nums",
+                          step.kind === "start"
+                            ? "text-emerald-700 dark:text-emerald-300"
+                            : "text-ink-900 dark:text-white"
+                        )}
+                      >
+                        {formatDelta(step, formatEuro)}
+                      </span>
+                      {pct != null && pct >= 0.5 ? (
+                        <span className="text-[11px] font-medium tabular-nums text-ink-400 dark:text-white/45">
+                          {pct.toFixed(1)} % du revenu
+                        </span>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+          </ul>
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-teal-200/80 bg-gradient-to-r from-teal-50/80 to-emerald-50/50 px-4 py-3.5 dark:border-teal-300/25 dark:from-teal-500/12 dark:to-emerald-500/8">
+            <span className="text-sm font-bold text-ink-700 dark:text-white/80">
+              Trésorerie restante
             </span>
-            <span className="font-display text-base font-bold tabular-nums text-teal-700 dark:text-teal-300">
+            <span className="font-display text-xl font-bold tabular-nums text-teal-700 dark:text-teal-300 sm:text-2xl">
               {formatEuro(model.remainingCashEur)}
             </span>
           </div>
-
-          <ol className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-ink-500 dark:text-white/45">
-            {model.steps.map((step, index) => (
-              <li key={`flow-${step.id}`} className="inline-flex items-center gap-1">
-                {index > 0 ? <span className="opacity-40">→</span> : null}
-                <span
-                  className={clsx(
-                    "rounded-full px-2 py-0.5",
-                    step.kind === "total"
-                      ? "bg-teal-50 text-teal-700 dark:bg-teal-500/10 dark:text-teal-200"
-                      : "bg-ink-50 text-ink-600 dark:bg-white/[0.06] dark:text-white/65"
-                  )}
-                >
-                  {step.label}
-                </span>
-              </li>
-            ))}
-          </ol>
         </>
       ) : (
-        <p className="mt-3 text-[11px] font-medium text-ink-500 dark:text-white/40">
+        <p className="mt-4 text-sm font-medium text-ink-500 dark:text-white/40">
           Calcul de la cascade financière en cours…
         </p>
       )}

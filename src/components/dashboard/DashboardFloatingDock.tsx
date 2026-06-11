@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 type Tab = {
   href: string;
@@ -176,10 +177,10 @@ export function DashboardDesktopSidebar() {
         <Link
           href="/dashboard"
           onClick={navigateWithinDashboard("/dashboard")}
-          className="grid h-12 w-12 place-items-center rounded-2xl border border-emerald-300/50 bg-emerald-50 text-emerald-600 shadow-sm transition dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-100 dark:shadow-[0_0_28px_rgba(16,185,129,0.18)]"
+          className="transition hover:opacity-90"
           aria-label="Dashboard"
         >
-          <House className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <PremiumIconBadge icon={House} tone="emerald" size="lg" />
         </Link>
         <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
           {TABS.map((tab) => {

@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import { clsx } from "clsx";
 import { AppSectionNav } from "@/components/AppSectionNav";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -107,9 +108,7 @@ export function LMNPClient({
 
       <header className="flex flex-col gap-2 border-b border-ink-200 pb-6 dark:border-cyan-100/[0.12]">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-200/80 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/50 dark:text-sky-300">
-            <Building2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />
-          </span>
+          <PremiumIconBadge icon={Building2} tone="sky" size="lg" className="mt-0.5" />
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink-900 dark:text-ink-50 sm:text-3xl">
               LMNP — Argenteuil

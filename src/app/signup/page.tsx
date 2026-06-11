@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { CheckCircle2, Sparkles, ShieldCheck, LineChart } from "lucide-react";
+import { CheckCircle2, Sparkles, ShieldCheck, LineChart, type LucideIcon } from "lucide-react";
 import { AuthForm } from "@/components/AuthForm";
 import { Logo } from "@/components/ui/Logo";
+import { PremiumIconBadge, type IconBadgeTone } from "@/components/ui/PremiumIconBadge";
 
-const FEATURES: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
-  { icon: LineChart, label: "Pilotez votre chiffre d’affaires en temps réel" },
-  { icon: Sparkles, label: "Assistant IA qui analyse vos transactions" },
-  { icon: ShieldCheck, label: "Vos données restent privées et chiffrées" }
+const FEATURES: { icon: LucideIcon; label: string; tone: IconBadgeTone }[] = [
+  { icon: LineChart, label: "Pilotez votre chiffre d’affaires en temps réel", tone: "brand" },
+  { icon: Sparkles, label: "Assistant IA qui analyse vos transactions", tone: "emerald" },
+  { icon: ShieldCheck, label: "Vos données restent privées et chiffrées", tone: "sky" }
 ];
 
 export default function SignupPage() {
@@ -33,9 +34,7 @@ export default function SignupPage() {
                 key={f.label}
                 className="flex items-center gap-3 rounded-2xl border border-ink-200/80 bg-white/80 px-4 py-3 shadow-sm backdrop-blur-sm dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:shadow-none"
               >
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/12 dark:text-emerald-300">
-                  <f.icon className="h-4 w-4" />
-                </span>
+                <PremiumIconBadge icon={f.icon} tone={f.tone} size="sm" />
                 <span className="text-sm font-medium text-ink-800 dark:text-white/80">{f.label}</span>
                 <CheckCircle2 className="ml-auto h-4 w-4 text-emerald-500 dark:text-emerald-400" aria-hidden />
               </li>

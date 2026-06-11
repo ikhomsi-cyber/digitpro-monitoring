@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import {
@@ -35,9 +36,7 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
-import { ActivityAnnualForecastCard } from "@/components/dashboard/ActivityAnnualForecastCard";
 import { ActivityBillingPaceWidget } from "@/components/dashboard/ActivityBillingPaceWidget";
-import { ActivityProductivitySummary } from "@/components/dashboard/ActivityProductivitySummary";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
 import {
   appendAgendaWorkedDayMonths,
@@ -199,9 +198,7 @@ export function BillableDaysCalendarBlock({
     overviewMonthTitle,
     overviewKpis,
     overviewWorkdayGauge,
-    overviewTjmEnVigueurHt,
-    annualRevenueTargetHt,
-    sortedIsos
+    overviewTjmEnVigueurHt
   } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -634,15 +631,6 @@ export function BillableDaysCalendarBlock({
         ctaMode="hidden"
       />
 
-      <ActivityAnnualForecastCard
-        selected={selected}
-        sortedWorkDayIsos={sortedIsos}
-        billableRatePeriods={billableRatePeriods}
-        fallbackTjmHt={tjmHt}
-        currentTjmHt={overviewTjmEnVigueurHt}
-        annualRevenueTargetHt={annualRevenueTargetHt}
-      />
-
       <ActivityBillingPaceWidget
         selected={selected}
         billableRatePeriods={billableRatePeriods}
@@ -654,12 +642,7 @@ export function BillableDaysCalendarBlock({
     <Card variant="solid" className="overflow-hidden">
       <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-cyan-100/[0.12] dark:bg-[#06242b]/70 dark:bg-none">
         <div className="flex items-start gap-3">
-          <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-emerald-200/70 bg-emerald-50/90 text-emerald-700 shadow-sm dark:border-teal-200/[0.16] dark:bg-teal-200/[0.10] dark:text-teal-100 dark:shadow-none"
-            aria-hidden
-          >
-            <CalendarDays className="h-4 w-4" strokeWidth={1.85} />
-          </span>
+          <PremiumIconBadge icon={CalendarDays} tone="emerald" size="md" className="mt-0.5" />
           <div className="min-w-0 flex-1">
             <CardTitle className="!mt-0 text-base font-bold tracking-tight text-ink-900 dark:text-white">
               Jours travaillés & TJM
@@ -671,9 +654,8 @@ export function BillableDaysCalendarBlock({
         </div>
       </CardHeader>
       <CardBody className="relative px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-stretch lg:gap-5">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
-          <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4 lg:shrink-0">
+          <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4">
           {/* Calendrier compact */}
           <div className="flex shrink-0 flex-col items-center sm:items-start">
             <div
@@ -932,9 +914,7 @@ export function BillableDaysCalendarBlock({
               <div className="mt-3 space-y-3 border-t border-ink-100 pt-3 dark:border-cyan-100/[0.12]">
                 {/* TJM */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-teal-200/[0.16] dark:bg-teal-200/[0.10] dark:text-teal-100">
-                    <BriefcaseBusiness className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  </span>
+                  <PremiumIconBadge icon={BriefcaseBusiness} tone="emerald" size="sm" className="mt-0.5" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">TJM (HT)</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
@@ -954,9 +934,7 @@ export function BillableDaysCalendarBlock({
 
                 {/* IK */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-violet-200/80 bg-violet-50 text-violet-600 dark:border-violet-200/[0.18] dark:bg-violet-300/[0.12] dark:text-violet-100">
-                    <CarFront className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  </span>
+                  <PremiumIconBadge icon={CarFront} tone="violet" size="sm" className="mt-0.5" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">IK aller-retour</p>
                     <p className="font-display text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">
@@ -976,9 +954,7 @@ export function BillableDaysCalendarBlock({
 
                 {/* Repas + NDF */}
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-amber-200/80 bg-amber-50 text-amber-600 dark:border-amber-200/[0.18] dark:bg-amber-300/[0.12] dark:text-amber-100">
-                    <Utensils className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                  </span>
+                  <PremiumIconBadge icon={Utensils} tone="amber" size="sm" className="mt-0.5" />
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">Repas &amp; NDF</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
@@ -1057,20 +1033,7 @@ export function BillableDaysCalendarBlock({
               </div>
             </div>
           </div>
-
           </div>
-
-          <div className="min-w-0 w-full flex-1 lg:min-w-[280px]">
-            <ActivityProductivitySummary
-              selected={selected}
-              viewYear={viewYear}
-              billableRatePeriods={billableRatePeriods}
-              fallbackTjmHt={tjmHt}
-              currentTjmHt={overviewTjmEnVigueurHt}
-              persistToSupabase={persistToSupabase}
-            />
-          </div>
-        </div>
 
         {treasuryTransactions != null && treasuryScope != null ? (
           <div className="mt-5 border-t border-ink-100/90 pt-5 dark:border-white/[0.06]">

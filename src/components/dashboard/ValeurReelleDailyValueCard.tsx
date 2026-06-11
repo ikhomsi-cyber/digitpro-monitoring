@@ -12,6 +12,11 @@ import {
   type ValeurReelleDailyBreakdown
 } from "@/lib/valeur-reelle-daily-value";
 import type { ValeurReelleCashTree } from "@/lib/valeur-reelle-analyze";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import {
+  WATERFALL_AXIS_STYLES,
+  WATERFALL_AXIS_SVG_CLASS
+} from "@/components/dashboard/waterfall-axis-styles";
 
 type Fmt = ReturnType<typeof useDashboardDisplayFormat>;
 
@@ -113,26 +118,47 @@ function formatWorkedDaysLabel(
   return `${formatted} jour${days > 1 ? "s" : ""} facturé${days > 1 ? "s" : ""}`;
 }
 
+/** Typo axe X — alignée sur ValeurReelleWaterfallChart */
+const MINI_WATERFALL_AXIS = {
+  labelAreaH: 54,
+  connectorY: 14,
+  labelY: 30,
+  valueY: 46,
+  label: { fontSize: 12, fontWeight: 600 },
+  value: { fontSize: 13, fontWeight: 700 },
+  connector: { fontSize: 11, fontWeight: 700 }
+} as const;
+
 function MiniWaterfallSvg({ steps, fmt }: { steps: MiniStep[]; fmt: Fmt }) {
   const maxVal = Math.max(steps[0]?.cumulative ?? 1, steps[steps.length - 1]?.cumulative ?? 1, 1);
   const chartW = 480;
-  const chartH = 72;
+  const chartH = 68;
   const gap = 8;
   const barW = (chartW - gap * (steps.length + 1)) / steps.length;
+  const axis = MINI_WATERFALL_AXIS;
 
   return (
     <svg
-      viewBox={`0 0 ${chartW} ${chartH + 32}`}
-      className="w-full min-w-[280px]"
+      viewBox={`0 0 ${chartW} ${chartH + axis.labelAreaH}`}
+      className={clsx("w-full min-w-[300px]", WATERFALL_AXIS_SVG_CLASS)}
       role="img"
       aria-label="Mini waterfall journalier"
     >
+      <rect
+        x={0}
+        y={chartH + 1}
+        width={chartW}
+        height={axis.labelAreaH - 1}
+        rx="6"
+        className={WATERFALL_AXIS_STYLES.band}
+        aria-hidden
+      />
       <line
         x1={gap}
         x2={chartW - gap}
         y1={chartH}
         y2={chartH}
-        className="stroke-ink-200/60 dark:stroke-white/15"
+        className={WATERFALL_AXIS_STYLES.baseline}
         strokeWidth="1"
       />
       {steps.map((step, index) => {
@@ -166,7 +192,7 @@ function MiniWaterfallSvg({ steps, fmt }: { steps: MiniStep[]; fmt: Fmt }) {
                 x2={x + barW / 2}
                 y1={connectorY}
                 y2={connectorY}
-                className="stroke-ink-300/40 dark:stroke-white/20"
+                className={WATERFALL_AXIS_STYLES.connectorLine}
                 strokeWidth="1"
                 strokeDasharray="3 2"
               />
@@ -174,18 +200,22 @@ function MiniWaterfallSvg({ steps, fmt }: { steps: MiniStep[]; fmt: Fmt }) {
             {index > 0 && step.kind === "total" ? (
               <text
                 x={x - gap / 2}
-                y={chartH + 10}
+                y={chartH + axis.connectorY}
                 textAnchor="middle"
-                className="fill-ink-400 text-[9px] font-bold dark:fill-white/35"
+                fontSize={axis.connector.fontSize}
+                fontWeight={axis.connector.fontWeight}
+                className={WATERFALL_AXIS_STYLES.connector}
               >
                 =
               </text>
             ) : index > 0 ? (
               <text
                 x={x - gap / 2}
-                y={chartH + 10}
+                y={chartH + axis.connectorY}
                 textAnchor="middle"
-                className="fill-ink-400 text-[8px] font-bold dark:fill-white/30"
+                fontSize={axis.connector.fontSize}
+                fontWeight={axis.connector.fontWeight}
+                className={WATERFALL_AXIS_STYLES.connector}
               >
                 →
               </text>
@@ -203,17 +233,21 @@ function MiniWaterfallSvg({ steps, fmt }: { steps: MiniStep[]; fmt: Fmt }) {
             />
             <text
               x={x + barW / 2}
-              y={chartH + 22}
+              y={chartH + axis.labelY}
               textAnchor="middle"
-              className="fill-ink-500 text-[7.5px] font-bold dark:fill-white/45"
+              fontSize={axis.label.fontSize}
+              fontWeight={axis.label.fontWeight}
+              className={WATERFALL_AXIS_STYLES.label}
             >
               {step.shortLabel}
             </text>
             <text
               x={x + barW / 2}
-              y={chartH + 32}
+              y={chartH + axis.valueY}
               textAnchor="middle"
-              className="fill-ink-800 text-[8px] font-bold tabular-nums dark:fill-white/80"
+              fontSize={axis.value.fontSize}
+              fontWeight={axis.value.fontWeight}
+              className={WATERFALL_AXIS_STYLES.value}
             >
               {formatDelta(step.kind === "start" || step.kind === "total" ? step.delta : step.delta, fmt)}
             </text>
@@ -336,12 +370,7 @@ export function ValeurReelleDailyValueCard({
           </p>
           <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/38">{basisLabel}</p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-emerald-200/70 bg-emerald-50/80 text-emerald-600 dark:border-emerald-300/20 dark:bg-emerald-500/10 dark:text-emerald-300"
-          aria-hidden
-        >
-          <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={TrendingUp} tone="emerald" size="md" />
       </div>
 
       <div className="mt-3 overflow-x-auto">

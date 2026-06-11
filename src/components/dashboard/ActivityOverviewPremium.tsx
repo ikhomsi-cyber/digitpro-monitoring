@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { PremiumIconBadge, type IconBadgeTone } from "@/components/ui/PremiumIconBadge";
 
 function clamp01(x: number): number {
   if (!Number.isFinite(x)) return 0;
@@ -32,13 +33,13 @@ export type ActivityWorkdayGauge = {
 
 function ActivityKpiCard({
   label,
-  icon: Icon,
-  iconClassName,
+  icon,
+  tone,
   children
 }: {
   label: string;
   icon: typeof CalendarCheck;
-  iconClassName: string;
+  tone: IconBadgeTone;
   children: React.ReactNode;
 }) {
   return (
@@ -47,15 +48,7 @@ function ActivityKpiCard({
         <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
           {label}
         </p>
-        <span
-          className={clsx(
-            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border",
-            iconClassName
-          )}
-          aria-hidden
-        >
-          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={icon} tone={tone} size="sm" />
       </div>
       <div className="mt-2 flex flex-1 flex-col justify-end">{children}</div>
     </div>
@@ -113,7 +106,7 @@ export function ActivityOverviewPremium({
         <ActivityKpiCard
           label="Facturé à date"
           icon={CalendarCheck}
-          iconClassName="text-violet-600 bg-violet-50 border-violet-200/80 dark:text-violet-300 dark:bg-violet-500/12 dark:border-violet-300/20"
+          tone="violet"
         >
           <p className="font-display text-xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-2xl">
             {fmt.int(billedDays)}
@@ -127,7 +120,7 @@ export function ActivityOverviewPremium({
         <ActivityKpiCard
           label="Taux d'avancement"
           icon={Percent}
-          iconClassName="text-sky-600 bg-sky-50 border-sky-200/80 dark:text-sky-300 dark:bg-sky-500/12 dark:border-sky-300/20"
+          tone="sky"
         >
           <p className="font-display text-xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-2xl">
             {fmt.int(advancementPct)}
@@ -143,7 +136,7 @@ export function ActivityOverviewPremium({
         <ActivityKpiCard
           label="CA sécurisé"
           icon={Lock}
-          iconClassName="text-emerald-600 bg-emerald-50 border-emerald-200/80 dark:text-emerald-300 dark:bg-emerald-500/12 dark:border-emerald-300/20"
+          tone="emerald"
         >
           <p className="font-display text-xl font-bold tabular-nums tracking-tight text-emerald-800 dark:text-emerald-200 sm:text-2xl">
             {fmt.euro(kpis.caEstime)}
@@ -154,7 +147,7 @@ export function ActivityOverviewPremium({
         <ActivityKpiCard
           label="Projection fin de mois"
           icon={TrendingUp}
-          iconClassName="text-amber-600 bg-amber-50 border-amber-200/80 dark:text-amber-300 dark:bg-amber-500/12 dark:border-amber-300/20"
+          tone="amber"
         >
           <p className="font-display text-xl font-bold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-2xl">
             {fmt.euro(kpis.projectionFinMois)}

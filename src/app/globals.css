@@ -184,6 +184,49 @@ body {
     --chart-dot-stroke: #172d3a;
   }
 
+  /* Waterfall SVG — axe X lisible en dark mode */
+  .waterfall-axis-svg {
+    --wf-axis-band: transparent;
+    --wf-axis-baseline: rgba(148, 163, 184, 0.45);
+    --wf-axis-connector-line: rgba(148, 163, 184, 0.35);
+    --wf-axis-connector: #94a3b8;
+    --wf-axis-label: #475569;
+    --wf-axis-value: #0f172a;
+    --wf-axis-pct: #64748b;
+  }
+  .dark .waterfall-axis-svg {
+    --wf-axis-band: rgba(4, 26, 32, 0.55);
+    --wf-axis-baseline: rgba(165, 243, 252, 0.38);
+    --wf-axis-connector-line: rgba(165, 243, 252, 0.42);
+    --wf-axis-connector: #a5f3fc;
+    --wf-axis-label: #ecfeff;
+    --wf-axis-value: #ffffff;
+    --wf-axis-pct: #cffafe;
+  }
+  .waterfall-axis-svg .waterfall-axis-band {
+    fill: var(--wf-axis-band);
+  }
+  .waterfall-axis-svg .waterfall-axis-baseline {
+    stroke: var(--wf-axis-baseline);
+  }
+  .waterfall-axis-svg .waterfall-axis-connector-line {
+    stroke: var(--wf-axis-connector-line);
+  }
+  .waterfall-axis-svg .waterfall-axis-connector {
+    fill: var(--wf-axis-connector);
+  }
+  .waterfall-axis-svg .waterfall-axis-label {
+    fill: var(--wf-axis-label);
+  }
+  .waterfall-axis-svg .waterfall-axis-value {
+    fill: var(--wf-axis-value);
+    font-variant-numeric: tabular-nums;
+  }
+  .waterfall-axis-svg .waterfall-axis-pct {
+    fill: var(--wf-axis-pct);
+    font-variant-numeric: tabular-nums;
+  }
+
   kbd {
     @apply inline-flex min-w-[1.4rem] items-center justify-center rounded-md border border-ink-300/70 bg-ink-50 px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none text-ink-600;
   }

@@ -49,7 +49,7 @@ export function computeActivityYearRevenueHt(
   return round2(total);
 }
 
-function countWorkedDaysInYear(selected: ReadonlySet<string>, viewYear: number): number {
+export function countWorkedDaysInYear(selected: ReadonlySet<string>, viewYear: number): number {
   const yearPrefix = `${viewYear}-`;
   let n = 0;
   for (const iso of selected) {

@@ -8,8 +8,12 @@ import {
 
 export type GainPerWorkDayEstimate = {
   gainPerDayEur: number;
-  /** Jours ouvrés cochés jusqu'à aujourd'hui dans le mois en cours. */
+  /** Jours ouvrés cochés du mois passé — dénominateur du gain moyen. */
   workedDays: number;
+  /** Clé `YYYY-MM` du mois passé utilisé pour le gain moyen. */
+  gainAverageMonthKey: string;
+  /** Jours ouvrés cochés jusqu'à aujourd'hui dans le mois en cours. */
+  currentMonthWorkedDays: number;
   /** Gain total estimé (BNC + frais perso) sur la base historique + mois partiel. */
   estimatedGainEur: number;
   /** Indique si une part de l'estimation provient de l'historique (pas seulement le réalisé). */
@@ -29,6 +33,12 @@ function workedBillableDaysInMonth(
   const month0 = Number(monthKey.slice(5, 7)) - 1;
   if (!Number.isFinite(y) || !Number.isFinite(month0)) return 0;
   return computeTjmWorkdayGauge(selected, y, month0, refDate).countedBillable;
+}
+
+function previousMonthKey(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const cursor = new Date(y, m - 2, 1);
+  return `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /** Mois civils passés (hors mois en cours), les plus récents en premier. */
@@ -93,7 +103,16 @@ export function estimateCurrentMonthGainPerWorkDay(
 ): GainPerWorkDayEstimate | null {
   if (monthKey !== dashboardMonthKeyNowLocal(now)) return null;
 
-  const workedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
+  const currentMonthWorkedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
+  const gainAverageMonthKey = previousMonthKey(monthKey);
+  const previousMonthWorkedDays = workedBillableDaysInMonth(
+    billableWorkDayIsos,
+    gainAverageMonthKey,
+    now
+  );
+  const gainAverageWorkedDays =
+    previousMonthWorkedDays > 0 ? previousMonthWorkedDays : currentMonthWorkedDays;
+
   const actualGain = gainEurFromCashTree(cashTree);
   const caHt = cashTree.caFactureEur;
   const history = computeHistoricalGainSignals(transactions, billableWorkDayIsos, now);
@@ -107,18 +126,20 @@ export function estimateCurrentMonthGainPerWorkDay(
       estimatedGain = fromCa;
       usesHistoricalEstimate = true;
     }
-  } else if (history.gainPerWorkDayEur != null && workedDays > 0) {
-    const fromHistory = Math.round(history.gainPerWorkDayEur * workedDays * 100) / 100;
+  } else if (history.gainPerWorkDayEur != null && currentMonthWorkedDays > 0) {
+    const fromHistory = Math.round(history.gainPerWorkDayEur * currentMonthWorkedDays * 100) / 100;
     if (fromHistory > estimatedGain) {
       estimatedGain = fromHistory;
       usesHistoricalEstimate = true;
     }
   }
 
-  if (workedDays > 0) {
+  if (gainAverageWorkedDays > 0) {
     return {
-      gainPerDayEur: Math.round((estimatedGain / workedDays) * 100) / 100,
-      workedDays,
+      gainPerDayEur: Math.round((estimatedGain / gainAverageWorkedDays) * 100) / 100,
+      workedDays: gainAverageWorkedDays,
+      gainAverageMonthKey,
+      currentMonthWorkedDays,
       estimatedGainEur: estimatedGain,
       usesHistoricalEstimate
     };
@@ -128,6 +149,8 @@ export function estimateCurrentMonthGainPerWorkDay(
     return {
       gainPerDayEur: Math.round(history.gainPerWorkDayEur * 100) / 100,
       workedDays: 0,
+      gainAverageMonthKey,
+      currentMonthWorkedDays,
       estimatedGainEur: 0,
       usesHistoricalEstimate: true
     };

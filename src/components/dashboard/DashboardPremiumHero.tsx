@@ -12,9 +12,9 @@ import { computeYearEndProjection, type YearEndProjection } from "@/lib/year-end
 import { computeKpiTrend, type KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
 import { AnnualObjectiveCard } from "@/components/dashboard/AnnualObjectiveCard";
-import { FinancialWaterfallChart } from "@/components/dashboard/FinancialWaterfallChart";
 import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
+import { PremiumIconBadge, type IconBadgeTone } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -67,8 +67,8 @@ function KpiSection({
 
 function KpiCard({
   label,
-  icon: Icon,
-  iconClassName,
+  icon,
+  tone,
   href,
   ariaLabel,
   trend,
@@ -76,7 +76,7 @@ function KpiCard({
 }: {
   label: string;
   icon: typeof TrendingUp;
-  iconClassName: string;
+  tone: IconBadgeTone;
   href?: string;
   ariaLabel?: string;
   trend?: KpiTrend | null;
@@ -112,15 +112,7 @@ function KpiCard({
           </p>
           <KpiTrendBadge trend={trend} />
         </div>
-        <span
-          className={clsx(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border",
-            iconClassName
-          )}
-          aria-hidden
-        >
-          <Icon className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={icon} tone={tone} size="md" />
       </div>
       <div className="mt-3 flex flex-1 flex-col justify-between gap-2">{children}</div>
     </div>
@@ -171,6 +163,78 @@ function KpiValue({
   );
 }
 
+function AvantIrBreakdown({
+  totalEur,
+  bncEur,
+  fraisPersoEur,
+  billedDays,
+  netPerDayEur,
+  remainingHtEur,
+  usesRevenueProration,
+  formatEuro,
+  formatInt
+}: {
+  totalEur: number;
+  bncEur: number;
+  fraisPersoEur: number;
+  billedDays: number;
+  netPerDayEur: number;
+  remainingHtEur: number;
+  usesRevenueProration: boolean;
+  formatEuro: (n: number) => string;
+  formatInt: (n: number) => number;
+}) {
+  const rows = [
+    { label: "BNC (honoraires)", value: bncEur, tone: "sky" as const },
+    { label: "Frais perso récupérés", value: fraisPersoEur, tone: "emerald" as const }
+  ];
+
+  return (
+    <div className="space-y-2.5">
+      <p className="font-display text-xl font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white sm:text-2xl">
+        {formatEuro(totalEur)}
+      </p>
+
+      <div className="rounded-xl border border-amber-200/60 bg-amber-50/35 px-3 py-2.5 dark:border-amber-300/15 dark:bg-amber-500/[0.06]">
+        <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-ink-500 dark:text-white/42">
+          Détail du calcul
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {rows.map((row) => (
+            <li key={row.label} className="flex items-center justify-between gap-3 text-[11px] font-semibold">
+              <span className="text-ink-600 dark:text-white/60">{row.label}</span>
+              <span
+                className={clsx(
+                  "tabular-nums",
+                  row.tone === "sky"
+                    ? "text-sky-700 dark:text-sky-300"
+                    : "text-emerald-700 dark:text-emerald-300"
+                )}
+              >
+                {formatEuro(row.value)}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-amber-200/50 pt-2 text-[11px] font-bold dark:border-amber-300/12">
+          <span className="text-ink-700 dark:text-white/75">= Avant IR</span>
+          <span className="tabular-nums text-amber-800 dark:text-amber-200">{formatEuro(totalEur)}</span>
+        </div>
+        <p className="mt-2 text-[10px] font-medium leading-relaxed text-ink-500 dark:text-white/42">
+          {formatInt(billedDays)} j. facturés × {formatEuro(netPerDayEur)}/j
+          {usesRevenueProration
+            ? " · prorata sur la répartition Valeur réelle du mois"
+            : " · estimation au TJM HT"}
+        </p>
+      </div>
+
+      <p className="text-[11px] font-bold text-ink-500 dark:text-white/40">
+        Reste à produire {formatEuro(remainingHtEur)} HT
+      </p>
+    </div>
+  );
+}
+
 function WorkdaysSummary({
   billed,
   planned,
@@ -181,20 +245,101 @@ function WorkdaysSummary({
   formatInt: (n: number) => number;
 }) {
   const total = billed + planned;
+  const denominator = Math.max(total, 1);
+  const billedPct = Math.round((billed / denominator) * 100);
+  const plannedPct = Math.max(0, 100 - billedPct);
+
+  const segments = [
+    {
+      id: "billed",
+      label: "Facturé",
+      value: billed,
+      pct: billedPct,
+      barClass: "bg-gradient-to-r from-emerald-400 to-emerald-500 dark:from-emerald-300 dark:to-emerald-400",
+      chipClass:
+        "border-emerald-200/70 bg-emerald-50/80 dark:border-emerald-300/20 dark:bg-emerald-500/10",
+      valueClass: "text-emerald-700 dark:text-emerald-200"
+    },
+    {
+      id: "planned",
+      label: "Prévu",
+      value: planned,
+      pct: plannedPct,
+      barClass: "bg-gradient-to-r from-violet-300 to-violet-400 dark:from-violet-400/80 dark:to-violet-300/70",
+      chipClass: "border-violet-200/70 bg-violet-50/80 dark:border-violet-300/20 dark:bg-violet-500/10",
+      valueClass: "text-violet-700 dark:text-violet-200"
+    }
+  ] as const;
 
   return (
-    <dl className="space-y-1.5 rounded-xl border border-violet-200/60 bg-violet-50/40 px-3 py-2.5 dark:border-violet-300/15 dark:bg-violet-400/[0.05]">
-      {[
-        { label: "Facturé", value: billed },
-        { label: "Prévu", value: planned },
-        { label: "Total", value: total }
-      ].map((row) => (
-        <div key={row.label} className="flex items-center justify-between gap-3 text-[11px] font-bold">
-          <dt className="text-ink-500 dark:text-white/45">{row.label}</dt>
-          <dd className="tabular-nums text-ink-900 dark:text-white">{formatInt(row.value)} j.</dd>
+    <div className="space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="font-display text-3xl font-bold leading-none tabular-nums tracking-tight text-ink-900 dark:text-white">
+            {formatInt(billed)}
+            <span className="ml-1.5 text-lg font-semibold text-ink-400 dark:text-white/35">
+              / {formatInt(total)}
+            </span>
+          </p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
+            jours facturés ce mois
+          </p>
         </div>
-      ))}
-    </dl>
+        <div className="rounded-xl border border-violet-200/70 bg-violet-50/70 px-2.5 py-1.5 text-right dark:border-violet-300/20 dark:bg-violet-500/10">
+          <p className="font-display text-xl font-bold tabular-nums leading-none text-violet-700 dark:text-violet-200">
+            {formatInt(billedPct)}%
+          </p>
+          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
+            avancement
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="flex h-3 overflow-hidden rounded-full border border-ink-200/60 bg-ink-100/70 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]"
+        role="img"
+        aria-label={`${formatInt(billed)} jours facturés sur ${formatInt(total)}, ${formatInt(billedPct)} %`}
+      >
+        {segments.map((segment) =>
+          segment.pct > 0 ? (
+            <div
+              key={segment.id}
+              className={clsx("h-full rounded-full transition-[width] duration-500", segment.barClass)}
+              style={{ width: `${segment.pct}%` }}
+            />
+          ) : null
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        {segments.map((segment) => (
+          <div
+            key={`chip-${segment.id}`}
+            className={clsx(
+              "rounded-xl border px-2 py-2 text-center shadow-sm dark:shadow-none",
+              segment.chipClass
+            )}
+          >
+            <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
+              {segment.label}
+            </p>
+            <p className={clsx("mt-0.5 text-sm font-bold tabular-nums", segment.valueClass)}>
+              {formatInt(segment.value)}
+              <span className="ml-0.5 text-[10px] font-semibold opacity-70">j.</span>
+            </p>
+          </div>
+        ))}
+        <div className="rounded-xl border border-ink-200/70 bg-ink-50/80 px-2 py-2 text-center shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
+            Total
+          </p>
+          <p className="mt-0.5 text-sm font-bold tabular-nums text-ink-900 dark:text-white">
+            {formatInt(total)}
+            <span className="ml-0.5 text-[10px] font-semibold opacity-70">j.</span>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -241,7 +386,7 @@ function YearEndProjectionCard({
     <KpiCard
       label="Projection fin d'année"
       icon={LineChart}
-      iconClassName="text-indigo-600 bg-indigo-50 border-indigo-200/80 dark:text-indigo-300 dark:bg-indigo-500/12 dark:border-indigo-300/20"
+      tone="indigo"
       trend={trend}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -295,15 +440,63 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
     );
   }, [billable.billableRatePeriods, billable.tjmHt]);
 
-  const inPocketToDateEur = useMemo(() => {
+  const avantIrDetail = useMemo(() => {
     const caHtMonth = stats.caMensuelEur > 0 ? stats.caMensuelEur / 1.2 : 0;
     const billedDaysInRevenue = activeTjmHt > 0 ? caHtMonth / activeTjmHt : 0;
-    if (billedDaysToDate <= 0) return 0;
-    if (billedDaysInRevenue > 0) {
-      return (stats.netDansMaPocheMoisEur / billedDaysInRevenue) * billedDaysToDate;
+    const usesRevenueProration = billedDaysInRevenue > 0 && billedDaysToDate > 0;
+    const proration = usesRevenueProration ? billedDaysToDate / billedDaysInRevenue : 0;
+
+    const bncMois = stats.tjmRepartitionMois.bncEur;
+    const fraisPersoMois = stats.tjmRepartitionMois.fraisPersoEur;
+    const netMois = stats.netDansMaPocheMoisEur;
+
+    let totalEur = 0;
+    let bncEur = 0;
+    let fraisPersoEur = 0;
+    let netPerDayEur = 0;
+
+    if (billedDaysToDate <= 0) {
+      return {
+        totalEur,
+        bncEur,
+        fraisPersoEur,
+        billedDays: billedDaysToDate,
+        netPerDayEur,
+        usesRevenueProration: false
+      };
     }
-    return activeTjmHt * billedDaysToDate;
-  }, [activeTjmHt, billedDaysToDate, stats.caMensuelEur, stats.netDansMaPocheMoisEur]);
+
+    if (usesRevenueProration) {
+      bncEur = bncMois * proration;
+      fraisPersoEur = fraisPersoMois * proration;
+      totalEur = netMois * proration;
+      netPerDayEur = netMois / billedDaysInRevenue;
+    } else {
+      netPerDayEur = activeTjmHt;
+      totalEur = activeTjmHt * billedDaysToDate;
+      const shareDenom = Math.max(bncMois + fraisPersoMois, 1);
+      bncEur = totalEur * (bncMois / shareDenom);
+      fraisPersoEur = totalEur * (fraisPersoMois / shareDenom);
+    }
+
+    return {
+      totalEur,
+      bncEur,
+      fraisPersoEur,
+      billedDays: billedDaysToDate,
+      netPerDayEur,
+      usesRevenueProration
+    };
+  }, [
+    activeTjmHt,
+    billedDaysToDate,
+    stats.caMensuelEur,
+    stats.netDansMaPocheMoisEur,
+    stats.tjmRepartitionMois.bncEur,
+    stats.tjmRepartitionMois.fraisPersoEur
+  ]);
+
+  const inPocketToDateEur = avantIrDetail.totalEur;
 
   const remunerationDisponibleEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
   const realTjmBeforeIncomeTaxEur = billedDaysToDate > 0 ? inPocketToDateEur / billedDaysToDate : 0;
@@ -385,7 +578,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
         stats.tjmRepartitionMois.caHtEur,
         mom.tjmRepartitionMois.caHtEur
       ),
-      waterfall: computeKpiTrend(stats.caMensuelEur, mom.caMensuelEur),
       annual: computeKpiTrend(currentMonthHt, previousMonthHt),
       projection: computeKpiTrend(currentMonthHt, previousMonthHt)
     };
@@ -456,7 +648,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             <KpiCard
               label="Cash disponible"
               icon={WalletCards}
-              iconClassName="text-sky-600 bg-sky-50 border-sky-200/80 dark:text-sky-300 dark:bg-sky-500/12 dark:border-sky-400/20"
+              tone="sky"
               trend={kpiTrends?.cash}
             >
               <KpiValue
@@ -476,7 +668,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             <KpiCard
               label="Encaissé ce mois"
               icon={TrendingUp}
-              iconClassName="text-emerald-600 bg-emerald-50 border-emerald-200/80 dark:text-emerald-300 dark:bg-emerald-500/12 dark:border-emerald-400/20"
+              tone="emerald"
               href="/dashboard?section=sasu&scope=pro"
               ariaLabel="Ouvrir la page SASU"
               trend={kpiTrends?.encaisse}
@@ -513,7 +705,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             <KpiCard
               label="Jours du mois"
               icon={CalendarDays}
-              iconClassName="text-violet-600 bg-violet-50 border-violet-200/80 dark:text-violet-300 dark:bg-violet-500/12 dark:border-violet-300/20"
+              tone="violet"
               href="/dashboard?section=activite"
               ariaLabel="Ouvrir la page Activité"
               trend={kpiTrends?.workdays}
@@ -528,7 +720,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             <KpiCard
               label="TJM"
               icon={CalendarDays}
-              iconClassName="text-indigo-600 bg-indigo-50 border-indigo-200/80 dark:text-indigo-300 dark:bg-indigo-500/12 dark:border-indigo-300/20"
+              tone="indigo"
               href="/parametres"
               ariaLabel="Ouvrir le paramétrage des TJM"
               trend={kpiTrends?.tjm}
@@ -546,13 +738,19 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             <KpiCard
               label="Avant IR"
               icon={PiggyBank}
-              iconClassName="text-amber-600 bg-amber-50 border-amber-200/80 dark:text-amber-300 dark:bg-amber-500/12 dark:border-amber-300/20"
+              tone="amber"
               trend={kpiTrends?.avantIr}
             >
-              <KpiValue
-                value={fmt.euro(inPocketToDateEur)}
-                sublabel={`Reste à produire ${fmt.euro(activeTjmHt * remainingBillableDays)} HT`}
-                sublabelTone="neutral"
+              <AvantIrBreakdown
+                totalEur={avantIrDetail.totalEur}
+                bncEur={avantIrDetail.bncEur}
+                fraisPersoEur={avantIrDetail.fraisPersoEur}
+                billedDays={avantIrDetail.billedDays}
+                netPerDayEur={avantIrDetail.netPerDayEur}
+                remainingHtEur={activeTjmHt * remainingBillableDays}
+                usesRevenueProration={avantIrDetail.usesRevenueProration}
+                formatEuro={fmt.euro}
+                formatInt={fmt.int}
               />
             </KpiCard>
 
@@ -562,15 +760,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
                 formatEuro={fmt.euro}
                 formatInt={fmt.int}
                 trend={kpiTrends?.revenueAllocation}
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <FinancialWaterfallChart
-                stats={stats}
-                statsReady={statsReady}
-                formatEuro={fmt.euro}
-                trend={kpiTrends?.waterfall}
               />
             </div>
           </KpiSection>

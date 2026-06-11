@@ -7,6 +7,7 @@ import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeActivityTjmPerformance } from "@/lib/activity-tjm-performance";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { PremiumIconBadge, type IconBadgeTone } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   selected: ReadonlySet<string>;
@@ -20,8 +21,8 @@ function TjmMetricCard({
   value,
   sublabel,
   trend,
-  icon: Icon,
-  iconClassName,
+  icon,
+  tone,
   highlight = false
 }: {
   label: string;
@@ -29,7 +30,7 @@ function TjmMetricCard({
   sublabel?: string;
   trend?: ReturnType<typeof computeActivityTjmPerformance>["trends"]["current"];
   icon: typeof BriefcaseBusiness;
-  iconClassName: string;
+  tone: IconBadgeTone;
   highlight?: boolean;
 }) {
   return (
@@ -48,15 +49,7 @@ function TjmMetricCard({
           </p>
           <KpiTrendBadge trend={trend} />
         </div>
-        <span
-          className={clsx(
-            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border",
-            iconClassName
-          )}
-          aria-hidden
-        >
-          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={icon} tone={tone} size="sm" />
       </div>
       <p
         className={clsx(
@@ -98,9 +91,7 @@ export function ActivityTjmPerformanceCard({
     <section className="rounded-[2rem] border border-ink-200/80 bg-gradient-to-b from-white via-white to-indigo-50/35 p-5 shadow-[0_20px_60px_-28px_rgba(79,70,229,0.25)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72)] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-indigo-200/80 bg-indigo-50 text-indigo-600 dark:border-indigo-300/20 dark:bg-indigo-500/12 dark:text-indigo-300">
-            <Gauge className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </span>
+          <PremiumIconBadge icon={Gauge} tone="indigo" size="lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-indigo-700/85 dark:text-indigo-300/80">
               Performance TJM
@@ -123,7 +114,7 @@ export function ActivityTjmPerformanceCard({
           sublabel="HT · mois en cours"
           trend={performance.trends.current}
           icon={BriefcaseBusiness}
-          iconClassName="text-indigo-600 bg-indigo-50 border-indigo-200/80 dark:text-indigo-300 dark:bg-indigo-500/12 dark:border-indigo-300/20"
+          tone="indigo"
           highlight
         />
         <TjmMetricCard
@@ -132,7 +123,7 @@ export function ActivityTjmPerformanceCard({
           sublabel="HT · pondéré par jours travaillés"
           trend={performance.trends.averageYtd}
           icon={Gauge}
-          iconClassName="text-sky-600 bg-sky-50 border-sky-200/80 dark:text-sky-300 dark:bg-sky-500/12 dark:border-sky-300/20"
+          tone="sky"
         />
         <TjmMetricCard
           label="Meilleur mois"
@@ -140,7 +131,7 @@ export function ActivityTjmPerformanceCard({
           sublabel={`${performance.bestMonth.monthLabel} · ${fmt.int(performance.bestMonth.workedDays)} j.`}
           trend={performance.trends.best}
           icon={ArrowUpRight}
-          iconClassName="text-emerald-600 bg-emerald-50 border-emerald-200/80 dark:text-emerald-300 dark:bg-emerald-500/12 dark:border-emerald-300/20"
+          tone="emerald"
         />
         <TjmMetricCard
           label="Pire mois"
@@ -148,7 +139,7 @@ export function ActivityTjmPerformanceCard({
           sublabel={`${performance.worstMonth.monthLabel} · ${fmt.int(performance.worstMonth.workedDays)} j.`}
           trend={performance.trends.worst}
           icon={ArrowDownRight}
-          iconClassName="text-rose-600 bg-rose-50 border-rose-200/80 dark:text-rose-300 dark:bg-rose-500/12 dark:border-rose-300/20"
+          tone="rose"
         />
       </div>
 

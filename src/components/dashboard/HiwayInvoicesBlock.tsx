@@ -5,6 +5,7 @@ import { ChevronDown, FileText, Mail, Plug, RefreshCw, Unplug } from "lucide-rea
 import { clsx } from "clsx";
 import { toast } from "sonner";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import {
   disconnectGmail,
   fetchHiwayInvoices,
@@ -217,9 +218,7 @@ export function HiwayInvoicesBlock() {
                     key={invoice.id}
                     className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-lg bg-white/80 px-2.5 py-2 dark:bg-white/[0.05]"
                   >
-                    <span className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-200/70 bg-emerald-50 text-emerald-600 dark:border-emerald-400/20 dark:bg-emerald-400/[0.12] dark:text-emerald-200">
-                      <FileText className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                    </span>
+                    <PremiumIconBadge icon={FileText} tone="emerald" size="sm" />
                     <span className="min-w-0">
                       <span className="block truncate text-[11px] font-semibold text-ink-900 dark:text-white">
                         {invoice.client ?? formatInvoiceDate(invoice.date)}

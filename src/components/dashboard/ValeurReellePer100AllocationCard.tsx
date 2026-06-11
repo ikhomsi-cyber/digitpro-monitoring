@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import { Coins } from "lucide-react";
 import type { ValeurReelleCashTree } from "@/lib/valeur-reelle-analyze";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 export type ValeurReellePer100Segment = {
   id: "retained" | "csg" | "personal" | "other";
@@ -136,12 +137,7 @@ export function ValeurReellePer100AllocationCard({ tree, fmt }: Props) {
             Base HT · échelle {fmt.euro(tree.caFactureEur)} → 100 €
           </p>
         </div>
-        <span
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-200/80 bg-sky-50 text-sky-600 dark:border-sky-300/20 dark:bg-sky-500/12 dark:text-sky-300"
-          aria-hidden
-        >
-          <Coins className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={Coins} tone="sky" size="md" />
       </div>
 
       <div

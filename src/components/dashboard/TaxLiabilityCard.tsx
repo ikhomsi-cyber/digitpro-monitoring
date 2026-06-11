@@ -9,6 +9,7 @@ import {
 } from "@/lib/tax-liability";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   cashEur: number | null;
@@ -84,12 +85,7 @@ export function TaxLiabilityCard({
             {statsReady ? formatEuro(coverage.totalLiabilityEur) : "Calcul…"}
           </p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-orange-200/80 bg-orange-50 text-orange-600 dark:border-orange-300/20 dark:bg-orange-500/12 dark:text-orange-300"
-          aria-hidden
-        >
-          <Landmark className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={Landmark} tone="orange" size="md" />
       </div>
 
       {statsReady ? (

@@ -7,6 +7,7 @@ import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { computeActivityBillingPaceProjection } from "@/lib/activity-billing-pace-projection";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   selected: ReadonlySet<string>;
@@ -93,9 +94,7 @@ export function ActivityBillingPaceWidget({
     <section className="rounded-[2rem] border border-teal-200/70 bg-gradient-to-br from-teal-50/80 via-white to-cyan-50/50 p-5 shadow-[0_20px_60px_-28px_rgba(20,184,166,0.35)] dark:border-teal-300/15 dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72)] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-teal-200/80 bg-teal-50 text-teal-600 dark:border-teal-300/20 dark:bg-teal-500/12 dark:text-teal-300">
-            <LineChart className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </span>
+          <PremiumIconBadge icon={LineChart} tone="teal" size="lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-teal-700/85 dark:text-teal-300/80">
               Projection au rythme actuel

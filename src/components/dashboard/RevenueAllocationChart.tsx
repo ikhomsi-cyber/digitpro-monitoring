@@ -5,6 +5,7 @@ import { ArrowRight, PieChart } from "lucide-react";
 import { clsx } from "clsx";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 export type RevenueAllocationInput = {
   caHtEur: number;
@@ -92,7 +93,7 @@ function AllocationTooltip({
     >
       <span className="block font-bold text-ink-900 dark:text-white">{segment.label}</span>
       <span className="mt-1 block tabular-nums">
-        {formatEuro(segment.valueEur)}/j · {pct.toFixed(1)} %
+        {formatEuro(segment.valueEur)} · {pct.toFixed(1)} % du mois
       </span>
       <span className="mt-1.5 block text-ink-500 dark:text-white/50">{segment.tooltip}</span>
     </span>
@@ -123,16 +124,11 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
           <p className="mt-0.5 font-display text-xl font-semibold tabular-nums text-ink-900 dark:text-white sm:text-2xl">
             {formatEuro(revenueEur)}
             <span className="ml-1.5 align-baseline text-xs font-semibold text-ink-500 dark:text-white/45">
-              HT / j.
+              HT · mois
             </span>
           </p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-teal-200/80 bg-teal-50 text-teal-600 dark:border-teal-300/20 dark:bg-teal-500/12 dark:text-teal-300"
-          aria-hidden
-        >
-          <PieChart className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={PieChart} tone="teal" size="md" />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] font-bold text-ink-500 dark:text-white/45">
@@ -156,7 +152,7 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
       <div
         className="mt-3 flex h-3 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70"
         role="img"
-        aria-label="Répartition du revenu journalier entre BNC, charges perso, CSG et dépenses"
+        aria-label="Répartition du revenu mensuel entre BNC, charges perso, CSG et dépenses"
       >
         {segments.map((segment) => {
           const pct = (segment.valueEur / barDenominator) * 100;
@@ -167,7 +163,7 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
               className={clsx("group/segment relative h-full min-w-[4px] focus-within:z-10 hover:z-10", segment.colorClass)}
               style={{ width: `${pct}%` }}
               tabIndex={0}
-              aria-label={`${segment.label} : ${formatEuro(segment.valueEur)} par jour, ${pct.toFixed(1)} pour cent`}
+              aria-label={`${segment.label} : ${formatEuro(segment.valueEur)} sur le mois, ${pct.toFixed(1)} pour cent`}
             >
               <AllocationTooltip segment={segment} pct={pct} formatEuro={formatEuro} />
             </div>

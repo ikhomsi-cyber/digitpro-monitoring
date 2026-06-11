@@ -9,6 +9,22 @@ import {
   valeurReelleWaterfallBarGeometry,
   type ValeurReelleWaterfallStep
 } from "@/lib/valeur-reelle-waterfall";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import {
+  WATERFALL_AXIS_STYLES,
+  WATERFALL_AXIS_SVG_CLASS
+} from "@/components/dashboard/waterfall-axis-styles";
+
+/** Typo axe X — alignée sur MiniWaterfallSvg (ValeurReelleDailyValueCard) */
+const WATERFALL_AXIS = {
+  labelAreaH: 58,
+  labelY: 18,
+  valueY: 34,
+  pctY: 48,
+  label: { fontSize: 12, fontWeight: 600 },
+  value: { fontSize: 13, fontWeight: 700 },
+  pct: { fontSize: 11, fontWeight: 600 }
+} as const;
 
 const STEP_COLORS: Record<string, { fill: string; stroke: string }> = {
   ca_ht: { fill: "#34d399", stroke: "#10b981" },
@@ -155,27 +171,31 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
             CA HT → déductions → valeur nette
           </p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sky-200/80 bg-sky-50 text-sky-600 dark:border-sky-300/20 dark:bg-sky-500/12 dark:text-sky-300"
-          aria-hidden
-        >
-          <Waves className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={Waves} tone="sky" size="md" />
       </div>
 
       <div className="mt-3 overflow-x-auto">
         <svg
-          viewBox={`0 0 ${chartW} ${chartH + 44}`}
-          className="w-full min-w-[340px]"
+          viewBox={`0 0 ${chartW} ${chartH + WATERFALL_AXIS.labelAreaH}`}
+          className={clsx("w-full min-w-[340px]", WATERFALL_AXIS_SVG_CLASS)}
           role="img"
           aria-label="Waterfall financier Valeur réelle"
         >
+          <rect
+            x={0}
+            y={chartH + 1}
+            width={chartW}
+            height={WATERFALL_AXIS.labelAreaH - 1}
+            rx="6"
+            className={WATERFALL_AXIS_STYLES.band}
+            aria-hidden
+          />
           <line
             x1={gap}
             x2={chartW - gap}
             y1={chartH}
             y2={chartH}
-            className="stroke-ink-300/50 dark:stroke-white/20"
+            className={WATERFALL_AXIS_STYLES.baseline}
             strokeWidth="1"
           />
           {geometries.map(({ step, geom }, index) => {
@@ -195,7 +215,7 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
                     x2={geom.x + geom.width / 2}
                     y1={connectorY}
                     y2={connectorY}
-                    className="stroke-ink-300/40 dark:stroke-white/20"
+                    className={WATERFALL_AXIS_STYLES.connectorLine}
                     strokeWidth="1"
                     strokeDasharray="4 3"
                   />
@@ -229,9 +249,11 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
                 {step.kind !== "start" && step.pctOfCaHt > 0 ? (
                   <text
                     x={geom.x + geom.width / 2}
-                    y={Math.max(geom.y + 10, 12)}
+                    y={Math.max(geom.y + 12, 14)}
                     textAnchor="middle"
-                    className="fill-white text-[7.5px] font-bold tabular-nums"
+                    fontSize="10"
+                    fontWeight="700"
+                    className="fill-white tabular-nums"
                     pointerEvents="none"
                   >
                     {step.pctOfCaHt} %
@@ -239,25 +261,31 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
                 ) : null}
                 <text
                   x={geom.x + geom.width / 2}
-                  y={chartH + 14}
+                  y={chartH + WATERFALL_AXIS.labelY}
                   textAnchor="middle"
-                  className="fill-ink-500 text-[8px] font-bold dark:fill-white/45"
+                  fontSize={WATERFALL_AXIS.label.fontSize}
+                  fontWeight={WATERFALL_AXIS.label.fontWeight}
+                  className={WATERFALL_AXIS_STYLES.label}
                 >
                   {step.label}
                 </text>
                 <text
                   x={geom.x + geom.width / 2}
-                  y={chartH + 26}
+                  y={chartH + WATERFALL_AXIS.valueY}
                   textAnchor="middle"
-                  className="fill-ink-800 text-[8.5px] font-bold tabular-nums dark:fill-white/80"
+                  fontSize={WATERFALL_AXIS.value.fontSize}
+                  fontWeight={WATERFALL_AXIS.value.fontWeight}
+                  className={WATERFALL_AXIS_STYLES.value}
                 >
                   {formatDelta(step, fmt.euro)}
                 </text>
                 <text
                   x={geom.x + geom.width / 2}
-                  y={chartH + 38}
+                  y={chartH + WATERFALL_AXIS.pctY}
                   textAnchor="middle"
-                  className="fill-ink-400 text-[7.5px] font-semibold tabular-nums dark:fill-white/35"
+                  fontSize={WATERFALL_AXIS.pct.fontSize}
+                  fontWeight={WATERFALL_AXIS.pct.fontWeight}
+                  className={WATERFALL_AXIS_STYLES.pct}
                 >
                   {step.pctOfCaHt} %
                 </text>

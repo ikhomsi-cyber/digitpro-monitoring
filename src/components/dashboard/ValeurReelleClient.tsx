@@ -11,13 +11,15 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   buildDashboardMonthOptions,
   buildDashboardYearOptions,
+  dashboardMonthKeyNowLocal,
   defaultDashboardPeriodFilter,
+  formatDashboardMonthLabel,
   toggleDashboardYearInFilter
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
-import { dashboardMonthKeyNowLocal } from "@/lib/dashboard-period";
 import { ValeurReelleDailyValueCard } from "@/components/dashboard/ValeurReelleDailyValueCard";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import {
   analyzeValeurReelle,
@@ -424,7 +426,7 @@ function CashFlowTreeVisual({
   tree: ValeurReelleCashTree;
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
   billableDays: number;
-  /** Mois en cours : estimation historique + jours ouvrés cochés jusqu'à aujourd'hui. */
+  /** Mois en cours : gain moyen basé sur les jours travaillés du mois passé. */
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   periodLabel: string;
   tjmHt: number;
@@ -538,6 +540,9 @@ function CashFlowTreeVisual({
                   <>
                     {formattedGainDayDenominator} jour{gainDayDenominator > 1 ? "s" : ""} travaillé
                     {gainDayDenominator > 1 ? "s" : ""}
+                    {gainPerWorkDayEstimate.gainAverageMonthKey
+                      ? ` · ${formatDashboardMonthLabel(gainPerWorkDayEstimate.gainAverageMonthKey)}`
+                      : " · mois passé"}
                     {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé sur historique" : null}
                   </>
                 ) : (
@@ -694,9 +699,7 @@ function RecoverableVatMonthlyBlock({
     <section className="rounded-[2rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/50 p-4 shadow-[0_20px_60px_-28px_rgba(16,185,129,0.28)] dark:border-emerald-300/15 dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72)] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-emerald-200/80 bg-emerald-50 text-emerald-600 dark:border-emerald-300/20 dark:bg-emerald-500/12 dark:text-emerald-300">
-            <Sparkles className="h-4 w-4" strokeWidth={2} aria-hidden />
-          </span>
+          <PremiumIconBadge icon={Sparkles} tone="emerald" size="lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700/85 dark:text-emerald-300/80">
               Économies TVA

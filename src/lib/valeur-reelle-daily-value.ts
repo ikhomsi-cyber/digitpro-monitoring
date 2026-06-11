@@ -53,7 +53,7 @@ export function computeValeurReelleDailyBreakdown(input: {
 
   const isCurrentMonthEstimate = gainPerWorkDayEstimate != null;
   const workedDays = isCurrentMonthEstimate
-    ? gainPerWorkDayEstimate.workedDays
+    ? gainPerWorkDayEstimate.currentMonthWorkedDays
     : billableDays;
   const denominator = workedDays > 0 ? workedDays : billableDays;
 

@@ -8,6 +8,7 @@ import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDispl
 import { computeAnnualObjectiveTracking } from "@/lib/annual-objective";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 type Props = {
   achievedHtEur: number;
@@ -64,12 +65,7 @@ export function AnnualObjectiveCard({ achievedHtEur, trend }: Props) {
             CA HT encaissé · {new Date().getFullYear()}
           </p>
         </div>
-        <span
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-rose-200/80 bg-rose-50 text-rose-600 dark:border-rose-300/20 dark:bg-rose-500/12 dark:text-rose-300"
-          aria-hidden
-        >
-          <Target className="h-4 w-4" strokeWidth={2} />
-        </span>
+        <PremiumIconBadge icon={Target} tone="rose" size="md" />
       </div>
 
       <label className="mt-3 block">

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Landmark, Scale } from "lucide-react";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
   computeTreasuryVerserSnapshot,
@@ -44,12 +45,7 @@ export function TreasuryVerserPanel({
         data-private
       >
         <div className="flex items-start gap-2">
-          <span
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white text-violet-700 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.06] dark:text-violet-200 dark:shadow-none"
-            aria-hidden
-          >
-            <Scale className="h-4 w-4" strokeWidth={1.85} />
-          </span>
+          <PremiumIconBadge icon={Scale} tone="violet" size="md" className="mt-0.5" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-800/80 dark:text-violet-200/80">
               Disponible à verser (estim.)
