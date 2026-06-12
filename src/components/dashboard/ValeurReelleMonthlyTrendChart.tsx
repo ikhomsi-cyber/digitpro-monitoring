@@ -136,7 +136,7 @@ export function ValeurReelleMonthlyTrendChart({ series }: { series: ValeurReelle
 
   if (!points.length) {
     return (
-      <section className="rounded-[2rem] border border-dashed border-ink-200 bg-ink-50/40 px-4 py-6 text-center text-xs text-ink-500 dark:border-cyan-100/[0.12] dark:bg-cyan-50/[0.05] dark:text-white/45 sm:p-5">
+      <section className="text-center text-xs text-ink-500 dark:text-white/45">
         Aucune donnée mensuelle sur cette période.
       </section>
     );
@@ -156,7 +156,7 @@ export function ValeurReelleMonthlyTrendChart({ series }: { series: ValeurReelle
 
   return (
     <section
-      className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-emerald-50/25 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5"
+      className="space-y-4"
       data-private
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

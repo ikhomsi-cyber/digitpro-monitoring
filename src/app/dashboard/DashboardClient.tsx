@@ -58,7 +58,8 @@ import {
   dashboardRowMeta,
   dashboardRowTitle,
   dashboardSegmentBtn,
-  dashboardSegmentShell
+  dashboardSegmentShell,
+  dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
@@ -800,7 +801,7 @@ export function DashboardClient({
           initial="initial"
           animate="animate"
           exit="exit"
-          className="w-full space-y-6 will-change-[opacity,transform] sm:space-y-8"
+          className={clsx("w-full will-change-[opacity,transform]", dashboardSectionStack)}
         >
       {dashboardSection === "full" ? (
         <DashboardPremiumHero

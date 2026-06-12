@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Target } from "lucide-react";
 import { clsx } from "clsx";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeAnnualObjectiveTracking } from "@/lib/annual-objective";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import { dashboardFlatKpi } from "@/lib/dashboard-surfaces";
 
 type Props = {
   achievedHtEur: number;
@@ -44,15 +43,10 @@ export function AnnualObjectiveCard({ achievedHtEur, trend }: Props) {
   }
 
   const progressPct = tracking?.completionPct ?? 0;
-  const progressTone =
-    progressPct >= 100
-      ? "bg-emerald-500 dark:bg-emerald-400"
-      : progressPct >= 60
-        ? "bg-sky-500 dark:bg-sky-400"
-        : "bg-amber-500 dark:bg-amber-400";
+  const progressTone = "bg-teal-500 dark:bg-teal-400";
 
   return (
-    <div className="flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none">
+    <div className={dashboardFlatKpi}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -65,7 +59,6 @@ export function AnnualObjectiveCard({ achievedHtEur, trend }: Props) {
             CA HT encaissé · {new Date().getFullYear()}
           </p>
         </div>
-        <PremiumIconBadge icon={Target} tone="rose" size="md" />
       </div>
 
       <label className="mt-3 block">

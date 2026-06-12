@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import type { LucideIcon } from "lucide-react";
 
 export type IconBadgeTone =
+  | "neutral"
   | "emerald"
   | "sky"
   | "teal"
@@ -14,26 +15,28 @@ export type IconBadgeTone =
   | "brand";
 
 const TONE_CLASSES: Record<IconBadgeTone, string> = {
+  neutral:
+    "border-ink-200/80 bg-ink-50/80 text-ink-500 dark:border-white/[0.10] dark:bg-white/[0.05] dark:text-white/55",
   emerald:
-    "border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/40 text-emerald-600 shadow-[0_2px_10px_-4px_rgba(16,185,129,0.45)] dark:border-emerald-300/28 dark:from-emerald-400/22 dark:via-emerald-500/10 dark:to-emerald-600/6 dark:text-emerald-100 dark:shadow-[0_0_22px_-6px_rgba(52,211,153,0.5),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-emerald-200/70 bg-emerald-50/60 text-emerald-600 dark:border-emerald-300/18 dark:bg-emerald-400/10 dark:text-emerald-200/90",
   sky:
-    "border-sky-200/90 bg-gradient-to-br from-sky-50 via-white to-sky-50/40 text-sky-600 shadow-[0_2px_10px_-4px_rgba(14,165,233,0.4)] dark:border-sky-300/28 dark:from-sky-400/22 dark:via-sky-500/10 dark:to-sky-600/6 dark:text-sky-100 dark:shadow-[0_0_22px_-6px_rgba(56,189,248,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-sky-200/70 bg-sky-50/60 text-sky-600 dark:border-sky-300/18 dark:bg-sky-400/10 dark:text-sky-200/90",
   teal:
-    "border-teal-200/90 bg-gradient-to-br from-teal-50 via-white to-teal-50/40 text-teal-600 shadow-[0_2px_10px_-4px_rgba(20,184,166,0.4)] dark:border-teal-300/28 dark:from-teal-400/22 dark:via-teal-500/10 dark:to-teal-600/6 dark:text-teal-100 dark:shadow-[0_0_22px_-6px_rgba(45,212,191,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-teal-200/70 bg-teal-50/60 text-teal-600 dark:border-teal-300/18 dark:bg-teal-400/10 dark:text-teal-200/90",
   violet:
-    "border-violet-200/90 bg-gradient-to-br from-violet-50 via-white to-violet-50/40 text-violet-600 shadow-[0_2px_10px_-4px_rgba(139,92,246,0.4)] dark:border-violet-300/28 dark:from-violet-400/22 dark:via-violet-500/10 dark:to-violet-600/6 dark:text-violet-100 dark:shadow-[0_0_22px_-6px_rgba(167,139,250,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-violet-200/70 bg-violet-50/60 text-violet-600 dark:border-violet-300/18 dark:bg-violet-400/10 dark:text-violet-200/90",
   indigo:
-    "border-indigo-200/90 bg-gradient-to-br from-indigo-50 via-white to-indigo-50/40 text-indigo-600 shadow-[0_2px_10px_-4px_rgba(99,102,241,0.4)] dark:border-indigo-300/28 dark:from-indigo-400/22 dark:via-indigo-500/10 dark:to-indigo-600/6 dark:text-indigo-100 dark:shadow-[0_0_22px_-6px_rgba(129,140,248,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-indigo-200/70 bg-indigo-50/60 text-indigo-600 dark:border-indigo-300/18 dark:bg-indigo-400/10 dark:text-indigo-200/90",
   amber:
-    "border-amber-200/90 bg-gradient-to-br from-amber-50 via-white to-amber-50/40 text-amber-600 shadow-[0_2px_10px_-4px_rgba(245,158,11,0.4)] dark:border-amber-300/28 dark:from-amber-400/22 dark:via-amber-500/10 dark:to-amber-600/6 dark:text-amber-100 dark:shadow-[0_0_22px_-6px_rgba(251,191,36,0.45),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-amber-200/70 bg-amber-50/60 text-amber-600 dark:border-amber-300/18 dark:bg-amber-400/10 dark:text-amber-200/90",
   rose:
-    "border-rose-200/90 bg-gradient-to-br from-rose-50 via-white to-rose-50/40 text-rose-600 shadow-[0_2px_10px_-4px_rgba(244,63,94,0.4)] dark:border-rose-300/28 dark:from-rose-400/22 dark:via-rose-500/10 dark:to-rose-600/6 dark:text-rose-100 dark:shadow-[0_0_22px_-6px_rgba(251,113,133,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-rose-200/70 bg-rose-50/60 text-rose-600 dark:border-rose-300/18 dark:bg-rose-400/10 dark:text-rose-200/90",
   orange:
-    "border-orange-200/90 bg-gradient-to-br from-orange-50 via-white to-orange-50/40 text-orange-600 shadow-[0_2px_10px_-4px_rgba(249,115,22,0.4)] dark:border-orange-300/28 dark:from-orange-400/22 dark:via-orange-500/10 dark:to-orange-600/6 dark:text-orange-100 dark:shadow-[0_0_22px_-6px_rgba(251,146,60,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-orange-200/70 bg-orange-50/60 text-orange-600 dark:border-orange-300/18 dark:bg-orange-400/10 dark:text-orange-200/90",
   cyan:
-    "border-cyan-200/90 bg-gradient-to-br from-cyan-50 via-white to-cyan-50/40 text-cyan-600 shadow-[0_2px_10px_-4px_rgba(6,182,212,0.4)] dark:border-cyan-300/28 dark:from-cyan-400/22 dark:via-cyan-500/10 dark:to-cyan-600/6 dark:text-cyan-100 dark:shadow-[0_0_22px_-6px_rgba(103,232,249,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]",
+    "border-cyan-200/70 bg-cyan-50/60 text-cyan-600 dark:border-cyan-300/18 dark:bg-cyan-400/10 dark:text-cyan-200/90",
   brand:
-    "border-brand-200/90 bg-gradient-to-br from-brand-50 via-white to-brand-50/40 text-brand-600 shadow-[0_2px_10px_-4px_rgba(0,113,227,0.35)] dark:border-brand-300/28 dark:from-brand-400/22 dark:via-brand-500/10 dark:to-brand-600/6 dark:text-brand-100 dark:shadow-[0_0_22px_-6px_rgba(51,149,251,0.48),inset_0_1px_0_rgba(255,255,255,0.14)]"
+    "border-brand-200/70 bg-brand-50/60 text-brand-600 dark:border-brand-300/18 dark:bg-brand-400/10 dark:text-brand-200/90"
 };
 
 type PremiumIconBadgeProps = {
@@ -52,15 +55,14 @@ const SIZE_CLASSES = {
 } as const;
 
 /**
- * Pictogramme premium — dégradé, bordure nette, glow en dark mode.
- * Utiliser partout à la place des spans `bg-*-50 text-*-600` ad hoc.
+ * Pictogramme discret — fond plat, bordure légère. Préférer `neutral` sauf signal sémantique.
  */
 export function PremiumIconBadge({
   icon: Icon,
-  tone = "brand",
+  tone = "neutral",
   size = "md",
   className,
-  strokeWidth = 2.25
+  strokeWidth = 2
 }: PremiumIconBadgeProps) {
   const s = SIZE_CLASSES[size];
   return (

@@ -2,19 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  BriefcaseBusiness,
-  CarFront,
-  ReceiptText,
-  Utensils
-} from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { clsx } from "clsx";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import {
+  dashboardFlatSectionHeader,
+  dashboardSectionDivider,
+  dashboardSectionStack,
+  dashboardTwoColGrid
+} from "@/lib/dashboard-surfaces";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import {
@@ -622,38 +617,37 @@ export function BillableDaysCalendarBlock({
   );
 
   return (
-    <div className="space-y-5">
-      <ActivityOverviewPremium
-        monthTitle={overviewMonthTitle}
-        kpis={overviewKpis}
-        workdayGauge={overviewWorkdayGauge}
-        tjmHt={overviewTjmEnVigueurHt}
-        ctaMode="hidden"
-      />
+    <div className={dashboardSectionStack}>
+      <div className={dashboardTwoColGrid}>
+        <ActivityOverviewPremium
+          monthTitle={overviewMonthTitle}
+          kpis={overviewKpis}
+          workdayGauge={overviewWorkdayGauge}
+          tjmHt={overviewTjmEnVigueurHt}
+          ctaMode="hidden"
+        />
 
-      <ActivityBillingPaceWidget
-        selected={selected}
-        billableRatePeriods={billableRatePeriods}
-        fallbackTjmHt={tjmHt}
-        currentTjmHt={overviewTjmEnVigueurHt}
-        tjmRepartition={tjmRepartitionMois}
-      />
+        <ActivityBillingPaceWidget
+          selected={selected}
+          billableRatePeriods={billableRatePeriods}
+          fallbackTjmHt={tjmHt}
+          currentTjmHt={overviewTjmEnVigueurHt}
+          tjmRepartition={tjmRepartitionMois}
+        />
+      </div>
 
-    <Card variant="solid" className="overflow-hidden">
-      <CardHeader className="border-b border-ink-100/80 bg-gradient-to-b from-ink-50/80 to-white pb-4 dark:border-cyan-100/[0.12] dark:bg-[#06242b]/70 dark:bg-none">
-        <div className="flex items-start gap-3">
-          <PremiumIconBadge icon={CalendarDays} tone="emerald" size="md" className="mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <CardTitle className="!mt-0 text-base font-bold tracking-tight text-ink-900 dark:text-white">
+    <section className={clsx(dashboardSectionDivider, "space-y-6")}>
+      <header className={dashboardFlatSectionHeader}>
+        <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold tracking-tight text-ink-900 dark:text-white">
               Jours travaillés & TJM
-            </CardTitle>
+            </h2>
             <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-ink-500 dark:text-cyan-50/62 sm:text-xs">
               Calendrier des jours facturés, TJM et indicateurs du mois.
             </p>
-          </div>
         </div>
-      </CardHeader>
-      <CardBody className="relative px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
+      </header>
+      <div className="relative">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4">
           {/* Calendrier compact */}
@@ -662,7 +656,7 @@ export function BillableDaysCalendarBlock({
               ref={calendarRef}
               tabIndex={0}
               className={clsx(
-                "w-full max-w-[300px] rounded-2xl border border-ink-200/70 bg-white/90 p-3 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.08)] ring-1 ring-black/[0.03] outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] dark:ring-cyan-100/[0.06] sm:p-3.5",
+                "w-full max-w-[300px] rounded-xl border border-ink-200/35 p-3 outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 dark:border-cyan-100/[0.08] sm:p-3.5",
                 isDragging && "select-none touch-none"
               )}
               role="group"
@@ -861,7 +855,7 @@ export function BillableDaysCalendarBlock({
 
           {/* Mois sélectionné : brut TJM + IK — à droite du calendrier (sm+) */}
           <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
-            <div className="flex h-full min-h-0 flex-col rounded-[1.75rem] border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-cyan-100/[0.14] dark:bg-[#06242b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-cyan-100/[0.08] sm:p-3.5">
+            <div className="flex h-full min-h-0 flex-col border-l border-ink-200/35 py-1 pl-4 dark:border-cyan-100/[0.08] sm:pl-5 sm:py-2">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-ink-500 dark:text-cyan-50/70">
                 Mois sélectionné
               </p>
@@ -913,9 +907,7 @@ export function BillableDaysCalendarBlock({
 
               <div className="mt-3 space-y-3 border-t border-ink-100 pt-3 dark:border-cyan-100/[0.12]">
                 {/* TJM */}
-                <div className="flex items-start gap-2.5">
-                  <PremiumIconBadge icon={BriefcaseBusiness} tone="emerald" size="sm" className="mt-0.5" />
-                  <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">TJM (HT)</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                       {fmt.euro(brutTjmMoisEncoursHt)}
@@ -929,15 +921,12 @@ export function BillableDaysCalendarBlock({
                       remainingBillable={tjmWorkdayGauge.remainingBillable}
                       totalBillableMonth={tjmWorkdayGauge.totalBillableMonth}
                     />
-                  </div>
                 </div>
 
                 {/* IK */}
-                <div className="flex items-start gap-2.5">
-                  <PremiumIconBadge icon={CarFront} tone="violet" size="sm" className="mt-0.5" />
-                  <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">IK aller-retour</p>
-                    <p className="font-display text-base font-bold tabular-nums text-violet-700 dark:text-violet-300">
+                    <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                       {fmt.euro(ikMoisEncours)}
                     </p>
                     <p className="text-[10px] font-medium text-ink-400 dark:text-cyan-50/46">
@@ -949,13 +938,10 @@ export function BillableDaysCalendarBlock({
                       referenceEur={IK_REFERENCE_EUR}
                       tone="analyze"
                     />
-                  </div>
                 </div>
 
                 {/* Repas + NDF */}
-                <div className="flex items-start gap-2.5">
-                  <PremiumIconBadge icon={Utensils} tone="amber" size="sm" className="mt-0.5" />
-                  <div className="min-w-0 flex-1">
+                <div className="min-w-0">
                     <p className="text-[10px] font-semibold text-ink-500 dark:text-white/62">Repas &amp; NDF</p>
                     <p className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
                       {fmt.euro(mealFeesForViewedMonth?.total ?? 0)}
@@ -964,25 +950,25 @@ export function BillableDaysCalendarBlock({
                       <>
                         <p className="text-[10px] font-medium text-ink-400 dark:text-cyan-50/46">
                           Dirigeant {fmt.euro(mealFeesForViewedMonth.dirigeant)} · NDF{" "}
-                          <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                          <span className="font-semibold text-ink-800 dark:text-white/80">
                             {fmt.euro(mealFeesForViewedMonth.ndfAffiche)}
                           </span>
                         </p>
                         {mealFeesForViewedMonth.ndfTransactions.length > 0 ? (
-                          <div className="mt-2 overflow-hidden rounded-xl border border-emerald-200/70 bg-emerald-50/50 dark:border-emerald-400/15 dark:bg-emerald-400/[0.06]">
+                          <div className="mt-2 overflow-hidden rounded-xl border border-ink-200/60 dark:border-white/[0.08]">
                             <button
                               type="button"
                               onClick={() => setNdfListOpen((v) => !v)}
                               aria-expanded={ndfListOpen}
-                              className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left transition hover:bg-emerald-100/50 dark:hover:bg-emerald-400/[0.1]"
+                              className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left transition hover:bg-ink-50/80 dark:hover:bg-white/[0.04]"
                             >
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-700 dark:text-white/75">
                                 <ReceiptText className="h-3 w-3" strokeWidth={2.2} aria-hidden />
                                 {mealFeesForViewedMonth.ndfTransactions.length} NDF DigitPro
                               </span>
                               <ChevronDown
                                 className={clsx(
-                                  "h-3.5 w-3.5 text-emerald-700/70 transition-transform dark:text-emerald-300/70",
+                                  "h-3.5 w-3.5 text-ink-500 transition-transform dark:text-white/45",
                                   ndfListOpen && "rotate-180"
                                 )}
                                 strokeWidth={2.2}
@@ -990,7 +976,7 @@ export function BillableDaysCalendarBlock({
                               />
                             </button>
                             {ndfListOpen ? (
-                              <ul className="scrollbar-clean max-h-56 space-y-1 overflow-y-auto overscroll-contain border-t border-emerald-200/60 px-1.5 py-1.5 dark:border-emerald-400/12">
+                              <ul className="scrollbar-clean max-h-56 space-y-1 overflow-y-auto overscroll-contain border-t border-ink-200/50 px-1.5 py-1.5 dark:border-white/[0.06]">
                                 {mealFeesForViewedMonth.ndfTransactions.map((tx) => (
                                   <li
                                     key={tx.id}
@@ -1003,7 +989,7 @@ export function BillableDaysCalendarBlock({
                                       <span className="text-[9px] text-ink-400 dark:text-white/35">{tx.date}</span>
                                     </span>
                                     <span className="text-right">
-                                      <span className="block text-[11px] font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                                      <span className="block text-[11px] font-bold tabular-nums text-ink-900 dark:text-white">
                                         {fmt.euro(Math.abs(tx.amount))}
                                       </span>
                                       <span className="block text-[9px] font-medium tabular-nums text-ink-400 dark:text-white/40">
@@ -1028,7 +1014,6 @@ export function BillableDaysCalendarBlock({
                       referenceEur={MEALS_REFERENCE_EUR}
                       tone="emerald"
                     />
-                  </div>
                 </div>
               </div>
             </div>
@@ -1122,8 +1107,8 @@ export function BillableDaysCalendarBlock({
         ) : null}
 
           <HiwayInvoicesBlock />
-      </CardBody>
-    </Card>
+      </div>
+    </section>
     </div>
   );
 }

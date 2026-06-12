@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, TrendingUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
 import type { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { ValeurReelleRetainedValueExplainer } from "@/components/dashboard/ValeurReelleRetainedValueExplainer";
@@ -12,90 +12,66 @@ import {
   type ValeurReelleDailyBreakdown
 } from "@/lib/valeur-reelle-daily-value";
 import type { ValeurReelleCashTree } from "@/lib/valeur-reelle-analyze";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import {
-  WATERFALL_AXIS_STYLES,
-  WATERFALL_AXIS_SVG_CLASS
-} from "@/components/dashboard/waterfall-axis-styles";
+  ValeurReelleWaterfallSvg,
+  type ValeurReelleWaterfallSvgStep
+} from "@/components/dashboard/ValeurReelleWaterfallSvg";
 
 type Fmt = ReturnType<typeof useDashboardDisplayFormat>;
 
-type MiniStep = {
-  id: string;
-  label: string;
-  shortLabel: string;
-  delta: number;
-  cumulative: number;
-  kind: "start" | "decrease" | "total";
-  fill: string;
-  stroke: string;
-};
+function pctOfDaily(amount: number, caHt: number): number {
+  if (caHt <= 0) return 0;
+  return Math.round((Math.abs(amount) / caHt) * 1000) / 10;
+}
 
-const STEP_COLORS: Record<string, { fill: string; stroke: string }> = {
-  revenue: { fill: "#34d399", stroke: "#10b981" },
-  csg: { fill: "#fb923c", stroke: "#f97316" },
-  business: { fill: "#fb7185", stroke: "#f43f5e" },
-  personal: { fill: "#2dd4bf", stroke: "#14b8a6" },
-  retained: { fill: "#38bdf8", stroke: "#0ea5e9" }
-};
-
-function buildMiniSteps(b: ValeurReelleDailyBreakdown): MiniStep[] {
+function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWaterfallSvgStep[] {
   const afterCsg = b.caHtPerDay - b.csgPerDay;
   const afterBusiness = afterCsg - b.mandatoryFeesPerDay;
   const afterPersonal = afterBusiness - b.personalChargesPerDay;
+  const ca = b.caHtPerDay;
 
   return [
     {
       id: "revenue",
-      label: "Revenu généré",
-      shortLabel: "Revenu",
-      delta: b.caHtPerDay,
-      cumulative: b.caHtPerDay,
+      label: "CA HT",
+      deltaEur: ca,
+      cumulativeEur: ca,
       kind: "start",
-      ...STEP_COLORS.revenue
+      pctOfCaHt: ca > 0 ? 100 : 0
     },
     {
       id: "csg",
       label: "CSG",
-      shortLabel: "CSG",
-      delta: -b.csgPerDay,
-      cumulative: afterCsg,
+      deltaEur: -b.csgPerDay,
+      cumulativeEur: afterCsg,
       kind: "decrease",
-      ...STEP_COLORS.csg
+      pctOfCaHt: pctOfDaily(b.csgPerDay, ca)
     },
     {
       id: "business",
-      label: "Frais société",
-      shortLabel: "Frais pro",
-      delta: -b.mandatoryFeesPerDay,
-      cumulative: afterBusiness,
+      label: "Frais DigitPro",
+      deltaEur: -b.mandatoryFeesPerDay,
+      cumulativeEur: afterBusiness,
       kind: "decrease",
-      ...STEP_COLORS.business
+      pctOfCaHt: pctOfDaily(b.mandatoryFeesPerDay, ca)
     },
     {
       id: "personal",
       label: "Frais perso",
-      shortLabel: "Frais perso",
-      delta: -b.personalChargesPerDay,
-      cumulative: afterPersonal,
+      deltaEur: -b.personalChargesPerDay,
+      cumulativeEur: afterPersonal,
       kind: "decrease",
-      ...STEP_COLORS.personal
+      pctOfCaHt: pctOfDaily(b.personalChargesPerDay, ca)
     },
     {
       id: "retained",
       label: "Valeur retenue",
-      shortLabel: "Retenu",
-      delta: b.netPerDay,
-      cumulative: b.netPerDay,
+      deltaEur: b.netPerDay,
+      cumulativeEur: b.netPerDay,
       kind: "total",
-      ...STEP_COLORS.retained
+      pctOfCaHt: pctOfDaily(b.netPerDay, ca)
     }
   ];
-}
-
-function formatDelta(delta: number, fmt: Fmt): string {
-  if (delta >= 0) return fmt.euro(delta);
-  return `−${fmt.euro(Math.abs(delta))}`;
 }
 
 function formatWorkedDaysLabel(
@@ -116,146 +92,6 @@ function formatWorkedDaysLabel(
   }
 
   return `${formatted} jour${days > 1 ? "s" : ""} facturé${days > 1 ? "s" : ""}`;
-}
-
-/** Typo axe X — alignée sur ValeurReelleWaterfallChart */
-const MINI_WATERFALL_AXIS = {
-  labelAreaH: 54,
-  connectorY: 14,
-  labelY: 30,
-  valueY: 46,
-  label: { fontSize: 12, fontWeight: 600 },
-  value: { fontSize: 13, fontWeight: 700 },
-  connector: { fontSize: 11, fontWeight: 700 }
-} as const;
-
-function MiniWaterfallSvg({ steps, fmt }: { steps: MiniStep[]; fmt: Fmt }) {
-  const maxVal = Math.max(steps[0]?.cumulative ?? 1, steps[steps.length - 1]?.cumulative ?? 1, 1);
-  const chartW = 480;
-  const chartH = 68;
-  const gap = 8;
-  const barW = (chartW - gap * (steps.length + 1)) / steps.length;
-  const axis = MINI_WATERFALL_AXIS;
-
-  return (
-    <svg
-      viewBox={`0 0 ${chartW} ${chartH + axis.labelAreaH}`}
-      className={clsx("w-full min-w-[300px]", WATERFALL_AXIS_SVG_CLASS)}
-      role="img"
-      aria-label="Mini waterfall journalier"
-    >
-      <rect
-        x={0}
-        y={chartH + 1}
-        width={chartW}
-        height={axis.labelAreaH - 1}
-        rx="6"
-        className={WATERFALL_AXIS_STYLES.band}
-        aria-hidden
-      />
-      <line
-        x1={gap}
-        x2={chartW - gap}
-        y1={chartH}
-        y2={chartH}
-        className={WATERFALL_AXIS_STYLES.baseline}
-        strokeWidth="1"
-      />
-      {steps.map((step, index) => {
-        const scale = (v: number) => (v / maxVal) * chartH;
-        const x = index * (barW + gap) + gap;
-        const prevCumulative = index === 0 ? 0 : (steps[index - 1]?.cumulative ?? 0);
-
-        let yTop: number;
-        let height: number;
-
-        if (step.kind === "start") {
-          yTop = chartH - scale(step.cumulative);
-          height = scale(step.cumulative);
-        } else if (step.kind === "decrease") {
-          const topVal = prevCumulative;
-          const bottomVal = step.cumulative;
-          yTop = chartH - scale(topVal);
-          height = Math.max(2, scale(topVal) - scale(bottomVal));
-        } else {
-          yTop = chartH - scale(step.cumulative);
-          height = Math.max(2, scale(step.cumulative));
-        }
-
-        const connectorY = chartH - scale(prevCumulative);
-
-        return (
-          <g key={step.id}>
-            {index > 0 && step.kind === "decrease" ? (
-              <line
-                x1={x - gap}
-                x2={x + barW / 2}
-                y1={connectorY}
-                y2={connectorY}
-                className={WATERFALL_AXIS_STYLES.connectorLine}
-                strokeWidth="1"
-                strokeDasharray="3 2"
-              />
-            ) : null}
-            {index > 0 && step.kind === "total" ? (
-              <text
-                x={x - gap / 2}
-                y={chartH + axis.connectorY}
-                textAnchor="middle"
-                fontSize={axis.connector.fontSize}
-                fontWeight={axis.connector.fontWeight}
-                className={WATERFALL_AXIS_STYLES.connector}
-              >
-                =
-              </text>
-            ) : index > 0 ? (
-              <text
-                x={x - gap / 2}
-                y={chartH + axis.connectorY}
-                textAnchor="middle"
-                fontSize={axis.connector.fontSize}
-                fontWeight={axis.connector.fontWeight}
-                className={WATERFALL_AXIS_STYLES.connector}
-              >
-                →
-              </text>
-            ) : null}
-            <rect
-              x={x}
-              y={yTop}
-              width={barW}
-              height={Math.max(2, height)}
-              rx="4"
-              fill={step.fill}
-              fillOpacity={step.kind === "total" ? 0.92 : 0.82}
-              stroke={step.stroke}
-              strokeWidth="1"
-            />
-            <text
-              x={x + barW / 2}
-              y={chartH + axis.labelY}
-              textAnchor="middle"
-              fontSize={axis.label.fontSize}
-              fontWeight={axis.label.fontWeight}
-              className={WATERFALL_AXIS_STYLES.label}
-            >
-              {step.shortLabel}
-            </text>
-            <text
-              x={x + barW / 2}
-              y={chartH + axis.valueY}
-              textAnchor="middle"
-              fontSize={axis.value.fontSize}
-              fontWeight={axis.value.fontWeight}
-              className={WATERFALL_AXIS_STYLES.value}
-            >
-              {formatDelta(step.kind === "start" || step.kind === "total" ? step.delta : step.delta, fmt)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
 }
 
 function DetailPanel({
@@ -348,8 +184,12 @@ export function ValeurReelleDailyValueCard({
     [billableDays, gainPerWorkDayEstimate, tjmHt, tree]
   );
 
-  const steps = useMemo(() => buildMiniSteps(breakdown), [breakdown]);
+  const steps = useMemo(() => buildDailyWaterfallSteps(breakdown), [breakdown]);
   const basisLabel = formatWorkedDaysLabel(breakdown, isCurrentMonthEstimate);
+  const retainedPct =
+    breakdown.caHtPerDay > 0
+      ? Math.round((breakdown.netPerDay / breakdown.caHtPerDay) * 1000) / 10
+      : null;
 
   if (breakdown.caHtPerDay <= 0 && breakdown.netPerDay <= 0) {
     return null;
@@ -360,49 +200,73 @@ export function ValeurReelleDailyValueCard({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="mb-4 rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-3.5 dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.04] sm:px-5 sm:py-4"
+      className="space-y-3"
       aria-label="Décomposition journalière"
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/42">
-            Par jour facturé
-          </p>
-          <p className="mt-0.5 text-[10px] font-medium text-ink-500 dark:text-white/38">{basisLabel}</p>
-        </div>
-        <PremiumIconBadge icon={TrendingUp} tone="emerald" size="md" />
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
+          Par jour facturé
+        </p>
+        <p className="mt-0.5 text-[10px] font-medium text-ink-400 dark:text-white/35">
+          CA HT → déductions → valeur retenue · {basisLabel}
+        </p>
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <MiniWaterfallSvg steps={steps} fmt={fmt} />
+        <ValeurReelleWaterfallSvg
+          steps={steps}
+          formatDelta={(delta) =>
+            delta >= 0 ? fmt.euro(delta) : `−${fmt.euro(Math.abs(delta))}`
+          }
+          ariaLabel="Waterfall journalier par jour facturé"
+        />
       </div>
 
-      <div className="mt-2 rounded-xl border border-emerald-500/12 bg-emerald-500/[0.06] px-3 py-2 dark:border-emerald-400/18 dark:bg-emerald-500/08">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/42">
-              Valeur retenue
-            </span>
-            <ValeurReelleRetainedValueExplainer
-              breakdown={breakdown}
-              fmt={fmt}
-              isCurrentMonthEstimate={isCurrentMonthEstimate}
-            />
-          </div>
-          <span className="font-display text-lg font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
-            {fmt.euro(breakdown.netPerDay)}
-            <span className="ml-1 text-[10px] font-semibold text-ink-500 dark:text-white/40">/ jour</span>
-          </span>
-        </div>
-        {breakdown.netExceedsTjm ? (
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink-200/40 pt-3 dark:border-cyan-100/[0.07]">
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
+          = Valeur retenue
           <ValeurReelleRetainedValueExplainer
             breakdown={breakdown}
             fmt={fmt}
             isCurrentMonthEstimate={isCurrentMonthEstimate}
-            variant="inline-banner"
           />
-        ) : null}
+        </span>
+        <div className="text-right">
+          <span className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
+            {fmt.euro(breakdown.netPerDay)}
+          </span>
+          <span className="ml-2 text-[10px] font-semibold tabular-nums text-ink-500 dark:text-white/40">
+            {retainedPct != null ? `${retainedPct} % du CA HT · / jour` : "/ jour"}
+          </span>
+        </div>
       </div>
+
+      {breakdown.netExceedsTjm ? (
+        <ValeurReelleRetainedValueExplainer
+          breakdown={breakdown}
+          fmt={fmt}
+          isCurrentMonthEstimate={isCurrentMonthEstimate}
+          variant="inline-banner"
+        />
+      ) : null}
+
+      <ol className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-ink-500 dark:text-white/45">
+        {steps.map((step, index) => (
+          <li key={`flow-${step.id}`} className="inline-flex items-center gap-1">
+            {index > 0 ? <span className="opacity-40">→</span> : null}
+            <span
+              className={clsx(
+                "rounded-full px-2 py-0.5",
+                step.kind === "total"
+                  ? "bg-ink-100 text-ink-800 dark:bg-white/[0.10] dark:text-white"
+                  : "bg-ink-50 text-ink-600 dark:bg-white/[0.06] dark:text-white/65"
+              )}
+            >
+              {step.label}
+            </span>
+          </li>
+        ))}
+      </ol>
 
       <button
         type="button"

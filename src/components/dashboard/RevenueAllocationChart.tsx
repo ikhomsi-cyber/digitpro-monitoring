@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArrowRight, PieChart } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { clsx } from "clsx";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import { dashboardFlatKpi } from "@/lib/dashboard-surfaces";
 
 export type RevenueAllocationInput = {
   caHtEur: number;
@@ -39,8 +39,8 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "BNC",
       flowLabel: "BNC",
       valueEur: Math.max(0, allocation.bncEur),
-      colorClass: "bg-sky-400",
-      textClass: "text-sky-700 dark:text-sky-300",
+      colorClass: "bg-teal-600 dark:bg-teal-400",
+      textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Honoraires versés en BNC (rémunération dirigeant), estimés à partir de la répartition Valeur réelle du mois."
     },
@@ -49,8 +49,8 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "Perso",
       flowLabel: "Personal",
       valueEur: Math.max(0, allocation.fraisPersoEur),
-      colorClass: "bg-emerald-400",
-      textClass: "text-emerald-700 dark:text-emerald-300",
+      colorClass: "bg-teal-500 dark:bg-teal-400/80",
+      textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Charges personnelles couvertes sur l'activité : repas, indemnités kilométriques et frais perso refacturés."
     },
@@ -59,8 +59,8 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "CSG",
       flowLabel: "CSG",
       valueEur: Math.max(0, allocation.csgEur),
-      colorClass: "bg-orange-400",
-      textClass: "text-orange-700 dark:text-orange-300",
+      colorClass: "bg-teal-400/80 dark:bg-teal-400/55",
+      textClass: "text-ink-600 dark:text-white/65",
       tooltip:
         "Cotisations sociales (CSG) provisionnées sur le chiffre d'affaires du mois en cours."
     },
@@ -69,8 +69,8 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "Dépenses",
       flowLabel: "Expenses",
       valueEur: Math.max(0, allocation.fraisDigitProEur),
-      colorClass: "bg-rose-500",
-      textClass: "text-rose-700 dark:text-rose-300",
+      colorClass: "bg-ink-400 dark:bg-white/30",
+      textClass: "text-ink-600 dark:text-white/65",
       tooltip:
         "Frais obligatoires DigitPro (compta, assurances, outils) imputés au TJM et déduits du revenu disponible."
     }
@@ -112,7 +112,7 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
   ];
 
   return (
-    <div className="flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none">
+    <div className={dashboardFlatKpi}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -128,7 +128,6 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
             </span>
           </p>
         </div>
-        <PremiumIconBadge icon={PieChart} tone="teal" size="md" />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] font-bold text-ink-500 dark:text-white/45">

@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
-import { CalendarDays, LineChart, PiggyBank, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
@@ -19,7 +18,6 @@ import {
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import { ValeurReelleDailyValueCard } from "@/components/dashboard/ValeurReelleDailyValueCard";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import {
   analyzeValeurReelle,
@@ -38,6 +36,11 @@ import type {
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
 import { ValeurReellePer100AllocationCard } from "@/components/dashboard/ValeurReellePer100AllocationCard";
+import {
+  dashboardSectionDivider,
+  dashboardSectionStack,
+  dashboardTwoColGrid
+} from "@/lib/dashboard-surfaces";
 import { ValeurReelleMonthlyTrendChart } from "@/components/dashboard/ValeurReelleMonthlyTrendChart";
 import { ValeurReelleWaterfallChart } from "@/components/dashboard/ValeurReelleWaterfallChart";
 import { buildValeurReelleMonthlyTrendSeries } from "@/lib/valeur-reelle-monthly-trend";
@@ -85,13 +88,11 @@ function VatSavingsMetricTile({
   label,
   value,
   sublabel,
-  icon: Icon,
   emphasized = false
 }: {
   label: string;
   value: string;
   sublabel?: string;
-  icon: typeof LineChart;
   emphasized?: boolean;
 }) {
   return (
@@ -99,29 +100,18 @@ function VatSavingsMetricTile({
       className={clsx(
         "rounded-2xl border px-4 py-3.5",
         emphasized
-          ? "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-400/20 dark:bg-emerald-500/10"
-          : "border-ink-200/75 bg-white/70 dark:border-white/[0.08] dark:bg-white/[0.04]"
+          ? "border-ink-200/80 bg-ink-50/40 dark:border-white/[0.10] dark:bg-white/[0.05]"
+          : "border-ink-200/75 bg-transparent dark:border-white/[0.08]"
       )}
     >
-      <div className="flex items-center gap-2">
-        <Icon
-          className={clsx(
-            "h-3.5 w-3.5",
-            emphasized ? "text-emerald-600 dark:text-emerald-300" : "text-ink-500 dark:text-white/45"
-          )}
-          strokeWidth={2}
-          aria-hidden
-        />
-        <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
-          {label}
-        </p>
-      </div>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
+        {label}
+      </p>
       <p
         className={clsx(
           "mt-2 font-display font-bold tabular-nums",
-          emphasized
-            ? "text-xl text-emerald-900 dark:text-emerald-100 sm:text-2xl"
-            : "text-lg text-ink-900 dark:text-white sm:text-xl"
+          emphasized ? "text-xl sm:text-2xl" : "text-lg sm:text-xl",
+          "text-ink-900 dark:text-white"
         )}
       >
         {value}
@@ -451,7 +441,6 @@ function CashFlowTreeVisual({
     tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
   const rows: Array<{
-    icon?: string;
     label: string;
     detail?: string;
     amount: number | null;
@@ -464,7 +453,6 @@ function CashFlowTreeVisual({
     emphasize?: boolean;
   }> = [
     {
-      icon: "💶",
       label: "CA facturé HT",
       detail: `TTC encaissé ${fmt.euro(tree.caTtcEur)} / 1,20`,
       amount: tree.caFactureEur,
@@ -472,7 +460,6 @@ function CashFlowTreeVisual({
       tone: "neutral"
     },
     {
-      icon: "📋",
       label: "CSG",
       detail: "9,7 % de (CA HT − frais obligatoires − charges perso)",
       amount: -tree.csgEur,
@@ -480,7 +467,6 @@ function CashFlowTreeVisual({
       tone: "deduct"
     },
     {
-      icon: "🧾",
       label: "Frais DigitPro",
       amount: -tree.mandatoryFeesEur,
       gaugeAmount: tree.mandatoryFeesEur,
@@ -491,7 +477,6 @@ function CashFlowTreeVisual({
       tone: "deduct"
     },
     {
-      icon: "🏠",
       label: "Frais perso",
       amount: -tree.personalChargesEur,
       gaugeAmount: tree.personalChargesEur,
@@ -508,67 +493,70 @@ function CashFlowTreeVisual({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45 }}
-      className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-emerald-50/30 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5"
+      className={clsx(dashboardSectionStack)}
     >
-      <div className="mb-5 rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-50/60 via-white/80 to-white/40 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-emerald-400/20 dark:from-emerald-500/[0.12] dark:via-[#0b3038]/40 dark:to-[#06242b]/30 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:px-5 sm:py-6">
+      <div className="border-b border-ink-200/45 pb-5 dark:border-cyan-100/[0.08] sm:pb-6">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/40">
           {periodLabel}
         </p>
-        <p className="mt-3 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">
-          Net disponible réel
-        </p>
-        <p className="mt-1 font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight tabular-nums text-ink-950 dark:text-white sm:text-5xl md:text-6xl">
-          {fmt.euro(netDisponibleReel)}
-        </p>
-        {netDisponiblePctCa != null ? (
-          <p className="mt-2 text-sm font-semibold tabular-nums text-ink-700 dark:text-white/75">
-            <span className="text-emerald-700 dark:text-emerald-300">{netDisponiblePctCa} %</span>
-            {" "}du CA HT
-          </p>
-        ) : null}
-        {reelParJour != null ? (
-          <p className="mt-3 text-sm font-medium text-ink-600 dark:text-white/60">
-            <span className="font-semibold text-ink-700 dark:text-white/75">Gain moyen :</span>{" "}
-            <span className="font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
-              {fmt.euro(reelParJour)}/jour
-            </span>
-            <span className="text-[11px] text-ink-500 dark:text-white/40">
-              {" "}
-              ·{" "}
-              {isCurrentMonthEstimate ? (
-                gainPerWorkDayEstimate.workedDays > 0 ? (
-                  <>
-                    {formattedGainDayDenominator} jour{gainDayDenominator > 1 ? "s" : ""} travaillé
-                    {gainDayDenominator > 1 ? "s" : ""}
-                    {gainPerWorkDayEstimate.gainAverageMonthKey
-                      ? ` · ${formatDashboardMonthLabel(gainPerWorkDayEstimate.gainAverageMonthKey)}`
-                      : " · mois passé"}
-                    {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé sur historique" : null}
-                  </>
+        <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-ink-600 dark:text-white/55">
+              Net disponible réel
+            </p>
+            <p className="mt-0.5 font-display text-3xl font-semibold leading-none tracking-apple-tight tabular-nums text-ink-950 dark:text-white sm:text-4xl lg:text-5xl">
+              {fmt.euro(netDisponibleReel)}
+            </p>
+            {netDisponiblePctCa != null ? (
+              <p className="mt-1.5 text-sm font-semibold tabular-nums text-ink-700 dark:text-white/75">
+                <span className="text-ink-800 dark:text-white/80">{netDisponiblePctCa} %</span>
+                {" "}du CA HT
+              </p>
+            ) : null}
+          </div>
+          {reelParJour != null ? (
+            <div className="md:text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/42">
+                Gain moyen
+              </p>
+              <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white sm:text-2xl">
+                {fmt.euro(reelParJour)}
+                <span className="ml-1 text-sm font-semibold text-ink-500 dark:text-white/40">/jour</span>
+              </p>
+              <p className="mt-1 text-[11px] text-ink-500 dark:text-white/40">
+                {isCurrentMonthEstimate ? (
+                  gainPerWorkDayEstimate.workedDays > 0 ? (
+                    <>
+                      {formattedGainDayDenominator} j. travaillé{gainDayDenominator > 1 ? "s" : ""}
+                      {gainPerWorkDayEstimate.gainAverageMonthKey
+                        ? ` · ${formatDashboardMonthLabel(gainPerWorkDayEstimate.gainAverageMonthKey)}`
+                        : " · mois passé"}
+                      {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé" : null}
+                    </>
+                  ) : (
+                    "estimation sur historique"
+                  )
                 ) : (
-                  "estimation sur historique"
-                )
-              ) : (
-                `${formattedGainDayDenominator} jour${gainDayDenominator > 1 ? "s" : ""} facturé${gainDayDenominator > 1 ? "s" : ""}`
-              )}
-            </span>
-          </p>
-        ) : (
-          <p className="mt-3 text-[11px] font-medium leading-snug text-ink-500 dark:text-white/40">
-            Cochez vos jours travaillés sur le dashboard pour le gain moyen / jour.
-          </p>
-        )}
+                  `${formattedGainDayDenominator} j. facturé${gainDayDenominator > 1 ? "s" : ""}`
+                )}
+              </p>
+            </div>
+          ) : (
+            <p className="text-[11px] font-medium text-ink-500 dark:text-white/40 md:max-w-xs md:text-right">
+              Cochez vos jours travaillés pour le gain moyen / jour.
+            </p>
+          )}
+        </div>
       </div>
 
-      <ValeurReelleDailyValueCard
-        tree={tree}
-        fmt={fmt}
-        tjmHt={tjmHt}
-        billableDays={billableDays}
-        gainPerWorkDayEstimate={gainPerWorkDayEstimate}
-      />
-
-      <div className="mb-4">
+      <div className={dashboardTwoColGrid}>
+        <ValeurReelleDailyValueCard
+          tree={tree}
+          fmt={fmt}
+          tjmHt={tjmHt}
+          billableDays={billableDays}
+          gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+        />
         <ValeurReelleWaterfallChart tree={tree} fmt={fmt} />
       </div>
 
@@ -578,14 +566,7 @@ function CashFlowTreeVisual({
             return null;
           }
 
-          const amountClass =
-            row.tone === "deduct"
-              ? "text-rose-700 dark:text-rose-300"
-              : row.tone === "highlight"
-                ? "text-emerald-700 dark:text-emerald-300"
-                : row.tone === "result"
-                  ? "text-sky-800 dark:text-sky-200"
-                  : "text-ink-900 dark:text-white";
+          const amountClass = "text-ink-900 dark:text-white";
 
           return (
             <div
@@ -595,8 +576,8 @@ function CashFlowTreeVisual({
                   ? "rounded-xl border border-transparent px-3 py-3"
                   : "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 rounded-xl border border-transparent px-3 py-2",
                 row.emphasize
-                  ? "border-emerald-500/15 bg-emerald-500/8 dark:bg-emerald-500/10"
-                  : "bg-white/45 dark:bg-white/[0.025]"
+                  ? "border-ink-200/50 bg-ink-50/30 dark:border-white/[0.08] dark:bg-white/[0.03]"
+                  : "bg-transparent"
               )}
             >
               <div className="min-w-0 font-sans">
@@ -609,7 +590,6 @@ function CashFlowTreeVisual({
                       : "text-ink-700 dark:text-white/80"
                   )}
                 >
-                  {row.icon ? <span aria-hidden>{row.icon}</span> : null}
                   {row.label}
                 </span>
                 {row.showBreakdownPie ? (
@@ -696,12 +676,10 @@ function RecoverableVatMonthlyBlock({
   const referenceMonthLabel = formatVatReferenceMonthLabel(kpis.referenceMonthKey);
 
   return (
-    <section className="rounded-[2rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/50 p-4 shadow-[0_20px_60px_-28px_rgba(16,185,129,0.28)] dark:border-emerald-300/15 dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_80px_-24px_rgba(0,22,28,0.72)] sm:p-5">
+    <section className={clsx(dashboardSectionDivider, "space-y-5")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <PremiumIconBadge icon={Sparkles} tone="emerald" size="lg" />
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-700/85 dark:text-emerald-300/80">
+        <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-ink-500 dark:text-white/45">
               Économies TVA
             </p>
             <h2 className="mt-1 font-display text-lg font-semibold text-ink-900 dark:text-white sm:text-xl">
@@ -710,13 +688,12 @@ function RecoverableVatMonthlyBlock({
             <p className="mt-1 text-[11px] text-ink-600 dark:text-white/50">
               TVA récupérable sur vos dépenses éligibles · {referenceMonthLabel}
             </p>
-          </div>
         </div>
-        <div className="rounded-2xl border border-emerald-200/70 bg-white/70 px-3 py-2 text-right dark:border-white/10 dark:bg-white/[0.05]">
+        <div className="rounded-xl border border-ink-200/60 px-3 py-2 text-right dark:border-white/[0.08]">
           <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
             Moyenne mensuelle
           </p>
-          <p className="mt-0.5 text-sm font-bold tabular-nums text-emerald-800 dark:text-emerald-200">
+          <p className="mt-0.5 text-sm font-bold tabular-nums text-ink-900 dark:text-white">
             {fmt.euro(kpis.averageMonthlyEur)}
           </p>
         </div>
@@ -727,26 +704,23 @@ function RecoverableVatMonthlyBlock({
           label="Ce mois"
           value={fmt.euro(kpis.monthEur)}
           sublabel={referenceMonthLabel}
-          icon={CalendarDays}
         />
         <VatSavingsMetricTile
           label="Depuis janvier"
           value={fmt.euro(kpis.ytdEur)}
           sublabel={`${kpis.monthsElapsed} mois · ${kpis.referenceYear}`}
-          icon={PiggyBank}
           emphasized
         />
         <VatSavingsMetricTile
           label="Projection annuelle"
           value={fmt.euro(kpis.annualProjectionEur)}
           sublabel={`Moy. ${fmt.euro(kpis.averageMonthlyEur)} × 12`}
-          icon={LineChart}
         />
       </div>
 
       {breakdownRows.length ? (
         <div className="mt-5">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700/80 dark:text-emerald-300/70">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500 dark:text-white/45">
             Répartition par catégorie
           </p>
           <BreakdownPieChart
@@ -757,7 +731,7 @@ function RecoverableVatMonthlyBlock({
           />
         </div>
       ) : (
-        <p className="mt-5 rounded-xl border border-emerald-200/50 bg-emerald-50/40 px-3 py-3 text-xs font-semibold text-emerald-800/80 dark:border-emerald-400/15 dark:bg-emerald-500/8 dark:text-emerald-200/80">
+        <p className="mt-5 rounded-xl border border-ink-200/50 px-3 py-3 text-xs font-semibold text-ink-600 dark:border-white/[0.08] dark:text-white/55">
           Aucune économie TVA sur cette période — vos achats éligibles apparaîtront ici.
         </p>
       )}
@@ -936,7 +910,7 @@ export function ValeurReelleClient({
   );
 
   return (
-    <div className="scroll-mt-28 space-y-6 overflow-x-hidden sm:space-y-8">
+    <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
       <DashboardPeriodFilterSection
         selectedYears={selectedYears}
         setSelectedYears={setSelectedYears}
@@ -976,9 +950,10 @@ export function ValeurReelleClient({
         fmt={fmt}
       />
 
-      <ValeurReellePer100AllocationCard tree={analysis.cashTree} fmt={fmt} />
-
-      <ValeurReelleMonthlyTrendChart series={monthlyTrendSeries} />
+      <div className={dashboardTwoColGrid}>
+        <ValeurReellePer100AllocationCard tree={analysis.cashTree} fmt={fmt} />
+        <ValeurReelleMonthlyTrendChart series={monthlyTrendSeries} />
+      </div>
 
     </div>
   );

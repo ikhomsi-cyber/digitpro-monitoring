@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { Landmark } from "lucide-react";
 import { clsx } from "clsx";
 import {
   computeTaxLiabilityCoverage,
@@ -9,7 +8,7 @@ import {
 } from "@/lib/tax-liability";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import { dashboardFlatKpi } from "@/lib/dashboard-surfaces";
 
 type Props = {
   cashEur: number | null;
@@ -72,7 +71,7 @@ export function TaxLiabilityCard({
   const breakdownTotal = Math.max(coverage.vatEur + coverage.csgEur, 1);
 
   return (
-    <div className="flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none">
+    <div className={dashboardFlatKpi}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -85,18 +84,14 @@ export function TaxLiabilityCard({
             {statsReady ? formatEuro(coverage.totalLiabilityEur) : "Calcul…"}
           </p>
         </div>
-        <PremiumIconBadge icon={Landmark} tone="orange" size="md" />
       </div>
 
       {statsReady ? (
         <>
-          <div className="mt-3 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
-              Détail
-            </p>
-            <div className="flex h-2 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
+          <div className="mt-2 space-y-2">
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
               <div
-                className="bg-cyan-400 dark:bg-cyan-300"
+                className="bg-ink-500 dark:bg-white/45"
                 style={{ width: `${(coverage.vatEur / breakdownTotal) * 100}%` }}
                 title={`TVA : ${formatEuro(coverage.vatEur)}`}
                 aria-hidden
@@ -108,58 +103,36 @@ export function TaxLiabilityCard({
                 aria-hidden
               />
             </div>
-            <dl className="grid grid-cols-2 gap-2">
-              {[
-                { label: "TVA", value: coverage.vatEur, dot: "bg-cyan-400" },
-                { label: "CSG", value: coverage.csgEur, dot: "bg-orange-400" }
-              ].map((row) => (
-                <div
-                  key={row.label}
-                  className="rounded-xl border border-ink-200/70 bg-white/55 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]"
-                >
-                  <dt className="flex items-center gap-1.5 text-[10px] font-bold text-ink-500 dark:text-white/45">
-                    <span className={clsx("h-2 w-2 rounded-full", row.dot)} aria-hidden />
-                    {row.label}
-                  </dt>
-                  <dd className="mt-1 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
-                    {formatEuro(row.value)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-ink-200/70 bg-white/55 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.04]">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
-                  Couverture trésorerie
-                </p>
-                <p className="text-[10px] text-ink-500 dark:text-white/45">Cash / dettes</p>
+            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-semibold">
+              <div className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" aria-hidden />
+                <dt className="text-ink-500 dark:text-white/45">TVA</dt>
+                <dd className="tabular-nums text-ink-900 dark:text-white">{formatEuro(coverage.vatEur)}</dd>
               </div>
+              <div className="inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-400" aria-hidden />
+                <dt className="text-ink-500 dark:text-white/45">CSG</dt>
+                <dd className="tabular-nums text-ink-900 dark:text-white">{formatEuro(coverage.csgEur)}</dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={clsx(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide",
                   styles.badge
                 )}
               >
                 {coverage.coveragePct != null ? `${formatInt(coverage.coveragePct)} %` : "—"}
               </span>
+              <div className="h-1.5 min-w-[5rem] flex-1 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
+                <div
+                  className={clsx("h-full rounded-full transition-[width] duration-500", styles.bar)}
+                  style={{ width: `${barWidthPct}%` }}
+                />
+              </div>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70">
-              <div
-                className={clsx("h-full rounded-full transition-[width] duration-500", styles.bar)}
-                style={{ width: `${barWidthPct}%` }}
-              />
-            </div>
-            <p className="mt-1.5 text-[10px] font-medium text-ink-500 dark:text-white/40">
+            <p className="text-[10px] font-medium text-ink-500 dark:text-white/40">
               {styles.label}
-              {coverage.coveragePct != null ? (
-                <span className="text-ink-400 dark:text-white/35">
-                  {" "}
-                  · {formatEuro(coverage.cashEur)} / {formatEuro(coverage.totalLiabilityEur)}
-                </span>
-              ) : null}
             </p>
           </div>
         </>

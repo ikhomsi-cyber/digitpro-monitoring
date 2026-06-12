@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { CalendarDays, LineChart, PiggyBank, TrendingUp, WalletCards } from "lucide-react";
 import { clsx } from "clsx";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
@@ -14,7 +13,7 @@ import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
 import { AnnualObjectiveCard } from "@/components/dashboard/AnnualObjectiveCard";
 import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
-import { PremiumIconBadge, type IconBadgeTone } from "@/components/ui/PremiumIconBadge";
+import { dashboardDenseKpiGrid, dashboardFlatHero, dashboardFlatKpi, dashboardSectionTitle } from "@/lib/dashboard-surfaces";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -42,21 +41,14 @@ function KpiSection({
 }: {
   title: string;
   children: ReactNode;
-  columns: "1" | "2" | "3";
+  columns: 1 | 2 | 3 | 4;
 }) {
   return (
-    <section className="space-y-3">
-      <h2 className="border-b border-ink-200/70 pb-2 text-[11px] font-bold uppercase tracking-[0.24em] text-ink-600 dark:border-cyan-100/[0.12] dark:text-emerald-300/85">
-        {title}
-      </h2>
+    <section className="space-y-2.5">
+      <h2 className={dashboardSectionTitle}>{title}</h2>
       <div
         className={clsx(
-          "grid items-stretch gap-3 sm:gap-4",
-          columns === "1"
-            ? "grid-cols-1"
-            : columns === "2"
-              ? "grid-cols-1 sm:grid-cols-2"
-              : "grid-cols-1 sm:grid-cols-3"
+          columns === 1 ? "grid grid-cols-1" : dashboardDenseKpiGrid(columns as 2 | 3 | 4)
         )}
       >
         {children}
@@ -67,16 +59,12 @@ function KpiSection({
 
 function KpiCard({
   label,
-  icon,
-  tone,
   href,
   ariaLabel,
   trend,
   children
 }: {
   label: string;
-  icon: typeof TrendingUp;
-  tone: IconBadgeTone;
   href?: string;
   ariaLabel?: string;
   trend?: KpiTrend | null;
@@ -99,22 +87,19 @@ function KpiCard({
           : undefined
       }
       className={clsx(
-        "flex h-full min-h-[8.75rem] flex-col rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 text-left shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none",
+        dashboardFlatKpi,
         interactive &&
-          "cursor-pointer transition hover:-translate-y-0.5 hover:border-emerald-300/70 hover:bg-white hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 dark:hover:border-emerald-400/25 dark:hover:bg-white/[0.07]"
+          "cursor-pointer transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-300/60 dark:focus-visible:ring-white/20"
       )}
       aria-label={interactive ? ariaLabel : undefined}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
-            {label}
-          </p>
-          <KpiTrendBadge trend={trend} />
-        </div>
-        <PremiumIconBadge icon={icon} tone={tone} size="md" />
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
+          {label}
+        </p>
+        <KpiTrendBadge trend={trend} />
       </div>
-      <div className="mt-3 flex flex-1 flex-col justify-between gap-2">{children}</div>
+      <div className="mt-2 flex flex-1 flex-col justify-between gap-1.5">{children}</div>
     </div>
   );
 }
@@ -185,8 +170,8 @@ function AvantIrBreakdown({
   formatInt: (n: number) => number;
 }) {
   const rows = [
-    { label: "BNC (honoraires)", value: bncEur, tone: "sky" as const },
-    { label: "Frais perso récupérés", value: fraisPersoEur, tone: "emerald" as const }
+    { label: "BNC (honoraires)", value: bncEur },
+    { label: "Frais perso récupérés", value: fraisPersoEur }
   ];
 
   return (
@@ -195,7 +180,7 @@ function AvantIrBreakdown({
         {formatEuro(totalEur)}
       </p>
 
-      <div className="rounded-xl border border-amber-200/60 bg-amber-50/35 px-3 py-2.5 dark:border-amber-300/15 dark:bg-amber-500/[0.06]">
+      <div className="border-t border-ink-200/50 pt-2.5 dark:border-cyan-100/[0.08]">
         <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-ink-500 dark:text-white/42">
           Détail du calcul
         </p>
@@ -203,22 +188,13 @@ function AvantIrBreakdown({
           {rows.map((row) => (
             <li key={row.label} className="flex items-center justify-between gap-3 text-[11px] font-semibold">
               <span className="text-ink-600 dark:text-white/60">{row.label}</span>
-              <span
-                className={clsx(
-                  "tabular-nums",
-                  row.tone === "sky"
-                    ? "text-sky-700 dark:text-sky-300"
-                    : "text-emerald-700 dark:text-emerald-300"
-                )}
-              >
-                {formatEuro(row.value)}
-              </span>
+              <span className="tabular-nums text-ink-900 dark:text-white">{formatEuro(row.value)}</span>
             </li>
           ))}
         </ul>
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-amber-200/50 pt-2 text-[11px] font-bold dark:border-amber-300/12">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-ink-200/50 pt-2 text-[11px] font-bold dark:border-cyan-100/[0.08]">
           <span className="text-ink-700 dark:text-white/75">= Avant IR</span>
-          <span className="tabular-nums text-amber-800 dark:text-amber-200">{formatEuro(totalEur)}</span>
+          <span className="tabular-nums text-ink-900 dark:text-white">{formatEuro(totalEur)}</span>
         </div>
         <p className="mt-2 text-[10px] font-medium leading-relaxed text-ink-500 dark:text-white/42">
           {formatInt(billedDays)} j. facturés × {formatEuro(netPerDayEur)}/j
@@ -255,48 +231,35 @@ function WorkdaysSummary({
       label: "Facturé",
       value: billed,
       pct: billedPct,
-      barClass: "bg-gradient-to-r from-emerald-400 to-emerald-500 dark:from-emerald-300 dark:to-emerald-400",
-      chipClass:
-        "border-emerald-200/70 bg-emerald-50/80 dark:border-emerald-300/20 dark:bg-emerald-500/10",
-      valueClass: "text-emerald-700 dark:text-emerald-200"
+      barClass: "bg-teal-500 dark:bg-teal-400",
+      valueClass: "text-ink-700 dark:text-white/75"
     },
     {
       id: "planned",
       label: "Prévu",
       value: planned,
       pct: plannedPct,
-      barClass: "bg-gradient-to-r from-violet-300 to-violet-400 dark:from-violet-400/80 dark:to-violet-300/70",
-      chipClass: "border-violet-200/70 bg-violet-50/80 dark:border-violet-300/20 dark:bg-violet-500/10",
-      valueClass: "text-violet-700 dark:text-violet-200"
+      barClass: "bg-ink-300 dark:bg-white/25",
+      valueClass: "text-ink-500 dark:text-white/50"
     }
   ] as const;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="font-display text-3xl font-bold leading-none tabular-nums tracking-tight text-ink-900 dark:text-white">
-            {formatInt(billed)}
-            <span className="ml-1.5 text-lg font-semibold text-ink-400 dark:text-white/35">
-              / {formatInt(total)}
-            </span>
-          </p>
-          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
-            jours facturés ce mois
-          </p>
-        </div>
-        <div className="rounded-xl border border-violet-200/70 bg-violet-50/70 px-2.5 py-1.5 text-right dark:border-violet-300/20 dark:bg-violet-500/10">
-          <p className="font-display text-xl font-bold tabular-nums leading-none text-violet-700 dark:text-violet-200">
-            {formatInt(billedPct)}%
-          </p>
-          <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
-            avancement
-          </p>
-        </div>
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="font-display text-2xl font-bold leading-none tabular-nums tracking-tight text-ink-900 dark:text-white">
+          {formatInt(billed)}
+          <span className="ml-1 text-base font-semibold text-ink-400 dark:text-white/35">
+            / {formatInt(total)} j.
+          </span>
+        </p>
+        <p className="text-sm font-bold tabular-nums text-ink-600 dark:text-white/65">
+          {formatInt(billedPct)}%
+        </p>
       </div>
 
       <div
-        className="flex h-3 overflow-hidden rounded-full border border-ink-200/60 bg-ink-100/70 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.05]"
+        className="flex h-2 overflow-hidden rounded-full bg-ink-100/70 dark:bg-white/[0.05]"
         role="img"
         aria-label={`${formatInt(billed)} jours facturés sur ${formatInt(total)}, ${formatInt(billedPct)} %`}
       >
@@ -311,51 +274,23 @@ function WorkdaysSummary({
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5">
+      <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-semibold tabular-nums">
         {segments.map((segment) => (
-          <div
-            key={`chip-${segment.id}`}
-            className={clsx(
-              "rounded-xl border px-2 py-2 text-center shadow-sm dark:shadow-none",
-              segment.chipClass
-            )}
-          >
-            <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
-              {segment.label}
-            </p>
-            <p className={clsx("mt-0.5 text-sm font-bold tabular-nums", segment.valueClass)}>
-              {formatInt(segment.value)}
-              <span className="ml-0.5 text-[10px] font-semibold opacity-70">j.</span>
-            </p>
-          </div>
+          <span key={`chip-${segment.id}`} className={segment.valueClass}>
+            {segment.label} {formatInt(segment.value)} j.
+          </span>
         ))}
-        <div className="rounded-xl border border-ink-200/70 bg-ink-50/80 px-2 py-2 text-center shadow-sm dark:border-white/[0.08] dark:bg-white/[0.04] dark:shadow-none">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
-            Total
-          </p>
-          <p className="mt-0.5 text-sm font-bold tabular-nums text-ink-900 dark:text-white">
-            {formatInt(total)}
-            <span className="ml-0.5 text-[10px] font-semibold opacity-70">j.</span>
-          </p>
-        </div>
-      </div>
+        <span className="text-ink-500 dark:text-white/45">Total {formatInt(total)} j.</span>
+      </p>
     </div>
   );
 }
 
 function ConfidenceBadge({ projection }: { projection: YearEndProjection }) {
-  const tone =
-    projection.confidence.level === "high"
-      ? "border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-500/10 dark:text-emerald-200"
-      : projection.confidence.level === "medium"
-        ? "border-amber-200/80 bg-amber-50 text-amber-900 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-100"
-        : "border-rose-200/80 bg-rose-50 text-rose-900 dark:border-rose-400/25 dark:bg-rose-500/10 dark:text-rose-100";
-
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide",
-        tone
+        "inline-flex items-center gap-1.5 rounded-full border border-ink-200/80 bg-ink-50/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-600 dark:border-white/10 dark:bg-white/[0.05] dark:text-white/60"
       )}
     >
       Confiance {projection.confidence.label}
@@ -383,12 +318,7 @@ function YearEndProjectionCard({
   ];
 
   return (
-    <KpiCard
-      label="Projection fin d'année"
-      icon={LineChart}
-      tone="indigo"
-      trend={trend}
-    >
+    <KpiCard label="Projection fin d'année" trend={trend}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] font-semibold text-ink-600 dark:text-white/55">
           Prévision au {projection.forecastDateLabel}
@@ -399,7 +329,7 @@ function YearEndProjectionCard({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="min-h-[4.5rem] rounded-xl border border-ink-200/70 bg-white/55 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]"
+            className="min-h-[4.5rem] border-l border-ink-200/40 py-1 pl-2.5 first:border-l-0 dark:border-cyan-100/[0.07]"
           >
             <dt className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
               {row.label}
@@ -614,28 +544,19 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
   );
 
   return (
-    <header className="relative mx-auto mt-6 w-full overflow-hidden rounded-[2rem] border border-ink-200/80 bg-gradient-to-b from-white via-white to-ink-50/80 px-5 py-8 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.15)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_32px_100px_-20px_rgba(0,22,28,0.78),inset_0_1px_0_rgba(255,255,255,0.08)] sm:px-8 sm:py-10">
-      <div
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-400/15 blur-3xl dark:bg-emerald-500/20"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -bottom-20 -left-16 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/15"
-        aria-hidden
-      />
-
-      <div className="relative" suppressHydrationWarning>
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-ink-500 dark:text-emerald-300/80">
+    <header className={dashboardFlatHero} suppressHydrationWarning>
+      <div suppressHydrationWarning>
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-ink-500 dark:text-white/45">
           DigitPro Monitoring
         </p>
         {showContextBanner ? (
-          <p className="mt-4 max-w-2xl rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/25 dark:bg-amber-500/10 dark:text-amber-50">
+          <p className="mt-4 max-w-2xl border-l-2 border-amber-400/80 py-1 pl-4 text-sm text-amber-950 dark:border-amber-400/50 dark:text-amber-50">
             {contextMessage}
           </p>
         ) : null}
         <h1
           suppressHydrationWarning
-          className="mt-4 max-w-3xl text-balance font-display text-3xl font-semibold leading-[1.08] tracking-apple-tight text-ink-900 dark:text-white sm:text-4xl md:text-[2.65rem]"
+          className="mt-3 max-w-3xl text-balance font-display text-2xl font-semibold leading-[1.08] tracking-apple-tight text-ink-900 dark:text-white sm:text-3xl md:text-4xl"
         >
           Pilotage finances, trésorerie et chiffre d&apos;affaires en temps réel.
         </h1>
@@ -643,14 +564,9 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
           SASU · LMNP · Cashflow · Fiscalité
         </p>
 
-        <div className="mt-10 space-y-8">
-          <KpiSection title="Cash" columns="2">
-            <KpiCard
-              label="Cash disponible"
-              icon={WalletCards}
-              tone="sky"
-              trend={kpiTrends?.cash}
-            >
+        <div className="mt-6 space-y-5">
+          <KpiSection title="Trésorerie & activité" columns={4}>
+            <KpiCard label="Cash disponible" trend={kpiTrends?.cash}>
               <KpiValue
                 value={stats.soldeQontoEur != null ? fmt.euro(stats.soldeQontoEur) : "—"}
                 sublabel={
@@ -667,8 +583,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
 
             <KpiCard
               label="Encaissé ce mois"
-              icon={TrendingUp}
-              tone="emerald"
               href="/dashboard?section=sasu&scope=pro"
               ariaLabel="Ouvrir la page SASU"
               trend={kpiTrends?.encaisse}
@@ -687,25 +601,8 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
               />
             </KpiCard>
 
-            <div className="sm:col-span-2">
-              <TaxLiabilityCard
-                cashEur={stats.soldeQontoEur}
-                vatEur={stats.detteTvaDepuisDebutEur}
-                csgEur={stats.detteCsgDepuisDebutEur}
-                totalLiabilityEur={stats.detteTotaleDepuisDebutEur}
-                statsReady={statsReady}
-                formatEuro={fmt.euro}
-                formatInt={fmt.int}
-                trend={kpiTrends?.tax}
-              />
-            </div>
-          </KpiSection>
-
-          <KpiSection title="Activité" columns="2">
             <KpiCard
               label="Jours du mois"
-              icon={CalendarDays}
-              tone="violet"
               href="/dashboard?section=activite"
               ariaLabel="Ouvrir la page Activité"
               trend={kpiTrends?.workdays}
@@ -719,8 +616,6 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
 
             <KpiCard
               label="TJM"
-              icon={CalendarDays}
-              tone="indigo"
               href="/parametres"
               ariaLabel="Ouvrir le paramétrage des TJM"
               trend={kpiTrends?.tjm}
@@ -734,13 +629,19 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
             </KpiCard>
           </KpiSection>
 
-          <KpiSection title="Résultat" columns="2">
-            <KpiCard
-              label="Avant IR"
-              icon={PiggyBank}
-              tone="amber"
-              trend={kpiTrends?.avantIr}
-            >
+          <KpiSection title="Fiscalité & objectifs" columns={3}>
+            <TaxLiabilityCard
+              cashEur={stats.soldeQontoEur}
+              vatEur={stats.detteTvaDepuisDebutEur}
+              csgEur={stats.detteCsgDepuisDebutEur}
+              totalLiabilityEur={stats.detteTotaleDepuisDebutEur}
+              statsReady={statsReady}
+              formatEuro={fmt.euro}
+              formatInt={fmt.int}
+              trend={kpiTrends?.tax}
+            />
+
+            <KpiCard label="Avant IR" trend={kpiTrends?.avantIr}>
               <AvantIrBreakdown
                 totalEur={avantIrDetail.totalEur}
                 bncEur={avantIrDetail.bncEur}
@@ -754,24 +655,20 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
               />
             </KpiCard>
 
-            <div className="sm:col-span-2">
-              <RevenueAllocationChart
-                allocation={stats.tjmRepartitionMois}
-                formatEuro={fmt.euro}
-                formatInt={fmt.int}
-                trend={kpiTrends?.revenueAllocation}
-              />
-            </div>
-          </KpiSection>
-
-          <KpiSection title="Objectif annuel" columns="1">
             <AnnualObjectiveCard
               achievedHtEur={stats.caAnnuelEncaisseHtEur}
               trend={kpiTrends?.annual}
             />
           </KpiSection>
 
-          <KpiSection title="Projection" columns="1">
+          <KpiSection title="Répartition & projection" columns={2}>
+            <RevenueAllocationChart
+              allocation={stats.tjmRepartitionMois}
+              formatEuro={fmt.euro}
+              formatInt={fmt.int}
+              trend={kpiTrends?.revenueAllocation}
+            />
+
             <YearEndProjectionCard
               projection={yearEndProjection}
               formatEuro={fmt.euro}
@@ -781,7 +678,7 @@ export function DashboardPremiumHero({ stats, statsReady, contextMessage, showCo
           </KpiSection>
         </div>
 
-        <p className="mt-8 text-xs text-ink-400 dark:text-white/30">by Iliass KHOMSI</p>
+        <p className="mt-5 text-xs text-ink-400 dark:text-white/30">by Iliass KHOMSI</p>
       </div>
     </header>
   );

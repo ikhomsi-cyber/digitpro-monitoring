@@ -180,7 +180,7 @@ export function DashboardDesktopSidebar() {
           className="transition hover:opacity-90"
           aria-label="Dashboard"
         >
-          <PremiumIconBadge icon={House} tone="emerald" size="lg" />
+          <PremiumIconBadge icon={House} size="lg" />
         </Link>
         <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
           {TABS.map((tab) => {

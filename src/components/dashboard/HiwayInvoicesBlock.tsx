@@ -218,7 +218,7 @@ export function HiwayInvoicesBlock() {
                     key={invoice.id}
                     className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-lg bg-white/80 px-2.5 py-2 dark:bg-white/[0.05]"
                   >
-                    <PremiumIconBadge icon={FileText} tone="emerald" size="sm" />
+                    <PremiumIconBadge icon={FileText} size="sm" />
                     <span className="min-w-0">
                       <span className="block truncate text-[11px] font-semibold text-ink-900 dark:text-white">
                         {invoice.client ?? formatInvoiceDate(invoice.date)}

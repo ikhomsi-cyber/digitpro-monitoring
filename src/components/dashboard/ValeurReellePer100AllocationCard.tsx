@@ -3,9 +3,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
-import { Coins } from "lucide-react";
 import type { ValeurReelleCashTree } from "@/lib/valeur-reelle-analyze";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 
 export type ValeurReellePer100Segment = {
   id: "retained" | "csg" | "personal" | "other";
@@ -106,7 +104,7 @@ export function ValeurReellePer100AllocationCard({ tree, fmt }: Props) {
 
   if (!hasData) {
     return (
-      <section className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/25 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5">
+      <section>
         <p className="text-sm font-semibold text-ink-500 dark:text-white/45">
           Aucun CA HT sur cette période — répartition par 100 € indisponible.
         </p>
@@ -119,7 +117,7 @@ export function ValeurReellePer100AllocationCard({ tree, fmt }: Props) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.05 }}
-      className="rounded-[2rem] border border-ink-200/90 bg-gradient-to-br from-ink-50/80 via-white to-sky-50/25 p-4 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-5"
+      className="space-y-4"
       aria-labelledby="valeur-per-100-title"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -137,11 +135,10 @@ export function ValeurReellePer100AllocationCard({ tree, fmt }: Props) {
             Base HT · échelle {fmt.euro(tree.caFactureEur)} → 100 €
           </p>
         </div>
-        <PremiumIconBadge icon={Coins} tone="sky" size="md" />
       </div>
 
       <div
-        className="relative overflow-hidden rounded-2xl border border-white/70 bg-ink-100 p-1 shadow-inner dark:border-cyan-100/[0.10] dark:bg-[#06242b]/70"
+        className="relative overflow-hidden rounded-xl border border-ink-200/35 p-1 dark:border-cyan-100/[0.08]"
         role="img"
         aria-label="Répartition pour 100 euros facturés HT entre valeur retenue, CSG, frais perso et autres charges"
       >
@@ -207,7 +204,7 @@ export function ValeurReellePer100AllocationCard({ tree, fmt }: Props) {
         {segments.map((segment) => (
           <li
             key={`legend-${segment.id}`}
-            className="min-w-0 rounded-xl border border-ink-200/70 bg-white/55 px-2.5 py-2 shadow-sm dark:border-cyan-100/[0.08] dark:bg-white/[0.04] dark:shadow-none"
+            className="min-w-0 py-1"
             title={segment.detail}
           >
             <div className="flex items-center gap-1.5">

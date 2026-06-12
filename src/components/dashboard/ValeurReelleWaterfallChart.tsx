@@ -1,38 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Waves } from "lucide-react";
 import { clsx } from "clsx";
 import type { ValeurReelleCashTree } from "@/lib/valeur-reelle-analyze";
 import {
   buildValeurReelleWaterfall,
-  valeurReelleWaterfallBarGeometry,
   type ValeurReelleWaterfallStep
 } from "@/lib/valeur-reelle-waterfall";
-import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
-import {
-  WATERFALL_AXIS_STYLES,
-  WATERFALL_AXIS_SVG_CLASS
-} from "@/components/dashboard/waterfall-axis-styles";
-
-/** Typo axe X — alignée sur MiniWaterfallSvg (ValeurReelleDailyValueCard) */
-const WATERFALL_AXIS = {
-  labelAreaH: 58,
-  labelY: 18,
-  valueY: 34,
-  pctY: 48,
-  label: { fontSize: 12, fontWeight: 600 },
-  value: { fontSize: 13, fontWeight: 700 },
-  pct: { fontSize: 11, fontWeight: 600 }
-} as const;
-
-const STEP_COLORS: Record<string, { fill: string; stroke: string }> = {
-  ca_ht: { fill: "#34d399", stroke: "#10b981" },
-  csg: { fill: "#fb923c", stroke: "#f97316" },
-  digitpro: { fill: "#fb7185", stroke: "#f43f5e" },
-  personal: { fill: "#2dd4bf", stroke: "#14b8a6" },
-  valeur_nette: { fill: "#38bdf8", stroke: "#0ea5e9" }
-};
+import { VALEUR_REELLE_WATERFALL_COLORS } from "@/components/dashboard/waterfall-axis-styles";
+import { ValeurReelleWaterfallSvg } from "@/components/dashboard/ValeurReelleWaterfallSvg";
 
 type Props = {
   tree: ValeurReelleCashTree;
@@ -53,7 +29,7 @@ function WaterfallTooltip({
   fmt: Props["fmt"];
   onClose: () => void;
 }) {
-  const colors = STEP_COLORS[step.id] ?? STEP_COLORS.valeur_nette;
+  const colors = VALEUR_REELLE_WATERFALL_COLORS[step.id] ?? VALEUR_REELLE_WATERFALL_COLORS.valeur_nette;
   const breakdown = step.breakdown?.filter((row) => Math.abs(row.amountEur) > 0) ?? [];
 
   return (
@@ -124,175 +100,31 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
   const model = useMemo(() => buildValeurReelleWaterfall(tree), [tree]);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
 
-  const maxValue = useMemo(
-    () => Math.max(1, model.steps[0]?.cumulativeEur ?? 1),
-    [model.steps]
-  );
-
-  const chartW = 560;
-  const chartH = 176;
-  const gap = 10;
-  const barW = (chartW - gap * (model.steps.length + 1)) / model.steps.length;
-
-  const geometries = useMemo(
-    () =>
-      model.steps.map((step, index) => {
-        const prevCumulative = index === 0 ? 0 : (model.steps[index - 1]?.cumulativeEur ?? 0);
-        return {
-          step,
-          geom: valeurReelleWaterfallBarGeometry(
-            step,
-            prevCumulative,
-            index,
-            maxValue,
-            chartW,
-            chartH,
-            gap,
-            barW
-          ),
-          prevCumulative
-        };
-      }),
-    [model.steps, maxValue, barW]
-  );
-
   const activeStep = activeStepId
     ? model.steps.find((step) => step.id === activeStepId) ?? null
     : null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-ink-200/80 bg-white/75 px-4 py-4 shadow-sm dark:border-cyan-100/[0.10] dark:bg-cyan-50/[0.055] dark:shadow-none">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
-            Waterfall financier
-          </p>
-          <p className="mt-0.5 text-[10px] font-medium text-ink-400 dark:text-white/35">
-            CA HT → déductions → valeur nette
-          </p>
-        </div>
-        <PremiumIconBadge icon={Waves} tone="sky" size="md" />
+    <div className="space-y-3">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
+          Waterfall financier
+        </p>
+        <p className="mt-0.5 text-[10px] font-medium text-ink-400 dark:text-white/35">
+          CA HT → déductions → valeur nette
+        </p>
       </div>
 
       <div className="mt-3 overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${chartW} ${chartH + WATERFALL_AXIS.labelAreaH}`}
-          className={clsx("w-full min-w-[340px]", WATERFALL_AXIS_SVG_CLASS)}
-          role="img"
-          aria-label="Waterfall financier Valeur réelle"
-        >
-          <rect
-            x={0}
-            y={chartH + 1}
-            width={chartW}
-            height={WATERFALL_AXIS.labelAreaH - 1}
-            rx="6"
-            className={WATERFALL_AXIS_STYLES.band}
-            aria-hidden
-          />
-          <line
-            x1={gap}
-            x2={chartW - gap}
-            y1={chartH}
-            y2={chartH}
-            className={WATERFALL_AXIS_STYLES.baseline}
-            strokeWidth="1"
-          />
-          {geometries.map(({ step, geom }, index) => {
-            const colors = STEP_COLORS[step.id] ?? STEP_COLORS.valeur_nette;
-            const prevGeom = index > 0 ? geometries[index - 1] : null;
-            const connectorY =
-              index > 0 && step.kind === "decrease"
-                ? chartH - (geometries[index - 1].prevCumulative / maxValue) * chartH
-                : null;
-            const isActive = activeStepId === step.id;
-
-            return (
-              <g key={step.id}>
-                {connectorY != null ? (
-                  <line
-                    x1={(prevGeom?.geom.x ?? 0) + (prevGeom?.geom.width ?? 0)}
-                    x2={geom.x + geom.width / 2}
-                    y1={connectorY}
-                    y2={connectorY}
-                    className={WATERFALL_AXIS_STYLES.connectorLine}
-                    strokeWidth="1"
-                    strokeDasharray="4 3"
-                  />
-                ) : null}
-                <rect
-                  x={geom.x - 2}
-                  y={geom.y - 4}
-                  width={geom.width + 4}
-                  height={geom.height + 8}
-                  fill="transparent"
-                  className="cursor-pointer"
-                  onMouseEnter={() => setActiveStepId(step.id)}
-                  onFocus={() => setActiveStepId(step.id)}
-                  onMouseLeave={() => setActiveStepId((id) => (id === step.id ? null : id))}
-                  onBlur={() => setActiveStepId((id) => (id === step.id ? null : id))}
-                  tabIndex={0}
-                  aria-label={`${step.label} ${formatDelta(step, fmt.euro)}`}
-                />
-                <rect
-                  x={geom.x}
-                  y={geom.y}
-                  width={geom.width}
-                  height={geom.height}
-                  rx="6"
-                  fill={colors.fill}
-                  fillOpacity={isActive ? 0.98 : step.kind === "total" ? 0.92 : 0.82}
-                  stroke={colors.stroke}
-                  strokeWidth={isActive ? 2 : 1.2}
-                  pointerEvents="none"
-                />
-                {step.kind !== "start" && step.pctOfCaHt > 0 ? (
-                  <text
-                    x={geom.x + geom.width / 2}
-                    y={Math.max(geom.y + 12, 14)}
-                    textAnchor="middle"
-                    fontSize="10"
-                    fontWeight="700"
-                    className="fill-white tabular-nums"
-                    pointerEvents="none"
-                  >
-                    {step.pctOfCaHt} %
-                  </text>
-                ) : null}
-                <text
-                  x={geom.x + geom.width / 2}
-                  y={chartH + WATERFALL_AXIS.labelY}
-                  textAnchor="middle"
-                  fontSize={WATERFALL_AXIS.label.fontSize}
-                  fontWeight={WATERFALL_AXIS.label.fontWeight}
-                  className={WATERFALL_AXIS_STYLES.label}
-                >
-                  {step.label}
-                </text>
-                <text
-                  x={geom.x + geom.width / 2}
-                  y={chartH + WATERFALL_AXIS.valueY}
-                  textAnchor="middle"
-                  fontSize={WATERFALL_AXIS.value.fontSize}
-                  fontWeight={WATERFALL_AXIS.value.fontWeight}
-                  className={WATERFALL_AXIS_STYLES.value}
-                >
-                  {formatDelta(step, fmt.euro)}
-                </text>
-                <text
-                  x={geom.x + geom.width / 2}
-                  y={chartH + WATERFALL_AXIS.pctY}
-                  textAnchor="middle"
-                  fontSize={WATERFALL_AXIS.pct.fontSize}
-                  fontWeight={WATERFALL_AXIS.pct.fontWeight}
-                  className={WATERFALL_AXIS_STYLES.pct}
-                >
-                  {step.pctOfCaHt} %
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+        <ValeurReelleWaterfallSvg
+          steps={model.steps}
+          formatDelta={(delta) =>
+            delta >= 0 ? fmt.euro(delta) : `−${fmt.euro(Math.abs(delta))}`
+          }
+          ariaLabel="Waterfall financier Valeur réelle"
+          activeStepId={activeStepId}
+          onStepHover={setActiveStepId}
+        />
       </div>
 
       {activeStep ? (
@@ -305,12 +137,12 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-200/70 bg-white/55 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.04]">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-ink-200/40 pt-3 dark:border-cyan-100/[0.07]">
         <span className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
           = Valeur nette
         </span>
         <div className="text-right">
-          <span className="font-display text-base font-bold tabular-nums text-teal-700 dark:text-teal-300">
+          <span className="font-display text-base font-bold tabular-nums text-ink-900 dark:text-white">
             {fmt.euro(model.valeurNetteEur)}
           </span>
           <span className="ml-2 text-[10px] font-semibold tabular-nums text-ink-500 dark:text-white/40">
@@ -332,7 +164,7 @@ export function ValeurReelleWaterfallChart({ tree, fmt }: Props) {
               className={clsx(
                 "rounded-full px-2 py-0.5 transition",
                 step.kind === "total"
-                  ? "bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-500/10 dark:text-teal-200 dark:hover:bg-teal-500/15"
+                  ? "bg-ink-100 text-ink-800 hover:bg-ink-200/80 dark:bg-white/[0.10] dark:text-white dark:hover:bg-white/[0.14]"
                   : "bg-ink-50 text-ink-600 hover:bg-ink-100 dark:bg-white/[0.06] dark:text-white/65 dark:hover:bg-white/[0.09]",
                 activeStepId === step.id && "ring-1 ring-emerald-400/50"
               )}

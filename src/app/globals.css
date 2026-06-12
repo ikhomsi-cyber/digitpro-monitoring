@@ -167,6 +167,11 @@ body {
     --chart-dot-stroke: var(--surface-border);
   }
 
+  /* Dashboard plat — contenu sur le fond page, pas de cartes empilées */
+  .premium-dashboard-page main#dashboard-main > * {
+    --dashboard-content-max: 100%;
+  }
+
   .dashboard-chart-surface {
     --chart-grid: rgba(148, 163, 184, 0.38);
     --chart-axis: rgba(100, 116, 139, 0.45);
