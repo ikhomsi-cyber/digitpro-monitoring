@@ -1,5 +1,4 @@
-import { AppPageLoader } from "@/components/ui/AppPageLoader";
-
+/** Pas d’écran plein page lors des changements d’onglet (navigation client). */
 export default function DashboardLoading() {
-  return <AppPageLoader message="Chargement du tableau de bord…" />;
+  return null;
 }

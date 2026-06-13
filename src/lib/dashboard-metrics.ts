@@ -789,6 +789,8 @@ export type DashboardAnalyticsFilter = {
   years: number[] | null;
   /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM. */
   month?: string | null;
+  /** Plusieurs mois civils YYYY-MM (prioritaire sur `month` et `years`). */
+  months?: string[] | null;
 };
 
 export function filterDashboardTransactions(
@@ -796,6 +798,10 @@ export function filterDashboardTransactions(
   filter: DashboardAnalyticsFilter,
   now = new Date()
 ): DashboardTx[] {
+  if (filter.months != null && filter.months.length > 0) {
+    const monthSet = new Set(filter.months);
+    return txs.filter((t) => monthSet.has(transactionAnalyticsDayIso(t).slice(0, 7)));
+  }
   if (filter.month) {
     return txs.filter((t) => transactionAnalyticsDayIso(t).slice(0, 7) === filter.month);
   }

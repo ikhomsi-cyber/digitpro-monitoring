@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import { toast } from "sonner";
-import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
+import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import {
@@ -12,12 +11,10 @@ import {
   buildDashboardYearOptions,
   dashboardMonthKeyNowLocal,
   defaultDashboardPeriodFilter,
-  formatDashboardMonthLabel,
-  toggleDashboardYearInFilter
+  formatDashboardMonthLabel
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
-import { ValeurReelleDailyValueCard } from "@/components/dashboard/ValeurReelleDailyValueCard";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import {
   analyzeValeurReelle,
@@ -29,21 +26,27 @@ import {
   estimateCurrentMonthGainPerWorkDay,
   type GainPerWorkDayEstimate
 } from "@/lib/valeur-reelle-gain-per-day";
+import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
 import type {
   ValeurReelleCashTree,
   ValeurReelleVatLiability,
   ValeurReelleVatMonthlyRow,
   ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
-import { ValeurReellePer100AllocationCard } from "@/components/dashboard/ValeurReellePer100AllocationCard";
 import {
-  dashboardSectionDivider,
-  dashboardSectionStack,
-  dashboardTwoColGrid
+  dashboardEyebrow,
+  dashboardInsightCard,
+  dashboardInsightGrid,
+  dashboardPanelTitle,
+  dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
-import { ValeurReelleMonthlyTrendChart } from "@/components/dashboard/ValeurReelleMonthlyTrendChart";
-import { ValeurReelleWaterfallChart } from "@/components/dashboard/ValeurReelleWaterfallChart";
-import { buildValeurReelleMonthlyTrendSeries } from "@/lib/valeur-reelle-monthly-trend";
+
+const SEG_COLORS = {
+  net: "#0ea5e9",
+  csg: "#f59e0b",
+  digitpro: "#fb7185",
+  perso: "#34d399"
+} as const;
 
 const MANDATORY_FEES_COLORS = [
   "#fb7185",
@@ -68,12 +71,12 @@ const PERSONAL_CHARGES_COLORS = [
 ];
 
 const RECOVERABLE_VAT_COLORS = [
-  "#10b981",
-  "#14b8a6",
-  "#2dd4bf",
-  "#34d399",
-  "#5eead4",
-  "#6ee7b7"
+  "#0071E3",
+  "#0ea5e9",
+  "#38bdf8",
+  "#3b82f6",
+  "#60a5fa",
+  "#2563eb"
 ];
 
 function formatVatReferenceMonthLabel(monthKey: string): string {
@@ -81,45 +84,6 @@ function formatVatReferenceMonthLabel(monthKey: string): string {
   if (!year || !month) return monthKey;
   return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(
     new Date(year, month - 1, 1)
-  );
-}
-
-function VatSavingsMetricTile({
-  label,
-  value,
-  sublabel,
-  emphasized = false
-}: {
-  label: string;
-  value: string;
-  sublabel?: string;
-  emphasized?: boolean;
-}) {
-  return (
-    <div
-      className={clsx(
-        "rounded-2xl border px-4 py-3.5",
-        emphasized
-          ? "border-ink-200/80 bg-ink-50/40 dark:border-white/[0.10] dark:bg-white/[0.05]"
-          : "border-ink-200/75 bg-transparent dark:border-white/[0.08]"
-      )}
-    >
-      <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/45">
-        {label}
-      </p>
-      <p
-        className={clsx(
-          "mt-2 font-display font-bold tabular-nums",
-          emphasized ? "text-xl sm:text-2xl" : "text-lg sm:text-xl",
-          "text-ink-900 dark:text-white"
-        )}
-      >
-        {value}
-      </p>
-      {sublabel ? (
-        <p className="mt-1 text-[10px] font-medium text-ink-500 dark:text-white/40">{sublabel}</p>
-      ) : null}
-    </div>
   );
 }
 
@@ -404,28 +368,95 @@ function BreakdownPieChart({
   );
 }
 
-function CashFlowTreeVisual({
+type Fmt = ReturnType<typeof useDashboardDisplayFormat>;
+
+type AllocationSegment = { id: string; label: string; amount: number; color: string };
+
+/** Barre d'allocation horizontale empilée — visuel épuré qui remplace le waterfall. */
+function AllocationStackBar({ segments, fmt }: { segments: AllocationSegment[]; fmt: Fmt }) {
+  const total = segments.reduce((sum, seg) => sum + Math.max(0, seg.amount), 0);
+  if (total <= 0) return null;
+  const withPct = segments.map((seg) => ({
+    ...seg,
+    pct: Math.round((Math.max(0, seg.amount) / total) * 1000) / 10
+  }));
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="flex h-12 w-full overflow-hidden rounded-2xl border border-ink-200/40 dark:border-white/[0.06]">
+        {withPct.map((seg) => (
+          <div
+            key={seg.id}
+            className="relative flex min-w-0 items-center justify-center transition-all"
+            style={{ width: `${seg.pct}%`, backgroundColor: seg.color }}
+            title={`${seg.label} · ${fmt.euro(seg.amount)} · ${seg.pct} %`}
+          >
+            {seg.pct >= 11 ? (
+              <span className="truncate px-1 text-center text-[10px] font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
+                {seg.pct} %
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-4">
+        {withPct.map((seg) => (
+          <li key={`legend-${seg.id}`} className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: seg.color }} aria-hidden />
+              <span className="truncate text-[11px] font-semibold text-ink-600 dark:text-white/60">{seg.label}</span>
+            </div>
+            <p className="mt-0.5 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
+              {fmt.euro(seg.amount)}
+            </p>
+            <p className="text-[10px] font-medium tabular-nums text-ink-500 dark:text-white/40">{seg.pct} % du total</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** En-tête de bloc insight (eyebrow + titre + sous-titre + zone droite). */
+function BlockHeader({
+  eyebrow,
+  title,
+  sub,
+  right
+}: {
+  eyebrow: string;
+  title: string;
+  sub?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className={dashboardEyebrow}>{eyebrow}</p>
+        <h3 className={clsx(dashboardPanelTitle, "mt-1")}>{title}</h3>
+        {sub ? <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">{sub}</p> : null}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+/** Carte « Cash disponible » : net disponible réel + gain moyen, isolés. */
+function CashAvailableCard({
   tree,
   fmt,
   billableDays,
   gainPerWorkDayEstimate,
-  periodLabel,
-  tjmHt,
-  onRecategorized
+  periodLabel
 }: {
   tree: ValeurReelleCashTree;
-  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+  fmt: Fmt;
   billableDays: number;
-  /** Mois en cours : gain moyen basé sur les jours travaillés du mois passé. */
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   periodLabel: string;
-  tjmHt: number;
-  onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const isCurrentMonthEstimate = gainPerWorkDayEstimate != null;
-  const gainDayDenominator = isCurrentMonthEstimate
-    ? gainPerWorkDayEstimate.workedDays
-    : billableDays;
+  const gainDayDenominator = isCurrentMonthEstimate ? gainPerWorkDayEstimate.workedDays : billableDays;
   const formattedGainDayDenominator = new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits: isCurrentMonthEstimate ? 0 : 1
   }).format(gainDayDenominator);
@@ -437,207 +468,190 @@ function CashFlowTreeVisual({
     : gainDayDenominator > 0
       ? Math.round((netDisponibleReel / gainDayDenominator) * 100) / 100
       : null;
-  const percentOfCa = (amount: number) =>
-    tree.caFactureEur > 0 ? Math.round((amount / tree.caFactureEur) * 1000) / 10 : 0;
 
-  const rows: Array<{
-    label: string;
-    detail?: string;
-    amount: number | null;
-    gaugeAmount?: number;
-    breakdown?: ValeurReelleWaterfallBreakdownRow[];
-    showBreakdownPie?: boolean;
-    breakdownPalette?: readonly string[];
-    recategorizeOptions?: readonly string[];
-    tone: "neutral" | "deduct" | "result" | "highlight";
-    emphasize?: boolean;
-  }> = [
-    {
-      label: "CA facturé HT",
-      detail: `TTC encaissé ${fmt.euro(tree.caTtcEur)} / 1,20`,
-      amount: tree.caFactureEur,
-      gaugeAmount: tree.caFactureEur,
-      tone: "neutral"
-    },
-    {
-      label: "CSG",
-      detail: "9,7 % de (CA HT − frais obligatoires − charges perso)",
-      amount: -tree.csgEur,
-      gaugeAmount: tree.csgEur,
-      tone: "deduct"
-    },
-    {
-      label: "Frais DigitPro",
-      amount: -tree.mandatoryFeesEur,
-      gaugeAmount: tree.mandatoryFeesEur,
-      breakdown: tree.mandatoryFeesBreakdown,
-      showBreakdownPie: true,
-      breakdownPalette: MANDATORY_FEES_COLORS,
-      recategorizeOptions: VALEUR_REELLE_EXPENSE_CATEGORIES,
-      tone: "deduct"
-    },
-    {
-      label: "Frais perso",
-      amount: -tree.personalChargesEur,
-      gaugeAmount: tree.personalChargesEur,
-      breakdown: tree.personalChargesBreakdown,
-      showBreakdownPie: true,
-      breakdownPalette: PERSONAL_CHARGES_COLORS,
-      recategorizeOptions: VALEUR_REELLE_EXPENSE_CATEGORIES,
-      tone: "deduct"
-    },
+  const gainBasisNote = isCurrentMonthEstimate
+    ? gainPerWorkDayEstimate.workedDays > 0
+      ? `${formattedGainDayDenominator} j. travaillé${gainDayDenominator > 1 ? "s" : ""}${
+          gainPerWorkDayEstimate.gainAverageMonthKey
+            ? ` · ${formatDashboardMonthLabel(gainPerWorkDayEstimate.gainAverageMonthKey)}`
+            : " · mois passé"
+        }${gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé" : ""}`
+      : "estimation sur historique"
+    : `${formattedGainDayDenominator} j. facturé${gainDayDenominator > 1 ? "s" : ""}`;
+
+  return (
+    <section className="flex flex-col items-center py-6 text-center sm:py-8" data-private>
+      <p className="text-sm font-medium text-ink-500 dark:text-white/55">Cash disponible · HT</p>
+      <p className="mt-2 font-display text-4xl font-bold tabular-nums tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
+        {fmt.euro(netDisponibleReel)}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {netDisponiblePctCa != null ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/50 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300">
+            <span className="text-ink-600 dark:text-white/60">Part du CA HT</span>
+            <span className="tabular-nums">{netDisponiblePctCa} %</span>
+          </span>
+        ) : null}
+        {reelParJour != null ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-ink-200/70 px-4 py-2 text-sm font-medium text-ink-700 dark:border-white/10 dark:text-white/75">
+            <span className="text-ink-600 dark:text-white/60">Gain moyen</span>
+            <span className="tabular-nums">{fmt.euro(reelParJour)} /jour</span>
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-[11px] font-medium text-ink-500 dark:text-white/40">
+        {reelParJour != null ? `${gainBasisNote} · ` : ""}
+        <span className="capitalize">{periodLabel}</span>
+      </p>
+    </section>
+  );
+}
+
+/** Bloc « Par jour facturé » — barre empilée (CA HT/jour réparti). */
+function DailyValueBlock({
+  tree,
+  fmt,
+  tjmHt,
+  billableDays,
+  gainPerWorkDayEstimate
+}: {
+  tree: ValeurReelleCashTree;
+  fmt: Fmt;
+  tjmHt: number;
+  billableDays: number;
+  gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
+}) {
+  const breakdown = useMemo(
+    () => computeValeurReelleDailyBreakdown({ tree, tjmHt, billableDays, gainPerWorkDayEstimate }),
+    [billableDays, gainPerWorkDayEstimate, tjmHt, tree]
+  );
+
+  if (breakdown.caHtPerDay <= 0 && breakdown.netPerDay <= 0) return null;
+
+  const retainedPct =
+    breakdown.caHtPerDay > 0 ? Math.round((breakdown.netPerDay / breakdown.caHtPerDay) * 1000) / 10 : null;
+  const basisLabel =
+    breakdown.workedDays > 0
+      ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. ${
+          gainPerWorkDayEstimate != null ? "travaillés" : "facturés"
+        }`
+      : (breakdown.estimateNote ?? "estimation");
+
+  const segments: AllocationSegment[] = [
+    { id: "net", label: "Valeur retenue", amount: breakdown.netPerDay, color: SEG_COLORS.net },
+    { id: "csg", label: "CSG", amount: breakdown.csgPerDay, color: SEG_COLORS.csg },
+    { id: "digitpro", label: "Frais DigitPro", amount: breakdown.mandatoryFeesPerDay, color: SEG_COLORS.digitpro }
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45 }}
-      className={clsx(dashboardSectionStack)}
-    >
-      <div className="border-b border-ink-200/45 pb-5 dark:border-cyan-100/[0.08] sm:pb-6">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/40">
-          {periodLabel}
+    <div className={dashboardInsightCard}>
+      <BlockHeader
+        eyebrow="Par jour facturé"
+        title="Décomposition / jour"
+        sub={`CA HT ${fmt.euro(breakdown.caHtPerDay)} · ${basisLabel}`}
+      />
+      <div className="mt-3 flex items-baseline gap-2">
+        <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
+          {fmt.euro(breakdown.netPerDay)}
         </p>
-        <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-ink-600 dark:text-white/55">
-              Net disponible réel
+        <span className="text-sm font-medium tabular-nums text-sky-600 dark:text-sky-300">
+          {retainedPct != null ? `${retainedPct} % retenu` : "/ jour"}
+        </span>
+      </div>
+      <AllocationStackBar segments={segments} fmt={fmt} />
+      <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
+        Valeur retenue = CA HT − CSG − frais DigitPro (frais perso réintégrés).
+      </p>
+    </div>
+  );
+}
+
+/** Bloc « Waterfall financier » simplifié — barre empilée sur la période. */
+function FinancialAllocationBlock({ tree, fmt }: { tree: ValeurReelleCashTree; fmt: Fmt }) {
+  const caHt = Math.max(0, tree.caFactureEur);
+  const valeurNette = Math.max(0, caHt - tree.csgEur - tree.mandatoryFeesEur - tree.personalChargesEur);
+  if (caHt <= 0) return null;
+  const netPct = caHt > 0 ? Math.round((valeurNette / caHt) * 1000) / 10 : null;
+
+  const segments: AllocationSegment[] = [
+    { id: "net", label: "Valeur nette", amount: valeurNette, color: SEG_COLORS.net },
+    { id: "csg", label: "CSG", amount: tree.csgEur, color: SEG_COLORS.csg },
+    { id: "digitpro", label: "Frais DigitPro", amount: tree.mandatoryFeesEur, color: SEG_COLORS.digitpro },
+    { id: "perso", label: "Frais perso", amount: tree.personalChargesEur, color: SEG_COLORS.perso }
+  ];
+
+  return (
+    <div className={dashboardInsightCard}>
+      <BlockHeader eyebrow="Waterfall financier" title="Répartition du CA HT" sub={`Base ${fmt.euro(caHt)}`} />
+      <div className="mt-3 flex items-baseline gap-2">
+        <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
+          {fmt.euro(valeurNette)}
+        </p>
+        <span className="text-sm font-medium tabular-nums text-sky-600 dark:text-sky-300">
+          {netPct != null ? `${netPct} % net` : null}
+        </span>
+      </div>
+      <AllocationStackBar segments={segments} fmt={fmt} />
+      <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
+        CA HT → CSG → frais DigitPro → frais perso → valeur nette.
+      </p>
+    </div>
+  );
+}
+
+/** Bloc dédié à une catégorie de frais (DigitPro / perso) avec camembert. */
+function FeesBlock({
+  eyebrow,
+  title,
+  amount,
+  breakdown,
+  palette,
+  fmt,
+  caHt,
+  recategorizeOptions,
+  onRecategorized
+}: {
+  eyebrow: string;
+  title: string;
+  amount: number;
+  breakdown: ValeurReelleWaterfallBreakdownRow[];
+  palette: readonly string[];
+  fmt: Fmt;
+  caHt: number;
+  recategorizeOptions?: readonly string[];
+  onRecategorized?: (transactionId: string, category: string) => void;
+}) {
+  const pctOfCa = caHt > 0 ? Math.round((amount / caHt) * 1000) / 10 : null;
+  return (
+    <div className={dashboardInsightCard}>
+      <BlockHeader
+        eyebrow={eyebrow}
+        title={title}
+        right={
+          <div className="text-right">
+            <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white">
+              {fmt.euro(amount)}
             </p>
-            <p className="mt-0.5 font-display text-3xl font-semibold leading-none tracking-apple-tight tabular-nums text-ink-950 dark:text-white sm:text-4xl lg:text-5xl">
-              {fmt.euro(netDisponibleReel)}
-            </p>
-            {netDisponiblePctCa != null ? (
-              <p className="mt-1.5 text-sm font-semibold tabular-nums text-ink-700 dark:text-white/75">
-                <span className="text-ink-800 dark:text-white/80">{netDisponiblePctCa} %</span>
-                {" "}du CA HT
+            {pctOfCa != null ? (
+              <p className="text-[11px] font-medium tabular-nums text-ink-500 dark:text-white/40">
+                {pctOfCa} % du CA HT
               </p>
             ) : null}
           </div>
-          {reelParJour != null ? (
-            <div className="md:text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/42">
-                Gain moyen
-              </p>
-              <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white sm:text-2xl">
-                {fmt.euro(reelParJour)}
-                <span className="ml-1 text-sm font-semibold text-ink-500 dark:text-white/40">/jour</span>
-              </p>
-              <p className="mt-1 text-[11px] text-ink-500 dark:text-white/40">
-                {isCurrentMonthEstimate ? (
-                  gainPerWorkDayEstimate.workedDays > 0 ? (
-                    <>
-                      {formattedGainDayDenominator} j. travaillé{gainDayDenominator > 1 ? "s" : ""}
-                      {gainPerWorkDayEstimate.gainAverageMonthKey
-                        ? ` · ${formatDashboardMonthLabel(gainPerWorkDayEstimate.gainAverageMonthKey)}`
-                        : " · mois passé"}
-                      {gainPerWorkDayEstimate.usesHistoricalEstimate ? " · estimé" : null}
-                    </>
-                  ) : (
-                    "estimation sur historique"
-                  )
-                ) : (
-                  `${formattedGainDayDenominator} j. facturé${gainDayDenominator > 1 ? "s" : ""}`
-                )}
-              </p>
-            </div>
-          ) : (
-            <p className="text-[11px] font-medium text-ink-500 dark:text-white/40 md:max-w-xs md:text-right">
-              Cochez vos jours travaillés pour le gain moyen / jour.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className={dashboardTwoColGrid}>
-        <ValeurReelleDailyValueCard
-          tree={tree}
+        }
+      />
+      {breakdown.length ? (
+        <BreakdownPieChart
+          breakdown={breakdown}
           fmt={fmt}
-          tjmHt={tjmHt}
-          billableDays={billableDays}
-          gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+          palette={palette}
+          recategorizeOptions={recategorizeOptions}
+          onRecategorized={onRecategorized}
         />
-        <ValeurReelleWaterfallChart tree={tree} fmt={fmt} />
-      </div>
-
-      <div className="space-y-2 text-[12px] leading-relaxed sm:text-[13px]">
-        {rows.map((row, i) => {
-          if (row.amount === null) {
-            return null;
-          }
-
-          const amountClass = "text-ink-900 dark:text-white";
-
-          return (
-            <div
-              key={`${row.label}-${i}`}
-              className={clsx(
-                row.showBreakdownPie
-                  ? "rounded-xl border border-transparent px-3 py-3"
-                  : "grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 rounded-xl border border-transparent px-3 py-2",
-                row.emphasize
-                  ? "border-ink-200/50 bg-ink-50/30 dark:border-white/[0.08] dark:bg-white/[0.03]"
-                  : "bg-transparent"
-              )}
-            >
-              <div className="min-w-0 font-sans">
-                <div className="flex items-start justify-between gap-3">
-                <span
-                  className={clsx(
-                    "inline-flex items-center gap-1.5 font-medium",
-                    row.emphasize
-                      ? "text-ink-900 dark:text-white"
-                      : "text-ink-700 dark:text-white/80"
-                  )}
-                >
-                  {row.label}
-                </span>
-                {row.showBreakdownPie ? (
-                  <span className={clsx("shrink-0 text-right font-semibold tabular-nums", amountClass)}>
-                    {row.amount >= 0 && row.tone !== "deduct" ? "" : row.amount < 0 ? "−" : ""}
-                    {fmt.euro(Math.abs(row.amount))}
-                  </span>
-                ) : null}
-                </div>
-                {row.detail ? (
-                  <span className="mt-0.5 block font-sans text-[10px] font-normal text-ink-500 dark:text-white/40">
-                    {row.detail}
-                    {row.gaugeAmount != null ? ` · ${percentOfCa(row.gaugeAmount)} % du CA HT` : ""}
-                  </span>
-                ) : null}
-                {row.breakdown?.length && !row.showBreakdownPie ? (
-                  <span className="mt-1 flex flex-wrap gap-1.5">
-                    {row.breakdown.map((b) => (
-                      <span
-                        key={`${row.label}-${b.label}`}
-                        className="inline-flex rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-ink-600 dark:bg-white/[0.06] dark:text-white/55"
-                      >
-                        {b.label} {fmt.euro(b.amountEur)}
-                      </span>
-                    ))}
-                  </span>
-                ) : null}
-                {row.showBreakdownPie && row.breakdown?.length ? (
-                  <BreakdownPieChart
-                    breakdown={row.breakdown}
-                    fmt={fmt}
-                    palette={row.breakdownPalette ?? MANDATORY_FEES_COLORS}
-                    recategorizeOptions={row.recategorizeOptions}
-                    onRecategorized={onRecategorized}
-                  />
-                ) : null}
-              </div>
-              {!row.showBreakdownPie ? (
-                <span className={clsx("shrink-0 text-right font-semibold tabular-nums", amountClass)}>
-                  {row.amount >= 0 && row.tone !== "deduct" ? "" : row.amount < 0 ? "−" : ""}
-                  {fmt.euro(Math.abs(row.amount))}
-                </span>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </motion.div>
+      ) : (
+        <p className="mt-3 text-xs text-ink-400 dark:text-white/35">Aucune dépense sur cette période.</p>
+      )}
+    </div>
   );
 }
 
@@ -675,47 +689,32 @@ function RecoverableVatMonthlyBlock({
   }));
   const referenceMonthLabel = formatVatReferenceMonthLabel(kpis.referenceMonthKey);
 
-  return (
-    <section className={clsx(dashboardSectionDivider, "space-y-5")}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-ink-500 dark:text-white/45">
-              Économies TVA
-            </p>
-            <h2 className="mt-1 font-display text-lg font-semibold text-ink-900 dark:text-white sm:text-xl">
-              Chaque achat pro vous fait gagner de la TVA
-            </h2>
-            <p className="mt-1 text-[11px] text-ink-600 dark:text-white/50">
-              TVA récupérable sur vos dépenses éligibles · {referenceMonthLabel}
-            </p>
-        </div>
-        <div className="rounded-xl border border-ink-200/60 px-3 py-2 text-right dark:border-white/[0.08]">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/40">
-            Moyenne mensuelle
-          </p>
-          <p className="mt-0.5 text-sm font-bold tabular-nums text-ink-900 dark:text-white">
-            {fmt.euro(kpis.averageMonthlyEur)}
-          </p>
-        </div>
-      </div>
+  const compactKpis = [
+    { id: "month", label: "Ce mois", value: fmt.euro(kpis.monthEur) },
+    { id: "ytd", label: "Depuis janvier", value: fmt.euro(kpis.ytdEur) },
+    { id: "avg", label: "Moyenne / mois", value: fmt.euro(kpis.averageMonthlyEur) },
+    { id: "projection", label: "Projection", value: fmt.euro(kpis.annualProjectionEur) }
+  ];
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <VatSavingsMetricTile
-          label="Ce mois"
-          value={fmt.euro(kpis.monthEur)}
-          sublabel={referenceMonthLabel}
-        />
-        <VatSavingsMetricTile
-          label="Depuis janvier"
-          value={fmt.euro(kpis.ytdEur)}
-          sublabel={`${kpis.monthsElapsed} mois · ${kpis.referenceYear}`}
-          emphasized
-        />
-        <VatSavingsMetricTile
-          label="Projection annuelle"
-          value={fmt.euro(kpis.annualProjectionEur)}
-          sublabel={`Moy. ${fmt.euro(kpis.averageMonthlyEur)} × 12`}
-        />
+  return (
+    <section className={clsx(dashboardInsightCard, "space-y-4")}>
+      <BlockHeader
+        eyebrow="Économies TVA"
+        title="TVA récupérée"
+        sub={`Sur vos dépenses éligibles · ${referenceMonthLabel}`}
+      />
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        {compactKpis.map((kpi) => (
+          <div key={kpi.id} className="min-w-0">
+            <p className="truncate text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/42">
+              {kpi.label}
+            </p>
+            <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-white sm:text-lg">
+              {kpi.value}
+            </p>
+          </div>
+        ))}
       </div>
 
       {breakdownRows.length ? (
@@ -797,11 +796,11 @@ export function ValeurReelleClient({
   loadError: string | null;
 }) {
   const fmt = useDashboardDisplayFormat();
-  const [selectedYears, setSelectedYears] = useState<number[] | null>(
+  const [selectedYears, setSelectedYears] = useState<number[]>(
     () => defaultDashboardPeriodFilter().selectedYears
   );
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(
-    () => defaultDashboardPeriodFilter().selectedMonth
+  const [selectedMonths, setSelectedMonths] = useState<string[]>(
+    () => [defaultDashboardPeriodFilter().selectedMonth]
   );
   const [localCategoryOverrides, setLocalCategoryOverrides] = useState<
     Record<string, { category: string; categoryManual: true }>
@@ -830,34 +829,58 @@ export function ValeurReelleClient({
     [proTransactions]
   );
 
-  const onToggleYear = useCallback(
-    (y: number) => {
-      setSelectedMonth(null);
-      setSelectedYears(toggleDashboardYearInFilter(y, yearOptions));
-    },
-    [yearOptions]
+  const onToggleYear = useCallback((y: number) => {
+    setSelectedYears((prev) => {
+      const next = new Set(prev);
+      if (next.has(y)) {
+        if (next.size <= 1) return prev;
+        next.delete(y);
+        setSelectedMonths((months) => months.filter((m) => Number(m.slice(0, 4)) !== y));
+      } else {
+        next.add(y);
+      }
+      return Array.from(next).sort((a, b) => b - a);
+    });
+  }, []);
+
+  // Retire les mois dont l'année n'est plus sélectionnée.
+  const selectedMonthsForYears = useMemo(
+    () => selectedMonths.filter((m) => selectedYears.includes(Number(m.slice(0, 4)))),
+    [selectedMonths, selectedYears]
   );
 
+  const onToggleMonth = useCallback((m: string) => {
+    setSelectedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return Array.from(next).sort((a, b) => a.localeCompare(b));
+    });
+  }, []);
+
+  const onClearMonths = useCallback(() => setSelectedMonths([]), []);
+
+  const singleMonth = selectedMonthsForYears.length === 1 ? selectedMonthsForYears[0]! : null;
+
   const analysis = useMemo(
-    () => analyzeValeurReelle(transactions, { years: selectedYears, month: selectedMonth }),
-    [selectedMonth, selectedYears, transactions]
+    () =>
+      analyzeValeurReelle(transactions, {
+        years: selectedYears,
+        months: selectedMonthsForYears.length ? selectedMonthsForYears : null
+      }),
+    [selectedMonthsForYears, selectedYears, transactions]
   );
 
   const vatYearMonthlyRows = useMemo(() => {
-    const refMonth = selectedMonth ?? dashboardMonthKeyNowLocal();
+    const refMonth = singleMonth ?? dashboardMonthKeyNowLocal();
     const year = Number(refMonth.slice(0, 4));
-    const yearsForVat =
-      selectedYears != null && selectedYears.length > 0
-        ? selectedYears.includes(year)
-          ? [year]
-          : [selectedYears[0]!]
-        : [year];
+    const yearsForVat = selectedYears.includes(year) ? [year] : [selectedYears[0]!];
     return analyzeValeurReelle(transactions, { years: yearsForVat, month: null }).vatRecoverableMonthlyRows;
-  }, [selectedMonth, selectedYears, transactions]);
+  }, [singleMonth, selectedYears, transactions]);
 
   const vatSavingsKpis = useMemo(
-    () => computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: selectedMonth }),
-    [selectedMonth, vatYearMonthlyRows]
+    () => computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: singleMonth }),
+    [singleMonth, vatYearMonthlyRows]
   );
 
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
@@ -879,49 +902,41 @@ export function ValeurReelleClient({
 
   const gainPerWorkDayEstimate = useMemo(
     () => {
-      if (!selectedMonth) return null;
+      if (!singleMonth) return null;
       return estimateCurrentMonthGainPerWorkDay(
         transactions,
         analysis.cashTree,
         billableActivity?.selected ?? new Set<string>(),
-        selectedMonth
+        singleMonth
       );
     },
-    [analysis.cashTree, billableActivity?.selected, selectedMonth, transactions]
+    [analysis.cashTree, billableActivity?.selected, singleMonth, transactions]
   );
 
   const tjmHtForPeriod = useMemo(() => {
-    const monthKey = selectedMonth ?? dashboardMonthKeyNowLocal();
+    const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
     return resolveBillableTjmForClientMonth(
       billableActivity?.billableRatePeriods ?? [],
       billableActivity?.billableRatePeriods[0]?.clientName ?? "",
       monthKey,
       billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT
     );
-  }, [billableActivity?.billableRatePeriods, billableActivity?.tjmHt, selectedMonth]);
+  }, [billableActivity?.billableRatePeriods, billableActivity?.tjmHt, singleMonth]);
 
-  const monthlyTrendSeries = useMemo(
-    () =>
-      buildValeurReelleMonthlyTrendSeries(transactions, {
-        years: selectedYears,
-        month: selectedMonth
-      }),
-    [selectedMonth, selectedYears, transactions]
-  );
+  const tree = analysis.cashTree;
 
   return (
     <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
-      <DashboardPeriodFilterSection
-        selectedYears={selectedYears}
-        setSelectedYears={setSelectedYears}
-        selectedMonth={selectedMonth}
-        setSelectedMonth={setSelectedMonth}
-        monthOptions={monthOptions}
+      <DashboardInsightPeriodFilter
+        eyebrow="Valeur réelle"
+        title="Ce qu'il vous reste vraiment"
         yearOptions={yearOptions}
+        monthOptions={monthOptions}
+        selectedYears={selectedYears}
+        selectedMonths={selectedMonthsForYears}
         onToggleYear={onToggleYear}
-        sticky
-        showRollingOption={false}
-        showActiveLabel={false}
+        onToggleMonth={onToggleMonth}
+        onClearMonths={onClearMonths}
       />
 
       {demoMode ? (
@@ -933,15 +948,49 @@ export function ValeurReelleClient({
         </p>
       ) : null}
 
-      <CashFlowTreeVisual
-        tree={analysis.cashTree}
+      <CashAvailableCard
+        tree={tree}
         fmt={fmt}
         billableDays={billableDaysInPeriod}
         gainPerWorkDayEstimate={gainPerWorkDayEstimate}
         periodLabel={analysis.periodLabel}
-        tjmHt={tjmHtForPeriod}
-        onRecategorized={handleRecategorized}
       />
+
+      <div className={dashboardInsightGrid}>
+        <DailyValueBlock
+          tree={tree}
+          fmt={fmt}
+          tjmHt={tjmHtForPeriod}
+          billableDays={billableDaysInPeriod}
+          gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+        />
+        <FinancialAllocationBlock tree={tree} fmt={fmt} />
+      </div>
+
+      <div className={dashboardInsightGrid}>
+        <FeesBlock
+          eyebrow="Frais société"
+          title="Frais DigitPro"
+          amount={tree.mandatoryFeesEur}
+          breakdown={tree.mandatoryFeesBreakdown}
+          palette={MANDATORY_FEES_COLORS}
+          fmt={fmt}
+          caHt={tree.caFactureEur}
+          recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
+          onRecategorized={handleRecategorized}
+        />
+        <FeesBlock
+          eyebrow="Dépenses perso"
+          title="Frais perso"
+          amount={tree.personalChargesEur}
+          breakdown={tree.personalChargesBreakdown}
+          palette={PERSONAL_CHARGES_COLORS}
+          fmt={fmt}
+          caHt={tree.caFactureEur}
+          recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
+          onRecategorized={handleRecategorized}
+        />
+      </div>
 
       <RecoverableVatMonthlyBlock
         rows={analysis.vatRecoverableMonthlyRows}
@@ -949,12 +998,6 @@ export function ValeurReelleClient({
         paidTransactions={analysis.vatLiability.paidTransactions}
         fmt={fmt}
       />
-
-      <div className={dashboardTwoColGrid}>
-        <ValeurReellePer100AllocationCard tree={analysis.cashTree} fmt={fmt} />
-        <ValeurReelleMonthlyTrendChart series={monthlyTrendSeries} />
-      </div>
-
     </div>
   );
 }

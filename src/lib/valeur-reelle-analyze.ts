@@ -7,7 +7,10 @@ import {
   last12MonthsKeys,
   type DashboardAnalyticsFilter
 } from "@/lib/dashboard-metrics";
-import { formatDashboardPeriodLabelWithMonth } from "@/lib/dashboard-period";
+import {
+  formatDashboardPeriodLabelWithMonth,
+  formatDashboardPeriodLabelWithMonths
+} from "@/lib/dashboard-period";
 import { deriveExpenseBucket, type DerivedExpenseBucket } from "@/lib/derived-expense-bucket";
 import {
   amountNetOfRecoverableVat,
@@ -597,8 +600,12 @@ export function analyzeValeurReelle(
   const now = options?.now ?? new Date();
   const years = options?.years ?? null;
   const month = options?.month ?? null;
-  const periodLabel = formatDashboardPeriodLabelWithMonth(years, month);
-  const scoped = filterDashboardTransactions([...transactions], { years, month }, now);
+  const months = options?.months ?? null;
+  const periodLabel =
+    months != null && months.length > 0
+      ? formatDashboardPeriodLabelWithMonths(years, months)
+      : formatDashboardPeriodLabelWithMonth(years, month);
+  const scoped = filterDashboardTransactions([...transactions], { years, month, months }, now);
 
   let activeIncomeEur = 0;
   let passiveIncomeEur = 0;

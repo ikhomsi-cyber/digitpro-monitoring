@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { BANKIN_UNCATEGORIZED_CATEGORY } from "@/lib/bankin/categorize";
 import { buildBankinReferenceCategoryList } from "@/lib/bankin/reference-categories";
 import {
+  categorisationMonthBounds,
+  currentCategorisationMonthKey,
   mapCategorisationCandidateRows,
   normalizeCategory,
   type CategorisationCandidateRow
@@ -17,6 +18,9 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
+  const monthKey = currentCategorisationMonthKey();
+  const { startIso, endIso } = categorisationMonthBounds(monthKey);
+
   const [categoryRes, txRes] = await Promise.all([
     supabase
       .from("transactions")
@@ -27,7 +31,9 @@ export async function GET() {
       .from("transactions")
       .select("id,date,label,amount,company,bank_name,category,import_sessions!inner(format)")
       .eq("import_sessions.format", "powens")
-      .eq("category", BANKIN_UNCATEGORIZED_CATEGORY)
+      .lt("amount", 0)
+      .gte("date", startIso)
+      .lte("date", endIso)
       .order("date", { ascending: false })
       .limit(200)
   ]);
@@ -42,7 +48,10 @@ export async function GET() {
   const categories = buildBankinReferenceCategoryList(
     (categoryRes.data ?? []).map((row) => normalizeCategory((row as { category?: unknown }).category))
   );
-  const transactions = mapCategorisationCandidateRows((txRes.data ?? []) as unknown as CategorisationCandidateRow[]);
+  const transactions = mapCategorisationCandidateRows(
+    (txRes.data ?? []) as unknown as CategorisationCandidateRow[],
+    monthKey
+  );
 
-  return NextResponse.json({ ok: true, categories, transactions });
+  return NextResponse.json({ ok: true, categories, transactions, monthKey });
 }

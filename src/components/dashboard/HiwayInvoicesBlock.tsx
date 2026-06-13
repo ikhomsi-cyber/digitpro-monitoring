@@ -148,7 +148,7 @@ export function HiwayInvoicesBlock() {
   let content: React.ReactNode;
   if (status && !status.configured) {
     content = (
-      <p className="rounded-xl border border-amber-200/70 bg-amber-50/60 px-3 py-2.5 text-[11px] font-medium text-amber-800 dark:border-amber-300/20 dark:bg-amber-300/[0.08] dark:text-amber-100">
+      <p className="text-[11px] font-medium text-amber-800 dark:text-amber-100">
         Gmail non configuré : définissez <code className="font-mono">GOOGLE_CLIENT_ID</code>,{" "}
         <code className="font-mono">GOOGLE_CLIENT_SECRET</code> et{" "}
         <code className="font-mono">GOOGLE_REDIRECT_URI</code> dans les variables d&apos;environnement
@@ -158,7 +158,7 @@ export function HiwayInvoicesBlock() {
     );
   } else if (status && !status.connected) {
     content = (
-      <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/50 px-3 py-4 text-center dark:border-emerald-400/15 dark:bg-emerald-400/[0.06]">
+      <div className="space-y-3 text-center">
         <p className="text-[11px] font-medium text-ink-600 dark:text-cyan-50/70">
           Connectez votre boîte Gmail pour lister vos factures{" "}
           <span className="font-semibold">DigitPro Consulting - Facture F…</span> envoyées par{" "}
@@ -194,11 +194,11 @@ export function HiwayInvoicesBlock() {
         </div>
 
         {invoices == null ? (
-          <p className="rounded-xl border border-dashed border-ink-200/70 px-3 py-4 text-center text-[11px] font-medium text-ink-400 dark:border-cyan-100/[0.12] dark:text-cyan-50/45">
+          <p className="text-center text-[11px] font-medium text-ink-400 dark:text-cyan-50/45">
             Cliquez sur « Récupérer mes factures » pour interroger Gmail.
           </p>
         ) : invoices.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-ink-200/70 px-3 py-4 text-center text-[11px] font-medium text-ink-400 dark:border-cyan-100/[0.12] dark:text-cyan-50/45">
+          <p className="text-center text-[11px] font-medium text-ink-400 dark:text-cyan-50/45">
             Aucune facture « DigitPro Consulting - Facture F… » trouvée dans cette boîte Gmail.
           </p>
         ) : (
@@ -216,7 +216,7 @@ export function HiwayInvoicesBlock() {
                 (invoice) => (
                   <li
                     key={invoice.id}
-                    className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-lg bg-white/80 px-2.5 py-2 dark:bg-white/[0.05]"
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5 border-b border-ink-200/30 py-2 last:border-b-0 dark:border-white/[0.06]"
                   >
                     <PremiumIconBadge icon={FileText} size="sm" />
                     <span className="min-w-0">
@@ -253,7 +253,7 @@ export function HiwayInvoicesBlock() {
                 type="button"
                 onClick={() => setInvoicesExpanded((v) => !v)}
                 aria-expanded={invoicesExpanded}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200/70 bg-emerald-50/50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-800 transition hover:bg-emerald-100/80 dark:border-emerald-400/20 dark:bg-emerald-400/[0.08] dark:text-emerald-100 dark:hover:bg-emerald-400/[0.14]"
+                className="mt-2 flex w-full items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold text-emerald-800 transition hover:opacity-80 dark:text-emerald-100"
               >
                 <ChevronDown
                   className={clsx("h-3.5 w-3.5 transition-transform", invoicesExpanded && "rotate-180")}
@@ -271,14 +271,14 @@ export function HiwayInvoicesBlock() {
     );
   } else {
     content = (
-      <p className="rounded-xl border border-dashed border-ink-200/70 px-3 py-4 text-center text-[11px] font-medium text-ink-400 dark:border-cyan-100/[0.12] dark:text-cyan-50/45">
+      <p className="text-center text-[11px] font-medium text-ink-400 dark:text-cyan-50/45">
         Chargement…
       </p>
     );
   }
 
   return (
-    <div className="mt-5 border-t border-ink-100/90 pt-5 dark:border-white/[0.06]">
+    <div className="mt-8 space-y-3">
       {eyebrow}
       {content}
     </div>

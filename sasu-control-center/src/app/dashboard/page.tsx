@@ -17,6 +17,7 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
+import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
@@ -82,14 +83,16 @@ export default async function DashboardPage({
   // If Supabase exists but user isn't logged in, show login prompt.
   if (envMode === "SUPABASE" && !user) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center">
-        <Logo className="mx-auto mb-8" />
-        <div className="h-eyebrow">Session expirée</div>
-        <h1 className="mt-2 h-display">Veuillez vous reconnecter.</h1>
-        <div className="mt-8">
-          <Link href="/login" className="btn-primary">
-            Aller à la connexion <ArrowUpRight className="h-4 w-4" />
-          </Link>
+      <div className="premium-dashboard-page flex min-h-dvh items-center justify-center px-6 py-24">
+        <div className="mx-auto max-w-2xl text-center">
+          <Logo className="mx-auto mb-8" />
+          <div className="h-eyebrow">Session expirée</div>
+          <h1 className="mt-2 h-display">Veuillez vous reconnecter.</h1>
+          <div className="mt-8">
+            <Link href="/login" className="premium-cta inline-flex">
+              Aller à la connexion <ArrowUpRight className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -110,6 +113,7 @@ export default async function DashboardPage({
   let transactionYearBounds: { minYear: number; maxYear: number } | null = null;
   let initialBillableWorkDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
+  let initialAnnualRevenueTargetHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
 
@@ -122,6 +126,7 @@ export default async function DashboardPage({
         : Promise.resolve({
             initialBillableWorkDays: [],
             initialBillableTjmHt: null,
+            initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
           }),
       loadQontoLiveBalanceEur()
@@ -132,6 +137,7 @@ export default async function DashboardPage({
     transactionYearBounds = boundsRes;
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
+    initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
     if (transactionsRes.errorMessage) {
       console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
@@ -167,9 +173,10 @@ export default async function DashboardPage({
       billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
       initialWorkDayIsos={initialBillableWorkDays}
+      initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <DashboardDesktopSidebar />
-    <div className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-auto lg:px-8">
+    <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       <DashboardTopNav
         envMode={envMode}
         dataMode={dataMode}
@@ -192,25 +199,21 @@ export default async function DashboardPage({
           loadError={transactionsLoadError}
         />
       ) : (
-        <Suspense
-          fallback={
-            <div className="mt-6 space-y-6 sm:mt-8">
-              <div className="h-40 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
-              <div className="h-72 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
-            </div>
-          }
-        >
-          <DashboardClient
-            syncKey={syncKey}
-            initialTransactions={transactions}
-            transactionYearBounds={transactionYearBounds}
-            initialDashboardScope={initialDashboardScope}
-            heroStats={heroStats}
-            heroContextMessage={heroContextMessage}
-            showContextBanner={showContextBanner}
-            demoMode={demoMode}
-            loadError={transactionsLoadError}
-          />
+        <Suspense fallback={null}>
+          <DashboardSectionProvider>
+            <DashboardClient
+              syncKey={syncKey}
+              initialTransactions={transactions}
+              transactionYearBounds={transactionYearBounds}
+              initialDashboardScope={initialDashboardScope}
+              heroStats={heroStats}
+              heroContextMessage={heroContextMessage}
+              showContextBanner={showContextBanner}
+              demoMode={demoMode}
+              loadError={transactionsLoadError}
+            />
+            <DashboardFloatingDock />
+          </DashboardSectionProvider>
         </Suspense>
       )}
 
@@ -231,10 +234,6 @@ export default async function DashboardPage({
           © {new Date().getFullYear()} DigitPro. Conçu par Iliass KHOMSI.
         </span>
       </footer>
-
-      <Suspense fallback={null}>
-        <DashboardFloatingDock />
-      </Suspense>
     </div>
     </BillableActivityProvider>
     </DashboardDummyDataProvider>

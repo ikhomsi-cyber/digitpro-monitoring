@@ -36,10 +36,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/site.webmanifest" />
         <link rel="apple-touch-icon" href="/icons/digitpro-icon.svg" />
         <meta name="theme-color" content="#06242b" media="(prefers-color-scheme: dark)" />
-        <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#F5F5F7" media="(prefers-color-scheme: light)" />
       </head>
       <body
-        className={`${inter.variable} ${display.variable} font-sans bg-white text-ink-900 transition-colors duration-200 dark:bg-[#06242b] dark:text-ink-50`}
+        className={`${inter.variable} ${display.variable} font-sans bg-ink-100 text-ink-900 transition-colors duration-200 dark:bg-[#06242b] dark:text-ink-50`}
+        suppressHydrationWarning
       >
         <div className="min-h-dvh">{children}</div>
         <Toaster

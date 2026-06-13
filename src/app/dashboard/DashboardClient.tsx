@@ -7,10 +7,9 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
-import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
   CalendarClock,
@@ -23,6 +22,7 @@ import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
+import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
@@ -42,7 +42,8 @@ import { counterpartyLogoHref } from "@/lib/counterparty-logo";
 import {
   buildDashboardMonthOptions,
   defaultDashboardPeriodFilter,
-  formatDashboardPeriodLabelWithMonth
+  formatDashboardPeriodLabelWithMonth,
+  formatDashboardPeriodLabelWithMonths
 } from "@/lib/dashboard-period";
 import {
   dashboardAnalysisShell,
@@ -53,10 +54,7 @@ import {
   dashboardFilterPill,
   dashboardGaugeTrack,
   dashboardInsetPanel,
-  dashboardPanelSub,
   dashboardPanelTitle,
-  dashboardPeriodNavBtn,
-  dashboardPeriodTitle,
   dashboardPremiumPanel,
   dashboardRowAmount,
   dashboardRowDivider,
@@ -100,22 +98,9 @@ import {
   sasuSimplifiedExpenseGroup
 } from "@/lib/sasu-analytics";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
+import { useDashboardSection } from "@/components/dashboard/DashboardSectionContext";
 
 export type { DashboardTx };
-
-const DASHBOARD_SECTION_SLIDE_VARIANTS = {
-  initial: { opacity: 0, y: 8 },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.26, ease: [0.22, 1, 0.36, 1] as const }
-  },
-  exit: {
-    opacity: 0,
-    y: -8,
-    transition: { duration: 0.18, ease: [0.4, 0, 1, 1] as const }
-  }
-};
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -235,17 +220,7 @@ export function DashboardClient({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const dashboardSection = useMemo(() => {
-    if (searchParams.get("panel") === "valeur-reelle") return "valeur" as const;
-    const s = searchParams.get("section");
-    if (s === "activite") return "activite" as const;
-    if (s === "sasu") return "sasu" as const;
-    if (s === "private") return "private" as const;
-    if (s === "categorisation") return "categorisation" as const;
-    return "full" as const;
-  }, [searchParams]);
+  const { section: dashboardSection, searchParams } = useDashboardSection();
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
@@ -255,14 +230,16 @@ export function DashboardClient({
   const [selectedYears, setSelectedYears] = useState<number[] | null>(
     () => defaultDashboardPeriodFilter().selectedYears
   );
-  /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM. */
+  /** null = fenêtre/années ; sinon un seul mois civil YYYY-MM (onglet Privé). */
   const [selectedMonth, setSelectedMonth] = useState<string | null>(
     () => defaultDashboardPeriodFilter().selectedMonth
   );
-  /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) pour la carte Total expenses. */
-  const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(
-    () => defaultDashboardPeriodFilter().selectedMonth
+  /** Multi-mois pour l’onglet SASU (comme Valeur réelle). */
+  const [selectedMonths, setSelectedMonths] = useState<string[]>(
+    () => [defaultDashboardPeriodFilter().selectedMonth]
   );
+  /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) via clic sur le graphique. */
+  const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
   const [revenueCounterpartyDetail, setRevenueCounterpartyDetail] = useState<string | null>(null);
   /** Catégorie dérivée sélectionnée dans Total expenses (liste des opérations). */
@@ -271,7 +248,6 @@ export function DashboardClient({
   const [sasuBreakdownMode, setSasuBreakdownMode] = useState<"categories" | "simplified">("categories");
   const [showAllSasuCategoryRows, setShowAllSasuCategoryRows] = useState(false);
   const [expandedSasuSubcategoryGroups, setExpandedSasuSubcategoryGroups] = useState<Set<string>>(() => new Set());
-  const [sasuMonthlyBreakdownMode, setSasuMonthlyBreakdownMode] = useState<"categories" | "simplified">("categories");
   const [sasuMonthlyCategoryFilters, setSasuMonthlyCategoryFilters] = useState<string[]>([]);
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
@@ -286,7 +262,8 @@ export function DashboardClient({
     setRevenueCounterpartyDetail(null);
     setExpenseCategoryDetail(null);
     setSelectedExpenseCategoryFilters([]);
-  }, [scope, selectedMonth, selectedYears, syncKey]);
+    setTotalExpensesMonthFilter(null);
+  }, [scope, selectedMonth, selectedMonths, selectedYears, syncKey]);
 
   useEffect(() => {
     setExpenseCategoryDetail(null);
@@ -369,10 +346,30 @@ export function DashboardClient({
   const billableActivity = useBillableActivity();
   const { sortedIsos: billableWorkDayIsos } = billableActivity;
 
-  const analyticsFilter = useMemo(
-    () => ({ years: selectedYears, month: selectedMonth }),
-    [selectedMonth, selectedYears]
+  const analyticsFilter = useMemo(() => {
+    if (dashboardSection === "sasu") {
+      const years = selectedYears ?? [new Date().getFullYear()];
+      const months = selectedMonths.filter((m) => years.includes(Number(m.slice(0, 4))));
+      return {
+        years,
+        months: months.length ? months : null,
+        month: null as string | null
+      };
+    }
+    return { years: selectedYears, month: selectedMonth };
+  }, [dashboardSection, selectedMonth, selectedMonths, selectedYears]);
+
+  const sasuMonthsForYears = useMemo(
+    () => {
+      if (dashboardSection !== "sasu") return [];
+      const years = selectedYears ?? [new Date().getFullYear()];
+      return selectedMonths.filter((m) => years.includes(Number(m.slice(0, 4))));
+    },
+    [dashboardSection, selectedMonths, selectedYears]
   );
+
+  const sasuSingleMonth = sasuMonthsForYears.length === 1 ? sasuMonthsForYears[0]! : null;
+  const effectiveMonth = dashboardSection === "sasu" ? sasuSingleMonth : selectedMonth;
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),
@@ -404,13 +401,18 @@ export function DashboardClient({
     return Array.from(set).sort((a, b) => a.localeCompare(b, "fr"));
   }, [periodFilteredTx, kpiMode]);
 
+  const analyticsYears = useMemo(
+    () => (effectiveMonth ? [Number(effectiveMonth.slice(0, 4))] : selectedYears),
+    [effectiveMonth, selectedYears]
+  );
+
   const metrics = useMemo(
     () =>
       computeDashboardMonthlyMetrics(filteredTx, {
-        years: selectedMonth ? [Number(selectedMonth.slice(0, 4))] : selectedYears,
+        years: analyticsYears,
         kpiMode
       }),
-    [filteredTx, kpiMode, selectedMonth, selectedYears]
+    [analyticsYears, filteredTx, kpiMode]
   );
 
   /** Mois de la fenêtre d’analyse déjà écoulés (≤ mois en cours), pour les moyennes. */
@@ -430,15 +432,15 @@ export function DashboardClient({
     () =>
       kpiMode === "personal"
         ? computeExpenseCategoryMonthlyBreakdown(filteredTx, {
-            years: selectedYears,
+            years: analyticsYears,
             expenseInclude: (tx) => countsTowardDashboardExpenseKpi(tx, "personal"),
             expenseGroup: "personal"
           })
         : computeDerivedExpenseCategoryMonthlyBreakdown(filteredTx, {
-            years: selectedYears,
+            years: analyticsYears,
             useExpenseHt: true
           }),
-    [filteredTx, selectedYears, kpiMode]
+    [analyticsYears, filteredTx, kpiMode]
   );
 
   const expenseCategoryBreakdownMain = useMemo(
@@ -452,30 +454,32 @@ export function DashboardClient({
     [expenseCategoryBreakdown, kpiMode]
   );
 
+  const activeExpenseMonthKey = totalExpensesMonthFilter ?? effectiveMonth;
+
   const totalExpensesCard = useMemo(() => {
-    if (totalExpensesMonthFilter) {
-      const m = metrics.find((x) => x.month === totalExpensesMonthFilter);
+    if (activeExpenseMonthKey) {
+      const m = metrics.find((x) => x.month === activeExpenseMonthKey);
       return m ? m.expenses : 0;
     }
     return sum(metrics.map((x) => x.expenses));
-  }, [metrics, totalExpensesMonthFilter]);
+  }, [activeExpenseMonthKey, metrics]);
 
   const totalExpensesCardTtc = useMemo(() => {
     if (kpiMode !== "sasu") return totalExpensesCard;
     let ttc = 0;
     for (const tx of filteredTx) {
       if (!countsTowardDashboardExpenseTotal(tx)) continue;
-      if (totalExpensesMonthFilter && tx.date.slice(0, 7) !== totalExpensesMonthFilter) continue;
+      if (activeExpenseMonthKey && tx.date.slice(0, 7) !== activeExpenseMonthKey) continue;
       ttc += Math.abs(tx.amount);
     }
     return ttc;
-  }, [filteredTx, kpiMode, totalExpensesCard, totalExpensesMonthFilter]);
+  }, [activeExpenseMonthKey, filteredTx, kpiMode, totalExpensesCard]);
 
   const expenseCategoryTotalsForTotalExpensesCard = useMemo(() => {
     const cats = expenseCategoryBreakdownMain.categories;
     if (!cats.length) return [];
     let withTotals: { name: string; total: number }[];
-    if (!totalExpensesMonthFilter) {
+    if (!activeExpenseMonthKey) {
       const totals = new Map<string, number>();
       for (const c of cats) totals.set(c, 0);
       for (const row of expenseCategoryBreakdownMain.rows) {
@@ -487,7 +491,7 @@ export function DashboardClient({
         .map((name) => ({ name, total: totals.get(name) ?? 0 }))
         .filter((x) => x.total > 0);
     } else {
-      const row = expenseCategoryBreakdownMain.rows.find((r) => r.monthKey === totalExpensesMonthFilter);
+      const row = expenseCategoryBreakdownMain.rows.find((r) => r.monthKey === activeExpenseMonthKey);
       if (!row) return [];
       withTotals = cats
         .map((name) => ({ name, total: row.values[name] ?? 0 }))
@@ -499,7 +503,7 @@ export function DashboardClient({
         if (b.name === "CESU" && a.name !== "CESU") return 1;
         return b.total - a.total;
       });
-  }, [expenseCategoryBreakdownMain, totalExpensesMonthFilter]);
+  }, [activeExpenseMonthKey, expenseCategoryBreakdownMain]);
 
   const VAT_RATE = 0.2;
   const totalRevenues = useMemo(() => sum(metrics.map((m) => m.revenue)), [metrics]);
@@ -559,8 +563,11 @@ export function DashboardClient({
 
   const sasuSimplifiedExpenseSlices = useMemo(() => {
     if (!shouldComputeSasuPanel) return [];
-    return buildSasuSimplifiedExpenseSlices(filteredTx);
-  }, [filteredTx, shouldComputeSasuPanel]);
+    const txs = activeExpenseMonthKey
+      ? filteredTx.filter((tx) => tx.date.slice(0, 7) === activeExpenseMonthKey)
+      : filteredTx;
+    return buildSasuSimplifiedExpenseSlices(txs);
+  }, [activeExpenseMonthKey, filteredTx, shouldComputeSasuPanel]);
 
   const sasuSimplifiedSubcategories = useMemo(() => {
     if (!shouldComputeSasuPanel) return {};
@@ -590,11 +597,11 @@ export function DashboardClient({
       .filter((tx) => {
         if (tx.amount >= 0) return false;
         if (expenseDashboardGroupingLabel(tx, kpiMode) !== expenseCategoryDetail) return false;
-        if (totalExpensesMonthFilter && tx.date.slice(0, 7) !== totalExpensesMonthFilter) return false;
+        if (activeExpenseMonthKey && tx.date.slice(0, 7) !== activeExpenseMonthKey) return false;
         return true;
       })
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-  }, [filteredTx, expenseCategoryDetail, totalExpensesMonthFilter, kpiMode]);
+  }, [activeExpenseMonthKey, filteredTx, expenseCategoryDetail, kpiMode]);
 
   const monthlyTotalExpensesSeries = useMemo(
     () =>
@@ -620,7 +627,7 @@ export function DashboardClient({
       const monthBucket = monthly.get(monthKey);
       if (!monthBucket) continue;
       const name =
-        sasuMonthlyBreakdownMode === "simplified"
+        sasuBreakdownMode === "simplified"
           ? sasuSimplifiedExpenseGroup(tx)
           : expenseDashboardGroupingLabel(tx, kpiMode);
       if (!name) continue;
@@ -630,7 +637,7 @@ export function DashboardClient({
     }
 
     return { totals, monthly };
-  }, [metrics, periodFilteredTx, kpiMode, sasuMonthlyBreakdownMode, shouldComputeSasuPanel]);
+  }, [metrics, periodFilteredTx, kpiMode, sasuBreakdownMode, shouldComputeSasuPanel]);
 
   const sasuMonthlyEvolutionOptions = useMemo(() => {
     const { totals } = sasuMonthlyEvolutionBuckets;
@@ -643,14 +650,14 @@ export function DashboardClient({
   const sasuMonthlyEvolutionColorByName = useMemo(() => {
     const total = sum(sasuMonthlyEvolutionOptions.map((item) => item.total));
     const slices =
-      sasuMonthlyBreakdownMode === "simplified"
+      sasuBreakdownMode === "simplified"
         ? sasuMonthlyEvolutionOptions.map((item) => ({
             ...item,
             color: item.name === "Frais DigitPro" ? "#ff8733" : "#11c7cb"
           }))
         : buildSasuExpenseDonutSlices(sasuMonthlyEvolutionOptions, total);
     return new Map(slices.map((slice) => [slice.name, slice.color]));
-  }, [sasuMonthlyBreakdownMode, sasuMonthlyEvolutionOptions]);
+  }, [sasuBreakdownMode, sasuMonthlyEvolutionOptions]);
 
   useEffect(() => {
     setSasuMonthlyCategoryFilters((prev) => {
@@ -715,14 +722,16 @@ export function DashboardClient({
     return Math.max(1, maxValue);
   }, [sasuMonthlyEvolutionSeries]);
 
-  const sasuMonthlyAverage = useMemo(() => {
-    if (!sasuMonthlyEvolutionSeries.length) return 0;
-    return sum(sasuMonthlyEvolutionSeries.map((month) => month.value)) / sasuMonthlyEvolutionSeries.length;
-  }, [sasuMonthlyEvolutionSeries]);
-
   const periodLabel = useMemo(() => {
+    if (dashboardSection === "sasu") {
+      const years = selectedYears ?? [new Date().getFullYear()];
+      return formatDashboardPeriodLabelWithMonths(
+        years,
+        sasuMonthsForYears.length ? sasuMonthsForYears : null
+      );
+    }
     return formatDashboardPeriodLabelWithMonth(selectedYears, selectedMonth);
-  }, [selectedMonth, selectedYears]);
+  }, [dashboardSection, sasuMonthsForYears, selectedMonth, selectedYears]);
 
   const totalExpensesCardSubtitle = useMemo(() => {
     let base: string;
@@ -732,8 +741,8 @@ export function DashboardClient({
       base = `Hors ${BNC_PAYROLL_EXPENSE_CATEGORY} et ${TVA_DERIVED_EXPENSE_BUCKET} · HT (TVA récupérable déduite quand applicable)`;
     }
     let s: string;
-    if (totalExpensesMonthFilter) {
-      s = `${base} · ${monthLabelFr(totalExpensesMonthFilter)} (mois sélectionné) · ${periodLabel}`;
+    if (activeExpenseMonthKey) {
+      s = `${base} · ${monthLabelFr(activeExpenseMonthKey)} (mois sélectionné) · ${periodLabel}`;
     } else {
       s = `${base} · ${periodLabel}`;
     }
@@ -742,7 +751,7 @@ export function DashboardClient({
       s += ` · Filtre : ${n} catégorie${n > 1 ? "s" : ""}`;
     }
     return s;
-  }, [totalExpensesMonthFilter, periodLabel, selectedExpenseCategoryFilters, kpiMode]);
+  }, [activeExpenseMonthKey, periodLabel, selectedExpenseCategoryFilters, kpiMode]);
 
   const yearOptions = useMemo(() => {
     if (dashboardSection !== "sasu" && transactionYearBounds) {
@@ -772,22 +781,36 @@ export function DashboardClient({
     [dashboardSection, transactionYearBounds, transactions]
   );
 
-  const currentSasuYear = selectedYears?.[0] ?? yearOptions[0] ?? new Date().getFullYear();
-  const moveSasuYear = useCallback((delta: -1 | 1) => {
-    setSelectedMonth(null);
-    setSelectedYears([currentSasuYear + delta]);
-  }, [currentSasuYear]);
-  const moveSasuPeriod = useCallback((delta: -1 | 1) => {
-    if (!selectedMonth) {
-      moveSasuYear(delta);
-      return;
-    }
-    const index = monthOptions.indexOf(selectedMonth);
-    const nextMonth = index >= 0 ? monthOptions[index - delta] : null;
-    if (!nextMonth) return;
-    setSelectedMonth(nextMonth);
-    setSelectedYears([Number(nextMonth.slice(0, 4))]);
-  }, [monthOptions, moveSasuYear, selectedMonth]);
+  const onSasuToggleYear = useCallback(
+    (y: number) => {
+      setSelectedYears((prev) => {
+        const base = prev ?? [yearOptions[0] ?? new Date().getFullYear()];
+        const next = new Set(base);
+        if (next.has(y)) {
+          if (next.size <= 1) return prev;
+          next.delete(y);
+          setSelectedMonths((months) => months.filter((m) => Number(m.slice(0, 4)) !== y));
+        } else {
+          next.add(y);
+        }
+        return Array.from(next).sort((a, b) => b - a);
+      });
+    },
+    [yearOptions]
+  );
+
+  const onSasuToggleMonth = useCallback((m: string) => {
+    setSelectedMonths((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return Array.from(next).sort((a, b) => a.localeCompare(b));
+    });
+  }, []);
+
+  const onSasuClearMonths = useCallback(() => setSelectedMonths([]), []);
+
+  const sasuYearsForFilter = selectedYears ?? [yearOptions[0] ?? new Date().getFullYear()];
 
   function toggleYearInFilter(y: number) {
     setSelectedMonth(null);
@@ -816,17 +839,11 @@ export function DashboardClient({
   return (
     <main id="dashboard-main" className="relative mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
       <SectionThemeSync />
-      <AnimatePresence initial={false} mode="popLayout">
-        <motion.div
-          key={dashboardSection}
-          variants={DASHBOARD_SECTION_SLIDE_VARIANTS}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          className={clsx("w-full will-change-[opacity,transform]", dashboardSectionStack)}
-        >
-      {dashboardSection === "full" ? (
-        <>
+      <div className={clsx("w-full", dashboardSectionStack)}>
+      <div
+        className={clsx(dashboardSection !== "full" && "hidden", dashboardSectionStack)}
+        aria-hidden={dashboardSection !== "full"}
+      >
           <RevolutBalanceHero stats={currentHeroStats} statsReady />
           <RevolutInsightsSection transactions={transactions} />
           <TaxLiabilityCard
@@ -847,28 +864,35 @@ export function DashboardClient({
           />
           <DashboardPremiumHero
             stats={currentHeroStats}
+            transactions={transactions}
             statsReady
             contextMessage={heroContextMessage}
             showContextBanner={showContextBanner}
           />
-        </>
-      ) : null}
-      {dashboardSection === "activite" ? (
+      </div>
+      <div className={clsx(dashboardSection !== "activite" && "hidden")} aria-hidden={dashboardSection !== "activite"}>
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
         />
-      ) : null}
-      {dashboardSection === "valeur" ? (
+      </div>
+      <div className={clsx(dashboardSection !== "valeur" && "hidden")} aria-hidden={dashboardSection !== "valeur"}>
         <ValeurReelleClient
           initialTransactions={transactions}
           demoMode={demoMode}
           loadError={loadError}
         />
-      ) : null}
-      {dashboardSection === "categorisation" ? <DashboardCategorisationPanel /> : null}
-      {(dashboardSection === "sasu" || dashboardSection === "private") && (
-        <>
+      </div>
+      <div
+        className={clsx(dashboardSection !== "categorisation" && "hidden")}
+        aria-hidden={dashboardSection !== "categorisation"}
+      >
+        <DashboardCategorisationPanel />
+      </div>
+      <div
+        className={clsx(dashboardSection !== "sasu" && dashboardSection !== "private" && "hidden")}
+        aria-hidden={dashboardSection !== "sasu" && dashboardSection !== "private"}
+      >
           {dashboardSection === "private" ? (
             <DashboardPeriodFilterSection
               selectedYears={selectedYears}
@@ -887,38 +911,17 @@ export function DashboardClient({
           {dashboardSection === "sasu" ? (
             <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
               <div className={clsx(dashboardAnalysisShell, "xl:col-span-2")}>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => moveSasuPeriod(-1)}
-                      className={dashboardPeriodNavBtn}
-                      aria-label={selectedMonth ? "Afficher le mois précédent" : "Afficher l’année précédente"}
-                    >
-                      ‹
-                    </button>
-                    <p className={dashboardPeriodTitle}>
-                      {selectedMonth ? monthLabelFr(selectedMonth) : currentSasuYear}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => moveSasuPeriod(1)}
-                      className={dashboardPeriodNavBtn}
-                      aria-label={selectedMonth ? "Afficher le mois suivant" : "Afficher l’année suivante"}
-                    >
-                      ›
-                    </button>
-                  </div>
-                  <DashboardPeriodFilterSection
-                    selectedYears={selectedYears}
-                    setSelectedYears={setSelectedYears}
-                    selectedMonth={selectedMonth}
-                    setSelectedMonth={setSelectedMonth}
-                    monthOptions={monthOptions}
-                    yearOptions={yearOptions}
-                    onToggleYear={toggleYearInFilter}
-                    showRollingOption={false}
-                    showActiveLabel={false}
-                  />
+                <DashboardInsightPeriodFilter
+                  eyebrow="SASU"
+                  title="Entrées & sorties"
+                  yearOptions={yearOptions}
+                  monthOptions={monthOptions}
+                  selectedYears={sasuYearsForFilter}
+                  selectedMonths={sasuMonthsForYears}
+                  onToggleYear={onSasuToggleYear}
+                  onToggleMonth={onSasuToggleMonth}
+                  onClearMonths={onSasuClearMonths}
+                />
                   <div className={clsx(dashboardSegmentShell("mt-3 grid-cols-2"))}>
                     {[
                       { label: "Entrées", mode: "revenues" as const },
@@ -945,9 +948,7 @@ export function DashboardClient({
                       : sasuExpenseDonutSlices;
                   const currentTotal = sasuAnalysisMode === "revenues"
                     ? totalRevenuesHt
-                    : sasuBreakdownMode === "simplified"
-                      ? sasuSimplifiedExpenseSlices.reduce((sum, slice) => sum + slice.total, 0)
-                      : totalExpensesCard;
+                    : totalExpensesCard;
                   return (
                     <>
                 <div className={dashboardGaugeTrack}>
@@ -962,8 +963,8 @@ export function DashboardClient({
                     ))}
                   </div>
                 </div>
-                <div className={clsx("relative mx-auto flex h-64 w-64 max-w-full items-center justify-center", dashboardDonutTrack)}>
-                  <svg viewBox="0 0 200 200" className="block h-64 w-64 max-w-full" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
+                <div className={clsx("relative mx-auto flex h-80 w-80 max-w-full items-center justify-center sm:h-96 sm:w-96", dashboardDonutTrack)}>
+                  <svg viewBox="0 0 200 200" className="block h-80 w-80 max-w-full sm:h-96 sm:w-96" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
                     <defs>
                       <filter id="sasu-donut-shadow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
@@ -990,10 +991,10 @@ export function DashboardClient({
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
                     <div>
-                      <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white" data-private>
+                      <p className="font-display text-2xl font-bold tabular-nums text-ink-900 dark:text-white sm:text-3xl" data-private>
                         {fmt.euro(currentTotal)}
                       </p>
-                      <p className="mt-1 text-sm font-medium text-ink-500 dark:text-white/56">
+                      <p className="mt-1.5 text-sm font-medium text-ink-500 dark:text-white/56 sm:text-base">
                         {sasuAnalysisMode === "revenues" ? "Revenus HT" : "Dépenses HT"}
                       </p>
                     </div>
@@ -1002,14 +1003,20 @@ export function DashboardClient({
                 <div className={clsx(dashboardSegmentShell("mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2"))}>
                   <button
                     type="button"
-                    onClick={() => setSasuBreakdownMode("categories")}
+                    onClick={() => {
+                      setSasuBreakdownMode("categories");
+                      setSasuMonthlyCategoryFilters([]);
+                    }}
                     className={dashboardSegmentBtn(sasuBreakdownMode === "categories")}
                   >
                     {sasuAnalysisMode === "revenues" ? "Revenus" : "Catégories"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSasuBreakdownMode("simplified")}
+                    onClick={() => {
+                      setSasuBreakdownMode("simplified");
+                      setSasuMonthlyCategoryFilters([]);
+                    }}
                     className={dashboardSegmentBtn(sasuBreakdownMode === "simplified")}
                   >
                     Simplifié
@@ -1021,47 +1028,8 @@ export function DashboardClient({
               </div>
 
               <div className={clsx(dashboardPremiumPanel, "order-last xl:col-span-2")}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className={dashboardEyebrow}>
-                      Évolution mensuelle
-                    </p>
-                    <h3 className={clsx("mt-1", dashboardPanelTitle)}>
-                      Dépenses par mois
-                    </h3>
-                    <p className={clsx("mt-0.5", dashboardPanelSub)}>
-                      {periodLabel} · {sasuMonthlyCategoryFilters.length || "toutes"} catégorie
-                      {sasuMonthlyCategoryFilters.length > 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <div className={clsx(dashboardInsetPanel, "px-3 py-2 text-right")}>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-ink-400 dark:text-white/38">Moy. / mois</p>
-                    <p className="mt-0.5 font-display text-base font-bold tabular-nums text-ink-900 dark:text-white" data-private>
-                      {fmt.euro(sasuMonthlyAverage)}
-                    </p>
-                  </div>
-                  <div className={dashboardSegmentShell("grid-cols-2")}>
-                    {[
-                      { label: "Catégories", mode: "categories" as const },
-                      { label: "Simplifié", mode: "simplified" as const }
-                    ].map((item) => (
-                      <button
-                        key={item.mode}
-                        type="button"
-                        onClick={() => {
-                          setSasuMonthlyBreakdownMode(item.mode);
-                          setSasuMonthlyCategoryFilters([]);
-                        }}
-                        className={dashboardSegmentBtn(sasuMonthlyBreakdownMode === item.mode)}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {sasuMonthlyEvolutionOptions.length ? (
-                  <div className={clsx(dashboardInsetPanel, "relative mt-3 overflow-hidden px-2 py-2 shadow-[inset_0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]")}>
+                  <div className={clsx(dashboardInsetPanel, "relative overflow-hidden px-2 py-2 shadow-[inset_0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]")}>
                     <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-[1] w-10 bg-gradient-to-l from-white to-transparent dark:from-[#0b3038]" aria-hidden />
                     <div className="flex gap-2 overflow-x-auto pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {sasuMonthlyCategoryFilters.length ? (
@@ -1386,7 +1354,7 @@ export function DashboardClient({
                                         <span className="min-w-0 truncate text-ink-600 dark:text-white/70">
                                           {subcategory.name} · {subPct} %
                                         </span>
-                                        <span className="shrink-0 font-semibold tabular-nums text-ink-800 dark:text-white/86">
+                                        <span className={clsx(dashboardRowAmount, "shrink-0")}>
                                           {fmt.euro(subcategory.total)}
                                         </span>
                                       </div>
@@ -2073,11 +2041,8 @@ export function DashboardClient({
       </section>
           ) : null}
 
-        </>
-      )}
-
-        </motion.div>
-      </AnimatePresence>
+      </div>
+      </div>
     </main>
   );
 }

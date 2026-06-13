@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Activity, Building2, Briefcase, Gem, Tags, User, type LucideIcon } from "lucide-react";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
+import { useOptionalDashboardSection } from "@/components/dashboard/DashboardSectionContext";
 
 const ITEMS: readonly {
   href: string;
@@ -56,7 +57,11 @@ const ITEMS: readonly {
  */
 export function DashboardNavToasts() {
   const pathname = usePathname() ?? "";
-  const searchParams = useSearchParams();
+  const fallbackSearchParams = useSearchParams();
+  const sectionCtx = useOptionalDashboardSection();
+  const searchParams =
+    sectionCtx?.searchParams ??
+    new URLSearchParams(fallbackSearchParams.toString());
   const scope = searchParams.get("scope");
   const panel = searchParams.get("panel");
   const section = searchParams.get("section");
@@ -64,6 +69,11 @@ export function DashboardNavToasts() {
   if (!pathname.startsWith("/dashboard")) return null;
 
   const ctx = { scope, panel, section };
+  const onDashboardNavClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!href.startsWith("/dashboard") || !sectionCtx) return;
+    event.preventDefault();
+    sectionCtx.navigateWithinDashboard(href);
+  };
 
   return (
     <nav
@@ -92,8 +102,9 @@ export function DashboardNavToasts() {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch
+                prefetch={!item.href.startsWith("/dashboard")}
                 scroll={false}
+                onClick={item.href.startsWith("/dashboard") ? onDashboardNavClick(item.href) : undefined}
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "flex shrink-0 flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 text-center transition sm:px-4 sm:py-2",

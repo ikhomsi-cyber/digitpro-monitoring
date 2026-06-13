@@ -5,18 +5,20 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowUp,
+  Ban,
   Check,
   CornerDownLeft,
   CreditCard,
   ReceiptText,
   Search,
   Sparkles,
-  Utensils,
   X
 } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
+import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { NDF_DIGITPRO_CATEGORY } from "@/lib/ndf-digitpro";
+import { resolveNdfRejectionCategory } from "@/lib/categorisation-candidates";
 
 export type CategorisationTx = {
   id: string;
@@ -114,7 +116,7 @@ function MerchantAvatar({ label, size = "md" }: { label: string; size?: "sm" | "
   return (
     <div
       className={clsx(
-        "grid shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-50 font-display font-bold text-emerald-700 ring-1 ring-emerald-200/70 dark:from-emerald-400/15 dark:to-teal-400/5 dark:text-emerald-200 dark:ring-emerald-300/15",
+        "grid shrink-0 place-items-center rounded-2xl bg-ink-100 font-display font-bold text-ink-700 ring-1 ring-ink-200/60 dark:bg-white/[0.08] dark:text-white/85 dark:ring-white/10",
         dim
       )}
       aria-hidden
@@ -125,15 +127,18 @@ function MerchantAvatar({ label, size = "md" }: { label: string; size?: "sm" | "
 }
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const tone =
-    confidence >= 90
-      ? "bg-emerald-500/12 text-emerald-700 ring-emerald-500/25 dark:bg-emerald-400/12 dark:text-emerald-200 dark:ring-emerald-300/20"
-      : confidence >= 75
-        ? "bg-amber-500/12 text-amber-700 ring-amber-500/25 dark:bg-amber-300/10 dark:text-amber-100 dark:ring-amber-200/20"
-        : "bg-ink-500/10 text-ink-600 ring-ink-500/20 dark:bg-white/8 dark:text-white/70 dark:ring-white/12";
   return (
-    <span className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1", tone)}>
-      <Sparkles className="h-3 w-3" aria-hidden />
+    <span
+      className={clsx(
+        "inline-flex items-center gap-1 rounded-full bg-ink-50 px-2 py-0.5 text-[10px] font-bold ring-1 ring-ink-200/70 dark:bg-white/[0.06] dark:ring-white/10",
+        confidence >= 90
+          ? "text-ink-800 dark:text-white/90"
+          : confidence >= 75
+            ? "text-ink-600 dark:text-white/70"
+            : "text-ink-500 dark:text-white/50"
+      )}
+    >
+      <Sparkles className="h-3 w-3 opacity-70" aria-hidden />
       {confidence}%
     </span>
   );
@@ -142,34 +147,16 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
 function StatCard({
   label,
   value,
-  tone = "neutral",
   icon: Icon
 }: {
   label: string;
   value: string;
-  tone?: "neutral" | "emerald" | "sky";
   icon: typeof ReceiptText;
 }) {
   return (
-    <div
-      className={clsx(
-        "flex items-center gap-3 rounded-2xl border px-3.5 py-3",
-        tone === "emerald"
-          ? "border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-400/15 dark:bg-emerald-400/[0.07]"
-          : tone === "sky"
-            ? "border-sky-200/80 bg-sky-50/70 dark:border-sky-400/15 dark:bg-sky-400/[0.07]"
-            : "border-ink-200/80 bg-white/70 dark:border-cyan-100/[0.10] dark:bg-white/[0.04]"
-      )}
-    >
+    <div className="flex items-center gap-3 rounded-2xl border border-ink-200/50 bg-white/70 px-3.5 py-3 dark:border-white/[0.08] dark:bg-white/[0.04]">
       <span
-        className={clsx(
-          "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
-          tone === "emerald"
-            ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-200"
-            : tone === "sky"
-              ? "bg-sky-500/12 text-sky-700 dark:text-sky-200"
-              : "bg-ink-500/10 text-ink-600 dark:bg-white/10 dark:text-white/70"
-        )}
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink-100 text-ink-600 dark:bg-white/[0.08] dark:text-white/70"
         aria-hidden
       >
         <Icon className="h-4 w-4" strokeWidth={2} />
@@ -190,7 +177,8 @@ function TransactionRow({
   active,
   saving,
   onSelect,
-  onValidateNdf
+  onValidateNdf,
+  onRejectNdf
 }: {
   tx: CategorisationTx;
   suggestion: Suggestion;
@@ -198,6 +186,7 @@ function TransactionRow({
   saving: boolean;
   onSelect: () => void;
   onValidateNdf: () => void;
+  onRejectNdf: () => void;
 }) {
   return (
     <motion.article
@@ -208,10 +197,10 @@ function TransactionRow({
       transition={{ duration: 0.18 }}
       onClick={onSelect}
       className={clsx(
-        "group w-full min-w-0 cursor-pointer rounded-[1.35rem] border bg-white p-3 transition dark:bg-[#0b3038]",
+        "group w-full min-w-0 cursor-pointer rounded-[1.35rem] border border-ink-200/50 bg-white/80 p-3 transition dark:border-white/[0.08] dark:bg-white/[0.04]",
         active
-          ? "border-emerald-400/60 ring-2 ring-emerald-400/25 dark:border-emerald-300/40 dark:ring-emerald-300/15"
-          : "border-ink-200/80 hover:border-ink-300 hover:shadow-sm dark:border-cyan-100/[0.10] dark:hover:border-cyan-100/[0.2]"
+          ? "border-brand-400/50 ring-2 ring-brand-400/20 dark:border-brand-400/35 dark:ring-brand-400/15"
+          : "border-ink-200/60 hover:border-ink-300/80 hover:shadow-sm dark:border-white/[0.08] dark:hover:border-white/[0.14]"
       )}
     >
       <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
@@ -231,18 +220,32 @@ function TransactionRow({
           <ConfidenceBadge confidence={suggestion.confidence} />
         </div>
       </div>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={(e) => {
-          e.stopPropagation();
-          onValidateNdf();
-        }}
-        className="mt-2.5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 text-xs font-bold text-white transition hover:bg-emerald-500 disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400 lg:hidden"
-      >
-        <ReceiptText className="h-4 w-4" aria-hidden />
-        Valider NDF DigitPro
-      </button>
+      <div className="mt-2.5 grid grid-cols-2 gap-2 lg:hidden">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={(e) => {
+            e.stopPropagation();
+            onValidateNdf();
+          }}
+          className="premium-cta inline-flex h-10 items-center justify-center gap-1.5 rounded-full px-4 text-xs font-bold disabled:opacity-60"
+        >
+          <ReceiptText className="h-3.5 w-3.5" aria-hidden />
+          NDF
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRejectNdf();
+          }}
+          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-ink-200 text-xs font-bold text-ink-600 transition hover:bg-ink-50 disabled:opacity-60 dark:border-white/12 dark:text-white/70 dark:hover:bg-white/[0.06]"
+        >
+          <Ban className="h-3.5 w-3.5" aria-hidden />
+          Pas NDF
+        </button>
+      </div>
     </motion.article>
   );
 }
@@ -253,7 +256,9 @@ function DetailPanel({
   similar,
   categories,
   saving,
+  rejectCategoryLabel,
   onValidateNdf,
+  onRejectNdf,
   onPick,
   onSkip
 }: {
@@ -262,14 +267,16 @@ function DetailPanel({
   similar: number;
   categories: string[];
   saving: boolean;
+  rejectCategoryLabel: string;
   onValidateNdf: () => void;
+  onRejectNdf: () => void;
   onPick: (category: string) => void;
   onSkip: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   if (!tx || !suggestion) {
     return (
-      <aside className="hidden h-fit rounded-[1.75rem] border border-ink-200/80 bg-white/70 p-6 text-center text-sm font-medium text-ink-500 dark:border-cyan-100/[0.10] dark:bg-[#0b3038] dark:text-white/45 lg:block">
+      <aside className={clsx(dashboardInsightCard, "hidden h-fit p-6 text-center text-sm font-medium text-ink-500 dark:text-white/45 lg:block")}>
         <ReceiptText className="mx-auto mb-3 h-8 w-8 text-ink-300 dark:text-white/20" aria-hidden />
         Sélectionnez une transaction pour la traiter.
       </aside>
@@ -281,7 +288,7 @@ function DetailPanel({
   );
 
   return (
-    <aside className="sticky top-[calc(env(safe-area-inset-top)+1.5rem)] hidden h-fit self-start rounded-[1.75rem] border border-ink-200/80 bg-white p-5 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] lg:block">
+    <aside className={clsx(dashboardInsightCard, "sticky top-[calc(env(safe-area-inset-top)+1.5rem)] hidden h-fit self-start p-5 lg:block")}>
       <div className="flex items-start gap-3">
         <MerchantAvatar label={tx.label} size="lg" />
         <div className="min-w-0">
@@ -297,9 +304,9 @@ function DetailPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 p-3 dark:border-emerald-400/15 dark:bg-emerald-400/[0.07]">
+      <div className="mt-4 rounded-2xl border border-ink-200/50 bg-ink-50/50 p-3 dark:border-white/[0.08] dark:bg-white/[0.04]">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-800/80 dark:text-emerald-200/80">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500 dark:text-white/45">
             Suggestion
           </p>
           <ConfidenceBadge confidence={suggestion.confidence} />
@@ -311,12 +318,30 @@ function DetailPanel({
         type="button"
         disabled={saving}
         onClick={onValidateNdf}
-        className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-600 text-sm font-bold text-white shadow-[0_12px_30px_-14px_rgba(16,185,129,0.8)] transition hover:bg-emerald-500 disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+        className="premium-cta mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold disabled:opacity-60"
       >
         <ReceiptText className="h-4 w-4" aria-hidden />
         Valider en NDF DigitPro
-        <kbd className="ml-1 border-white/30 bg-white/20 text-white">N</kbd>
+        <kbd className="ml-1 rounded border border-white/25 bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
+          N
+        </kbd>
       </button>
+
+      <button
+        type="button"
+        disabled={saving}
+        onClick={onRejectNdf}
+        className="mt-2 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-ink-200 bg-white text-sm font-bold text-ink-700 transition hover:border-ink-300 hover:bg-ink-50 disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:text-white/80 dark:hover:bg-white/[0.07]"
+      >
+        <Ban className="h-4 w-4" aria-hidden />
+        Pas une NDF
+        <kbd className="ml-1 rounded border border-ink-200 bg-ink-50 px-1.5 py-0.5 text-[10px] font-bold text-ink-500 dark:border-white/12 dark:bg-white/[0.06] dark:text-white/55">
+          X
+        </kbd>
+      </button>
+      <p className="mt-1.5 text-center text-[10px] font-medium text-ink-400 dark:text-white/40">
+        Classé en {rejectCategoryLabel} — ne sera plus proposé ici.
+      </p>
 
       {similar > 0 ? (
         <p className="mt-2 text-center text-[11px] font-medium text-ink-400 dark:text-white/40">
@@ -381,16 +406,21 @@ function DetailPanel({
 
 export function CategorisationClient({
   transactions: initialTransactions,
-  categories
+  categories,
+  monthKey,
+  monthLabel
 }: {
   transactions: CategorisationTx[];
   categories: string[];
+  monthKey: string;
+  monthLabel: string;
 }) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState(initialTransactions[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [validatedCount, setValidatedCount] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
   const initialTotalRef = useRef(initialTransactions.length);
 
   const suggestions = useMemo(
@@ -410,9 +440,25 @@ export function CategorisationClient({
   const remainingAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
   const selectedSimilarCount = similarCount(selected, transactions);
   const doneTotal = initialTotalRef.current;
-  const progressPct = doneTotal > 0 ? Math.round((validatedCount / doneTotal) * 100) : 0;
+  const processedCount = validatedCount + rejectedCount;
+  const progressPct = doneTotal > 0 ? Math.round((processedCount / doneTotal) * 100) : 0;
+  const selectedRejectCategory = selected
+    ? resolveNdfRejectionCategory(selected, categories)
+    : "Repas dirigeant";
 
-  function saveCategory(transactionId: string, category: string, successMessage: string) {
+  function removeTransaction(transactionId: string, onRemoved?: () => void) {
+    setTransactions((prev) => {
+      const idx = prev.findIndex((tx) => tx.id === transactionId);
+      const next = prev.filter((tx) => tx.id !== transactionId);
+      setSelectedId((current) =>
+        current !== transactionId ? current : next[idx]?.id ?? next[idx - 1]?.id ?? next[0]?.id ?? ""
+      );
+      onRemoved?.();
+      return next;
+    });
+  }
+
+  function saveCategory(transactionId: string, category: string, successMessage: string, onSuccess?: () => void) {
     startTransition(async () => {
       try {
         const res = await fetch("/api/categorisation", {
@@ -423,15 +469,7 @@ export function CategorisationClient({
         const body = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string };
         if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Impossible d’enregistrer");
         toast.success(successMessage);
-        setValidatedCount((c) => c + 1);
-        setTransactions((prev) => {
-          const idx = prev.findIndex((tx) => tx.id === transactionId);
-          const next = prev.filter((tx) => tx.id !== transactionId);
-          setSelectedId((current) =>
-            current !== transactionId ? current : next[idx]?.id ?? next[idx - 1]?.id ?? next[0]?.id ?? ""
-          );
-          return next;
-        });
+        removeTransaction(transactionId, onSuccess);
       } catch (error) {
         toast.error("Impossible d’enregistrer", {
           description: error instanceof Error ? error.message : undefined
@@ -442,12 +480,20 @@ export function CategorisationClient({
 
   function markNdf(tx: CategorisationTx | null) {
     if (!tx) return;
-    saveCategory(tx.id, NDF_DIGITPRO_CATEGORY, "Validé en NDF DigitPro");
+    saveCategory(tx.id, NDF_DIGITPRO_CATEGORY, "Validé en NDF DigitPro", () => setValidatedCount((c) => c + 1));
+  }
+
+  function rejectNdf(tx: CategorisationTx | null) {
+    if (!tx) return;
+    const category = resolveNdfRejectionCategory(tx, categories);
+    saveCategory(tx.id, category, `Exclu de la file NDF — classé en ${category}`, () =>
+      setRejectedCount((c) => c + 1)
+    );
   }
 
   function pickCategory(tx: CategorisationTx | null, category: string) {
     if (!tx) return;
-    saveCategory(tx.id, category, `Classé en ${category}`);
+    saveCategory(tx.id, category, `Classé en ${category}`, () => setRejectedCount((c) => c + 1));
   }
 
   function selectNext(delta = 1) {
@@ -463,6 +509,9 @@ export function CategorisationClient({
       if (key === "n" || event.key === "Enter") {
         event.preventDefault();
         markNdf(selected);
+      } else if (key === "x") {
+        event.preventDefault();
+        rejectNdf(selected);
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         selectNext(1);
@@ -477,15 +526,15 @@ export function CategorisationClient({
 
   if (!transactions.length) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center rounded-[2rem] border border-emerald-200/70 bg-gradient-to-b from-emerald-50/70 to-white p-10 text-center dark:border-emerald-400/15 dark:from-emerald-400/[0.06] dark:to-[#0b3038]">
-        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-emerald-500/12 text-emerald-600 dark:text-emerald-300">
+      <div className={clsx(dashboardInsightCard, "flex min-h-[60vh] flex-col items-center justify-center p-10 text-center")}>
+        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-ink-100 text-ink-600 dark:bg-white/[0.08] dark:text-white/75">
           <Check className="h-8 w-8" strokeWidth={2.4} aria-hidden />
         </div>
         <h2 className="mt-5 font-display text-2xl font-bold text-ink-950 dark:text-white">Tout est à jour</h2>
         <p className="mt-2 max-w-sm text-sm font-medium text-ink-500 dark:text-white/50">
-          {validatedCount > 0
-            ? `${validatedCount} note${validatedCount > 1 ? "s" : ""} de frais validée${validatedCount > 1 ? "s" : ""}. Elles apparaissent maintenant dans Repas & NDF du mois concerné.`
-            : "Aucun paiement carte Powens en attente de catégorisation."}
+          {validatedCount > 0 || rejectedCount > 0
+            ? `${validatedCount} NDF validée${validatedCount > 1 ? "s" : ""}${rejectedCount > 0 ? ` · ${rejectedCount} exclue${rejectedCount > 1 ? "s" : ""}` : ""}.`
+            : `Aucun paiement carte en attente pour ${monthLabel.toLowerCase()}. Si vous venez de payer, lancez une synchro Powens depuis le dashboard puis revenez ici.`}
         </p>
       </div>
     );
@@ -494,43 +543,47 @@ export function CategorisationClient({
   return (
     <div className="min-h-[calc(100dvh-8rem)]">
       {/* En-tête */}
-      <header className="rounded-[2rem] border border-ink-200/80 bg-gradient-to-br from-white via-white to-emerald-50/40 p-5 shadow-sm dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:bg-none dark:shadow-[0_24px_80px_-28px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-6">
+      <header className={clsx(dashboardInsightCard, "p-5 sm:p-6")}>
         <div className="flex items-start gap-3">
           <span
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/12 text-emerald-700 dark:text-emerald-200"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-ink-100 text-ink-600 dark:bg-white/[0.08] dark:text-white/75"
             aria-hidden
           >
             <CreditCard className="h-5 w-5" strokeWidth={2} />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700/80 dark:text-emerald-300/80">
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
               Notes de frais · Powens
             </p>
             <h1 className="mt-0.5 font-display text-2xl font-bold tracking-tight text-ink-950 dark:text-white">
               Paiements carte à valider
             </h1>
+            <p className="mt-1 text-sm font-semibold capitalize text-ink-700 dark:text-white/75">
+              {monthLabel}
+            </p>
             <p className="mt-1 max-w-xl text-sm font-medium text-ink-500 dark:text-white/50">
-              Ces paiements carte importés depuis Powens sont estimés comme des notes de frais. Validez-les en{" "}
-              <span className="font-semibold text-emerald-700 dark:text-emerald-300">NDF DigitPro</span> pour les
-              retrouver dans « Repas &amp; NDF ».
+              Validez en <span className="font-semibold text-ink-800 dark:text-white/85">NDF DigitPro</span> ou
+              excluez avec <span className="font-semibold text-ink-700 dark:text-white/75">Pas une NDF</span> pour ne
+              plus revoir le paiement ici.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
-          <StatCard label="À traiter" value={String(transactions.length)} icon={ReceiptText} tone="emerald" />
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-4">
+          <StatCard label="À traiter" value={String(transactions.length)} icon={ReceiptText} />
           <StatCard label="Montant total" value={formatEuro(remainingAmount, false)} icon={CreditCard} />
-          <StatCard label="Validées (session)" value={String(validatedCount)} icon={Check} tone="sky" />
+          <StatCard label="Validées (session)" value={String(validatedCount)} icon={Check} />
+          <StatCard label="Exclues (session)" value={String(rejectedCount)} icon={Ban} />
         </div>
 
         <div className="mt-4">
           <div className="flex items-center justify-between text-[11px] font-semibold text-ink-500 dark:text-white/45">
-            <span>{validatedCount} validées</span>
+            <span>{processedCount} traitées</span>
             <span>{transactions.length} restantes</span>
           </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[0.06]">
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/[0.08]">
             <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500"
+              className="h-full rounded-full bg-brand-500 dark:bg-brand-400"
               initial={false}
               animate={{ width: `${progressPct}%` }}
               transition={{ duration: 0.3 }}
@@ -548,7 +601,7 @@ export function CategorisationClient({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher un commerçant…"
-              className="h-11 w-full rounded-2xl border border-ink-200/80 bg-white pl-10 pr-9 text-sm font-semibold text-ink-900 outline-none transition placeholder:font-medium placeholder:text-ink-400 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/15 dark:border-cyan-100/[0.10] dark:bg-[#0b3038] dark:text-white dark:placeholder:text-white/30"
+              className="h-11 w-full rounded-2xl border border-ink-200/60 bg-white pl-10 pr-9 text-sm font-semibold text-ink-900 outline-none transition placeholder:font-medium placeholder:text-ink-400 focus:border-brand-400/50 focus:ring-2 focus:ring-brand-400/15 dark:border-white/[0.10] dark:bg-[#0b3038] dark:text-white dark:placeholder:text-white/30"
             />
             {search ? (
               <button
@@ -563,7 +616,7 @@ export function CategorisationClient({
           </div>
 
           {filtered.length === 0 ? (
-            <div className="rounded-[1.35rem] border border-ink-200/80 bg-white/70 p-8 text-center text-sm font-medium text-ink-500 dark:border-cyan-100/[0.10] dark:bg-[#0b3038] dark:text-white/45">
+            <div className="rounded-[1.35rem] border border-ink-200/50 bg-white/70 p-8 text-center text-sm font-medium text-ink-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/45">
               Aucune transaction ne correspond à « {search} ».
             </div>
           ) : (
@@ -579,6 +632,7 @@ export function CategorisationClient({
                     saving={isPending}
                     onSelect={() => setSelectedId(tx.id)}
                     onValidateNdf={() => markNdf(tx)}
+                    onRejectNdf={() => rejectNdf(tx)}
                   />
                 );
               })}
@@ -592,17 +646,22 @@ export function CategorisationClient({
           similar={selectedSimilarCount}
           categories={categories}
           saving={isPending}
+          rejectCategoryLabel={selectedRejectCategory}
           onValidateNdf={() => markNdf(selected)}
+          onRejectNdf={() => rejectNdf(selected)}
           onPick={(category) => pickCategory(selected, category)}
           onSkip={() => selectNext(1)}
         />
       </div>
 
       {/* Barre de raccourcis (desktop) */}
-      <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-ink-200/80 bg-white/90 px-4 py-2 text-[11px] font-semibold text-ink-500 shadow-lg backdrop-blur-xl dark:border-cyan-100/[0.12] dark:bg-[#0b3038]/90 dark:text-white/55 lg:flex">
+      <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-full border border-ink-200/60 bg-white/90 px-4 py-2 text-[11px] font-semibold text-ink-500 shadow-lg backdrop-blur-xl dark:border-white/[0.10] dark:bg-[#0b3038]/90 dark:text-white/55 lg:flex">
         <span className="inline-flex items-center gap-1">
-          <Utensils className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-300" aria-hidden />
+          <ReceiptText className="h-3.5 w-3.5 opacity-70" aria-hidden />
           <kbd>N</kbd> NDF
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <kbd>X</kbd> pas NDF
         </span>
         <span className="inline-flex items-center gap-1">
           <ArrowUp className="h-3 w-3" aria-hidden />

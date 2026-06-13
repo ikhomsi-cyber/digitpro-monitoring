@@ -3,9 +3,10 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
 import { Logo } from "@/components/ui/Logo";
-import { BANKIN_UNCATEGORIZED_CATEGORY } from "@/lib/bankin/categorize";
 import { buildBankinReferenceCategoryList } from "@/lib/bankin/reference-categories";
 import {
+  categorisationMonthBounds,
+  currentCategorisationMonthKey,
   mapCategorisationCandidateRows,
   normalizeCategory,
   type CategorisationCandidateRow
@@ -14,6 +15,7 @@ import { CategorisationClient, type CategorisationTx } from "./CategorisationCli
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { formatDashboardMonthLabel } from "@/lib/dashboard-period";
 import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 
@@ -47,8 +49,10 @@ export default async function CategorisationPage() {
   let categories: string[] = [];
   let transactions: CategorisationTx[] = [];
   let loadError: string | null = null;
+  const monthKey = currentCategorisationMonthKey();
 
   if (supabase) {
+    const { startIso, endIso } = categorisationMonthBounds(monthKey);
     const [categoryRes, txRes] = await Promise.all([
       supabase
         .from("transactions")
@@ -59,7 +63,9 @@ export default async function CategorisationPage() {
         .from("transactions")
         .select("id,date,label,amount,company,bank_name,category,import_sessions!inner(format)")
         .eq("import_sessions.format", "powens")
-        .eq("category", BANKIN_UNCATEGORIZED_CATEGORY)
+        .lt("amount", 0)
+        .gte("date", startIso)
+        .lte("date", endIso)
         .order("date", { ascending: false })
         .limit(200)
     ]);
@@ -70,7 +76,10 @@ export default async function CategorisationPage() {
       categories = buildBankinReferenceCategoryList(
         (categoryRes.data ?? []).map((row) => normalizeCategory((row as { category?: unknown }).category))
       );
-      transactions = mapCategorisationCandidateRows((txRes.data ?? []) as unknown as CategorisationCandidateRow[]);
+      transactions = mapCategorisationCandidateRows(
+        (txRes.data ?? []) as unknown as CategorisationCandidateRow[],
+        monthKey
+      );
     }
   }
 
@@ -95,11 +104,16 @@ export default async function CategorisationPage() {
               {loadError}
             </div>
           ) : categories.length === 0 ? (
-            <div className="rounded-3xl border border-amber-500/20 bg-amber-500/10 p-5 text-sm text-amber-900 dark:text-amber-100">
+            <div className="rounded-3xl border border-ink-200/70 bg-white p-5 text-sm text-ink-700 shadow-card dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/70 dark:shadow-none">
               Aucune catégorie Bankin de référence trouvée. Importe d’abord un export Bankin pour construire la liste.
             </div>
           ) : (
-            <CategorisationClient transactions={transactions} categories={categories} />
+            <CategorisationClient
+              transactions={transactions}
+              categories={categories}
+              monthKey={monthKey}
+              monthLabel={formatDashboardMonthLabel(monthKey)}
+            />
           )}
         </main>
         <DashboardFloatingDock />

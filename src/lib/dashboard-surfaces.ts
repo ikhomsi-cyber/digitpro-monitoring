@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 
-/** Espacement section — contenu posé sur le fond page, sans carte englobante. */
-export const dashboardSectionStack = "space-y-5 sm:space-y-6";
+/** Espacement section — aligné sur `gap-4` des cartes insight (Dépenses / Entrées). */
+export const dashboardSectionStack = "space-y-4";
 
 /** Séparateur horizontal entre blocs d'une même page. */
 export const dashboardSectionDivider = clsx(
@@ -14,11 +14,11 @@ export const dashboardFlatSectionHeader = clsx(
 );
 
 /** Zone hero / intro — pas de fond ni bordure. */
-export const dashboardFlatHero = "relative w-full py-4 sm:py-6";
+export const dashboardFlatHero = "relative w-full";
 
 /** Carte insight style Revolut (analyse, projection). */
 export const dashboardInsightCard =
-  "flex min-w-0 flex-col rounded-3xl border border-ink-200/50 bg-ink-50/60 p-5 dark:border-white/[0.06] dark:bg-white/[0.04]";
+  "flex min-w-0 flex-col rounded-3xl border border-ink-200/70 bg-white p-5 shadow-card dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none";
 
 /** Grille 2 colonnes pour cartes insight (sans séparateurs verticaux). */
 export const dashboardInsightGrid = "grid grid-cols-1 gap-4 sm:grid-cols-2";
@@ -81,8 +81,8 @@ export const dashboardGaugeTrack = clsx(
 );
 
 export const dashboardChartSurface = clsx(
-  "dashboard-chart-surface relative h-60 overflow-hidden rounded-2xl border border-ink-200/35 px-4 pb-5 pt-4",
-  "dark:border-cyan-100/[0.10]"
+  "dashboard-chart-surface relative h-60 overflow-hidden rounded-2xl border border-ink-200/60 bg-white px-4 pb-5 pt-4 shadow-sm",
+  "dark:border-cyan-100/[0.10] dark:bg-transparent dark:shadow-none"
 );
 
 export const dashboardDonutTrack = "text-ink-200 dark:text-[#284556]";

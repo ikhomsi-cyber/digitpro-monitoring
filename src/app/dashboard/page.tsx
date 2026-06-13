@@ -17,6 +17,7 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
+import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
 import { LMNPClient } from "@/app/lmnp/LMNPClient";
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
@@ -198,25 +199,21 @@ export default async function DashboardPage({
           loadError={transactionsLoadError}
         />
       ) : (
-        <Suspense
-          fallback={
-            <div className="mt-6 space-y-6 sm:mt-8">
-              <div className="h-40 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
-              <div className="h-72 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800/50" />
-            </div>
-          }
-        >
-          <DashboardClient
-            syncKey={syncKey}
-            initialTransactions={transactions}
-            transactionYearBounds={transactionYearBounds}
-            initialDashboardScope={initialDashboardScope}
-            heroStats={heroStats}
-            heroContextMessage={heroContextMessage}
-            showContextBanner={showContextBanner}
-            demoMode={demoMode}
-            loadError={transactionsLoadError}
-          />
+        <Suspense fallback={null}>
+          <DashboardSectionProvider>
+            <DashboardClient
+              syncKey={syncKey}
+              initialTransactions={transactions}
+              transactionYearBounds={transactionYearBounds}
+              initialDashboardScope={initialDashboardScope}
+              heroStats={heroStats}
+              heroContextMessage={heroContextMessage}
+              showContextBanner={showContextBanner}
+              demoMode={demoMode}
+              loadError={transactionsLoadError}
+            />
+            <DashboardFloatingDock />
+          </DashboardSectionProvider>
         </Suspense>
       )}
 
@@ -237,10 +234,6 @@ export default async function DashboardPage({
           © {new Date().getFullYear()} DigitPro. Conçu par Iliass KHOMSI.
         </span>
       </footer>
-
-      <Suspense fallback={null}>
-        <DashboardFloatingDock />
-      </Suspense>
     </div>
     </BillableActivityProvider>
     </DashboardDummyDataProvider>

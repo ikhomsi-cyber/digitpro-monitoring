@@ -1,4 +1,5 @@
 import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { isNdfCategorisationCandidate } from "@/lib/categorisation-candidates";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import { amountNetOfRecoverableVat } from "@/lib/recoverable-expense-vat";
@@ -168,4 +169,39 @@ export function summarizeNdfDigitProForMonth(
 
   kept.sort((a, b) => b.date.localeCompare(a.date));
   return { totalEur: Math.round(totalEur * 100) / 100, transactions: kept };
+}
+
+/** Libellé date relatif pour la liste NDF (Aujourd’hui, Hier, ou date courte). */
+export function formatNdfTxDateLabel(iso: string, now = new Date()): string {
+  const day = iso.slice(0, 10);
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(now.getDate() - 1);
+  const yesterday = `${yesterdayDate.getFullYear()}-${String(yesterdayDate.getMonth() + 1).padStart(2, "0")}-${String(yesterdayDate.getDate()).padStart(2, "0")}`;
+  if (day === today) return "Aujourd’hui";
+  if (day === yesterday) return "Hier";
+  const [y, m, d] = day.split("-").map(Number);
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" }).format(
+    new Date(y ?? 2000, (m ?? 1) - 1, d ?? 1)
+  );
+}
+
+/** Paiements carte du mois encore à valider en NDF DigitPro (onglet Catégorisation). */
+export function listPendingNdfCandidatesForMonth(
+  transactions: readonly DashboardTx[],
+  monthKey: string,
+  scope: "pro" | "personal" = "pro"
+): DashboardTx[] {
+  return transactions
+    .filter((tx) => {
+      if (tx.date.slice(0, 7) !== monthKey) return false;
+      if ((tx.scope ?? "pro") !== scope) return false;
+      return isNdfCategorisationCandidate({
+        label: tx.label,
+        amount: tx.amount,
+        company: "",
+        category: tx.category
+      });
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
 }

@@ -29,14 +29,31 @@ body {
   .premium-dashboard-page {
     @apply transition-colors;
   }
+  /**
+   * Fond teal unifié pour toutes les sections (dashboard, activité, SASU, etc.).
+   * `data-page` reste sur le conteneur pour d’éventuels usages futurs.
+   */
   .dark .premium-dashboard-page {
-    background-color: #06242b;
+    --pg-base: #06242b;
+    --pg-grad-top: #0c5361;
+    --pg-grad-mid: #06343d;
+    --pg-grad-bot: #03191f;
+    --pg-glow-1: rgba(24, 160, 176, 0.45);
+    --pg-glow-2: rgba(45, 212, 191, 0.18);
+    --pg-glow-3: rgba(14, 116, 144, 0.24);
+    background-color: var(--pg-base);
     background-image:
-      radial-gradient(900px 620px at 50% -10%, rgba(24, 160, 176, 0.45), transparent 62%),
-      radial-gradient(760px 520px at 10% 6%, rgba(45, 212, 191, 0.18), transparent 54%),
-      radial-gradient(700px 520px at 90% 0%, rgba(14, 116, 144, 0.24), transparent 52%),
-      linear-gradient(180deg, #0c5361 0%, #06343d 42%, #03191f 100%);
+      radial-gradient(900px 620px at 50% -10%, var(--pg-glow-1), transparent 62%),
+      radial-gradient(760px 520px at 10% 6%, var(--pg-glow-2), transparent 54%),
+      radial-gradient(700px 520px at 90% 0%, var(--pg-glow-3), transparent 52%),
+      linear-gradient(180deg, var(--pg-grad-top) 0%, var(--pg-grad-mid) 42%, var(--pg-grad-bot) 100%);
     background-attachment: fixed;
+    transition: background-color 0.6s ease;
+  }
+
+  /* Dashboard plat — contenu sur le fond page, pas de cartes empilées */
+  .premium-dashboard-page main#dashboard-main > * {
+    --dashboard-content-max: 100%;
   }
 
   .dashboard-chart-surface {
@@ -54,6 +71,49 @@ body {
     --chart-label-muted: rgba(236, 254, 255, 0.58);
     --chart-fade: #0b3038;
     --chart-dot-stroke: #172d3a;
+  }
+
+  /* Waterfall SVG — axe X lisible en dark mode */
+  .waterfall-axis-svg {
+    --wf-axis-band: transparent;
+    --wf-axis-baseline: rgba(148, 163, 184, 0.45);
+    --wf-axis-connector-line: rgba(148, 163, 184, 0.35);
+    --wf-axis-connector: #94a3b8;
+    --wf-axis-label: #475569;
+    --wf-axis-value: #0f172a;
+    --wf-axis-pct: #64748b;
+  }
+  .dark .waterfall-axis-svg {
+    --wf-axis-band: rgba(4, 26, 32, 0.55);
+    --wf-axis-baseline: rgba(165, 243, 252, 0.38);
+    --wf-axis-connector-line: rgba(165, 243, 252, 0.42);
+    --wf-axis-connector: #a5f3fc;
+    --wf-axis-label: #ecfeff;
+    --wf-axis-value: #ffffff;
+    --wf-axis-pct: #cffafe;
+  }
+  .waterfall-axis-svg .waterfall-axis-band {
+    fill: var(--wf-axis-band);
+  }
+  .waterfall-axis-svg .waterfall-axis-baseline {
+    stroke: var(--wf-axis-baseline);
+  }
+  .waterfall-axis-svg .waterfall-axis-connector-line {
+    stroke: var(--wf-axis-connector-line);
+  }
+  .waterfall-axis-svg .waterfall-axis-connector {
+    fill: var(--wf-axis-connector);
+  }
+  .waterfall-axis-svg .waterfall-axis-label {
+    fill: var(--wf-axis-label);
+  }
+  .waterfall-axis-svg .waterfall-axis-value {
+    fill: var(--wf-axis-value);
+    font-variant-numeric: tabular-nums;
+  }
+  .waterfall-axis-svg .waterfall-axis-pct {
+    fill: var(--wf-axis-pct);
+    font-variant-numeric: tabular-nums;
   }
 
   kbd {
@@ -74,33 +134,33 @@ body {
     @apply outline-none ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
   }
   .surface-card {
-    @apply rounded-2xl border border-ink-200 bg-white dark:border-ink-800 dark:bg-ink-900/80;
+    @apply rounded-2xl border border-ink-200 bg-white dark:border-cyan-100/[0.12] dark:bg-[#0b3038];
   }
   /** Card placed on the gray section bg — subtle white card */
   .surface-glass {
-    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900/80 dark:shadow-none;
+    @apply rounded-2xl border border-ink-200 bg-white shadow-card dark:border-cyan-100/[0.10] dark:bg-[#0b3038]/[0.86] dark:shadow-none dark:backdrop-blur-xl;
   }
 
-  /** Section that uses the signature Apple light-gray bg */
+  /** Section that uses the signature light-gray bg */
   .section-alt {
-    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-ink-900/60;
+    @apply rounded-3xl bg-ink-100 p-6 sm:p-8 dark:bg-white/[0.04];
   }
 
-  /** Pill primary button (Apple CTA) */
+  /** Pill primary button — premium emerald CTA */
   .btn-primary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-brand-600 active:bg-brand-700;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:focus-visible:ring-offset-[#06242b];
   }
-  /** Pill secondary button (white pill on gray) */
+  /** Pill secondary button (white pill / subtle dark) */
   .btn-secondary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-medium text-ink-900 transition hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500;
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-ink-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink-900 transition hover:border-ink-400 hover:bg-ink-50 dark:border-cyan-100/[0.16] dark:bg-white/[0.05] dark:text-white dark:hover:bg-white/[0.09];
   }
   /** Tertiary text-link "Learn more ›" */
   .btn-link {
-    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300;
+    @apply inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 transition hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 dark:border-cyan-100/[0.12] dark:bg-white/[0.05] dark:text-white/80;
   }
 
   /** Skeleton with shimmer */

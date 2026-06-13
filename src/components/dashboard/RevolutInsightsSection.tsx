@@ -14,7 +14,7 @@ import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
-import { dashboardEyebrow, dashboardPanelTitle } from "@/lib/dashboard-surfaces";
+import { dashboardEyebrow, dashboardInsightCard, dashboardPanelTitle } from "@/lib/dashboard-surfaces";
 
 type Scope = "all" | "pro" | "personal";
 
@@ -40,15 +40,123 @@ function monthShortLabel(monthKey: string): string {
   return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date(y, m - 1, 1));
 }
 
-const MACRO_DOT_COLORS = [
-  "bg-rose-400",
-  "bg-amber-400",
-  "bg-emerald-400",
-  "bg-sky-400",
-  "bg-violet-400",
-  "bg-fuchsia-400",
-  "bg-ink-400 dark:bg-white/40"
-] as const;
+/** Pictogramme par catégorie de dépense (macro bucket ou Bankin). */
+function expenseCategoryPicto(label: string): string {
+  const n = label.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (n.includes("kilomet") || /\bik\b/.test(n)) return "🚗";
+  if (n.includes("repas d'affaire") || n.includes("repas d affaire")) return "🍽️";
+  if (n.includes("repas dirigeant") || n.includes("repas du dirigeant")) return "🥗";
+  if (n.includes("mutuelle") || n.includes("prevoyance")) return "🏥";
+  if (n.includes("compta") || n.includes("admin")) return "📊";
+  if (n.includes("mobile") || n.includes("internet") || n.includes("telecom")) return "📱";
+  if (n.includes("icloud") || n.includes("logiciel") || n.includes("saas")) return "☁️";
+  if (n.includes("qonto") || n.includes("bancaire")) return "💳";
+  if (n.includes("assurance")) return "🛡️";
+  if (n.includes("materiel") || n.includes("matériel")) return "💻";
+  if (n.includes("bnc")) return "💼";
+  if (n.includes("tva") || n.includes("impot") || n.includes("impôt")) return "🧾";
+  if (n.includes("urssaf") || n.includes("retraite")) return "🏛️";
+  if (n.includes("ndf") || n.includes("note de frais")) return "🧾";
+  if (n.includes("cesu")) return "👶";
+  if (n.includes("loyer") || n.includes("logement") || n.includes("habitat")) return "🏠";
+  if (n.includes("restaurant") || n.includes("aliment") || n.includes("courses")) return "🛒";
+  if (n.includes("transport") || n.includes("essence") || n.includes("uber")) return "🚕";
+  if (n.includes("shopping") || n.includes("vetement")) return "🛍️";
+  if (n.includes("loisir") || n.includes("divertissement")) return "🎮";
+  if (n.includes("voyage") || n.includes("vacance")) return "✈️";
+  return "📦";
+}
+
+function formatBarAmount(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+function ExpenseCategoryBars({
+  rows,
+  fmt
+}: {
+  rows: ExpenseMacroRow[];
+  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+}) {
+  const top = rows.slice(0, 8);
+  const max = Math.max(1, ...top.map((row) => row.amount));
+
+  if (!top.length) {
+    return <span className="text-ink-500 dark:text-white/45">Aucune dépense ce mois</span>;
+  }
+
+  return (
+    <div
+      className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      role="list"
+      aria-label="Répartition des dépenses par catégorie"
+    >
+      <div className="flex min-w-min items-end gap-1.5 pt-6 sm:gap-2.5">
+        {top.map((row, index) => {
+          const heightPct = Math.max(22, Math.round((row.amount / max) * 100));
+          const isLeader = index === 0;
+
+          return (
+            <div
+              key={row.label}
+              role="listitem"
+              className="group relative flex min-w-[3rem] flex-1 flex-col items-center gap-1.5"
+              title={`${row.label} · ${fmt.euro(row.amount)}`}
+            >
+              <div
+                className="pointer-events-none absolute -top-7 left-1/2 z-10 w-max max-w-[9.5rem] -translate-x-1/2 opacity-0 transition duration-200 group-hover:opacity-100"
+                aria-hidden
+              >
+                <div className="rounded-xl border border-ink-200/60 bg-white px-2.5 py-1.5 text-center shadow-md dark:border-cyan-100/20 dark:bg-[#0a2f38] dark:shadow-[0_10px_28px_-8px_rgba(0,0,0,0.6)]">
+                  <p className="text-[10px] font-semibold leading-tight text-ink-800 dark:text-cyan-50">
+                    {row.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-bold tabular-nums text-rose-500 dark:text-rose-300">
+                    {fmt.euro(row.amount)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex h-40 w-12 shrink-0 items-end justify-center sm:h-44 sm:w-[3.25rem]">
+                <div
+                  className={clsx(
+                    "flex w-full min-h-[2.75rem] items-center justify-center rounded-full transition-all duration-200",
+                    isLeader
+                      ? "bg-rose-300/90 shadow-[0_0_16px_-6px_rgba(251,113,133,0.45)] dark:bg-rose-200/55 dark:shadow-[0_0_18px_-6px_rgba(251,113,133,0.35)]"
+                      : "bg-rose-100/85 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
+                  )}
+                  style={{ height: `${heightPct}%` }}
+                >
+                  <span
+                    className={clsx(
+                      "max-h-full overflow-hidden px-0.5 text-[10px] font-bold leading-none tracking-tight tabular-nums sm:text-[11px]",
+                      isLeader
+                        ? "text-rose-950/80 dark:text-white"
+                        : "text-ink-600 dark:text-white/75"
+                    )}
+                    style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                  >
+                    {formatBarAmount(row.amount)}
+                  </span>
+                </div>
+              </div>
+              <div
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink-200/45 bg-ink-50/80 text-lg transition duration-200 group-hover:scale-105 group-hover:border-rose-200/60 dark:border-white/[0.1] dark:bg-white/[0.06] dark:group-hover:border-rose-200/25"
+                aria-hidden
+              >
+                {expenseCategoryPicto(row.label)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function bankinMacroCategoryLabel(storedCategory: string): string {
   const raw = String(storedCategory ?? "").trim();
@@ -198,11 +306,7 @@ function Sparkline({ values, stroke }: { values: number[]; stroke: string }) {
 }
 
 function InsightCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col rounded-3xl border border-ink-200/50 bg-ink-50/60 p-5 dark:border-white/[0.06] dark:bg-white/[0.04]">
-      {children}
-    </div>
-  );
+  return <div className={dashboardInsightCard}>{children}</div>;
 }
 
 export function RevolutInsightsSection({ transactions }: { transactions: DashboardTx[] }) {
@@ -247,7 +351,7 @@ export function RevolutInsightsSection({ transactions }: { transactions: Dashboa
   const entreesDelta = current.entrees - previous.entrees;
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className={dashboardEyebrow}>Analyse</p>
@@ -304,26 +408,8 @@ export function RevolutInsightsSection({ transactions }: { transactions: Dashboa
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-            {expenseMacroRows.length ? (
-              expenseMacroRows.map((row, index) => (
-                <span
-                  key={row.label}
-                  className="inline-flex max-w-full items-center gap-1.5 text-ink-600 dark:text-white/60"
-                >
-                  <span
-                    className={clsx("h-2 w-2 shrink-0 rounded-full", MACRO_DOT_COLORS[index % MACRO_DOT_COLORS.length])}
-                    aria-hidden
-                  />
-                  <span className="truncate">{row.label}</span>
-                  <span className="font-medium tabular-nums text-ink-800 dark:text-white/85">
-                    {fmt.euro(row.amount)}
-                  </span>
-                </span>
-              ))
-            ) : (
-              <span className="text-ink-500 dark:text-white/45">Aucune dépense ce mois</span>
-            )}
+          <div className="mt-3 border-t border-dashed border-ink-200/50 pt-3 dark:border-cyan-100/[0.08]">
+            <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />
           </div>
           <div className="mt-3">
             <Sparkline values={spendSeries.map((p) => p.value)} stroke="#fb7185" />

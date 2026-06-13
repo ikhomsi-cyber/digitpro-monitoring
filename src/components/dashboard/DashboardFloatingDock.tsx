@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
+import { useOptionalDashboardSection } from "@/components/dashboard/DashboardSectionContext";
 
 type Tab = {
   href: string;
@@ -57,7 +58,11 @@ const TABS: Tab[] = [
 /** Dock iOS flottant — mobile uniquement. */
 export function DashboardFloatingDock() {
   const pathname = usePathname() ?? "";
-  const searchParams = useSearchParams();
+  const fallbackSearchParams = useSearchParams();
+  const sectionCtx = useOptionalDashboardSection();
+  const searchParams =
+    sectionCtx?.searchParams ??
+    new URLSearchParams(fallbackSearchParams.toString());
   const scope = searchParams.get("scope");
   const panel = searchParams.get("panel");
   const section = searchParams.get("section");
@@ -73,12 +78,10 @@ export function DashboardFloatingDock() {
   if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
 
   const ctx = { scope, panel, hash, section };
-  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+  const onDashboardTabClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard") || !sectionCtx) return;
     event.preventDefault();
-    window.history.pushState(null, "", href);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    sectionCtx.navigateWithinDashboard(href);
   };
 
   return (
@@ -103,7 +106,7 @@ export function DashboardFloatingDock() {
               href={tab.href}
               prefetch={!tab.href.includes("#")}
               scroll={false}
-              onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
+              onClick={tab.href.startsWith("/dashboard") ? onDashboardTabClick(tab.href) : undefined}
               className={clsx(
                 "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
                 active
@@ -147,7 +150,11 @@ export function DashboardFloatingDock() {
 /** Sidebar premium — desktop uniquement. */
 export function DashboardDesktopSidebar() {
   const pathname = usePathname() ?? "";
-  const searchParams = useSearchParams();
+  const fallbackSearchParams = useSearchParams();
+  const sectionCtx = useOptionalDashboardSection();
+  const searchParams =
+    sectionCtx?.searchParams ??
+    new URLSearchParams(fallbackSearchParams.toString());
   const scope = searchParams.get("scope");
   const panel = searchParams.get("panel");
   const section = searchParams.get("section");
@@ -163,12 +170,10 @@ export function DashboardDesktopSidebar() {
   if (!pathname.startsWith("/dashboard") && pathname !== "/categorisation") return null;
 
   const ctx = { scope, panel, hash, section };
-  const navigateWithinDashboard = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard")) return;
+  const onDashboardTabClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard") || !sectionCtx) return;
     event.preventDefault();
-    window.history.pushState(null, "", href);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    sectionCtx.navigateWithinDashboard(href);
   };
 
   return (
@@ -176,7 +181,7 @@ export function DashboardDesktopSidebar() {
       <div className="flex h-full flex-col items-center">
         <Link
           href="/dashboard"
-          onClick={navigateWithinDashboard("/dashboard")}
+          onClick={onDashboardTabClick("/dashboard")}
           className="transition hover:opacity-90"
           aria-label="Dashboard"
         >
@@ -192,7 +197,7 @@ export function DashboardDesktopSidebar() {
                 href={tab.href}
                 prefetch={!tab.href.includes("#")}
                 scroll={false}
-                onClick={tab.href.startsWith("/dashboard") ? navigateWithinDashboard(tab.href) : undefined}
+                onClick={tab.href.startsWith("/dashboard") ? onDashboardTabClick(tab.href) : undefined}
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "group flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center transition",

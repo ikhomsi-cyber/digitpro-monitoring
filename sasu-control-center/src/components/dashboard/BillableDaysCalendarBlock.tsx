@@ -684,54 +684,6 @@ export function BillableDaysCalendarBlock({
           {/* Mois sélectionné : brut TJM + IK — à droite du calendrier (sm+) */}
           <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[300px]">
             <div className="flex h-full min-h-0 flex-col rounded-[1.75rem] border border-ink-200/80 bg-white p-3 shadow-sm ring-1 ring-black/[0.02] dark:border-cyan-100/[0.14] dark:bg-[#06242b] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] dark:ring-cyan-100/[0.08] sm:p-3.5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-ink-500 dark:text-cyan-50/70">
-                Mois sélectionné
-              </p>
-              <p className="mt-1 text-[11px] font-semibold leading-snug text-ink-600 dark:text-white/82">
-                {selectedViewMonthStats.isCurrent ? (
-                  <>
-                    Jusqu’au{" "}
-                    <span className="font-bold text-ink-800 dark:text-white">
-                      {selectedViewMonthStats.todayLongFr}
-                    </span>
-                    , vous avez coché{" "}
-                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
-                      {selectedViewMonthStats.countedDays}
-                    </span>{" "}
-                    jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} travaillé
-                    {selectedViewMonthStats.countedDays !== 1 ? "s" : ""} (
-                    <span className="capitalize text-ink-800 dark:text-white">
-                      {selectedViewMonthStats.monthTitle}
-                    </span>
-                    ).
-                  </>
-                ) : selectedViewMonthStats.isPast ? (
-                  <>
-                    Pour{" "}
-                    <span className="font-bold capitalize text-ink-800 dark:text-white">
-                      {selectedViewMonthStats.monthTitle}
-                    </span>
-                    , vous avez coché{" "}
-                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
-                      {selectedViewMonthStats.countedDays}
-                    </span>{" "}
-                    jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} travaillé
-                    {selectedViewMonthStats.countedDays !== 1 ? "s" : ""}.
-                  </>
-                ) : (
-                  <>
-                    <span className="font-bold capitalize text-ink-800 dark:text-white">
-                      {selectedViewMonthStats.monthTitle}
-                    </span>{" "}
-                    :{" "}
-                    <span className="font-extrabold tabular-nums text-ink-900 dark:text-teal-100">
-                      {selectedViewMonthStats.countedDays}
-                    </span>{" "}
-                    jour{selectedViewMonthStats.countedDays !== 1 ? "s" : ""} coché
-                    {selectedViewMonthStats.countedDays !== 1 ? "s" : ""} sur ce mois (planification).
-                  </>
-                )}
-              </p>
 
               <div className="mt-3 space-y-3 border-t border-ink-100 pt-3 dark:border-cyan-100/[0.12]">
                 {/* TJM */}

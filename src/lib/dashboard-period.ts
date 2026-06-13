@@ -23,6 +23,27 @@ export function formatDashboardPeriodLabelWithMonth(
   return formatDashboardPeriodLabel(selectedYears);
 }
 
+/** Libellé court d'un mois avec année (ex. « juin 2026 »). */
+function shortMonthYearLabel(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map((part) => Number(part));
+  const date = new Date(Date.UTC(year || 2000, (month || 1) - 1, 1));
+  return new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(date);
+}
+
+/** Libellé de période supportant plusieurs mois et/ou plusieurs années. */
+export function formatDashboardPeriodLabelWithMonths(
+  selectedYears: number[] | null,
+  selectedMonths: string[] | null
+): string {
+  if (selectedMonths != null && selectedMonths.length > 0) {
+    const sorted = [...selectedMonths].sort((a, b) => a.localeCompare(b));
+    if (sorted.length === 1) return formatDashboardMonthLabel(sorted[0]!);
+    if (sorted.length <= 3) return sorted.map(shortMonthYearLabel).join(" · ");
+    return `${sorted.length} mois sélectionnés`;
+  }
+  return formatDashboardPeriodLabel(selectedYears);
+}
+
 export function buildDashboardYearOptions(
   transactionYearBounds: { minYear: number; maxYear: number } | null,
   transactions: readonly DashboardTx[]

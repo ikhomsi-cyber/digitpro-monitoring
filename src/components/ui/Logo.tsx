@@ -88,46 +88,8 @@ function Mark({ size = 28, hero = false }: { size?: number; hero?: boolean }) {
         aria-label="DigitPro"
         role="img"
       >
-        <defs>
-          <linearGradient
-            id={hero ? "dp-bg-hero" : "dp-bg"}
-            x1="0"
-            y1="0"
-            x2="40"
-            y2="40"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor="#1D1D1F" />
-            <stop offset="100%" stopColor="#000000" />
-          </linearGradient>
-          <linearGradient
-            id={hero ? "dp-shine-hero" : "dp-shine"}
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="40"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.18" />
-            <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <rect
-          x="2"
-          y="2"
-          width="36"
-          height="36"
-          rx="9"
-          fill={`url(#${hero ? "dp-bg-hero" : "dp-bg"})`}
-        />
-        <rect
-          x="2"
-          y="2"
-          width="36"
-          height="36"
-          rx="9"
-          fill={`url(#${hero ? "dp-shine-hero" : "dp-shine"})`}
-        />
+        <rect x="2" y="2" width="36" height="36" rx="9" fill="#1D1D1F" />
+        <rect x="2" y="2" width="36" height="36" rx="9" fill="#FFFFFF" fillOpacity="0.12" />
         {/* mini bars */}
         <rect x="10" y="22" width="3.5" height="9" rx="1" fill="#FFFFFF" />
         <rect x="16" y="17" width="3.5" height="14" rx="1" fill="#FFFFFF" />

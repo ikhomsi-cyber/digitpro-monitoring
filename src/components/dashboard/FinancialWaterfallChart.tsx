@@ -169,7 +169,7 @@ export function FinancialWaterfallChart({ stats, statsReady, formatEuro, trend }
                 return (
                   <li
                     key={`row-${step.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-ink-50/60 px-3 py-2.5 dark:bg-white/[0.04]"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-ink-200/50 bg-white px-3 py-2.5 shadow-sm dark:border-transparent dark:bg-white/[0.04] dark:shadow-none"
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span

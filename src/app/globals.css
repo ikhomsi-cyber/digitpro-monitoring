@@ -25,14 +25,13 @@ body {
 }
 
 @layer components {
-  /** Fond immersif dashboard (s’active sous `html.dark`). */
+  /** Fond immersif dashboard — gris-bleu clair en light, teal en dark. */
   .premium-dashboard-page {
-    @apply transition-colors;
+    @apply bg-ink-100 transition-colors;
   }
   /**
-   * Chaque page expose son propre accent ambiant (style Revolut) : la base
-   * sombre reste cohérente avec les cartes, seules les auréoles colorées
-   * changent d’une page à l’autre via `data-page`.
+   * Fond teal unifié pour toutes les sections (dashboard, activité, SASU, etc.).
+   * `data-page` reste sur le conteneur pour d’éventuels usages futurs.
    */
   .dark .premium-dashboard-page {
     --pg-base: #06242b;
@@ -50,121 +49,6 @@ body {
       linear-gradient(180deg, var(--pg-grad-top) 0%, var(--pg-grad-mid) 42%, var(--pg-grad-bot) 100%);
     background-attachment: fixed;
     transition: background-color 0.6s ease;
-  }
-
-  /** Activité — accent indigo / violet. */
-  .dark .premium-dashboard-page[data-page="activite"] {
-    --pg-base: #0b0a23;
-    --pg-grad-top: #241a55;
-    --pg-grad-mid: #130f33;
-    --pg-grad-bot: #07061a;
-    --pg-glow-1: rgba(139, 92, 246, 0.40);
-    --pg-glow-2: rgba(167, 139, 250, 0.16);
-    --pg-glow-3: rgba(99, 102, 241, 0.26);
-    --surface: #161334;
-    --surface-deep: #0e0c28;
-    --surface-chart: #181541;
-    --surface-border: rgba(196, 181, 253, 0.14);
-  }
-
-  /** Valeur réelle — accent émeraude. */
-  .dark .premium-dashboard-page[data-page="valeur"] {
-    --pg-base: #04211a;
-    --pg-grad-top: #0a4f3c;
-    --pg-grad-mid: #06342a;
-    --pg-grad-bot: #02160f;
-    --pg-glow-1: rgba(16, 185, 129, 0.42);
-    --pg-glow-2: rgba(52, 211, 153, 0.16);
-    --pg-glow-3: rgba(5, 150, 105, 0.26);
-    --surface: #0a2c22;
-    --surface-deep: #061f18;
-    --surface-chart: #0b3329;
-    --surface-border: rgba(167, 243, 208, 0.14);
-  }
-
-  /** SASU — accent bleu profond. */
-  .dark .premium-dashboard-page[data-page="sasu"] {
-    --pg-base: #06122b;
-    --pg-grad-top: #15326b;
-    --pg-grad-mid: #0a1d44;
-    --pg-grad-bot: #030b1f;
-    --pg-glow-1: rgba(59, 130, 246, 0.42);
-    --pg-glow-2: rgba(96, 165, 250, 0.16);
-    --pg-glow-3: rgba(37, 99, 235, 0.26);
-    --surface: #0c1e44;
-    --surface-deep: #08152f;
-    --surface-chart: #0d2350;
-    --surface-border: rgba(191, 219, 254, 0.14);
-  }
-
-  /** Catégorisation — accent ambre chaleureux. */
-  .dark .premium-dashboard-page[data-page="categorisation"] {
-    --pg-base: #1c1305;
-    --pg-grad-top: #4a3410;
-    --pg-grad-mid: #2e200a;
-    --pg-grad-bot: #150d03;
-    --pg-glow-1: rgba(245, 158, 11, 0.36);
-    --pg-glow-2: rgba(251, 191, 36, 0.15);
-    --pg-glow-3: rgba(217, 119, 6, 0.24);
-    --surface: #2a1f0a;
-    --surface-deep: #1f1607;
-    --surface-chart: #30240c;
-    --surface-border: rgba(253, 230, 138, 0.13);
-  }
-
-  /** LMNP — accent rose / magenta. */
-  .dark .premium-dashboard-page[data-page="lmnp"] {
-    --pg-base: #220a17;
-    --pg-grad-top: #5a1838;
-    --pg-grad-mid: #350f22;
-    --pg-grad-bot: #170610;
-    --pg-glow-1: rgba(244, 63, 94, 0.38);
-    --pg-glow-2: rgba(251, 113, 133, 0.15);
-    --pg-glow-3: rgba(225, 29, 72, 0.24);
-    --surface: #321020;
-    --surface-deep: #260b18;
-    --surface-chart: #3a1325;
-    --surface-border: rgba(254, 205, 211, 0.13);
-  }
-
-  /** Paramètres — accent graphite / ardoise. */
-  .dark .premium-dashboard-page[data-page="parametres"] {
-    --pg-base: #0c1018;
-    --pg-grad-top: #232c3c;
-    --pg-grad-mid: #131a26;
-    --pg-grad-bot: #080b11;
-    --pg-glow-1: rgba(100, 116, 139, 0.34);
-    --pg-glow-2: rgba(148, 163, 184, 0.14);
-    --pg-glow-3: rgba(71, 85, 105, 0.26);
-    --surface: #161c28;
-    --surface-deep: #0e131c;
-    --surface-chart: #19202e;
-    --surface-border: rgba(203, 213, 225, 0.13);
-  }
-
-  /**
-   * Retinte automatiquement les surfaces (cartes, panneaux, tracks, graphiques)
-   * pour qu’elles s’accordent à l’accent de chaque page. On cible les classes
-   * Tailwind teal codées en dur via des sélecteurs d’attribut, sauf sur le
-   * dashboard par défaut qui conserve sa palette teal d’origine.
-   */
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) [class*="bg-[#0b3038]"],
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) .surface-card,
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) .surface-glass {
-    background-color: var(--surface) !important;
-  }
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) [class*="bg-[#06242b]"] {
-    background-color: var(--surface-deep) !important;
-  }
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) [class*="bg-[#0d2b38]"] {
-    background-color: var(--surface-chart) !important;
-  }
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) [class*="border-cyan-100"] {
-    border-color: var(--surface-border) !important;
-  }
-  .dark .premium-dashboard-page[data-page]:not([data-page="dashboard"]) .dashboard-chart-surface {
-    --chart-fade: var(--surface-chart);
-    --chart-dot-stroke: var(--surface-border);
   }
 
   /* Dashboard plat — contenu sur le fond page, pas de cartes empilées */

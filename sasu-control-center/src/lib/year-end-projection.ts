@@ -13,14 +13,6 @@ const VAT_RATE = 0.2;
 
 export type YearEndConfidenceLevel = "high" | "medium" | "low";
 
-export type YearEndProjectionMonth = {
-  monthKey: string;
-  monthLabel: string;
-  revenueHt: number;
-  kind: "actual" | "forecast";
-  cumulativeHt: number;
-};
-
 export type YearEndProjection = {
   year: number;
   forecastDateLabel: string;
@@ -28,8 +20,6 @@ export type YearEndProjection = {
   projectedPersonalIncomeEur: number;
   projectedCsgEur: number;
   projectedCashEur: number;
-  monthlySeries: YearEndProjectionMonth[];
-  currentMonthKey: string;
   confidence: {
     level: YearEndConfidenceLevel;
     score: number;
@@ -276,111 +266,6 @@ function resolveTjmForMonth(
   return tjmHt;
 }
 
-function monthShortLabelFr(year: number, month1: number): string {
-  return new Intl.DateTimeFormat("fr-FR", { month: "short" })
-    .format(new Date(year, month1 - 1, 1))
-    .replace(/\.$/u, "");
-}
-
-function estimateMonthRevenueHt(
-  monthKey: string,
-  habits: HistoricalHabits,
-  weights: BlendWeights,
-  paceMonthly: number,
-  capacitySet: ReadonlySet<string>,
-  todayIso: string,
-  billableRatePeriods: readonly BillableRatePeriod[],
-  clientName: string,
-  fallbackTjmHt: number,
-  tjmCache: Map<string, number>
-): number {
-  const habit = habitRevenueForMonth(monthKey, habits);
-  const plan = planRevenueForMonth(
-    monthKey,
-    capacitySet,
-    todayIso,
-    billableRatePeriods,
-    clientName,
-    fallbackTjmHt,
-    tjmCache
-  );
-  return weights.habit * habit + weights.pace * paceMonthly + weights.plan * plan;
-}
-
-function buildMonthlyProjectionSeries(input: {
-  year: number;
-  monthsElapsed: number;
-  revenueByMonth: Map<string, number>;
-  habits: HistoricalHabits;
-  weights: BlendWeights;
-  paceMonthly: number;
-  capacitySet: ReadonlySet<string>;
-  todayIso: string;
-  billableRatePeriods: readonly BillableRatePeriod[];
-  clientName: string;
-  fallbackTjmHt: number;
-  tjmCache: Map<string, number>;
-}): YearEndProjectionMonth[] {
-  const series: YearEndProjectionMonth[] = [];
-  let cumulative = 0;
-
-  for (let month1 = 1; month1 <= 12; month1 += 1) {
-    const monthKey = monthKeyFromParts(input.year, month1);
-    const actualHt = input.revenueByMonth.get(monthKey) ?? 0;
-    let revenueHt = 0;
-    let kind: YearEndProjectionMonth["kind"] = "forecast";
-
-    if (month1 < input.monthsElapsed) {
-      revenueHt = actualHt;
-      kind = "actual";
-    } else if (month1 === input.monthsElapsed) {
-      if (actualHt > 0) {
-        revenueHt = actualHt;
-        kind = "actual";
-      } else {
-        revenueHt = estimateMonthRevenueHt(
-          monthKey,
-          input.habits,
-          input.weights,
-          input.paceMonthly,
-          input.capacitySet,
-          input.todayIso,
-          input.billableRatePeriods,
-          input.clientName,
-          input.fallbackTjmHt,
-          input.tjmCache
-        );
-        kind = "forecast";
-      }
-    } else {
-      revenueHt = estimateMonthRevenueHt(
-        monthKey,
-        input.habits,
-        input.weights,
-        input.paceMonthly,
-        input.capacitySet,
-        input.todayIso,
-        input.billableRatePeriods,
-        input.clientName,
-        input.fallbackTjmHt,
-        input.tjmCache
-      );
-      kind = "forecast";
-    }
-
-    cumulative += revenueHt;
-    series.push({
-      monthKey,
-      monthLabel: monthShortLabelFr(input.year, month1),
-      revenueHt: round2(revenueHt),
-      kind,
-      cumulativeHt: round2(cumulative)
-    });
-  }
-
-  return series;
-}
-
 function planRevenueForMonth(
   monthKey: string,
   capacitySet: ReadonlySet<string>,
@@ -500,21 +385,6 @@ export function computeYearEndProjection(input: {
   const netCashTodayEur = cashBase - input.detteTotaleEur;
   const projectedCashEur = netCashTodayEur + remainingPersonalIncomeEur - remainingCsgEur;
 
-  const monthlySeries = buildMonthlyProjectionSeries({
-    year,
-    monthsElapsed,
-    revenueByMonth,
-    habits,
-    weights,
-    paceMonthly,
-    capacitySet,
-    todayIso,
-    billableRatePeriods: input.billableRatePeriods,
-    clientName,
-    fallbackTjmHt: input.fallbackTjmHt,
-    tjmCache
-  });
-
   const forecastDateLabel = new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "long",
@@ -528,8 +398,6 @@ export function computeYearEndProjection(input: {
     projectedPersonalIncomeEur: round2(projectedPersonalIncomeEur),
     projectedCsgEur: round2(projectedCsgEur),
     projectedCashEur: round2(projectedCashEur),
-    monthlySeries,
-    currentMonthKey: monthKeyFromParts(year, monthsElapsed),
     confidence: resolveConfidence(
       ytdCapacityDays,
       sortedCapacity.length,

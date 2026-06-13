@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { CategorisationClient, type CategorisationTx } from "@/app/categorisation/CategorisationClient";
+import { currentCategorisationMonthKey } from "@/lib/categorisation-candidates";
+import { formatDashboardMonthLabel } from "@/lib/dashboard-period";
 
 type State =
-  | { status: "loading"; categories: string[]; transactions: CategorisationTx[]; error: null }
-  | { status: "ready"; categories: string[]; transactions: CategorisationTx[]; error: null }
-  | { status: "error"; categories: string[]; transactions: CategorisationTx[]; error: string };
+  | { status: "loading"; categories: string[]; transactions: CategorisationTx[]; monthKey: string; monthLabel: string; error: null }
+  | { status: "ready"; categories: string[]; transactions: CategorisationTx[]; monthKey: string; monthLabel: string; error: null }
+  | { status: "error"; categories: string[]; transactions: CategorisationTx[]; monthKey: string; monthLabel: string; error: string };
 
 export function DashboardCategorisationPanel() {
   const [state, setState] = useState<State>({
     status: "loading",
     categories: [],
     transactions: [],
+    monthKey: currentCategorisationMonthKey(),
+    monthLabel: formatDashboardMonthLabel(currentCategorisationMonthKey()),
     error: null
   });
 
@@ -25,13 +29,17 @@ export function DashboardCategorisationPanel() {
           error?: string;
           categories?: string[];
           transactions?: CategorisationTx[];
+          monthKey?: string;
         };
         if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Chargement impossible.");
         if (cancelled) return;
+        const monthKey = body.monthKey ?? currentCategorisationMonthKey();
         setState({
           status: "ready",
           categories: body.categories ?? [],
           transactions: body.transactions ?? [],
+          monthKey,
+          monthLabel: formatDashboardMonthLabel(monthKey),
           error: null
         });
       })
@@ -41,6 +49,8 @@ export function DashboardCategorisationPanel() {
           status: "error",
           categories: [],
           transactions: [],
+          monthKey: currentCategorisationMonthKey(),
+          monthLabel: formatDashboardMonthLabel(currentCategorisationMonthKey()),
           error: error instanceof Error ? error.message : "Chargement impossible."
         });
       });
@@ -73,5 +83,12 @@ export function DashboardCategorisationPanel() {
     );
   }
 
-  return <CategorisationClient transactions={state.transactions} categories={state.categories} />;
+  return (
+    <CategorisationClient
+      transactions={state.transactions}
+      categories={state.categories}
+      monthKey={state.monthKey}
+      monthLabel={state.monthLabel}
+    />
+  );
 }
