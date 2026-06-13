@@ -16,6 +16,13 @@ export const dashboardFlatSectionHeader = clsx(
 /** Zone hero / intro — pas de fond ni bordure. */
 export const dashboardFlatHero = "relative w-full py-4 sm:py-6";
 
+/** Carte insight style Revolut (analyse, projection). */
+export const dashboardInsightCard =
+  "flex min-w-0 flex-col rounded-3xl border border-ink-200/50 bg-ink-50/60 p-5 dark:border-white/[0.06] dark:bg-white/[0.04]";
+
+/** Grille 2 colonnes pour cartes insight (sans séparateurs verticaux). */
+export const dashboardInsightGrid = "grid grid-cols-1 gap-4 sm:grid-cols-2";
+
 /** Cellule KPI — typographie seule, sans carte. */
 export const dashboardFlatKpi = "flex h-full min-h-0 flex-col py-2 text-left sm:py-3";
 

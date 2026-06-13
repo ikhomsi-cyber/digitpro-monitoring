@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { clsx } from "clsx";
 import {
-  dashboardFlatSectionHeader,
   dashboardSectionDivider,
   dashboardSectionStack,
   dashboardTwoColGrid
@@ -28,10 +27,8 @@ import {
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
-import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
-import { ActivityBillingPaceWidget } from "@/components/dashboard/ActivityBillingPaceWidget";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
 import {
   appendAgendaWorkedDayMonths,
@@ -165,24 +162,13 @@ function BudgetGauge({
   );
 }
 
-const EMPTY_TJM_REPARTITION: DashboardHeroStats["tjmRepartitionMois"] = {
-  caHtEur: 0,
-  bncEur: 0,
-  fraisPersoEur: 0,
-  csgEur: 0,
-  fraisDigitProEur: 0
-};
-
 export function BillableDaysCalendarBlock({
   treasuryTransactions,
-  treasuryScope,
-  tjmRepartitionMois = EMPTY_TJM_REPARTITION
+  treasuryScope
 }: {
   /** Mouvements pour le bloc trésorerie (solde, CA, TVA). */
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
-  /** Répartition TJM du hero pour estimer le revenu personnel projeté. */
-  tjmRepartitionMois?: DashboardHeroStats["tjmRepartitionMois"];
 }) {
   const {
     selected,
@@ -190,10 +176,8 @@ export function BillableDaysCalendarBlock({
     tjmHt,
     billableRatePeriods,
     persistToSupabase,
-    overviewMonthTitle,
     overviewKpis,
-    overviewWorkdayGauge,
-    overviewTjmEnVigueurHt
+    overviewWorkdayGauge
   } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -620,33 +604,14 @@ export function BillableDaysCalendarBlock({
     <div className={dashboardSectionStack}>
       <div className={dashboardTwoColGrid}>
         <ActivityOverviewPremium
-          monthTitle={overviewMonthTitle}
           kpis={overviewKpis}
           workdayGauge={overviewWorkdayGauge}
-          tjmHt={overviewTjmEnVigueurHt}
           ctaMode="hidden"
         />
 
-        <ActivityBillingPaceWidget
-          selected={selected}
-          billableRatePeriods={billableRatePeriods}
-          fallbackTjmHt={tjmHt}
-          currentTjmHt={overviewTjmEnVigueurHt}
-          tjmRepartition={tjmRepartitionMois}
-        />
       </div>
 
     <section className={clsx(dashboardSectionDivider, "space-y-6")}>
-      <header className={dashboardFlatSectionHeader}>
-        <div className="min-w-0 flex-1">
-            <h2 className="text-base font-bold tracking-tight text-ink-900 dark:text-white">
-              Jours travaillés & TJM
-            </h2>
-            <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-ink-500 dark:text-cyan-50/62 sm:text-xs">
-              Calendrier des jours facturés, TJM et indicateurs du mois.
-            </p>
-        </div>
-      </header>
       <div className="relative">
           {/* Calendrier + mois en cours : côte à côte dès sm */}
           <div className="flex w-full flex-col flex-wrap items-stretch gap-4 sm:flex-row sm:items-start sm:gap-4">

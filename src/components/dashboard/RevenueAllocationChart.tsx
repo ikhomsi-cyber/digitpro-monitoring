@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { clsx } from "clsx";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
-import { dashboardFlatKpi } from "@/lib/dashboard-surfaces";
+import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 
 export type RevenueAllocationInput = {
   caHtEur: number;
@@ -39,7 +39,7 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "BNC",
       flowLabel: "BNC",
       valueEur: Math.max(0, allocation.bncEur),
-      colorClass: "bg-teal-600 dark:bg-teal-400",
+      colorClass: "bg-emerald-500 dark:bg-emerald-400",
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Honoraires versés en BNC (rémunération dirigeant), estimés à partir de la répartition Valeur réelle du mois."
@@ -49,7 +49,7 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "Perso",
       flowLabel: "Personal",
       valueEur: Math.max(0, allocation.fraisPersoEur),
-      colorClass: "bg-teal-500 dark:bg-teal-400/80",
+      colorClass: "bg-sky-500 dark:bg-sky-400",
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Charges personnelles couvertes sur l'activité : repas, indemnités kilométriques et frais perso refacturés."
@@ -59,7 +59,7 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "CSG",
       flowLabel: "CSG",
       valueEur: Math.max(0, allocation.csgEur),
-      colorClass: "bg-teal-400/80 dark:bg-teal-400/55",
+      colorClass: "bg-amber-500 dark:bg-amber-400",
       textClass: "text-ink-600 dark:text-white/65",
       tooltip:
         "Cotisations sociales (CSG) provisionnées sur le chiffre d'affaires du mois en cours."
@@ -69,7 +69,7 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       label: "Dépenses",
       flowLabel: "Expenses",
       valueEur: Math.max(0, allocation.fraisDigitProEur),
-      colorClass: "bg-ink-400 dark:bg-white/30",
+      colorClass: "bg-violet-500 dark:bg-violet-400",
       textClass: "text-ink-600 dark:text-white/65",
       tooltip:
         "Frais obligatoires DigitPro (compta, assurances, outils) imputés au TJM et déduits du revenu disponible."
@@ -112,34 +112,26 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
   ];
 
   return (
-    <div className={dashboardFlatKpi}>
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500 dark:text-white/45">
-              Allocation du revenu
-            </p>
-            <KpiTrendBadge trend={trend} />
-          </div>
-          <p className="mt-0.5 font-display text-xl font-semibold tabular-nums text-ink-900 dark:text-white sm:text-2xl">
-            {formatEuro(revenueEur)}
-            <span className="ml-1.5 align-baseline text-xs font-semibold text-ink-500 dark:text-white/45">
-              HT · mois
-            </span>
-          </p>
-        </div>
+    <div className={dashboardInsightCard}>
+      <p className="text-sm text-ink-500 dark:text-white/50">Allocation du revenu</p>
+      <div className="mt-1 flex flex-wrap items-baseline gap-2">
+        <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
+          {formatEuro(revenueEur)}
+          <span className="ml-1.5 text-sm font-medium text-ink-500 dark:text-white/45">HT · mois</span>
+        </p>
+        <KpiTrendBadge trend={trend} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1 text-[10px] font-bold text-ink-500 dark:text-white/45">
+      <div className="mt-3 flex flex-wrap items-center gap-1 text-xs text-ink-500 dark:text-white/45">
         {flowSteps.map((step, index) => (
           <span key={step.label} className="inline-flex items-center gap-1">
-            {index > 0 ? <ArrowRight className="h-3 w-3 shrink-0 opacity-50" aria-hidden /> : null}
+            {index > 0 ? <ArrowRight className="h-3 w-3 shrink-0 opacity-40" aria-hidden /> : null}
             <span
               className={clsx(
-                "rounded-full px-2 py-0.5",
+                "rounded-full px-2 py-0.5 font-medium",
                 step.emphasized
-                  ? "bg-ink-100 text-ink-800 dark:bg-white/[0.10] dark:text-white"
-                  : "bg-white/70 text-ink-600 dark:bg-white/[0.05] dark:text-white/65"
+                  ? "bg-ink-100/80 text-ink-700 dark:bg-white/[0.08] dark:text-white/75"
+                  : "text-ink-600 dark:text-white/55"
               )}
             >
               {step.label}
@@ -149,7 +141,7 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
       </div>
 
       <div
-        className="mt-3 flex h-3 overflow-hidden rounded-full bg-ink-200/70 dark:bg-[#06242b]/70"
+        className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/[0.08]"
         role="img"
         aria-label="Répartition du revenu mensuel entre BNC, charges perso, CSG et dépenses"
       >
@@ -170,26 +162,22 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
         })}
       </div>
 
-      <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
         {segments.map((segment) => {
           const pct = (segment.valueEur / barDenominator) * 100;
           return (
             <li
               key={`legend-${segment.id}`}
-              className="group/segment relative min-w-0 rounded-xl border border-ink-200/70 bg-white/55 px-2.5 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]"
+              className="group/segment relative inline-flex max-w-full items-center gap-1.5 text-ink-600 dark:text-white/60"
               tabIndex={0}
             >
               <AllocationTooltip segment={segment} pct={pct} formatEuro={formatEuro} />
-              <div className="flex items-center gap-1.5">
-                <span className={clsx("h-2 w-2 shrink-0 rounded-full", segment.colorClass)} aria-hidden />
-                <span className={clsx("truncate text-[10px] font-bold", segment.textClass)}>{segment.label}</span>
-              </div>
-              <p className="mt-1 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
+              <span className={clsx("h-2 w-2 shrink-0 rounded-full", segment.colorClass)} aria-hidden />
+              <span className="truncate">{segment.label}</span>
+              <span className="font-medium tabular-nums text-ink-800 dark:text-white/85">
                 {formatEuro(segment.valueEur)}
-              </p>
-              <p className="text-[10px] font-semibold tabular-nums text-ink-500 dark:text-white/40">
-                {formatInt(pct)} %
-              </p>
+              </span>
+              <span className="tabular-nums text-ink-500 dark:text-white/45">{formatInt(pct)} %</span>
             </li>
           );
         })}

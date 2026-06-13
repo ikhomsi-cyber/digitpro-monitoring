@@ -26,6 +26,11 @@ import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCa
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
+import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
+import { RevolutInsightsSection } from "@/components/dashboard/RevolutInsightsSection";
+import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
+import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
+import { computeKpiTrend } from "@/lib/kpi-month-trend";
 import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
 import { DashboardCategorisationPanel } from "@/app/dashboard/DashboardCategorisationPanel";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
@@ -343,6 +348,23 @@ export function DashboardClient({
   }, [pathname, router, searchParams]);
 
   const fmt = useDashboardDisplayFormat();
+
+  const taxLiabilityTrend = useMemo(() => {
+    const mom = currentHeroStats.momKpis;
+    if (!mom) return null;
+    return computeKpiTrend(currentHeroStats.detteTotaleDepuisDebutEur, mom.detteTotaleDepuisDebutEur, {
+      positiveIsGood: false
+    });
+  }, [currentHeroStats]);
+
+  const revenueAllocationTrend = useMemo(() => {
+    const mom = currentHeroStats.momKpis;
+    if (!mom) return null;
+    return computeKpiTrend(
+      currentHeroStats.tjmRepartitionMois.caHtEur,
+      mom.tjmRepartitionMois.caHtEur
+    );
+  }, [currentHeroStats]);
 
   const billableActivity = useBillableActivity();
   const { sortedIsos: billableWorkDayIsos } = billableActivity;
@@ -804,18 +826,37 @@ export function DashboardClient({
           className={clsx("w-full will-change-[opacity,transform]", dashboardSectionStack)}
         >
       {dashboardSection === "full" ? (
-        <DashboardPremiumHero
-          stats={currentHeroStats}
-          statsReady
-          contextMessage={heroContextMessage}
-          showContextBanner={showContextBanner}
-        />
+        <>
+          <RevolutBalanceHero stats={currentHeroStats} statsReady />
+          <RevolutInsightsSection transactions={transactions} />
+          <TaxLiabilityCard
+            cashEur={currentHeroStats.soldeQontoEur}
+            vatEur={currentHeroStats.detteTvaDepuisDebutEur}
+            csgEur={currentHeroStats.detteCsgDepuisDebutEur}
+            totalLiabilityEur={currentHeroStats.detteTotaleDepuisDebutEur}
+            statsReady
+            formatEuro={fmt.euro}
+            formatInt={fmt.int}
+            trend={taxLiabilityTrend}
+          />
+          <RevenueAllocationChart
+            allocation={currentHeroStats.tjmRepartitionMois}
+            formatEuro={fmt.euro}
+            formatInt={fmt.int}
+            trend={revenueAllocationTrend}
+          />
+          <DashboardPremiumHero
+            stats={currentHeroStats}
+            statsReady
+            contextMessage={heroContextMessage}
+            showContextBanner={showContextBanner}
+          />
+        </>
       ) : null}
       {dashboardSection === "activite" ? (
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
-          tjmRepartitionMois={currentHeroStats.tjmRepartitionMois}
         />
       ) : null}
       {dashboardSection === "valeur" ? (

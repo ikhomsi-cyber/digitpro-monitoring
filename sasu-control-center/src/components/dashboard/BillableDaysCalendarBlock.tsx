@@ -472,10 +472,8 @@ export function BillableDaysCalendarBlock({
   return (
     <div className="space-y-5">
       <ActivityOverviewPremium
-        monthTitle={overviewMonthTitle}
         kpis={overviewKpis}
         workdayGauge={overviewWorkdayGauge}
-        tjmHt={overviewTjmEnVigueurHt}
         ctaMode="hidden"
       />
 
