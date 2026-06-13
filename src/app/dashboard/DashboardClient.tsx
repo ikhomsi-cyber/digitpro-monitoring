@@ -1022,16 +1022,9 @@ export function DashboardClient({
                     Simplifié
                   </button>
                 </div>
-                    </>
-                  );
-                })()}
-              </div>
 
-              <div className={clsx(dashboardPremiumPanel, "order-last xl:col-span-2")}>
                 {sasuMonthlyEvolutionOptions.length ? (
-                  <div className={clsx(dashboardInsetPanel, "relative overflow-hidden px-2 py-2 shadow-[inset_0_1px_0_rgba(15,23,42,0.04)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]")}>
-                    <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-[1] w-10 bg-gradient-to-l from-white to-transparent dark:from-[#0b3038]" aria-hidden />
-                    <div className="flex gap-2 overflow-x-auto pb-0.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="mt-5 flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {sasuMonthlyCategoryFilters.length ? (
                       <button
                         type="button"
@@ -1067,7 +1060,6 @@ export function DashboardClient({
                         </button>
                       );
                     })}
-                    </div>
                   </div>
                 ) : null}
 
@@ -1220,6 +1212,9 @@ export function DashboardClient({
                     </svg>
                   </div>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className={dashboardPremiumPanel}>

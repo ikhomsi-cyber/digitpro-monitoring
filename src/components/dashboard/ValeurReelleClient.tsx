@@ -1,7 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { clsx } from "clsx";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import { toast } from "sonner";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
@@ -23,8 +34,11 @@ import {
   type ValeurReelleVatSavingsKpis
 } from "@/lib/valeur-reelle-analyze";
 import {
+  buildTrailingGainPerWorkDayPoints,
   estimateCurrentMonthGainPerWorkDay,
-  type GainPerWorkDayEstimate
+  formatTrailingGainPerDayRange,
+  type GainPerWorkDayEstimate,
+  type TrailingGainPerDayPoint
 } from "@/lib/valeur-reelle-gain-per-day";
 import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
 import type {
@@ -40,6 +54,7 @@ import {
   dashboardPanelTitle,
   dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
+import { useRootIsDark } from "@/lib/use-root-is-dark";
 
 const SEG_COLORS = {
   net: "#0ea5e9",
@@ -424,7 +439,7 @@ function BlockHeader({
   sub,
   right
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   sub?: string;
   right?: React.ReactNode;
@@ -432,11 +447,141 @@ function BlockHeader({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className={dashboardEyebrow}>{eyebrow}</p>
-        <h3 className={clsx(dashboardPanelTitle, "mt-1")}>{title}</h3>
+        {eyebrow ? <p className={dashboardEyebrow}>{eyebrow}</p> : null}
+        <h3 className={clsx(dashboardPanelTitle, eyebrow && "mt-1")}>{title}</h3>
         {sub ? <p className="mt-0.5 text-[11px] font-medium text-ink-500 dark:text-white/40">{sub}</p> : null}
       </div>
       {right}
+    </div>
+  );
+}
+
+function formatGainDayCompact(amount: number): string {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+function gainBarAmountLabelIndices(length: number): Set<number> {
+  const indices = new Set<number>();
+  if (length === 0) return indices;
+  for (let i = Math.max(0, length - 4); i < length; i += 1) {
+    indices.add(i);
+  }
+  const quarterBack = length - 1 - 6;
+  if (quarterBack >= 0) indices.add(quarterBack);
+  return indices;
+}
+
+function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; fmt: Fmt }) {
+  const uid = useId().replace(/:/g, "");
+  const isDark = useRootIsDark();
+  const gradId = `gain-per-day-${uid}`;
+  const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
+  const tickFill = isDark ? "#a1a1aa" : "#86868B";
+  const labelFill = isDark ? "#a7f3d0" : "#047857";
+
+  const amountLabelIndices = useMemo(() => gainBarAmountLabelIndices(points.length), [points.length]);
+
+  const data = useMemo(
+    () =>
+      points.map((point, index) => {
+        const showAmount = amountLabelIndices.has(index) && point.gainPerDayEur > 0;
+        return {
+          monthKey: point.monthKey,
+          label: point.monthLabel.split(" ")[0] ?? point.monthLabel,
+          fullLabel: point.monthLabel,
+          gain: point.gainPerDayEur,
+          amountLabel: showAmount ? formatGainDayCompact(point.gainPerDayEur) : ""
+        };
+      }),
+    [amountLabelIndices, points]
+  );
+
+  if (!data.some((entry) => entry.gain > 0)) return null;
+
+  return (
+    <div className="w-full" role="img" aria-label="Gain moyen par jour sur les douze derniers mois">
+      <div className="h-40 w-full overflow-visible sm:h-44">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 28, right: 4, left: 0, bottom: 2 }} barCategoryGap="20%">
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#34d399" stopOpacity={0.95} />
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0.85} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              minTickGap={18}
+              tick={{ fill: tickFill, fontSize: 9 }}
+            />
+            <YAxis hide domain={[0, "auto"]} />
+            <Tooltip
+              cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const row = payload[0]?.payload as { fullLabel?: string; gain?: number } | undefined;
+                const value = typeof row?.gain === "number" ? row.gain : 0;
+                const label = row?.fullLabel ?? "";
+                return (
+                  <div
+                    className={clsx(
+                      "rounded-lg border px-2 py-1.5 text-xs shadow-card",
+                      isDark
+                        ? "border-ink-600 bg-ink-900 text-ink-100"
+                        : "border-ink-200 bg-white text-ink-900"
+                    )}
+                  >
+                    <div className="font-medium capitalize">{label}</div>
+                    <div className="tabular-nums">{fmt.euro(value)} / jour</div>
+                  </div>
+                );
+              }}
+            />
+            <Bar dataKey="gain" radius={[5, 5, 0, 0]} maxBarSize={32} isAnimationActive={false}>
+              {data.map((entry) => (
+                <Cell
+                  key={entry.monthKey}
+                  fill={
+                    entry.gain > 0
+                      ? `url(#${gradId})`
+                      : isDark
+                        ? "rgba(255,255,255,0.08)"
+                        : "rgba(0,0,0,0.06)"
+                  }
+                />
+              ))}
+              <LabelList
+                content={(props) => {
+                  const { x, y, width, index } = props;
+                  if (index == null || x == null || y == null) return null;
+                  const label = data[index]?.amountLabel;
+                  if (!label) return null;
+                  return (
+                    <text
+                      x={Number(x) + Number(width ?? 0) / 2}
+                      y={Number(y) - 6}
+                      textAnchor="middle"
+                      fill={labelFill}
+                      fontSize={10}
+                      fontWeight={700}
+                    >
+                      {label}
+                    </text>
+                  );
+                }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -447,13 +592,15 @@ function CashAvailableCard({
   fmt,
   billableDays,
   gainPerWorkDayEstimate,
-  periodLabel
+  periodLabel,
+  gainPerDayPoints
 }: {
   tree: ValeurReelleCashTree;
   fmt: Fmt;
   billableDays: number;
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   periodLabel: string;
+  gainPerDayPoints: TrailingGainPerDayPoint[];
 }) {
   const isCurrentMonthEstimate = gainPerWorkDayEstimate != null;
   const gainDayDenominator = isCurrentMonthEstimate ? gainPerWorkDayEstimate.workedDays : billableDays;
@@ -503,6 +650,14 @@ function CashAvailableCard({
         {reelParJour != null ? `${gainBasisNote} · ` : ""}
         <span className="capitalize">{periodLabel}</span>
       </p>
+      {gainPerDayPoints.some((p) => p.gainPerDayEur > 0) ? (
+        <div className="mt-5 w-full max-w-lg px-1">
+          <GainPerDayChart points={gainPerDayPoints} fmt={fmt} />
+          <p className="mt-2 text-xs text-ink-400 dark:text-white/35">
+            Gain moyen / jour · {formatTrailingGainPerDayRange(gainPerDayPoints)}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -546,7 +701,6 @@ function DailyValueBlock({
   return (
     <div className={dashboardInsightCard}>
       <BlockHeader
-        eyebrow="Par jour facturé"
         title="Décomposition / jour"
         sub={`CA HT ${fmt.euro(breakdown.caHtPerDay)} · ${basisLabel}`}
       />
@@ -582,7 +736,7 @@ function FinancialAllocationBlock({ tree, fmt }: { tree: ValeurReelleCashTree; f
 
   return (
     <div className={dashboardInsightCard}>
-      <BlockHeader eyebrow="Waterfall financier" title="Répartition du CA HT" sub={`Base ${fmt.euro(caHt)}`} />
+      <BlockHeader title="Répartition du CA HT" sub={`Base ${fmt.euro(caHt)}`} />
       <div className="mt-3 flex items-baseline gap-2">
         <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
           {fmt.euro(valeurNette)}
@@ -913,6 +1067,25 @@ export function ValeurReelleClient({
     [analysis.cashTree, billableActivity?.selected, singleMonth, transactions]
   );
 
+  const gainPerDayPoints = useMemo(
+    () =>
+      buildTrailingGainPerWorkDayPoints(
+        transactions,
+        billableActivity?.selected ?? new Set<string>(),
+        dashboardMonthKeyNowLocal(),
+        12,
+        new Date(),
+        billableActivity?.billableRatePeriods ?? [],
+        billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT
+      ),
+    [
+      billableActivity?.billableRatePeriods,
+      billableActivity?.selected,
+      billableActivity?.tjmHt,
+      transactions
+    ]
+  );
+
   const tjmHtForPeriod = useMemo(() => {
     const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
     return resolveBillableTjmForClientMonth(
@@ -954,6 +1127,7 @@ export function ValeurReelleClient({
         billableDays={billableDaysInPeriod}
         gainPerWorkDayEstimate={gainPerWorkDayEstimate}
         periodLabel={analysis.periodLabel}
+        gainPerDayPoints={gainPerDayPoints}
       />
 
       <div className={dashboardInsightGrid}>
