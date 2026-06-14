@@ -20,7 +20,6 @@ import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
-import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { ActivityMonthSummaryCard } from "@/components/dashboard/ActivityMonthSummaryCard";
 import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
@@ -28,7 +27,6 @@ import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
 } from "@/lib/invoice-worked-days-series";
-import { resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
 import {
   listPendingNdfCandidatesForMonth,
   summarizeNdfDigitProForMonth
@@ -61,9 +59,7 @@ export function BillableDaysCalendarBlock({
     setSelected,
     tjmHt,
     billableRatePeriods,
-    persistToSupabase,
-    overviewKpis,
-    overviewWorkdayGauge
+    persistToSupabase
   } = useBillableActivity();
   const now = useMemo(() => new Date(), []);
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -418,13 +414,12 @@ export function BillableDaysCalendarBlock({
   }, [invoiceWorkedDaysSeries, workedDaysChartYear, workedDaysChartQuarter]);
 
   const chartWorkedDaysData = useMemo(() => {
-    const agendaTjmHt = resolveBillableTjmForClientMonth(
+    const withAgenda = appendAgendaWorkedDayMonths(
+      filteredInvoiceWorkedDaysSeries,
+      selected,
       billableRatePeriods,
-      billableRatePeriods[0]?.clientName ?? "",
-      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
       tjmHt
     );
-    const withAgenda = appendAgendaWorkedDayMonths(filteredInvoiceWorkedDaysSeries, selected, agendaTjmHt);
     if (workedDaysChartYear === "all") return withAgenda;
     let rows = withAgenda.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
     if (workedDaysChartQuarter !== "full") {
@@ -472,12 +467,6 @@ export function BillableDaysCalendarBlock({
 
   return (
     <div className={dashboardSectionStack}>
-      <ActivityOverviewPremium
-        kpis={overviewKpis}
-        workdayGauge={overviewWorkdayGauge}
-        ctaMode="hidden"
-      />
-
       <div className="flex w-full flex-col flex-wrap items-stretch gap-8 sm:flex-row sm:items-start sm:gap-10">
           {/* Calendrier compact */}
           <div className="flex shrink-0 flex-col items-center sm:items-start">
@@ -639,16 +628,6 @@ export function BillableDaysCalendarBlock({
             >
               Effacer ce mois
             </button>
-            <p className="mt-2 max-w-[300px] text-[9px] leading-relaxed text-ink-500 dark:text-white/45">
-              <span className="font-bold text-ink-600 dark:text-white/60">Glisser</span> pour sélectionner
-              plusieurs jours ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">Flèches</span> naviguer ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">Espace</span> basculer ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">A</span> tout sélectionner ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">T</span> aujourd’hui ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">Alt+←→</span> mois ·{" "}
-              <span className="font-bold text-ink-600 dark:text-white/60">Suppr</span> effacer
-            </p>
             <div className="mt-2 flex max-w-[238px] flex-wrap justify-center gap-x-3 gap-y-1 text-[9px] leading-snug text-ink-500 dark:text-white/50 sm:justify-start">
               <span className="inline-flex items-center gap-1">
                 <span

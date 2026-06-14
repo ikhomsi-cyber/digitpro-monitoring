@@ -2,6 +2,7 @@
 
 import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
+import { dashboardHeroSection } from "@/lib/dashboard-surfaces";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 
 /**
@@ -21,7 +22,7 @@ export function RevolutBalanceHero({
   const positive = remunerationEur >= 0;
 
   return (
-    <section className="flex flex-col items-center py-6 text-center sm:py-8" data-private>
+    <section className={dashboardHeroSection} data-private>
       <p className="text-sm font-medium text-ink-500 dark:text-white/55">Cash disponible · EUR</p>
       <p className="mt-2 font-display text-4xl font-bold tabular-nums tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
         {cashEur != null ? fmt.euro(cashEur) : "—"}

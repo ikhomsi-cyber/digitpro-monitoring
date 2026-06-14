@@ -464,40 +464,24 @@ function formatGainDayCompact(amount: number): string {
   }).format(amount);
 }
 
-function gainBarAmountLabelIndices(length: number): Set<number> {
-  const indices = new Set<number>();
-  if (length === 0) return indices;
-  for (let i = Math.max(0, length - 4); i < length; i += 1) {
-    indices.add(i);
-  }
-  const quarterBack = length - 1 - 6;
-  if (quarterBack >= 0) indices.add(quarterBack);
-  return indices;
-}
-
 function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; fmt: Fmt }) {
   const uid = useId().replace(/:/g, "");
   const isDark = useRootIsDark();
   const gradId = `gain-per-day-${uid}`;
   const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
-  const labelFill = isDark ? "#a7f3d0" : "#047857";
-
-  const amountLabelIndices = useMemo(() => gainBarAmountLabelIndices(points.length), [points.length]);
+  const labelFill = isDark ? "#ecfdf5" : "#064e3b";
 
   const data = useMemo(
     () =>
-      points.map((point, index) => {
-        const showAmount = amountLabelIndices.has(index) && point.gainPerDayEur > 0;
-        return {
-          monthKey: point.monthKey,
-          label: point.monthLabel.split(" ")[0] ?? point.monthLabel,
-          fullLabel: point.monthLabel,
-          gain: point.gainPerDayEur,
-          amountLabel: showAmount ? formatGainDayCompact(point.gainPerDayEur) : ""
-        };
-      }),
-    [amountLabelIndices, points]
+      points.map((point) => ({
+        monthKey: point.monthKey,
+        label: point.monthLabel.split(" ")[0] ?? point.monthLabel,
+        fullLabel: point.monthLabel,
+        gain: point.gainPerDayEur,
+        amountLabel: point.gainPerDayEur > 0 ? formatGainDayCompact(point.gainPerDayEur) : ""
+      })),
+    [points]
   );
 
   if (!data.some((entry) => entry.gain > 0)) return null;
@@ -506,7 +490,7 @@ function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; f
     <div className="w-full" role="img" aria-label="Gain moyen par jour sur les douze derniers mois">
       <div className="h-40 w-full overflow-visible sm:h-44">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 28, right: 4, left: 0, bottom: 2 }} barCategoryGap="20%">
+          <BarChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 2 }} barCategoryGap="20%">
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#34d399" stopOpacity={0.95} />
@@ -560,18 +544,24 @@ function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; f
               ))}
               <LabelList
                 content={(props) => {
-                  const { x, y, width, index } = props;
-                  if (index == null || x == null || y == null) return null;
+                  const { x, y, width, height, index } = props;
+                  if (index == null || x == null || y == null || height == null) return null;
                   const label = data[index]?.amountLabel;
                   if (!label) return null;
+                  const barHeight = Number(height);
+                  if (barHeight < 28) return null;
+                  const cx = Number(x) + Number(width ?? 0) / 2;
+                  const cy = Number(y) + barHeight / 2;
                   return (
                     <text
-                      x={Number(x) + Number(width ?? 0) / 2}
-                      y={Number(y) - 6}
+                      x={cx}
+                      y={cy}
                       textAnchor="middle"
+                      dominantBaseline="middle"
                       fill={labelFill}
                       fontSize={10}
                       fontWeight={700}
+                      transform={`rotate(-90, ${cx}, ${cy})`}
                     >
                       {label}
                     </text>

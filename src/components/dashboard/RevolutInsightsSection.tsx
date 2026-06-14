@@ -11,18 +11,14 @@ import {
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
-import { dashboardEyebrow, dashboardInsightCard, dashboardPanelTitle } from "@/lib/dashboard-surfaces";
+import { monthTitleFr } from "@/lib/billable-calendar-metrics";
+import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 
-type Scope = "all" | "pro" | "personal";
-
-const SCOPE_LABELS: Record<Scope, string> = {
-  all: "Tous vos comptes",
-  pro: "Compte pro",
-  personal: "Compte perso"
-};
+type ExpenseKindFilter = "all" | "perso" | "digitpro";
 
 function monthKeyNow(): string {
   const d = new Date();
@@ -35,9 +31,9 @@ function shiftMonthKey(monthKey: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthShortLabel(monthKey: string): string {
+function monthNavigatorLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
-  return new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date(y, m - 1, 1));
+  return monthTitleFr(y, m - 1);
 }
 
 /** Pictogramme par catégorie de dépense (macro bucket ou Bankin). */
@@ -135,8 +131,8 @@ function ExpenseCategoryBars({
                     className={clsx(
                       "max-h-full overflow-hidden px-0.5 text-[10px] font-bold leading-none tracking-tight tabular-nums sm:text-[11px]",
                       isLeader
-                        ? "text-rose-950/80 dark:text-white"
-                        : "text-ink-600 dark:text-white/75"
+                        ? "text-rose-950 dark:text-white"
+                        : "text-ink-800 dark:text-white/90"
                     )}
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
@@ -197,12 +193,25 @@ function txCountsAsIncome(tx: DashboardTx): boolean {
 
 type ExpenseMacroRow = { label: string; amount: number };
 
-function computeExpenseMacroBreakdown(txs: readonly DashboardTx[], monthKey: string): ExpenseMacroRow[] {
+function expenseMatchesKindFilter(tx: DashboardTx, filter: ExpenseKindFilter): boolean {
+  if (filter === "all") return true;
+  const bucket = deriveExpenseBucket(tx);
+  const group = resolveSasuSimplifiedExpenseGroup(tx, bucket);
+  if (filter === "perso") return group === "Frais perso";
+  return group === "Frais DigitPro";
+}
+
+function computeExpenseMacroBreakdown(
+  txs: readonly DashboardTx[],
+  monthKey: string,
+  kindFilter: ExpenseKindFilter = "all"
+): ExpenseMacroRow[] {
   const byLabel = new Map<string, number>();
   for (const tx of txs) {
     if (tx.date.slice(0, 7) !== monthKey || tx.amount >= 0) continue;
     const label = expenseMacroLabel(tx);
     if (!label) continue;
+    if (!expenseMatchesKindFilter(tx, kindFilter)) continue;
     byLabel.set(label, (byLabel.get(label) ?? 0) + Math.abs(tx.amount));
   }
   return Array.from(byLabel.entries())
@@ -234,11 +243,13 @@ const TRAILING_MONTHS = 12;
 function trailingMonthlySeries(
   txs: readonly DashboardTx[],
   endMonthKey: string,
-  kind: "income" | "spend"
+  kind: "income" | "spend",
+  expenseKindFilter: ExpenseKindFilter = "all"
 ): { monthKey: string; value: number }[] {
   const buckets = new Map<string, number>();
   for (const tx of txs) {
     if (kind === "income" ? !txCountsAsIncome(tx) : !txCountsAsExpense(tx)) continue;
+    if (kind === "spend" && !expenseMatchesKindFilter(tx, expenseKindFilter)) continue;
     const mk = kind === "income" ? incomeAnalyticsMonthKey(tx)! : tx.date.slice(0, 7);
     const amount = kind === "income" ? tx.amount : Math.abs(tx.amount);
     buckets.set(mk, (buckets.get(mk) ?? 0) + amount);
@@ -291,17 +302,49 @@ function smoothSparklinePath(coords: Array<{ x: number; y: number }>): string {
   return d;
 }
 
-function Sparkline({ values, stroke }: { values: number[]; stroke: string }) {
+function sparklineMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  const raw = new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(new Date(y, (m || 1) - 1, 1));
+  return raw.replace(/\.$/, "");
+}
+
+function Sparkline({
+  points,
+  stroke
+}: {
+  points: readonly { monthKey: string; value: number }[];
+  stroke: string;
+}) {
   const w = 280;
-  const h = 64;
-  const coords = sparklineCoords(values, w, h);
+  const chartH = 48;
+  const values = points.map((p) => p.value);
+  const coords = sparklineCoords(values, w, chartH);
   const path = smoothSparklinePath(coords);
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-16 w-full" aria-hidden>
-      <line x1="0" y1={h - 3} x2={w} y2={h - 3} className="stroke-ink-300/60 dark:stroke-white/15" strokeWidth="1" />
-      <path d={path} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <div className="w-full" aria-hidden>
+      <svg viewBox={`0 0 ${w} ${chartH}`} preserveAspectRatio="none" className="h-12 w-full">
+        <line
+          x1="0"
+          y1={chartH - 3}
+          x2={w}
+          y2={chartH - 3}
+          className="stroke-ink-300/60 dark:stroke-white/15"
+          strokeWidth="1"
+        />
+        <path d={path} fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <div className="mt-1 flex w-full justify-between gap-0.5 px-px">
+        {points.map((point) => (
+          <span
+            key={point.monthKey}
+            className="min-w-0 flex-1 truncate text-center text-[8px] font-medium capitalize leading-none text-ink-400 dark:text-white/38 sm:text-[9px]"
+          >
+            {sparklineMonthLabel(point.monthKey)}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -312,29 +355,41 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 export function RevolutInsightsSection({ transactions }: { transactions: DashboardTx[] }) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
-  const [scope, setScope] = useState<Scope>("pro");
   const [monthKey, setMonthKey] = useState<string>(monthKeyNow());
+  const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
 
-  const scopedTx = useMemo(() => {
-    if (scope === "all") return transactions;
-    return transactions.filter((t) => (t.scope ?? "pro") === scope);
-  }, [transactions, scope]);
+  const scopedTx = useMemo(
+    () => transactions.filter((t) => (t.scope ?? "pro") === "pro"),
+    [transactions]
+  );
 
   const current = useMemo(() => computeMonthMetrics(scopedTx, monthKey), [scopedTx, monthKey]);
   const previous = useMemo(
     () => computeMonthMetrics(scopedTx, shiftMonthKey(monthKey, -1)),
     [scopedTx, monthKey]
   );
+  const expenseMacroRows = useMemo(
+    () => computeExpenseMacroBreakdown(scopedTx, monthKey, expenseKindFilter),
+    [expenseKindFilter, scopedTx, monthKey]
+  );
+  const previousExpenseMacroRows = useMemo(
+    () => computeExpenseMacroBreakdown(scopedTx, shiftMonthKey(monthKey, -1), expenseKindFilter),
+    [expenseKindFilter, scopedTx, monthKey]
+  );
+  const filteredDepenses = useMemo(
+    () => expenseMacroRows.reduce((sum, row) => sum + row.amount, 0),
+    [expenseMacroRows]
+  );
+  const previousFilteredDepenses = useMemo(
+    () => previousExpenseMacroRows.reduce((sum, row) => sum + row.amount, 0),
+    [previousExpenseMacroRows]
+  );
   const spendSeries = useMemo(
-    () => trailingMonthlySeries(scopedTx, monthKey, "spend"),
-    [scopedTx, monthKey]
+    () => trailingMonthlySeries(scopedTx, monthKey, "spend", expenseKindFilter),
+    [expenseKindFilter, scopedTx, monthKey]
   );
   const incomeSeries = useMemo(
     () => trailingMonthlySeries(scopedTx, monthKey, "income"),
-    [scopedTx, monthKey]
-  );
-  const expenseMacroRows = useMemo(
-    () => computeExpenseMacroBreakdown(scopedTx, monthKey),
     [scopedTx, monthKey]
   );
   const upcomingInvoice = useMemo(
@@ -347,93 +402,99 @@ export function RevolutInsightsSection({ transactions }: { transactions: Dashboa
     [billable.billableRatePeriods, billable.selected, billable.tjmHt]
   );
 
-  const depensesDelta = current.depenses - previous.depenses;
+  const depensesDelta = filteredDepenses - previousFilteredDepenses;
   const entreesDelta = current.entrees - previous.entrees;
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className={dashboardEyebrow}>Analyse</p>
-          <h2 className={clsx(dashboardPanelTitle, "mt-1")}>Outils d&apos;analyse</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <select
-              value={scope}
-              onChange={(e) => setScope(e.target.value as Scope)}
-              className="appearance-none rounded-full border border-ink-200/60 bg-transparent py-1.5 pl-3 pr-8 text-sm font-medium text-ink-700 outline-none dark:border-white/10 dark:text-white/75"
-              aria-label="Périmètre des comptes"
-            >
-              {(Object.keys(SCOPE_LABELS) as Scope[]).map((s) => (
-                <option key={s} value={s}>
-                  {SCOPE_LABELS[s]}
-                </option>
-              ))}
-            </select>
-            <ChevronRight className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-ink-400 dark:text-white/40" aria-hidden />
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setMonthKey((m) => shiftMonthKey(m, -1))}
-              className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
-              aria-label="Mois précédent"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="w-16 text-center text-sm font-medium capitalize text-ink-700 dark:text-white/75">
-              {monthShortLabel(monthKey)}
-            </span>
-            <button
-              type="button"
-              onClick={() => setMonthKey((m) => shiftMonthKey(m, 1))}
-              className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
-              aria-label="Mois suivant"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+    <section className="space-y-3">
+      <div className="flex justify-center">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setMonthKey((m) => shiftMonthKey(m, -1))}
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
+            aria-label="Mois précédent"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[6.5rem] text-center text-sm font-medium text-ink-700 dark:text-white/75">
+            {monthNavigatorLabel(monthKey)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setMonthKey((m) => shiftMonthKey(m, 1))}
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
+            aria-label="Mois suivant"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <InsightCard>
-          <p className="text-sm text-ink-500 dark:text-white/50">Dépenses</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="shrink-0 text-sm text-ink-500 dark:text-white/50">Dépenses</p>
+            <div
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-ink-200/55 bg-ink-100/70 p-0.5 dark:border-white/[0.1] dark:bg-white/[0.05]"
+              role="group"
+              aria-label="Filtrer les dépenses"
+            >
+              {(
+                [
+                  { id: "all" as const, label: "Tous" },
+                  { id: "perso" as const, label: "Perso" },
+                  { id: "digitpro" as const, label: "DigitPro" }
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={expenseKindFilter === item.id}
+                  onClick={() => setExpenseKindFilter(item.id)}
+                  className={clsx(
+                    "rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-tight transition-all duration-200",
+                    expenseKindFilter === item.id
+                      ? "bg-white text-ink-900 shadow-sm dark:bg-white/[0.18] dark:text-white dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
+                      : "text-ink-500 hover:text-ink-800 dark:text-white/40 dark:hover:text-white/72"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="mt-1 flex items-baseline gap-2">
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
-              {fmt.euro(current.depenses)}
+              {fmt.euro(filteredDepenses)}
             </p>
             <span className="text-sm font-medium tabular-nums text-rose-500 dark:text-rose-400">
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
-          <div className="mt-3 border-t border-dashed border-ink-200/50 pt-3 dark:border-cyan-100/[0.08]">
+          <div className="mt-1.5">
             <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />
           </div>
           <div className="mt-3">
-            <Sparkline values={spendSeries.map((p) => p.value)} stroke="#fb7185" />
+            <Sparkline points={spendSeries} stroke="#fb7185" />
           </div>
-          <p className="mt-2 text-xs text-ink-400 dark:text-white/35">12 derniers mois</p>
         </InsightCard>
 
         <InsightCard>
           <div className="flex items-start justify-between gap-2">
             <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
-            {scope === "pro" ? (
-              <span
-                className={clsx(
-                  "shrink-0 text-right text-[11px] font-bold leading-tight tabular-nums",
-                  upcomingInvoice.amountHtEur <= 0
-                    ? "text-emerald-700 dark:text-emerald-300"
-                    : upcomingInvoice.dueInDays < 0
-                      ? "text-rose-700 dark:text-rose-300"
-                      : "text-amber-700 dark:text-amber-300"
-                )}
-              >
-                {upcomingInvoice.statusLabel} · {fmt.euro(upcomingInvoice.amountTtcEur)} TTC
-              </span>
-            ) : null}
+            <span
+              className={clsx(
+                "shrink-0 text-right text-[11px] font-bold leading-tight tabular-nums",
+                upcomingInvoice.amountHtEur <= 0
+                  ? "text-emerald-700 dark:text-emerald-300"
+                  : upcomingInvoice.dueInDays < 0
+                    ? "text-rose-700 dark:text-rose-300"
+                    : "text-amber-700 dark:text-amber-300"
+              )}
+            >
+              {upcomingInvoice.statusLabel} · {fmt.euro(upcomingInvoice.amountTtcEur)} TTC
+            </span>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
@@ -444,9 +505,8 @@ export function RevolutInsightsSection({ transactions }: { transactions: Dashboa
             </span>
           </div>
           <div className="mt-5">
-            <Sparkline values={incomeSeries.map((p) => p.value)} stroke="#34d399" />
+            <Sparkline points={incomeSeries} stroke="#34d399" />
           </div>
-          <p className="mt-2 text-xs text-ink-400 dark:text-white/35">12 derniers mois</p>
         </InsightCard>
       </div>
     </section>

@@ -22,6 +22,7 @@ import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
+import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
@@ -837,7 +838,7 @@ export function DashboardClient({
   }, []);
 
   return (
-    <main id="dashboard-main" className="relative mt-6 scroll-mt-28 overflow-x-hidden sm:mt-8">
+    <main id="dashboard-main" className="relative mt-0 scroll-mt-28 overflow-x-hidden sm:mt-2">
       <SectionThemeSync />
       <div className={clsx("w-full", dashboardSectionStack)}>
       <div
@@ -870,7 +871,15 @@ export function DashboardClient({
             showContextBanner={showContextBanner}
           />
       </div>
-      <div className={clsx(dashboardSection !== "activite" && "hidden")} aria-hidden={dashboardSection !== "activite"}>
+      <div
+        className={clsx(dashboardSection !== "activite" && "hidden", dashboardSectionStack)}
+        aria-hidden={dashboardSection !== "activite"}
+      >
+        <ActivityOverviewPremium
+          kpis={billableActivity.overviewKpis}
+          workdayGauge={billableActivity.overviewWorkdayGauge}
+          ctaMode="hidden"
+        />
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
@@ -963,14 +972,14 @@ export function DashboardClient({
                     ))}
                   </div>
                 </div>
-                <div className={clsx("relative mx-auto flex h-80 w-80 max-w-full items-center justify-center sm:h-96 sm:w-96", dashboardDonutTrack)}>
-                  <svg viewBox="0 0 200 200" className="block h-80 w-80 max-w-full sm:h-96 sm:w-96" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
+                <div className={clsx("relative mx-auto flex h-64 w-64 max-w-full items-center justify-center", dashboardDonutTrack)}>
+                  <svg viewBox="0 0 200 200" className="block h-64 w-64 max-w-full" role="img" aria-label={sasuAnalysisMode === "revenues" ? "Répartition des revenus SASU" : "Répartition des dépenses SASU"}>
                     <defs>
                       <filter id="sasu-donut-shadow" x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="8" stdDeviation="8" floodOpacity="0.18" />
                       </filter>
                     </defs>
-                    <circle cx="100" cy="100" r="58" fill="none" stroke="currentColor" strokeWidth="16" />
+                    <circle cx="100" cy="100" r="58" fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="16" />
                     {currentSlices.map((slice) => (
                       <circle
                         key={slice.name}
@@ -991,10 +1000,10 @@ export function DashboardClient({
                   </svg>
                   <div className="absolute inset-0 grid place-items-center text-center">
                     <div>
-                      <p className="font-display text-2xl font-bold tabular-nums text-ink-900 dark:text-white sm:text-3xl" data-private>
+                      <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white sm:text-2xl" data-private>
                         {fmt.euro(currentTotal)}
                       </p>
-                      <p className="mt-1.5 text-sm font-medium text-ink-500 dark:text-white/56 sm:text-base">
+                      <p className="mt-1 text-xs font-medium text-ink-500 dark:text-white/56 sm:text-sm">
                         {sasuAnalysisMode === "revenues" ? "Revenus HT" : "Dépenses HT"}
                       </p>
                     </div>

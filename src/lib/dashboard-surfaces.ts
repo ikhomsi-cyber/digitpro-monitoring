@@ -16,6 +16,10 @@ export const dashboardFlatSectionHeader = clsx(
 /** Zone hero / intro — pas de fond ni bordure. */
 export const dashboardFlatHero = "relative w-full";
 
+/** Bloc hero centré (Cash disponible, CA sécurisé, etc.). */
+export const dashboardHeroSection =
+  "flex flex-col items-center py-6 text-center sm:py-8";
+
 /** Carte insight style Revolut (analyse, projection). */
 export const dashboardInsightCard =
   "flex min-w-0 flex-col rounded-3xl border border-ink-200/70 bg-white p-5 shadow-card dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none";

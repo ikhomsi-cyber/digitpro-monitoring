@@ -18,15 +18,16 @@ export type SasuDonutSlice = {
   color: string;
 };
 
+/** Palette alignée sur le dashboard (emerald, sky, violet, amber, rose). */
 const SASU_DONUT_PALETTE = [
-  "#4f7eea",
-  "#ff8733",
-  "#8332c2",
-  "#ffb515",
-  "#4f7eea",
-  "#ffa66d",
-  "#11c7cb",
-  "#f72b68"
+  "#34d399",
+  "#38bdf8",
+  "#a78bfa",
+  "#fbbf24",
+  "#fb7185",
+  "#2dd4bf",
+  "#60a5fa",
+  "#f472b6"
 ] as const;
 
 function sasuSliceColor(index: number): string {
@@ -92,8 +93,8 @@ export function buildSasuSimplifiedExpenseSlices(transactions: readonly Dashboar
   const total = Math.max(0, digitPro + perso);
   let cursor = 0;
   return [
-    { name: "Frais DigitPro", total: digitPro, color: "#ff8733" },
-    { name: "Frais perso", total: perso, color: "#11c7cb" }
+    { name: "Frais DigitPro", total: digitPro, color: "#a78bfa" },
+    { name: "Frais perso", total: perso, color: "#38bdf8" }
   ]
     .filter((slice) => slice.total > 0)
     .map((slice) => {

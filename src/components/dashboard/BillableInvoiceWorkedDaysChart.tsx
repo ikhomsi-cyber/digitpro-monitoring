@@ -103,7 +103,7 @@ function ChartTooltip({
         </div>
       )}
       <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
-        TJM utilisé : {fmt.euro(p.tjmHt)} HT
+        TJM en vigueur : {fmt.euro(p.tjmHt)} HT
       </div>
     </div>
   );
