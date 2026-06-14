@@ -4,6 +4,7 @@ import { countAgendaWorkDaysInMonth } from "./billable-calendar-metrics";
 import {
   BILLABLE_CLIENT_TJM_HT,
   resolveBillableTjmForClientMonth,
+  resolveBillableTjmForMonth,
   type BillableRatePeriod
 } from "./billable-client-days";
 import { isRevenueCategory, revenueCounterpartyDisplayName } from "./revenue-category";
@@ -148,7 +149,10 @@ export function buildInvoiceWorkedDaysPastMonthsSeries(
       days += lineCaHt / tjmHt;
       weightedTjmTotal += tjmHt * Math.max(0, lineCaHt);
     }
-    const tjmHt = caHt > 0 ? weightedTjmTotal / caHt : fallbackTjmHt;
+    const tjmHt =
+      caHt > 0
+        ? weightedTjmTotal / caHt
+        : resolveBillableTjmForMonth(billableRatePeriods, mk, fallbackTjmHt);
     const m = Number(mk.slice(5, 7));
     const label = labelFmt.format(new Date(y, m - 1, 1));
     return {
@@ -189,7 +193,8 @@ function agendaMonthBar(
 export function appendAgendaWorkedDayMonths(
   encaisseRows: readonly InvoiceWorkedDayMonth[],
   selected: ReadonlySet<string>,
-  tjmHt: number,
+  billableRatePeriods: readonly BillableRatePeriod[] = [],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
   refDate = new Date()
 ): InvoiceWorkedDayMonth[] {
   const base = encaisseRows.map((r) => ({ ...r, kind: r.kind ?? ("encaisse" as const) }));
@@ -205,12 +210,14 @@ export function appendAgendaWorkedDayMonths(
   const lastKey = monthKeyFromYm(last.y, last.m0);
   if (!existingKeys.has(lastKey)) {
     const days = countAgendaWorkDaysInMonth(selected, last.y, last.m0, refDate);
+    const tjmHt = resolveBillableTjmForMonth(billableRatePeriods, lastKey, fallbackTjmHt);
     extras.push(agendaMonthBar(last.y, last.m0, days, tjmHt, "deja_facture"));
   }
 
   const currentKey = monthKeyFromYm(cy, cm0);
   if (!existingKeys.has(currentKey)) {
     const days = countAgendaWorkDaysInMonth(selected, cy, cm0, refDate);
+    const tjmHt = resolveBillableTjmForMonth(billableRatePeriods, currentKey, fallbackTjmHt);
     extras.push(agendaMonthBar(cy, cm0, days, tjmHt, "a_facturer"));
   }
 

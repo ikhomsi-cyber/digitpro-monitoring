@@ -417,13 +417,12 @@ export function BillableDaysCalendarBlock({
   }, [invoiceWorkedDaysSeries, workedDaysChartYear, workedDaysChartQuarter]);
 
   const chartWorkedDaysData = useMemo(() => {
-    const agendaTjmHt = resolveBillableTjmForClientMonth(
+    const withAgenda = appendAgendaWorkedDayMonths(
+      filteredInvoiceWorkedDaysSeries,
+      selected,
       billableRatePeriods,
-      billableRatePeriods[0]?.clientName ?? "",
-      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
       tjmHt
     );
-    const withAgenda = appendAgendaWorkedDayMonths(filteredInvoiceWorkedDaysSeries, selected, agendaTjmHt);
     if (workedDaysChartYear === "all") return withAgenda;
     let rows = withAgenda.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
     if (workedDaysChartQuarter !== "full") {

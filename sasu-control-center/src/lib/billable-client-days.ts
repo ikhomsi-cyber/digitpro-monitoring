@@ -23,6 +23,20 @@ function parseMonthStart(monthKey: string): string {
   return `${monthKey.slice(0, 7)}-01`;
 }
 
+/** TJM HT en vigueur pour un mois civil (premier client des périodes paramétrées). */
+export function resolveBillableTjmForMonth(
+  periods: readonly BillableRatePeriod[],
+  monthKey: string,
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT
+): number {
+  return resolveBillableTjmForClientMonth(
+    periods,
+    periods[0]?.clientName ?? "",
+    monthKey,
+    fallbackTjmHt
+  );
+}
+
 export function resolveBillableTjmForClientMonth(
   periods: readonly BillableRatePeriod[],
   clientName: string | null | undefined,
