@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { dashboardHeroSection } from "@/lib/dashboard-surfaces";
 
@@ -36,7 +37,7 @@ export function ActivityOverviewPremium({
 
   return (
     <>
-      <section className={dashboardHeroSection}>
+      <section className={clsx(dashboardHeroSection, "py-0 pt-2 pb-5 sm:pt-3 sm:pb-6")}>
         <p className="text-sm font-medium text-ink-500 dark:text-white/55">CA sécurisé · HT</p>
         <p className="mt-2 font-display text-4xl font-bold tabular-nums tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
           {fmt.euro(kpis.caEstime)}

@@ -63,26 +63,30 @@ export function DashboardInsightPeriodFilter({
       </div>
 
       {monthsForYears.length ? (
-        <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Mois à inclure">
+        <div className="flex w-full max-w-full items-center gap-2" role="group" aria-label="Mois à inclure">
           <button
             type="button"
             aria-pressed={selectedMonths.length === 0}
             onClick={onClearMonths}
-            className={dashboardFilterPill(selectedMonths.length === 0)}
+            className={clsx(dashboardFilterPill(selectedMonths.length === 0), "shrink-0")}
           >
             {selectedYears.length > 1 ? "Toutes les années" : "Toute l'année"}
           </button>
-          {monthsForYears.map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={monthSet.has(m)}
-              onClick={() => onToggleMonth(m)}
-              className={clsx(dashboardFilterPill(monthSet.has(m)), "capitalize")}
-            >
-              {monthPillLabel(m, showYearOnPill)}
-            </button>
-          ))}
+          <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+            <div className="flex w-max flex-nowrap items-center gap-2 pr-1">
+              {monthsForYears.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={monthSet.has(m)}
+                  onClick={() => onToggleMonth(m)}
+                  className={clsx(dashboardFilterPill(monthSet.has(m)), "capitalize")}
+                >
+                  {monthPillLabel(m, showYearOnPill)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
