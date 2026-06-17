@@ -8,7 +8,10 @@ import { amountNetOfRecoverableVat } from "@/lib/recoverable-expense-vat";
 export const NDF_DIGITPRO_CATEGORY = "NDF DigitPro";
 
 /** Fenêtre (jours) pour fusionner imports Bankin/Powens d'un même paiement carte. */
-const NDF_MERCHANT_DEDUPE_DAY_WINDOW = 3;
+export const NDF_MERCHANT_DEDUPE_DAY_WINDOW = 3;
+
+/** Autorisation Powens → débit comptabilisé (souvent J/J+1). */
+export const POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW = 7;
 
 /**
  * Tokens de fin de libellé qui ne sont pas un nom de porteur de carte
@@ -100,15 +103,32 @@ export function stripTrailingCardholderFromMerchant(label: string): string {
 
 /** Nettoie un libellé bancaire (CB, dates, numéros, nom porteur) pour affichage et dédup. */
 export function cleanNdfMerchantLabel(raw: string): string {
-  const stripped = raw
+  const stripped = stripPowensOperationalPrefix(raw)
     .replace(/\b(cb|carte|card|cblm|paiement|payment)\b/gi, " ")
     .replace(/\b\d{2,}\/\d{2,}\/\d{2,4}\b/g, " ")
     .replace(/\b\d{3,}\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-  const normalized = stripTrailingCardholderFromMerchant(stripped);
-  return normalized || raw.trim();
+  const withoutDaySuffix = stripBankRelativeDaySuffix(stripped);
+  const normalized = stripTrailingCardholderFromMerchant(withoutDaySuffix);
+  return normalized || stripPowensOperationalPrefix(raw).trim() || raw.trim();
+}
+
+/** Préfixes Powens ([En cours], [Carte], …). */
+function stripPowensOperationalPrefix(label: string): string {
+  return label.replace(/^(\[[^\]]+\]\s*)+/i, "").trim();
+}
+
+/** Suffixes banque (AUJ., HIER.) — pas le nom du commerçant. */
+function stripBankRelativeDaySuffix(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length < 2) return label.trim();
+  const last = foldMerchantToken(words[words.length - 1] ?? "");
+  if (last === "auj" || last === "hier") {
+    return words.slice(0, -1).join(" ").trim();
+  }
+  return label.trim();
 }
 
 /** Clé commerçant normalisée pour le dédoublonnage inter-imports. */
@@ -123,20 +143,75 @@ function daysBetweenIso(a: string, b: string): number {
   return Math.round(Math.abs(da.getTime() - db.getTime()) / 86_400_000);
 }
 
-function isNearDuplicateNdf(
-  merchant: string,
-  amountEur: number,
-  date: string,
-  kept: readonly DashboardTx[]
+/** Libellé stocké issu d'une autorisation Powens « en cours ». */
+export function isPowensComingStoredLabel(label: string): boolean {
+  return /^\[en cours\]/i.test(label.trim());
+}
+
+/** Comparaison souple (YAKA vs YAKA AUJ.). */
+export function ndfMerchantsMatch(normalizedA: string, normalizedB: string): boolean {
+  if (!normalizedA || !normalizedB) return false;
+  if (normalizedA === normalizedB) return true;
+  if (normalizedA.length >= 3 && normalizedB.includes(normalizedA)) return true;
+  if (normalizedB.length >= 3 && normalizedA.includes(normalizedB)) return true;
+  const tokenA = normalizedA.split(/\s+/)[0] ?? "";
+  const tokenB = normalizedB.split(/\s+/)[0] ?? "";
+  return tokenA.length >= 3 && tokenA === tokenB;
+}
+
+/** Même paiement carte à ±N jours (autorisation + débit comptabilisé). */
+export function isNearDuplicateCardPayment(
+  labelA: string,
+  amountA: number,
+  dateA: string,
+  labelB: string,
+  amountB: number,
+  dateB: string,
+  dayWindow = NDF_MERCHANT_DEDUPE_DAY_WINDOW
 ): boolean {
-  for (const existing of kept) {
-    const existingMerchant = normalizeNdfMerchantForDedupe(existing.label);
-    const existingAmount = Math.abs(existing.amount);
-    if (existingMerchant !== merchant) continue;
-    if (Math.abs(existingAmount - amountEur) > 0.005) continue;
-    if (daysBetweenIso(existing.date, date) <= NDF_MERCHANT_DEDUPE_DAY_WINDOW) return true;
+  if (Math.abs(Math.abs(amountA) - Math.abs(amountB)) > 0.005) return false;
+  const effectiveWindow =
+    isPowensComingStoredLabel(labelA) || isPowensComingStoredLabel(labelB)
+      ? Math.max(dayWindow, POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW)
+      : dayWindow;
+  if (daysBetweenIso(dateA, dateB) > effectiveWindow) return false;
+  return ndfMerchantsMatch(
+    normalizeNdfMerchantForDedupe(labelA),
+    normalizeNdfMerchantForDedupe(labelB)
+  );
+}
+
+function findNearDuplicateNdfIndex(
+  tx: DashboardTx,
+  kept: readonly DashboardTx[]
+): number {
+  for (let i = 0; i < kept.length; i++) {
+    const existing = kept[i]!;
+    if (
+      isNearDuplicateCardPayment(
+        existing.label,
+        existing.amount,
+        existing.date,
+        tx.label,
+        tx.amount,
+        tx.date
+      )
+    ) {
+      return i;
+    }
   }
-  return false;
+  return -1;
+}
+
+/** Préfère la version comptabilisée à l'autorisation [En cours]. */
+function shouldReplaceNdfWithCandidate(existing: DashboardTx, candidate: DashboardTx): boolean {
+  if (isPowensComingStoredLabel(existing.label) && !isPowensComingStoredLabel(candidate.label)) {
+    return true;
+  }
+  if (!isPowensComingStoredLabel(existing.label) && isPowensComingStoredLabel(candidate.label)) {
+    return false;
+  }
+  return candidate.date.localeCompare(existing.date) > 0;
 }
 
 export type NdfDigitProMonthSummary = {
@@ -154,15 +229,30 @@ export function summarizeNdfDigitProForMonth(
   transactions: readonly DashboardTx[],
   monthKey: string
 ): NdfDigitProMonthSummary {
+  const candidates = transactions
+    .filter((tx) => tx.date.slice(0, 7) === monthKey && isNdfDigitProTx(tx))
+    .sort((a, b) => {
+      const comingA = isPowensComingStoredLabel(a.label) ? 1 : 0;
+      const comingB = isPowensComingStoredLabel(b.label) ? 1 : 0;
+      if (comingA !== comingB) return comingA - comingB;
+      return b.date.localeCompare(a.date);
+    });
+
   const kept: DashboardTx[] = [];
   let totalEur = 0;
 
-  for (const tx of transactions) {
-    if (tx.date.slice(0, 7) !== monthKey) continue;
-    if (!isNdfDigitProTx(tx)) continue;
+  for (const tx of candidates) {
     const amt = Math.abs(tx.amount);
-    const merchant = normalizeNdfMerchantForDedupe(tx.label);
-    if (isNearDuplicateNdf(merchant, amt, tx.date, kept)) continue;
+    const dupIndex = findNearDuplicateNdfIndex(tx, kept);
+    if (dupIndex >= 0) {
+      const existing = kept[dupIndex]!;
+      if (shouldReplaceNdfWithCandidate(existing, tx)) {
+        totalEur -= Math.abs(existing.amount);
+        totalEur += amt;
+        kept[dupIndex] = tx;
+      }
+      continue;
+    }
     totalEur += amt;
     kept.push(tx);
   }
@@ -192,10 +282,12 @@ export function listPendingNdfCandidatesForMonth(
   monthKey: string,
   scope: "pro" | "personal" = "pro"
 ): DashboardTx[] {
+  const validatedNdf = summarizeNdfDigitProForMonth(transactions, monthKey).transactions;
   return transactions
     .filter((tx) => {
       if (tx.date.slice(0, 7) !== monthKey) return false;
       if ((tx.scope ?? "pro") !== scope) return false;
+      if (isPowensComingStoredLabel(tx.label)) return false;
       return isNdfCategorisationCandidate({
         label: tx.label,
         amount: tx.amount,
@@ -203,5 +295,19 @@ export function listPendingNdfCandidatesForMonth(
         category: tx.category
       });
     })
+    .filter(
+      (tx) =>
+        !validatedNdf.some((validated) =>
+          isNearDuplicateCardPayment(
+            validated.label,
+            validated.amount,
+            validated.date,
+            tx.label,
+            tx.amount,
+            tx.date,
+            POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+          )
+        )
+    )
     .sort((a, b) => b.date.localeCompare(a.date));
 }

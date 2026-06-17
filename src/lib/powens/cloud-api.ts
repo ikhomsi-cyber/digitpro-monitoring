@@ -4,6 +4,10 @@
  */
 
 import { categorizePowensApiTransaction } from "@/lib/bankin/categorize";
+import {
+  isNearDuplicateCardPayment,
+  POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+} from "@/lib/ndf-digitpro";
 import { fetchWithNetworkDiagnostics } from "@/lib/fetch-network-error";
 import { sanitizeLatin1HttpValue } from "@/lib/http-latin1";
 
@@ -495,7 +499,61 @@ function mergePowensRawTransactions(lists: readonly Record<string, unknown>[][])
       byKey.set(powensTxListKey(row), row);
     }
   }
-  return [...byKey.values()];
+  return dropPowensComingSettledDuplicates([...byKey.values()]);
+}
+
+function powensRawBaseLabel(raw: Record<string, unknown>): string {
+  return (
+    str(raw.wording ?? raw.simplified_wording ?? raw.original_wording ?? raw.description ?? raw.title) ||
+    str(raw.merchant_name) ||
+    str((raw.counterparty as Record<string, unknown> | undefined)?.label) ||
+    ""
+  );
+}
+
+function powensRawAmount(raw: Record<string, unknown>): number | null {
+  return (
+    num(raw.value) ??
+    num(raw.gross_value) ??
+    num(raw.amount) ??
+    num(raw.original_value) ??
+    (raw.amount != null ? Number(raw.amount) : null)
+  );
+}
+
+/** Ignore les autorisations `coming` quand le débit comptabilisé est déjà dans le lot. */
+function dropPowensComingSettledDuplicates(rows: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+  const settled = rows.filter((row) => row.coming !== true);
+  const coming = rows.filter((row) => row.coming === true);
+  if (!coming.length) return [...rows];
+
+  const keepComing = coming.filter((comingRow) => {
+    const cAmount = powensRawAmount(comingRow);
+    const cDate = resolvePowensTxDate(comingRow);
+    const cLabel = powensRawBaseLabel(comingRow);
+    if (cAmount == null || !cDate || !cLabel) return true;
+
+    return !settled.some((settledRow) => {
+      const sAmount = powensRawAmount(settledRow);
+      const sDate = resolvePowensTxDate(settledRow);
+      const sLabel = powensRawBaseLabel(settledRow);
+      if (sAmount == null || !sDate || !sLabel) return false;
+      if (num(comingRow.id_account) != null && num(settledRow.id_account) != null) {
+        if (num(comingRow.id_account) !== num(settledRow.id_account)) return false;
+      }
+      return isNearDuplicateCardPayment(
+        cLabel,
+        cAmount,
+        cDate,
+        sLabel,
+        sAmount,
+        sDate,
+        POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+      );
+    });
+  });
+
+  return [...settled, ...keepComing];
 }
 
 function pickPowensAccountBankName(raw: Record<string, unknown>): string | null {

@@ -43,6 +43,11 @@ import {
   type PowensImportAxis
 } from "@/lib/powens/config";
 import { createHash } from "crypto";
+import {
+  isNearDuplicateCardPayment,
+  isPowensComingStoredLabel,
+  POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+} from "@/lib/ndf-digitpro";
 type ImportTx = {
   date: string;
   label: string;
@@ -243,6 +248,160 @@ async function fetchExistingRowsByContentHashes(
     }
   }
   return map;
+}
+
+function shiftIsoDate(iso: string, dayDelta: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  d.setDate(d.getDate() + dayDelta);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+type StoredTxRow = {
+  id: string;
+  date: string;
+  label: string;
+  amount: number;
+  categoryManual: boolean;
+  content_hash: string | null;
+};
+
+async function fetchStoredTransactionsBetween(
+  client: SupabaseServer,
+  minDate: string,
+  maxDate: string
+): Promise<StoredTxRow[]> {
+  let categoryManualSupported = true;
+  for (;;) {
+    const query = categoryManualSupported
+      ? client
+          .from("transactions")
+          .select("id,date,label,amount,content_hash,category_manual")
+          .gte("date", minDate)
+          .lte("date", maxDate)
+      : client
+          .from("transactions")
+          .select("id,date,label,amount,content_hash")
+          .gte("date", minDate)
+          .lte("date", maxDate);
+    const { data, error } = await query;
+    if (error) {
+      if (categoryManualSupported && isMissingColumnError(error, "category_manual")) {
+        categoryManualSupported = false;
+        continue;
+      }
+      throw new Error(error.message);
+    }
+    return (data ?? []).map((row) => ({
+      id: String(row.id),
+      date: String(row.date).slice(0, 10),
+      label: String(row.label ?? ""),
+      amount: Number(row.amount),
+      categoryManual:
+        categoryManualSupported && "category_manual" in row && row.category_manual === true,
+      content_hash: row.content_hash ?? null
+    }));
+  }
+}
+
+async function resolvePowensFuzzyImportRows(
+  client: SupabaseServer,
+  toInsert: Array<ImportTx & { content_hash: string }>
+): Promise<{
+  toInsert: Array<ImportTx & { content_hash: string }>;
+  fuzzyMerge: Array<
+    ImportTx & { content_hash: string; id: string; categoryManual: boolean; refreshLabelDate: boolean }
+  >;
+}> {
+  if (!toInsert.length) return { toInsert, fuzzyMerge: [] };
+
+  const dates = toInsert.map((row) => row.date).sort();
+  const minDate = shiftIsoDate(dates[0]!, -POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW);
+  const maxDate = shiftIsoDate(dates[dates.length - 1]!, POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW);
+  const stored = await fetchStoredTransactionsBetween(client, minDate, maxDate);
+
+  const fuzzyMerge: Array<
+    ImportTx & { content_hash: string; id: string; categoryManual: boolean; refreshLabelDate: boolean }
+  > = [];
+  const keptInsert: Array<ImportTx & { content_hash: string }> = [];
+  const matchedIds = new Set<string>();
+
+  for (const row of toInsert) {
+    const match = stored.find(
+      (candidate) =>
+        !matchedIds.has(candidate.id) &&
+        isNearDuplicateCardPayment(
+          candidate.label,
+          candidate.amount,
+          candidate.date,
+          row.label,
+          row.amount,
+          row.date,
+          POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+        )
+    );
+    if (match) {
+      matchedIds.add(match.id);
+      fuzzyMerge.push({
+        ...row,
+        id: match.id,
+        categoryManual: match.categoryManual,
+        refreshLabelDate:
+          isPowensComingStoredLabel(match.label) && !isPowensComingStoredLabel(row.label)
+      });
+      continue;
+    }
+    keptInsert.push(row);
+  }
+
+  const dedupedInsert: Array<ImportTx & { content_hash: string }> = [];
+  for (const row of keptInsert) {
+    const dup = dedupedInsert.some((existing) =>
+      isNearDuplicateCardPayment(
+        existing.label,
+        existing.amount,
+        existing.date,
+        row.label,
+        row.amount,
+        row.date,
+        POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+      )
+    );
+    if (!dup) dedupedInsert.push(row);
+  }
+
+  return { toInsert: dedupedInsert, fuzzyMerge };
+}
+
+/** Supprime les lignes [En cours] en base lorsqu'un jumeau comptabilisé existe. */
+async function dedupeStoredPowensComingTransactions(client: SupabaseServer): Promise<number> {
+  const start = trailingTwelveMonthStartDateIso();
+  const stored = await fetchStoredTransactionsBetween(client, start, "2099-12-31");
+  const comingRows = stored.filter((row) => isPowensComingStoredLabel(row.label));
+  if (!comingRows.length) return 0;
+
+  const settledRows = stored.filter((row) => !isPowensComingStoredLabel(row.label));
+  const toDelete = comingRows
+    .filter((coming) =>
+      settledRows.some(
+        (settled) =>
+          settled.id !== coming.id &&
+          isNearDuplicateCardPayment(
+            coming.label,
+            coming.amount,
+            coming.date,
+            settled.label,
+            settled.amount,
+            settled.date,
+            POWENS_COMING_SETTLED_DEDUPE_DAY_WINDOW
+          )
+      )
+    )
+    .map((row) => row.id);
+
+  if (!toDelete.length) return 0;
+  const { error } = await client.from("transactions").delete().in("id", toDelete);
+  if (error) throw new Error(error.message);
+  return toDelete.length;
 }
 
 async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
@@ -449,16 +608,28 @@ export async function importTransactions(
 
   type PreparedRow = (typeof prepared)[number];
 
-  const toInsert: PreparedRow[] = [];
-  const toMerge: Array<{ id: string; categoryManual: boolean } & PreparedRow> = [];
+  let toInsert: PreparedRow[] = [];
+  let toMerge: Array<{ id: string; categoryManual: boolean; refreshLabelDate?: boolean } & PreparedRow> =
+    [];
 
   for (const p of prepared) {
     const existing = existingRows.get(p.content_hash);
     if (existing) {
-      toMerge.push({ ...p, id: existing.id, categoryManual: existing.categoryManual });
+      toMerge.push({
+        ...p,
+        id: existing.id,
+        categoryManual: existing.categoryManual,
+        refreshLabelDate: false
+      });
     } else {
       toInsert.push(p);
     }
+  }
+
+  if (meta.format === "powens" && toInsert.length > 0) {
+    const fuzzy = await resolvePowensFuzzyImportRows(client, toInsert);
+    toInsert = fuzzy.toInsert;
+    toMerge.push(...fuzzy.fuzzyMerge);
   }
 
   let balanceSupported = true;
@@ -566,6 +737,9 @@ export async function importTransactions(
       slice.map(async (row) => {
         const baseUpdate = {
           ...(row.categoryManual ? {} : { category: row.category }),
+          ...(row.refreshLabelDate
+            ? { label: row.label, date: row.date, content_hash: row.content_hash }
+            : {}),
           ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
           import_session_id: importSessionId
         } as const;
@@ -612,6 +786,13 @@ export async function importTransactions(
   if (sessionUpdateErr) throw new Error(sessionUpdateErr.message);
 
   await syncMonthlyMetricsFromDb(client);
+  if (meta.format === "powens") {
+    try {
+      await dedupeStoredPowensComingTransactions(client);
+    } catch (error) {
+      console.error("[import] dedupe Powens [En cours]:", error);
+    }
+  }
   revalidatePath("/dashboard");
 
   const metrics = await fetchLatestMetrics(client);
