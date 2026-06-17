@@ -10,6 +10,7 @@ import {
   CornerDownLeft,
   CreditCard,
   ReceiptText,
+  RefreshCw,
   Search,
   Sparkles,
   X
@@ -19,6 +20,9 @@ import { toast } from "sonner";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { NDF_DIGITPRO_CATEGORY } from "@/lib/ndf-digitpro";
 import { resolveNdfRejectionCategory } from "@/lib/categorisation-candidates";
+import { PullToRefreshIndicator } from "@/components/categorisation/PullToRefreshIndicator";
+import { useCategorisationRemoteRefresh } from "@/hooks/useCategorisationRemoteRefresh";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 export type CategorisationTx = {
   id: string;
@@ -416,12 +420,28 @@ export function CategorisationClient({
   monthLabel: string;
 }) {
   const [transactions, setTransactions] = useState(initialTransactions);
+  const [categoryList, setCategoryList] = useState(categories);
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState(initialTransactions[0]?.id ?? "");
   const [search, setSearch] = useState("");
   const [validatedCount, setValidatedCount] = useState(0);
   const [rejectedCount, setRejectedCount] = useState(0);
   const initialTotalRef = useRef(initialTransactions.length);
+
+  const { refreshFromApi } = useCategorisationRemoteRefresh({
+    transactions,
+    setTransactions,
+    setCategories: setCategoryList
+  });
+
+  const { pullDistance, progress, isRefreshing, isPulling } = usePullToRefresh(
+    async () => {
+      await refreshFromApi({ source: "pull" });
+    },
+    { disabled: isPending }
+  );
+
+  const showPullIndicator = isPulling || isRefreshing;
 
   const suggestions = useMemo(
     () => new Map(transactions.map((tx) => [tx.id, suggestCategory(tx)])),
@@ -443,7 +463,7 @@ export function CategorisationClient({
   const processedCount = validatedCount + rejectedCount;
   const progressPct = doneTotal > 0 ? Math.round((processedCount / doneTotal) * 100) : 0;
   const selectedRejectCategory = selected
-    ? resolveNdfRejectionCategory(selected, categories)
+    ? resolveNdfRejectionCategory(selected, categoryList)
     : "Repas dirigeant";
 
   function removeTransaction(transactionId: string, onRemoved?: () => void) {
@@ -485,7 +505,7 @@ export function CategorisationClient({
 
   function rejectNdf(tx: CategorisationTx | null) {
     if (!tx) return;
-    const category = resolveNdfRejectionCategory(tx, categories);
+    const category = resolveNdfRejectionCategory(tx, categoryList);
     saveCategory(tx.id, category, `Exclu de la file NDF — classé en ${category}`, () =>
       setRejectedCount((c) => c + 1)
     );
@@ -526,22 +546,41 @@ export function CategorisationClient({
 
   if (!transactions.length) {
     return (
-      <div className={clsx(dashboardInsightCard, "flex min-h-[60vh] flex-col items-center justify-center p-10 text-center")}>
-        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-ink-100 text-ink-600 dark:bg-white/[0.08] dark:text-white/75">
-          <Check className="h-8 w-8" strokeWidth={2.4} aria-hidden />
+      <>
+        <PullToRefreshIndicator
+          visible={showPullIndicator}
+          pullDistance={pullDistance}
+          progress={progress}
+          refreshing={isRefreshing}
+        />
+        <div className={clsx(dashboardInsightCard, "flex min-h-[60vh] flex-col items-center justify-center p-10 text-center")}>
+          <div className="grid h-16 w-16 place-items-center rounded-3xl bg-ink-100 text-ink-600 dark:bg-white/[0.08] dark:text-white/75">
+            {isRefreshing ? (
+              <RefreshCw className="h-8 w-8 animate-spin" strokeWidth={2.2} aria-hidden />
+            ) : (
+              <Check className="h-8 w-8" strokeWidth={2.4} aria-hidden />
+            )}
+          </div>
+          <h2 className="mt-5 font-display text-2xl font-bold text-ink-950 dark:text-white">Tout est à jour</h2>
+          <p className="mt-2 max-w-sm text-sm font-medium text-ink-500 dark:text-white/50">
+            {validatedCount > 0 || rejectedCount > 0
+              ? `${validatedCount} NDF validée${validatedCount > 1 ? "s" : ""}${rejectedCount > 0 ? ` · ${rejectedCount} exclue${rejectedCount > 1 ? "s" : ""}` : ""}.`
+              : `Aucun paiement carte en attente pour ${monthLabel.toLowerCase()}. Tirez vers le bas pour rafraîchir ou lancez une synchro Powens.`}
+          </p>
         </div>
-        <h2 className="mt-5 font-display text-2xl font-bold text-ink-950 dark:text-white">Tout est à jour</h2>
-        <p className="mt-2 max-w-sm text-sm font-medium text-ink-500 dark:text-white/50">
-          {validatedCount > 0 || rejectedCount > 0
-            ? `${validatedCount} NDF validée${validatedCount > 1 ? "s" : ""}${rejectedCount > 0 ? ` · ${rejectedCount} exclue${rejectedCount > 1 ? "s" : ""}` : ""}.`
-            : `Aucun paiement carte en attente pour ${monthLabel.toLowerCase()}. Si vous venez de payer, lancez une synchro Powens depuis le dashboard puis revenez ici.`}
-        </p>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="min-h-[calc(100dvh-8rem)]">
+    <>
+      <PullToRefreshIndicator
+        visible={showPullIndicator}
+        pullDistance={pullDistance}
+        progress={progress}
+        refreshing={isRefreshing}
+      />
+      <div className="min-h-[calc(100dvh-8rem)]">
       {/* En-tête */}
       <header className={clsx(dashboardInsightCard, "p-5 sm:p-6")}>
         <div className="flex items-start gap-3">
@@ -644,7 +683,7 @@ export function CategorisationClient({
           tx={selected}
           suggestion={selectedSuggestion}
           similar={selectedSimilarCount}
-          categories={categories}
+          categories={categoryList}
           saving={isPending}
           rejectCategoryLabel={selectedRejectCategory}
           onValidateNdf={() => markNdf(selected)}
@@ -671,6 +710,7 @@ export function CategorisationClient({
           <kbd>Entrée</kbd> valider
         </span>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

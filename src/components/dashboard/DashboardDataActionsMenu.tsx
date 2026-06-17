@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { CloudDownload, Landmark, Settings2, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   syncQontoTransactionsFromApi
 } from "@/app/dashboard/actions";
 import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
+import { requestCategorisationRefresh } from "@/lib/categorisation-refresh-bus";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
 type Props = {
@@ -33,9 +34,19 @@ export function DashboardDataActionsMenu({
   powensPrimaryImportAxis = "pro"
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const bankinFileInputRef = useRef<HTMLInputElement>(null);
+
+  function afterTransactionsImport(inserted: number, source: "powens" | "qonto") {
+    if (inserted > 0) {
+      requestCategorisationRefresh({ source, insertedCount: inserted });
+    }
+    if (!pathname.startsWith("/categorisation")) {
+      router.refresh();
+    }
+  }
 
   const powensPrimarySyncLabel =
     powensPrimaryImportAxis === "personal" ? "Synchroniser Powens perso" : "Synchroniser Powens SASU";
@@ -123,7 +134,7 @@ export function DashboardDataActionsMenu({
           id: toastId,
           description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API`
         });
-        router.refresh();
+        afterTransactionsImport(result.inserted, "qonto");
       } catch (e) {
         toast.error("Synchronisation Qonto échouée", {
           id: toastId,
@@ -156,7 +167,7 @@ export function DashboardDataActionsMenu({
         id: toastId,
         description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API`
       });
-      router.refresh();
+      afterTransactionsImport(result.inserted, "powens");
     });
   }
 
@@ -183,7 +194,7 @@ export function DashboardDataActionsMenu({
         id: toastId,
         description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API`
       });
-      router.refresh();
+      afterTransactionsImport(result.inserted, "powens");
     });
   }
 

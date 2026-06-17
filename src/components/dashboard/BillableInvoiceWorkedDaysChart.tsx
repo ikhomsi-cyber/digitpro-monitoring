@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -177,6 +177,16 @@ export function BillableInvoiceWorkedDaysChart({
   const xAxisAngle = xTickStep === 1 ? -40 : xTickStep <= 2 ? -35 : -30;
   const xAxisHeight = xTickStep === 1 ? 48 : xTickStep <= 3 ? 42 : 36;
 
+  const generatedCaHt = useMemo(
+    () =>
+      Math.round(
+        data
+          .filter((row) => row.kind === "encaisse" || row.kind === "deja_facture")
+          .reduce((sum, row) => sum + row.caHt, 0) * 100
+      ) / 100,
+    [data]
+  );
+
   return (
     <div className="w-full" data-private>
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/85">
@@ -191,6 +201,14 @@ export function BillableInvoiceWorkedDaysChart({
           Moyenne encaissé : {fmt.int(averageDaysPerMonth)} j. / mois{" "}
           <span className="font-normal text-ink-500 dark:text-ink-400">
             ({fmt.int(monthsInView)} mois encaissé{monthsInView > 1 ? "s" : ""})
+          </span>
+        </p>
+      ) : null}
+      {generatedCaHt > 0 ? (
+        <p className="mb-1.5 text-[11px] font-semibold tabular-nums text-ink-900 dark:text-ink-100">
+          CA généré : {fmt.euro(generatedCaHt)} HT{" "}
+          <span className="font-normal text-ink-500 dark:text-ink-400">
+            · encaissé + déjà facturé · {periodLabel}
           </span>
         </p>
       ) : null}
