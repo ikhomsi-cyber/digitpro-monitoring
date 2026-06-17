@@ -723,6 +723,47 @@ export function DashboardClient({
     return Math.max(1, maxValue);
   }, [sasuMonthlyEvolutionSeries]);
 
+  const sasuActiveCategoryFilterSet = useMemo(() => {
+    if (sasuAnalysisMode !== "expenses" || !sasuMonthlyCategoryFilters.length) return null;
+    return new Set(sasuMonthlyCategoryFilters);
+  }, [sasuAnalysisMode, sasuMonthlyCategoryFilters]);
+
+  const sasuPanelDonutView = useMemo(() => {
+    if (sasuAnalysisMode === "revenues") {
+      return { slices: sasuRevenueDonutSlices, total: totalRevenuesHt };
+    }
+    const slices =
+      sasuBreakdownMode === "simplified" ? sasuSimplifiedExpenseSlices : sasuExpenseDonutSlices;
+    if (!sasuActiveCategoryFilterSet?.size) {
+      return { slices, total: totalExpensesCard };
+    }
+    const filtered = slices.filter((slice) => sasuActiveCategoryFilterSet.has(slice.name));
+    const filteredTotal = filtered.reduce((acc, slice) => acc + slice.total, 0);
+    return {
+      slices: buildSasuExpenseDonutSlices(
+        filtered.map((slice) => ({ name: slice.name, total: slice.total })),
+        filteredTotal
+      ),
+      total: Math.round(filteredTotal * 100) / 100
+    };
+  }, [
+    sasuAnalysisMode,
+    sasuBreakdownMode,
+    sasuActiveCategoryFilterSet,
+    sasuRevenueDonutSlices,
+    sasuSimplifiedExpenseSlices,
+    sasuExpenseDonutSlices,
+    totalRevenuesHt,
+    totalExpensesCard
+  ]);
+
+  useEffect(() => {
+    if (!sasuActiveCategoryFilterSet || !expenseCategoryDetail) return;
+    if (!sasuActiveCategoryFilterSet.has(expenseCategoryDetail)) {
+      setExpenseCategoryDetail(null);
+    }
+  }, [sasuActiveCategoryFilterSet, expenseCategoryDetail]);
+
   const periodLabel = useMemo(() => {
     if (dashboardSection === "sasu") {
       const years = selectedYears ?? [new Date().getFullYear()];
@@ -854,7 +895,6 @@ export function DashboardClient({
             totalLiabilityEur={currentHeroStats.detteTotaleDepuisDebutEur}
             statsReady
             formatEuro={fmt.euro}
-            formatInt={fmt.int}
             trend={taxLiabilityTrend}
           />
           <RevenueAllocationChart
@@ -950,14 +990,8 @@ export function DashboardClient({
 
               <div className={dashboardPremiumPanel}>
                 {(() => {
-                  const currentSlices = sasuAnalysisMode === "revenues"
-                    ? sasuRevenueDonutSlices
-                    : sasuBreakdownMode === "simplified"
-                      ? sasuSimplifiedExpenseSlices
-                      : sasuExpenseDonutSlices;
-                  const currentTotal = sasuAnalysisMode === "revenues"
-                    ? totalRevenuesHt
-                    : totalExpensesCard;
+                  const currentSlices = sasuPanelDonutView.slices;
+                  const currentTotal = sasuPanelDonutView.total;
                   return (
                     <>
                 <div className={dashboardGaugeTrack}>
@@ -1228,35 +1262,16 @@ export function DashboardClient({
 
               <div className={dashboardPremiumPanel}>
                 <div className="space-y-1" data-private>
-                  {(sasuAnalysisMode === "revenues"
-                    ? sasuRevenueDonutSlices
-                    : sasuBreakdownMode === "simplified"
-                      ? sasuSimplifiedExpenseSlices
-                      : sasuExpenseDonutSlices
-                  ).length ? (
+                  {sasuPanelDonutView.slices.length ? (
                     (() => {
-                      const rows =
-                        sasuAnalysisMode === "revenues"
-                          ? sasuRevenueDonutSlices
-                          : sasuBreakdownMode === "simplified"
-                            ? sasuSimplifiedExpenseSlices
-                            : sasuExpenseDonutSlices;
+                      const rows = sasuPanelDonutView.slices;
                       const visibleRows = showAllSasuCategoryRows ? rows : rows.slice(0, 5);
                       const remainingRows = Math.max(0, rows.length - visibleRows.length);
                       return (
                         <>
                     {visibleRows.map(({ name, total, color }) => {
                       const simplified = sasuAnalysisMode === "expenses" && sasuBreakdownMode === "simplified";
-                      const simplifiedExpenseTotal = sasuSimplifiedExpenseSlices.reduce(
-                        (sum, slice) => sum + slice.total,
-                        0
-                      );
-                      const baseTotal =
-                        sasuAnalysisMode === "revenues"
-                          ? totalRevenuesHt
-                          : simplified
-                            ? simplifiedExpenseTotal
-                            : totalExpensesCard;
+                      const baseTotal = sasuPanelDonutView.total;
                       const pct = baseTotal > 0 ? Math.round((total / baseTotal) * 100) : 0;
                       const CatIcon = categoryGlyph(name);
                       const open = sasuAnalysisMode === "revenues" ? revenueCounterpartyDetail === name : expenseCategoryDetail === name;

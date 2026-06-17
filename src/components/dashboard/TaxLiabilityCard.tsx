@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { clsx } from "clsx";
 import {
   computeTaxLiabilityCoverage,
+  formatTruncatedPctFr,
   type TaxLiabilityCoverageTone
 } from "@/lib/tax-liability";
 import type { KpiTrend } from "@/lib/kpi-month-trend";
@@ -17,7 +18,6 @@ type Props = {
   totalLiabilityEur: number;
   statsReady: boolean;
   formatEuro: (n: number) => string;
-  formatInt: (n: number) => number;
   trend?: KpiTrend | null;
 };
 
@@ -47,7 +47,6 @@ export function TaxLiabilityCard({
   totalLiabilityEur,
   statsReady,
   formatEuro,
-  formatInt,
   trend
 }: Props) {
   const coverage = useMemo(
@@ -109,10 +108,20 @@ export function TaxLiabilityCard({
               style={{ width: `${barWidthPct}%` }}
             />
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-ink-500 dark:text-white/45">
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs text-ink-500 dark:text-white/45">
             <span>{styles.label}</span>
-            <span className="tabular-nums">
-              {coverage.coveragePct != null ? `${formatInt(coverage.coveragePct)} %` : "—"}
+            <span className="tabular-nums text-right">
+              {coverage.coveragePct != null ? `${formatTruncatedPctFr(coverage.coveragePct)} % couvert` : "—"}
+              {coverage.shortfallPct != null && coverage.shortfallPct > 0 ? (
+                <span className="ml-1.5 font-medium text-rose-600 dark:text-rose-300">
+                  · {formatTruncatedPctFr(coverage.shortfallPct)} % non couvert
+                </span>
+              ) : null}
+              {coverage.surplusPct != null && coverage.surplusPct > 0 ? (
+                <span className="ml-1.5 font-medium text-emerald-600 dark:text-emerald-300">
+                  · +{formatTruncatedPctFr(coverage.surplusPct)} % de marge
+                </span>
+              ) : null}
             </span>
           </div>
         </>

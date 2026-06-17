@@ -851,7 +851,6 @@ export function DashboardClient({
             totalLiabilityEur={currentHeroStats.detteTotaleDepuisDebutEur}
             statsReady
             formatEuro={fmt.euro}
-            formatInt={fmt.int}
             trend={taxLiabilityTrend}
           />
           <RevenueAllocationChart

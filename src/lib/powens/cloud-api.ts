@@ -351,22 +351,107 @@ export type PowensImportRow = {
   powensAccountId?: number;
 };
 
+const POWENS_TYPE_LABEL: Record<string, string> = {
+  deferred_card: "Carte différée",
+  summary_card: "Récap carte",
+  order: "Ordre",
+  payment: "Paiement",
+  withdrawal: "Retrait",
+  check: "Chèque",
+  deposit: "Dépôt",
+  payback: "Remboursement",
+  refund: "Remboursement",
+  loan_repayment: "Remboursement prêt",
+  bank: "Frais bancaires",
+  fee: "Commission",
+  market_order: "Ordre boursier",
+  market_fee: "Frais bourse",
+  arbitrage: "Arbitrage",
+  profit: "Revenu",
+  payout: "Versement",
+  card: "Carte"
+};
+
+function isoDatePart(v: unknown): string | null {
+  const s = str(v);
+  if (!s) return null;
+  const part = s.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(part) ? part : null;
+}
+
+/** Date analytique : pour les opérations `coming` (autorisées / en cours), privilégie rdate puis application_date. */
+function resolvePowensTxDate(raw: Record<string, unknown>): string | null {
+  const coming = raw.coming === true;
+  const keys = coming
+    ? ([
+        "rdate",
+        "application_date",
+        "date",
+        "vdate",
+        "datetime",
+        "vdatetime",
+        "rdatetime",
+        "operation_date",
+        "booking_date",
+        "value_date",
+        "bdate"
+      ] as const)
+    : ([
+        "date",
+        "application_date",
+        "vdate",
+        "rdate",
+        "datetime",
+        "vdatetime",
+        "rdatetime",
+        "operation_date",
+        "booking_date",
+        "value_date",
+        "bdate"
+      ] as const);
+
+  for (const key of keys) {
+    const d = isoDatePart(raw[key]);
+    if (d) return d;
+  }
+  return null;
+}
+
+function decoratePowensLabel(raw: Record<string, unknown>, baseLabel: string): string {
+  const txType = str(raw.type);
+  if (raw.coming === true) {
+    return `[En cours] ${baseLabel}`;
+  }
+  if (txType && txType !== "unknown" && txType !== "transfer" && txType !== "card") {
+    const typeLabel = POWENS_TYPE_LABEL[txType] ?? txType.replace(/_/g, " ");
+    return `[${typeLabel}] ${baseLabel}`;
+  }
+  return baseLabel;
+}
+
 function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | "personal"): PowensImportRow | null {
   const id = str(raw.id ?? raw.transaction_id ?? raw.uuid);
-  const dateRaw = str(raw.date ?? raw.operation_date ?? raw.booking_date ?? raw.value_date).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) return null;
+  const dateRaw = resolvePowensTxDate(raw);
+  if (!dateRaw) return null;
+
   const amount =
-    num(raw.amount) ??
     num(raw.value) ??
-    (raw.amount != null ? Number(raw.amount) : num(raw.original_amount));
+    num(raw.gross_value) ??
+    num(raw.amount) ??
+    num(raw.original_value) ??
+    (raw.amount != null ? Number(raw.amount) : null);
   if (amount == null || !Number.isFinite(amount)) return null;
-  const label =
+
+  const baseLabel =
     str(raw.wording ?? raw.simplified_wording ?? raw.original_wording ?? raw.description ?? raw.title) ||
     str(raw.merchant_name) ||
+    str((raw.counterparty as Record<string, unknown> | undefined)?.label) ||
     "Opération Powens";
+  const label = decoratePowensLabel(raw, baseLabel);
   const category = categorizePowensApiTransaction(raw, label, amount);
   const balance = num(raw.balance ?? raw.account_balance);
   const accountId = num(raw.id_account);
+
   return {
     date: dateRaw,
     label,
@@ -378,6 +463,39 @@ function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | 
     dedupeKey: id ? `powens:${scope}:${id}` : undefined,
     powensAccountId: accountId != null ? accountId : undefined
   };
+}
+
+function pickPaginationNextUrl(json: unknown): string | null {
+  if (!json || typeof json !== "object") return null;
+  const links = (json as Record<string, unknown>)._links;
+  if (!links || typeof links !== "object") return null;
+  const next = (links as Record<string, unknown>).next;
+  if (typeof next === "string" && next.trim()) return next.trim();
+  if (next && typeof next === "object") {
+    const href = (next as Record<string, unknown>).href;
+    if (typeof href === "string" && href.trim()) return href.trim();
+  }
+  return null;
+}
+
+function powensTxListKey(raw: Record<string, unknown>): string {
+  const id = str(raw.id ?? raw.transaction_id ?? raw.uuid);
+  if (id) return `id:${id}`;
+  const accountId = num(raw.id_account);
+  const date = resolvePowensTxDate(raw) ?? "";
+  const amount = num(raw.value) ?? num(raw.amount) ?? 0;
+  const label = str(raw.wording ?? raw.simplified_wording ?? raw.original_wording);
+  return `fallback:${accountId ?? ""}:${date}:${amount}:${label}`;
+}
+
+function mergePowensRawTransactions(lists: readonly Record<string, unknown>[][]): Record<string, unknown>[] {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const list of lists) {
+    for (const row of list) {
+      byKey.set(powensTxListKey(row), row);
+    }
+  }
+  return [...byKey.values()];
 }
 
 function pickPowensAccountBankName(raw: Record<string, unknown>): string | null {
@@ -407,11 +525,11 @@ function pickPowensAccountBankName(raw: Record<string, unknown>): string | null 
   return null;
 }
 
-async function powensFetchAccountBankNames(
+async function powensFetchAccountsMeta(
   base: string,
   bearer: string,
   effectiveUserId: string | null
-): Promise<Map<number, string>> {
+): Promise<{ bankNames: Map<number, string>; accountIds: number[] }> {
   const paths: string[] = [];
   if (effectiveUserId) {
     paths.push(`/users/${encodeURIComponent(effectiveUserId)}/accounts?limit=1000`);
@@ -440,21 +558,104 @@ async function powensFetchAccountBankNames(
       continue;
     }
     const accounts = asArray<Record<string, unknown>>(json);
-    const out = new Map<number, string>();
+    const bankNames = new Map<number, string>();
+    const accountIds: number[] = [];
     for (const account of accounts) {
       const id = num(account.id ?? account.id_account);
+      if (id == null) continue;
+      accountIds.push(id);
       const bankName = pickPowensAccountBankName(account);
-      if (id != null && bankName) out.set(id, bankName);
+      if (bankName) bankNames.set(id, bankName);
     }
-    if (out.size) return out;
+    if (accountIds.length) return { bankNames, accountIds };
   }
 
-  return new Map();
+  return { bankNames: new Map(), accountIds: [] };
+}
+
+async function powensFetchTransactionPages(
+  startUrl: string,
+  bearer: string,
+  logLabel: string,
+  apiBase: string
+): Promise<{ rows: Record<string, unknown>[]; errorCode: string | null; httpStatus: number | null; bodySnippet: string }> {
+  const rows: Record<string, unknown>[] = [];
+  let url: string | null = startUrl;
+  let pages = 0;
+  const maxPages = 40;
+  let errorCode: string | null = null;
+  let httpStatus: number | null = null;
+  let bodySnippet = "";
+
+  while (url && pages < maxPages) {
+    const res = await fetchWithNetworkDiagnostics(
+      url.startsWith("http") ? url : powensAppendOptionalClientIdQuery(url),
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      },
+      `${logLabel} (page ${pages + 1})`
+    );
+    const text = await res.text();
+    httpStatus = res.status;
+    bodySnippet = text.slice(0, 480);
+    errorCode = powensErrorCode(text);
+
+    if (!res.ok) {
+      return { rows, errorCode, httpStatus, bodySnippet };
+    }
+
+    let json: unknown;
+    try {
+      json = text ? JSON.parse(text) : [];
+    } catch {
+      return { rows, errorCode: "invalid_json", httpStatus, bodySnippet };
+    }
+
+    rows.push(...asArray<Record<string, unknown>>(json));
+    url = pickPaginationNextUrl(json);
+    if (url && !url.startsWith("http")) {
+      url = `${apiBase}${url.startsWith("/") ? "" : "/"}${url}`;
+    }
+    pages += 1;
+  }
+
+  return { rows, errorCode: null, httpStatus: 200, bodySnippet: "" };
+}
+
+function mapPowensRawRowsToImport(
+  rawRows: readonly Record<string, unknown>[],
+  opts: {
+    company: string;
+    scope: "pro" | "personal";
+    accountBankNames: Map<number, string>;
+    filterAccountIds?: number[] | null;
+  }
+): PowensImportRow[] {
+  let out: PowensImportRow[] = [];
+  for (const row of rawRows) {
+    const mapped = mapOneTx(row, opts.company, opts.scope);
+    if (mapped?.powensAccountId != null) {
+      mapped.bankName = opts.accountBankNames.get(mapped.powensAccountId) ?? pickPowensAccountBankName(row);
+    } else if (mapped) {
+      mapped.bankName = pickPowensAccountBankName(row);
+    }
+    if (mapped) out.push(mapped);
+  }
+  if (opts.filterAccountIds?.length) {
+    const allow = new Set(opts.filterAccountIds);
+    out = out.filter((r) => r.powensAccountId != null && allow.has(r.powensAccountId));
+  }
+  return out;
 }
 
 /**
  * Récupère les transactions avec le **token utilisateur** Powens (pas le token plateforme).
- * Doc : `GET /2.0/users/{userId}/transactions?limit=…` avec userId numérique ou `me` ; **limit** obligatoire (max 1000).
+ * Pagination complète + fetch par compte (cartes / autorisations) ; inclut les opérations `coming` (en cours / autorisées).
  */
 export async function powensCloudFetchTransactions(
   userBearer: string,
@@ -474,74 +675,89 @@ export async function powensCloudFetchTransactions(
   if (!effectiveUserId) {
     effectiveUserId = await powensResolveUserIdFromMeEndpoint(userBearer);
   }
-  const accountBankNames = await powensFetchAccountBankNames(base, bearer, effectiveUserId);
+  const { bankNames: accountBankNames, accountIds } = await powensFetchAccountsMeta(
+    base,
+    bearer,
+    effectiveUserId
+  );
 
-  const paths: string[] = [];
+  const accountFilter = opts.filterAccountIds?.length ? new Set(opts.filterAccountIds) : null;
+  const accountIdsToFetch = accountFilter
+    ? accountIds.filter((id) => accountFilter.has(id))
+    : accountIds;
+
+  const startPaths: string[] = [];
   if (effectiveUserId) {
-    paths.push(`/users/${encodeURIComponent(effectiveUserId)}/transactions?${limitQs}`);
+    startPaths.push(`${base}/users/${encodeURIComponent(effectiveUserId)}/transactions?${limitQs}`);
   }
-  paths.push(`/users/me/transactions?${limitQs}`);
+  startPaths.push(`${base}/users/me/transactions?${limitQs}`);
+
+  for (const accountId of accountIdsToFetch) {
+    if (effectiveUserId) {
+      startPaths.push(
+        `${base}/users/${encodeURIComponent(effectiveUserId)}/accounts/${accountId}/transactions?${limitQs}`
+      );
+    }
+    startPaths.push(`${base}/users/me/accounts/${accountId}/transactions?${limitQs}`);
+  }
 
   let lastFailure = "";
   let saw401Unauthorized = false;
+  let sawNoAccount = false;
+  const rawLists: Record<string, unknown>[][] = [];
 
-  for (const p of paths) {
-    const url = powensAppendOptionalClientIdQuery(`${base}${p}`);
-    const res = await fetchWithNetworkDiagnostics(
-      url,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${bearer}`,
-          Accept: "application/json"
-        },
-        cache: "no-store"
-      },
-      `Powens GET ${p}`
+  for (const startUrl of startPaths) {
+    const logPath = startUrl.replace(base, "");
+    const pageResult = await powensFetchTransactionPages(
+      powensAppendOptionalClientIdQuery(startUrl),
+      bearer,
+      `Powens GET ${logPath.split("?")[0]}`,
+      base
     );
-    const text = await res.text();
-    const errorCode = powensErrorCode(text);
 
-    if (errorCode === "noAccount") {
-      throw new Error(
-        "Powens : aucun compte bancaire n’est rattaché à cet utilisateur. " +
-          "Ouvrez « Connecter Powens », terminez la webview bancaire et cochez au moins un compte à synchroniser, puis relancez la synchronisation. " +
-          (effectiveUserId ? `Utilisateur Powens utilisé : ${effectiveUserId}. ` : "") +
-          `Réponse : ${text.slice(0, 480)}`
-      );
-    }
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        if (errorCode === "unauthorized" || /unauthorized/i.test(text)) saw401Unauthorized = true;
-      }
-      lastFailure = `${p.split("?")[0]} → HTTP ${res.status}: ${text.slice(0, 240)}`;
+    if (pageResult.errorCode === "noAccount") {
+      sawNoAccount = true;
       continue;
     }
-    let json: unknown;
-    try {
-      json = text ? JSON.parse(text) : [];
-    } catch {
-      lastFailure = `${p.split("?")[0]} → JSON invalide: ${text.slice(0, 200)}`;
+
+    if (pageResult.httpStatus != null && pageResult.httpStatus !== 200) {
+      if (pageResult.httpStatus === 401) {
+        if (pageResult.errorCode === "unauthorized" || /unauthorized/i.test(pageResult.bodySnippet)) {
+          saw401Unauthorized = true;
+        }
+      }
+      lastFailure = `${logPath.split("?")[0]} → HTTP ${pageResult.httpStatus}: ${pageResult.bodySnippet.slice(0, 240)}`;
       continue;
     }
-    const list = asArray<Record<string, unknown>>(json);
-    let out: PowensImportRow[] = [];
-    for (const row of list) {
-      const m = mapOneTx(row, opts.company, opts.scope);
-      if (m?.powensAccountId != null) {
-        m.bankName = accountBankNames.get(m.powensAccountId) ?? pickPowensAccountBankName(row);
-      } else if (m) {
-        m.bankName = pickPowensAccountBankName(row);
-      }
-      if (m) out.push(m);
+
+    if (pageResult.errorCode === "invalid_json") {
+      lastFailure = `${logPath.split("?")[0]} → JSON invalide: ${pageResult.bodySnippet.slice(0, 200)}`;
+      continue;
     }
-    if (opts.filterAccountIds?.length) {
-      const allow = new Set(opts.filterAccountIds);
-      out = out.filter((r) => r.powensAccountId != null && allow.has(r.powensAccountId));
+
+    if (pageResult.rows.length) {
+      rawLists.push(pageResult.rows);
     }
-    if (out.length || list.length === 0) return out;
-    lastFailure = `${p.split("?")[0]} → HTTP 200 mais aucune ligne exploitable (${list.length} objet(s) dans la réponse)`;
+  }
+
+  if (rawLists.length) {
+    const mergedRaw = mergePowensRawTransactions(rawLists);
+    const out = mapPowensRawRowsToImport(mergedRaw, {
+      company: opts.company,
+      scope: opts.scope,
+      accountBankNames,
+      filterAccountIds: opts.filterAccountIds
+    });
+    if (out.length || mergedRaw.length === 0) return out;
+    lastFailure = `HTTP 200 mais aucune ligne exploitable (${mergedRaw.length} objet(s) bruts)`;
+  }
+
+  if (sawNoAccount && !rawLists.length) {
+    throw new Error(
+      "Powens : aucun compte bancaire n’est rattaché à cet utilisateur. " +
+        "Ouvrez « Connecter Powens », terminez la webview bancaire et cochez au moins un compte à synchroniser, puis relancez la synchronisation. " +
+        (effectiveUserId ? `Utilisateur Powens utilisé : ${effectiveUserId}. ` : "")
+    );
   }
 
   if (saw401Unauthorized) {
@@ -558,10 +774,9 @@ export async function powensCloudFetchTransactions(
 
   throw new Error(
     "Powens : impossible de lister les transactions via les endpoints documentés " +
-      "(`GET /users/{id}/transactions` ou `GET /users/me/transactions`, avec `limit=1000`). " +
+      "(`GET /users/{id}/transactions`, `GET /users/me/transactions`, pagination `limit=1000`, fetch par compte). " +
       "Vérifiez POWENS_DOMAIN / POWENS_API_BASE_URL (même domaine que le jeton), que le jeton est un **auth_token utilisateur**, " +
       "et que des comptes bancaires sont activés (webview). " +
-      "Si besoin, passez explicitement `id_user` (réponse `auth/init`). " +
       (lastFailure ? `Dernier échec : ${lastFailure}` : "")
   );
 }

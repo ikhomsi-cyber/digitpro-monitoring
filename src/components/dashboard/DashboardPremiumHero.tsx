@@ -10,6 +10,7 @@ import { computeKpiTrend, type KpiTrend } from "@/lib/kpi-month-trend";
 import { KpiTrendBadge } from "@/components/dashboard/KpiTrendBadge";
 import { YearEndProjectionChart } from "@/components/dashboard/YearEndProjectionChart";
 import { dashboardFlatHero, dashboardInsightCard } from "@/lib/dashboard-surfaces";
+import { computeYearToDateInvoicingTotals } from "@/lib/invoice-worked-days-series";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -32,22 +33,35 @@ function YearEndProjectionCard({
   projection,
   formatEuro,
   formatInt,
-  trend
+  trend,
+  ytdFactureHtEur
 }: {
   projection: YearEndProjection;
   formatEuro: (n: number) => string;
   formatInt: (n: number) => number;
   trend?: KpiTrend | null;
+  ytdFactureHtEur: number;
 }) {
   return (
     <div className={dashboardInsightCard}>
-      <p className="text-sm text-ink-500 dark:text-white/50">Projection fin d&apos;année</p>
-      <div className="mt-1 flex flex-wrap items-baseline gap-2">
-        <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
-          {formatEuro(projection.projectedRevenueHtEur)}
-          <span className="ml-1.5 text-sm font-medium text-ink-500 dark:text-white/45">HT</span>
-        </p>
-        <KpiTrendBadge trend={trend} />
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm text-ink-500 dark:text-white/50">Projection fin d&apos;année</p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-2">
+            <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
+              {formatEuro(projection.projectedRevenueHtEur)}
+              <span className="ml-1.5 text-sm font-medium text-ink-500 dark:text-white/45">HT</span>
+            </p>
+            <KpiTrendBadge trend={trend} />
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-xs font-medium text-ink-500 dark:text-white/45">CA facturé</p>
+          <p className="mt-0.5 font-display text-base font-semibold tabular-nums text-ink-900 dark:text-white">
+            {formatEuro(ytdFactureHtEur)}
+            <span className="ml-1 text-xs font-medium text-ink-500 dark:text-white/45">HT</span>
+          </p>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-ink-500 dark:text-white/45">Prévision au {projection.forecastDateLabel}</p>
@@ -111,6 +125,17 @@ export function DashboardPremiumHero({ stats, transactions, statsReady, contextM
     ]
   );
 
+  const ytdInvoicing = useMemo(
+    () =>
+      computeYearToDateInvoicingTotals(
+        transactions,
+        new Set(billable.sortedIsos),
+        billable.billableRatePeriods,
+        billable.tjmHt
+      ),
+    [billable.billableRatePeriods, billable.sortedIsos, billable.tjmHt, transactions]
+  );
+
   return (
     <header className={dashboardFlatHero} suppressHydrationWarning>
       <div suppressHydrationWarning>
@@ -125,6 +150,7 @@ export function DashboardPremiumHero({ stats, transactions, statsReady, contextM
             formatEuro={fmt.euro}
             formatInt={fmt.int}
             trend={projectionTrend}
+            ytdFactureHtEur={ytdInvoicing.factureHtEur}
           />
       </div>
     </header>

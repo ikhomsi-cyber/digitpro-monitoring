@@ -223,3 +223,49 @@ export function appendAgendaWorkedDayMonths(
 
   return [...base, ...extras].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 }
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Totaux YTD par mois de prestation (aligné graphique « Jours facturés »). */
+export function computeYearToDateInvoicingTotals(
+  transactions: readonly DashboardTx[],
+  selected: ReadonlySet<string>,
+  billableRatePeriods: readonly BillableRatePeriod[] = [],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
+  now = new Date()
+): { encaisseHtEur: number; factureHtEur: number } {
+  const year = now.getFullYear();
+  const yearPrefix = `${year}-`;
+
+  const encaisseRows = buildInvoiceWorkedDaysPastMonthsSeries(
+    [...transactions],
+    "pro",
+    now,
+    undefined,
+    billableRatePeriods,
+    fallbackTjmHt
+  );
+  const rows = appendAgendaWorkedDayMonths(
+    encaisseRows,
+    selected,
+    billableRatePeriods,
+    fallbackTjmHt,
+    now
+  );
+
+  let encaisseHtEur = 0;
+  let factureHtEur = 0;
+  for (const row of rows) {
+    if (!row.monthKey.startsWith(yearPrefix)) continue;
+    if (row.kind === "encaisse") {
+      encaisseHtEur += row.caHt;
+      factureHtEur += row.caHt;
+    } else if (row.kind === "deja_facture") {
+      factureHtEur += row.caHt;
+    }
+  }
+
+  return { encaisseHtEur: round2(encaisseHtEur), factureHtEur: round2(factureHtEur) };
+}

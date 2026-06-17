@@ -81,6 +81,7 @@ export function isPendingNdfCategorization(category: string | null | undefined):
 /** Paiement carte Powens / Qonto (libellés variés, pas toujours « CB »). */
 export function isCardPowensLabel(raw: string): boolean {
   const label = fold(raw);
+  if (label.startsWith("[en cours]")) return true;
   if (/\b(cb|carte|card|cblm|paiement carte|payment card)\b/.test(label)) return true;
   if (/\bpayment\b/.test(label) && !/\b(virement|vir\.|transfer|wise)\b/.test(label)) return true;
   if (/\b(visa|mastercard|mc\s)/.test(label)) return true;
