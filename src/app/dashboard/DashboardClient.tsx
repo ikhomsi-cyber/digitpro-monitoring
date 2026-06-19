@@ -29,6 +29,7 @@ import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
 import { RevolutInsightsSection } from "@/components/dashboard/RevolutInsightsSection";
+import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
 import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
 import { computeKpiTrend } from "@/lib/kpi-month-trend";
@@ -205,7 +206,8 @@ export function DashboardClient({
   heroContextMessage,
   showContextBanner,
   demoMode,
-  loadError
+  loadError,
+  upcomingQontoDebits = []
 }: {
   syncKey: string;
   initialTransactions: DashboardTx[];
@@ -218,6 +220,8 @@ export function DashboardClient({
   showContextBanner: boolean;
   demoMode: boolean;
   loadError: string | null;
+  /** Prélèvements Qonto annoncés par email Gmail (date de débit future). */
+  upcomingQontoDebits?: QontoUpcomingDebit[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -890,6 +894,7 @@ export function DashboardClient({
           <RevolutInsightsSection
             transactions={transactions}
             bncYearTotalEur={currentHeroStats.bncYearTotalEur}
+            upcomingQontoDebits={upcomingQontoDebits}
           />
           <TaxLiabilityCard
             cashEur={currentHeroStats.soldeQontoEur}

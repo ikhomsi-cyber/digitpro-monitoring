@@ -35,6 +35,8 @@ import {
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
 
+type CalendarPaintMode = "billable" | "vacation";
+
 function monthMatrix(year: number, month0: number): CalendarMonthCell[] {
   const first = new Date(year, month0, 1);
   const last = new Date(year, month0 + 1, 0);
@@ -57,6 +59,8 @@ export function BillableDaysCalendarBlock({
   const {
     selected,
     setSelected,
+    vacationDays,
+    setVacationDays,
     tjmHt,
     billableRatePeriods,
     persistToSupabase
@@ -154,29 +158,76 @@ export function BillableDaysCalendarBlock({
   }>({ active: false, mode: "add", moved: false, startIso: "" });
   const [focusedIso, setFocusedIso] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [paintMode, setPaintMode] = useState<CalendarPaintMode>("billable");
 
   const toggleDay = useCallback(
     (iso: string) => {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(iso)) next.delete(iso);
-        else next.add(iso);
-        return next;
-      });
+      if (paintMode === "vacation") {
+        setVacationDays((prev) => {
+          const next = new Set(prev);
+          if (next.has(iso)) next.delete(iso);
+          else next.add(iso);
+          return next;
+        });
+        setSelected((prev) => {
+          if (!prev.has(iso)) return prev;
+          const next = new Set(prev);
+          next.delete(iso);
+          return next;
+        });
+      } else {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          if (next.has(iso)) next.delete(iso);
+          else next.add(iso);
+          return next;
+        });
+        setVacationDays((prev) => {
+          if (!prev.has(iso)) return prev;
+          const next = new Set(prev);
+          next.delete(iso);
+          return next;
+        });
+      }
     },
-    [setSelected]
+    [paintMode, setSelected, setVacationDays]
   );
 
   const applyDayPaint = useCallback(
     (iso: string, mode: "add" | "remove") => {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (mode === "add") next.add(iso);
-        else next.delete(iso);
-        return next;
-      });
+      if (paintMode === "vacation") {
+        setVacationDays((prev) => {
+          const next = new Set(prev);
+          if (mode === "add") next.add(iso);
+          else next.delete(iso);
+          return next;
+        });
+        if (mode === "add") {
+          setSelected((prev) => {
+            if (!prev.has(iso)) return prev;
+            const next = new Set(prev);
+            next.delete(iso);
+            return next;
+          });
+        }
+      } else {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          if (mode === "add") next.add(iso);
+          else next.delete(iso);
+          return next;
+        });
+        if (mode === "add") {
+          setVacationDays((prev) => {
+            if (!prev.has(iso)) return prev;
+            const next = new Set(prev);
+            next.delete(iso);
+            return next;
+          });
+        }
+      }
     },
-    [setSelected]
+    [paintMode, setSelected, setVacationDays]
   );
 
   const selectAllBillableInMonth = useCallback(() => {
@@ -186,19 +237,26 @@ export function BillableDaysCalendarBlock({
       for (const iso of billableIsos) next.add(iso);
       return next;
     });
-  }, [publicHolidays, setSelected, viewMonth0, viewYear]);
+    setVacationDays((prev) => {
+      const next = new Set(prev);
+      for (const iso of billableIsos) next.delete(iso);
+      return next;
+    });
+  }, [publicHolidays, setSelected, setVacationDays, viewMonth0, viewYear]);
 
   const handleDayPointerDown = useCallback(
     (iso: string, event: React.PointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0) return;
       event.preventDefault();
-      const mode = selected.has(iso) ? "remove" : "add";
+      const active =
+        paintMode === "vacation" ? vacationDays.has(iso) : selected.has(iso);
+      const mode = active ? "remove" : "add";
       dragRef.current = { active: true, mode, moved: false, startIso: iso };
       setIsDragging(true);
       setFocusedIso(iso);
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [selected]
+    [paintMode, selected, vacationDays]
   );
 
   const handleDayPointerEnter = useCallback(
@@ -232,7 +290,14 @@ export function BillableDaysCalendarBlock({
       }
       return next;
     });
-  }, [setSelected, viewYear, viewMonth0]);
+    setVacationDays((prev) => {
+      const next = new Set(prev);
+      for (const d of prev) {
+        if (d.startsWith(prefix)) next.delete(d);
+      }
+      return next;
+    });
+  }, [setSelected, setVacationDays, viewYear, viewMonth0]);
 
   const goPrevMonth = useCallback(() => {
     if (viewMonth0 === 0) {
@@ -340,6 +405,12 @@ export function BillableDaysCalendarBlock({
       if (event.key.toLowerCase() === "t") {
         event.preventDefault();
         goToday();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "v" && inCalendar) {
+        event.preventDefault();
+        setPaintMode((m) => (m === "billable" ? "vacation" : "billable"));
         return;
       }
 
@@ -511,6 +582,38 @@ export function BillableDaysCalendarBlock({
                 </button>
               </div>
 
+              <div
+                className="mb-2 flex justify-center"
+                role="group"
+                aria-label="Mode de saisie calendrier"
+              >
+                <div className="inline-flex rounded-full border border-ink-200/70 bg-ink-50/80 p-0.5 dark:border-white/[0.1] dark:bg-white/[0.05]">
+                  {(
+                    [
+                      { id: "billable" as const, label: "Facturé" },
+                      { id: "vacation" as const, label: "Vacances" }
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={paintMode === item.id}
+                      onClick={() => setPaintMode(item.id)}
+                      className={clsx(
+                        "rounded-full px-2.5 py-1 text-[10px] font-semibold transition",
+                        paintMode === item.id
+                          ? item.id === "vacation"
+                            ? "bg-sky-500 text-white shadow-sm dark:bg-sky-500/90"
+                            : "bg-emerald-500 text-white shadow-sm dark:bg-emerald-500/90"
+                          : "text-ink-500 hover:text-ink-800 dark:text-white/45 dark:hover:text-white/75"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-7 gap-y-0.5 gap-x-0.5">
                 {WEEKDAYS_SHORT.map((w) => (
                   <div
@@ -526,6 +629,7 @@ export function BillableDaysCalendarBlock({
                   }
                   const iso = toBillableIso(viewYear, viewMonth0, cell.day);
                   const on = selected.has(iso);
+                  const isPersonalVacation = vacationDays.has(iso);
                   const isToday = iso === todayIsoLive;
                   const dow = new Date(viewYear, viewMonth0, cell.day).getDay();
                   const isWeekend = dow === 0 || dow === 6;
@@ -537,26 +641,42 @@ export function BillableDaysCalendarBlock({
                   const dayTitle = titleParts.length > 0 ? titleParts.join(" · ") : undefined;
                   const ariaExtra = [
                     holidayLabel ? holidayLabel : null,
-                    schoolVacLabel ? schoolVacLabel : null
+                    schoolVacLabel ? schoolVacLabel : null,
+                    isPersonalVacation ? "vacances personnelles" : null
                   ]
                     .filter(Boolean)
                     .join(", ");
 
                   const billable = isBillableWorkdayIso(iso, publicHolidays);
-                  const pastMissed = billable && !on && !isHoliday && !isSchoolVacation && iso < todayIsoLive;
-                  const futurePlanned = billable && !on && !isHoliday && !isSchoolVacation && iso >= todayIsoLive;
-                  const heat = billable ? Math.min(1, 0.15 + (on ? 0.55 : pastMissed ? 0.35 : futurePlanned ? 0.25 : 0.12)) : 0;
+                  const pastMissed =
+                    billable &&
+                    !on &&
+                    !isPersonalVacation &&
+                    !isHoliday &&
+                    !isSchoolVacation &&
+                    iso < todayIsoLive;
+                  const futurePlanned =
+                    billable &&
+                    !on &&
+                    !isPersonalVacation &&
+                    !isHoliday &&
+                    !isSchoolVacation &&
+                    iso >= todayIsoLive;
+                  const heat =
+                    billable && !isPersonalVacation
+                      ? Math.min(1, 0.15 + (on ? 0.55 : pastMissed ? 0.35 : futurePlanned ? 0.25 : 0.12))
+                      : 0;
                   const isFocused = focusedIso === iso;
 
                   return (
                     <button
                       key={iso}
                       type="button"
-                      aria-pressed={on}
+                      aria-pressed={paintMode === "vacation" ? isPersonalVacation : on}
                       title={dayTitle}
                       tabIndex={isFocused ? 0 : -1}
                       aria-label={`${iso}${ariaExtra ? `, ${ariaExtra}` : ""}${
-                        on ? ", sélectionné" : ""
+                        isPersonalVacation ? ", vacances" : on ? ", facturé" : ""
                       }${isToday ? ", aujourd’hui" : ""}${isFocused ? ", focus clavier" : ""}`}
                       onPointerDown={(event) => handleDayPointerDown(iso, event)}
                       onPointerEnter={() => handleDayPointerEnter(iso)}
@@ -567,7 +687,13 @@ export function BillableDaysCalendarBlock({
                         "relative flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-semibold tabular-nums transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#0a0a0a]",
                         isFocused && "z-[2] ring-2 ring-emerald-300/80 ring-offset-1 dark:ring-emerald-400/70",
                         isDragging && "cursor-crosshair",
-                        on
+                        isPersonalVacation
+                          ? clsx(
+                              "bg-sky-50 font-semibold text-sky-950 ring-2 ring-sky-400/85 dark:bg-sky-950/55 dark:text-sky-100 dark:ring-sky-400/70",
+                              isToday &&
+                                "ring-2 ring-brand-400 ring-offset-1 dark:ring-brand-300 dark:ring-offset-[#0a0a0a]"
+                            )
+                          : on
                           ? clsx(
                               "bg-gradient-to-b from-emerald-400 to-emerald-600 text-white shadow-[0_0_16px_rgba(16,185,129,0.35)] dark:from-emerald-500 dark:to-emerald-700",
                               isToday &&
@@ -645,10 +771,10 @@ export function BillableDaysCalendarBlock({
               </span>
               <span className="inline-flex items-center gap-1">
                 <span
-                  className="inline-block h-2 w-2 shrink-0 rounded-sm bg-sky-100 ring-1 ring-sky-200/80 dark:bg-sky-900/50 dark:ring-sky-700/60"
+                  className="inline-block h-2 w-2 shrink-0 rounded-sm bg-sky-100 ring-2 ring-sky-400/80 dark:bg-sky-900/50 dark:ring-sky-400/70"
                   aria-hidden
                 />
-                Vacances
+                Mes vacances
               </span>
               <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.45)]" aria-hidden />

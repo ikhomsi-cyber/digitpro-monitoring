@@ -41,16 +41,22 @@ export async function loadTransactionYearBounds(
 
 export async function loadBillableActivitySettings(client: SupabaseServerClient, userId: string): Promise<{
   initialBillableWorkDays: string[];
+  initialBillableVacationDays: string[];
   initialBillableTjmHt: number | null;
   initialAnnualRevenueTargetHt: number | null;
   billableRatePeriods: BillableRatePeriod[];
 }> {
-  const [daysRes, setRes, ratesRes] = await Promise.all([
+  const [daysRes, vacationRes, setRes, ratesRes] = await Promise.all([
     client
       .from("billable_work_days")
       .select("work_date")
       .eq("user_id", userId)
       .order("work_date", { ascending: true }),
+    client
+      .from("billable_vacation_days")
+      .select("vacation_date")
+      .eq("user_id", userId)
+      .order("vacation_date", { ascending: true }),
     client
       .from("user_billable_settings")
       .select("tjm_ht,annual_revenue_target_ht")
@@ -66,6 +72,13 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
   const initialBillableWorkDays = !daysRes.error && daysRes.data
     ? daysRes.data.map((r) => String((r as { work_date: string }).work_date).slice(0, 10))
     : [];
+
+  const initialBillableVacationDays =
+    !vacationRes.error && vacationRes.data
+      ? vacationRes.data.map((r) =>
+          String((r as { vacation_date: string }).vacation_date).slice(0, 10)
+        )
+      : [];
 
   let initialBillableTjmHt: number | null = null;
   let initialAnnualRevenueTargetHt: number | null = null;
@@ -102,5 +115,11 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
       })
     : [];
 
-  return { initialBillableWorkDays, initialBillableTjmHt, initialAnnualRevenueTargetHt, billableRatePeriods };
+  return {
+    initialBillableWorkDays,
+    initialBillableVacationDays,
+    initialBillableTjmHt,
+    initialAnnualRevenueTargetHt,
+    billableRatePeriods
+  };
 }

@@ -5,8 +5,17 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isGmailConfigured } from "@/lib/gmail/config";
 import { buildGmailConsentUrl } from "@/lib/gmail/oauth";
-import { deleteGmailToken, getAuthorizedGmailClient, loadGmailTokenRow } from "@/lib/gmail/tokens";
+import {
+  clearGmailTokenIfInvalidGrant,
+  deleteGmailToken,
+  getAuthorizedGmailClient,
+  loadGmailTokenRow,
+  withAuthorizedGmailClient
+} from "@/lib/gmail/tokens";
+import { GMAIL_RECONNECT_REQUIRED_MESSAGE, isInvalidGrantError } from "@/lib/gmail/oauth-grant";
 import { fetchHiwayInvoicesFromGmail } from "@/lib/gmail/fetch-invoices";
+import { fetchQontoUpcomingDebitsFromGmail } from "@/lib/gmail/fetch-qonto-debits";
+import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import {
   applyHiwayInvoiceBillingRules,
   type HiwayInvoice
@@ -75,7 +84,7 @@ export async function fetchHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }
   const { supabase, user } = await requireUser();
   const client = await getAuthorizedGmailClient(supabase, user.id);
   if (!client) {
-    throw new Error("Aucun compte Gmail connecté. Cliquez sur « Connecter Gmail » d'abord.");
+    throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
   }
 
   const { billableRatePeriods, initialBillableTjmHt } = await loadBillableActivitySettings(
@@ -84,7 +93,15 @@ export async function fetchHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }
   );
   const fallbackTjmHt = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
 
-  const fetched = await fetchHiwayInvoicesFromGmail(client);
+  let fetched: HiwayInvoice[];
+  try {
+    fetched = await fetchHiwayInvoicesFromGmail(client);
+  } catch (error) {
+    if (await clearGmailTokenIfInvalidGrant(supabase, user.id, error)) {
+      throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
+    }
+    throw error;
+  }
   const invoices = fetched.map((inv) =>
     applyHiwayInvoiceBillingRules(inv, { billableRatePeriods, fallbackTjmHt })
   );
@@ -94,6 +111,12 @@ export async function fetchHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }
 
   const stored = await loadStoredHiwayInvoices(supabase, user.id);
   return { invoices: stored };
+}
+
+export async function fetchUpcomingQontoDebits(): Promise<{ debits: QontoUpcomingDebit[] }> {
+  const { supabase, user } = await requireUser();
+  const debits = await withAuthorizedGmailClient(supabase, user.id, fetchQontoUpcomingDebitsFromGmail);
+  return { debits: debits ?? [] };
 }
 
 export async function disconnectGmail(): Promise<{ ok: true }> {

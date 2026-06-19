@@ -11,7 +11,7 @@ import {
   type ReactNode
 } from "react";
 import { toast } from "sonner";
-import { replaceBillableWorkDays, updateAnnualRevenueTarget } from "@/app/dashboard/actions";
+import { replaceBillableWorkDays, replaceBillableVacationDays, updateAnnualRevenueTarget } from "@/app/dashboard/actions";
 import { computeCurrentMonthOverview } from "@/lib/billable-calendar-metrics";
 import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import type {
@@ -20,6 +20,7 @@ import type {
 } from "@/components/dashboard/ActivityOverviewPremium";
 
 const STORAGE_KEY = "digitpro:billable-work-days-iso";
+const VACATION_STORAGE_KEY = "digitpro:billable-vacation-days-iso";
 const ANNUAL_TARGET_STORAGE_KEY = "digitpro:annual-revenue-target-ht";
 
 function parseStored(raw: string | null): Set<string> {
@@ -45,6 +46,8 @@ type BillableActivityContextValue = {
   persistToSupabase: boolean;
   selected: Set<string>;
   setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
+  vacationDays: Set<string>;
+  setVacationDays: React.Dispatch<React.SetStateAction<Set<string>>>;
   hydrated: boolean;
   sortedIsos: readonly string[];
   overviewMonthTitle: string;
@@ -63,6 +66,7 @@ export function BillableActivityProvider({
   billableRatePeriods = [],
   persistToSupabase,
   initialWorkDayIsos,
+  initialVacationDayIsos = [],
   initialAnnualRevenueTargetHt = null
 }: {
   children: ReactNode;
@@ -70,10 +74,14 @@ export function BillableActivityProvider({
   billableRatePeriods?: readonly BillableRatePeriod[];
   persistToSupabase: boolean;
   initialWorkDayIsos: string[];
+  initialVacationDayIsos?: string[];
   initialAnnualRevenueTargetHt?: number | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() =>
     persistToSupabase ? new Set(initialWorkDayIsos) : new Set()
+  );
+  const [vacationDays, setVacationDays] = useState<Set<string>>(() =>
+    persistToSupabase ? new Set(initialVacationDayIsos) : new Set()
   );
   const [hydrated, setHydrated] = useState(false);
   const [annualRevenueTargetHt, setAnnualRevenueTargetHt] = useState<number | null>(
@@ -82,12 +90,19 @@ export function BillableActivityProvider({
   const [, startTransition] = useTransition();
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const vacationDaysRef = useRef(vacationDays);
+  vacationDaysRef.current = vacationDays;
   const lastPersistedRef = useRef<string | null>(null);
+  const lastVacationPersistedRef = useRef<string | null>(null);
   const lastTargetPersistedRef = useRef<number | null | undefined>(undefined);
 
   const serverDaysKey = useMemo(
     () => [...initialWorkDayIsos].sort().join("|"),
     [initialWorkDayIsos]
+  );
+  const serverVacationDaysKey = useMemo(
+    () => [...initialVacationDayIsos].sort().join("|"),
+    [initialVacationDayIsos]
   );
   const serverTargetKey = useMemo(
     () => (initialAnnualRevenueTargetHt == null ? "" : String(initialAnnualRevenueTargetHt)),
@@ -97,10 +112,14 @@ export function BillableActivityProvider({
   useEffect(() => {
     if (persistToSupabase) {
       setSelected(new Set(initialWorkDayIsos));
+      setVacationDays(new Set(initialVacationDayIsos));
       lastPersistedRef.current = persistSignature([...initialWorkDayIsos].sort(), tjmHt);
+      lastVacationPersistedRef.current = [...initialVacationDayIsos].sort().join(",");
     } else if (typeof window !== "undefined") {
       setSelected(parseStored(localStorage.getItem(STORAGE_KEY)));
+      setVacationDays(parseStored(localStorage.getItem(VACATION_STORAGE_KEY)));
       lastPersistedRef.current = null;
+      lastVacationPersistedRef.current = null;
     }
     if (persistToSupabase) {
       setAnnualRevenueTargetHt(initialAnnualRevenueTargetHt);
@@ -111,12 +130,17 @@ export function BillableActivityProvider({
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clés serveur résument les props initiales.
-  }, [persistToSupabase, serverDaysKey, serverTargetKey, tjmHt, initialAnnualRevenueTargetHt]);
+  }, [persistToSupabase, serverDaysKey, serverVacationDaysKey, serverTargetKey, tjmHt, initialAnnualRevenueTargetHt]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...selected].sort()));
   }, [selected, hydrated, persistToSupabase]);
+
+  useEffect(() => {
+    if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
+    localStorage.setItem(VACATION_STORAGE_KEY, JSON.stringify([...vacationDays].sort()));
+  }, [vacationDays, hydrated, persistToSupabase]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
@@ -173,6 +197,29 @@ export function BillableActivityProvider({
     return () => clearTimeout(t);
   }, [selected, hydrated, persistToSupabase, tjmHt]);
 
+  useEffect(() => {
+    if (!hydrated || !persistToSupabase) return;
+    const sortedDates = [...vacationDaysRef.current].sort();
+    const sig = sortedDates.join(",");
+    if (sig === lastVacationPersistedRef.current) return;
+    const t = setTimeout(() => {
+      const toSave = [...vacationDaysRef.current].sort();
+      const sigNow = toSave.join(",");
+      startTransition(() => {
+        void replaceBillableVacationDays(toSave)
+          .then(() => {
+            lastVacationPersistedRef.current = sigNow;
+          })
+          .catch((e) => {
+            toast.error("Enregistrement des vacances impossible", {
+              description: e instanceof Error ? e.message : undefined
+            });
+          });
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [vacationDays, hydrated, persistToSupabase]);
+
   const sortedIsos = useMemo(() => [...selected].sort(), [selected]);
 
   const overview = useMemo(
@@ -187,6 +234,8 @@ export function BillableActivityProvider({
       persistToSupabase,
       selected,
       setSelected,
+      vacationDays,
+      setVacationDays,
       hydrated,
       sortedIsos,
       overviewMonthTitle: overview.monthTitle,
@@ -196,7 +245,7 @@ export function BillableActivityProvider({
       annualRevenueTargetHt,
       setAnnualRevenueTargetHt
     }),
-    [tjmHt, billableRatePeriods, persistToSupabase, selected, hydrated, sortedIsos, overview, annualRevenueTargetHt]
+    [tjmHt, billableRatePeriods, persistToSupabase, selected, vacationDays, hydrated, sortedIsos, overview, annualRevenueTargetHt]
   );
 
   return (

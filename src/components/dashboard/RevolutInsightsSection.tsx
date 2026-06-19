@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchUpcomingQontoDebits } from "@/app/dashboard/gmail-actions";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -15,6 +16,7 @@ import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
+import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import { monthTitleFr } from "@/lib/billable-calendar-metrics";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 
@@ -34,6 +36,54 @@ function shiftMonthKey(monthKey: string, delta: number): string {
 function monthNavigatorLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
   return monthTitleFr(y, m - 1);
+}
+
+function formatDebitDateLabel(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "numeric",
+    month: "short"
+  }).format(new Date(y, m - 1, d));
+}
+
+function UpcomingQontoDebitsList({
+  debits,
+  fmt
+}: {
+  debits: QontoUpcomingDebit[];
+  fmt: ReturnType<typeof useDashboardDisplayFormat>;
+}) {
+  if (!debits.length) return null;
+
+  return (
+    <div className="mt-2.5 space-y-1.5 rounded-2xl border border-ink-200/50 bg-ink-50/60 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 dark:text-white/35">
+        Prochains prélèvements
+      </p>
+      <ul className="space-y-1.5">
+        {debits.map((debit) => (
+          <li key={debit.id} className="flex items-start justify-between gap-2 text-[11px] leading-snug">
+            <span className="min-w-0 truncate font-medium text-ink-700 dark:text-white/70">
+              {debit.organization}
+            </span>
+            <span className="shrink-0 text-right tabular-nums">
+              {debit.amountEur != null ? (
+                <span className="font-semibold text-ink-900 dark:text-white/85">
+                  {fmt.euro(debit.amountEur)}
+                </span>
+              ) : (
+                <span className="text-ink-400 dark:text-white/35">—</span>
+              )}
+              <span className="ml-1.5 text-ink-400 dark:text-white/38">
+                {formatDebitDateLabel(debit.debitDateIso)}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /** Pictogramme par catégorie de dépense (macro bucket ou Bankin). */
@@ -354,16 +404,38 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 
 export function RevolutInsightsSection({
   transactions,
-  bncYearTotalEur = 0
+  bncYearTotalEur = 0,
+  upcomingQontoDebits = []
 }: {
   transactions: DashboardTx[];
   /** BNC versés (virements sortants libellé « BNC ») depuis le 1er janvier, année civile en cours. */
   bncYearTotalEur?: number;
+  /** Prélèvements Qonto détectés dans Gmail (date de débit future). */
+  upcomingQontoDebits?: QontoUpcomingDebit[];
 }) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
   const [monthKey, setMonthKey] = useState<string>(monthKeyNow());
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
+  const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>(upcomingQontoDebits);
+
+  useEffect(() => {
+    setQontoDebits(upcomingQontoDebits);
+  }, [upcomingQontoDebits]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchUpcomingQontoDebits()
+      .then(({ debits }) => {
+        if (!cancelled) setQontoDebits(debits);
+      })
+      .catch(() => {
+        // Gmail non connecté ou indisponible : on garde les données SSR le cas échéant.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === "pro"),
@@ -479,6 +551,7 @@ export function RevolutInsightsSection({
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
+          <UpcomingQontoDebitsList debits={qontoDebits} fmt={fmt} />
           <div className="mt-1.5">
             <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />
           </div>

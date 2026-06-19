@@ -5,7 +5,6 @@ import { clsx } from "clsx";
 import {
   Bar,
   BarChart,
-  CartesianGrid,
   Cell,
   LabelList,
   ResponsiveContainer,
@@ -468,7 +467,6 @@ function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; f
   const uid = useId().replace(/:/g, "");
   const isDark = useRootIsDark();
   const gradId = `gain-per-day-${uid}`;
-  const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
   const labelFill = isDark ? "#ecfdf5" : "#064e3b";
 
@@ -497,7 +495,6 @@ function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; f
                 <stop offset="100%" stopColor="#10b981" stopOpacity={0.85} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="label"
               tickLine={false}

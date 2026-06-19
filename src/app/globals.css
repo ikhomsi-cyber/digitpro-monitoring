@@ -12,10 +12,20 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+html {
+  background-color: #f5f5f7;
+}
+
+html.dark {
+  background-color: #06242b;
 }
 
 body {
+  background-color: inherit;
   font-feature-settings: "ss01", "cv01", "cv11";
 }
 
@@ -25,6 +35,18 @@ body {
 }
 
 @layer components {
+  /** Écran de lancement / loading — fond uni edge-to-edge (Dynamic Island, encoches). */
+  .app-launch-screen {
+    @apply fixed inset-0 z-[9999] flex items-center justify-center bg-ink-100 dark:bg-[#06242b];
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    padding:
+      env(safe-area-inset-top, 0px)
+      env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px)
+      env(safe-area-inset-left, 0px);
+  }
+
   /** Fond immersif dashboard — gris-bleu clair en light, teal en dark. */
   .premium-dashboard-page {
     @apply bg-ink-100 transition-colors;

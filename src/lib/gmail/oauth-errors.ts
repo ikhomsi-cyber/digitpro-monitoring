@@ -16,5 +16,12 @@ export function gmailOAuthErrorMessage(code: string | null): string {
   if (key === "no_refresh_token") {
     return "Google n’a pas renvoyé de jeton durable. Révoquez l’accès dans votre compte Google, puis reconnectez.";
   }
+  if (key === "invalid_grant") {
+    return (
+      "Accès Gmail révoqué ou expiré. Reconnectez Gmail depuis l’onglet Activité. " +
+      "En mode test OAuth Google, les jetons expirent au bout de 7 jours — vérifiez aussi que GOOGLE_CLIENT_ID, " +
+      "GOOGLE_CLIENT_SECRET et GOOGLE_REDIRECT_URI correspondent à l’environnement (local vs prod)."
+    );
+  }
   return code ?? "Erreur inconnue";
 }

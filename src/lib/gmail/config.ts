@@ -19,6 +19,16 @@ export function isHiwayInvoiceSubject(subject: string): boolean {
   );
 }
 
+/** Requêtes Gmail pour les rappels de prélèvement Qonto (essai successif). */
+export function qontoDebitGmailQueries(): string[] {
+  return [
+    "debitera votre compte",
+    "débitera votre compte",
+    "subject:debitera subject:compte",
+    "from:qonto debitera compte"
+  ];
+}
+
 export type GmailOAuthConfig = {
   clientId: string;
   clientSecret: string;

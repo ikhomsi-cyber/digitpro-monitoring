@@ -1585,6 +1585,51 @@ export async function replaceBillableWorkDays(isoDates: string[], tjmHt: number)
   revalidatePath("/dashboard");
 }
 
+/** Remplace tous les jours de vacances personnelles cochés sur le calendrier activité. */
+export async function replaceBillableVacationDays(isoDates: string[]): Promise<void> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  for (const s of isoDates) {
+    if (typeof s !== "string" || !isValidIsoCalendarDate(s)) {
+      throw new Error(`Date invalide : ${String(s)}`);
+    }
+  }
+
+  const unique = [...new Set(isoDates)];
+
+  const { error: delErr } = await supabase
+    .from("billable_vacation_days")
+    .delete()
+    .eq("user_id", user.id);
+  if (delErr) {
+    const msg = delErr.message ?? "";
+    if (/billable_vacation_days|does not exist|schema cache|42P01/i.test(msg)) {
+      throw new Error(
+        "Table « billable_vacation_days » introuvable : exécutez la migration Supabase (20260613120000_billable_vacation_days.sql)."
+      );
+    }
+    throw new Error(msg);
+  }
+
+  if (unique.length > 0) {
+    const { error: insErr } = await supabase.from("billable_vacation_days").insert(
+      unique.map((vacation_date) => ({
+        user_id: user.id,
+        vacation_date
+      }))
+    );
+    if (insErr) throw new Error(insErr.message);
+  }
+
+  revalidatePath("/dashboard");
+}
+
 /** Enregistre l'objectif annuel de CA HT (table `user_billable_settings`). */
 export async function updateAnnualRevenueTarget(targetHtEur: number | null): Promise<void> {
   await assertSupabaseWritesEnabled();

@@ -15,6 +15,7 @@ import {
   type GmailConnectionStatus
 } from "@/app/dashboard/gmail-actions";
 import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
+import { GMAIL_RECONNECT_REQUIRED_MESSAGE } from "@/lib/gmail/oauth-grant";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
 
 const HIWAY_INVOICES_PREVIEW_COUNT = 3;
@@ -31,6 +32,7 @@ export function HiwayInvoicesBlock() {
   const [status, setStatus] = useState<GmailConnectionStatus | null>(null);
   const [invoices, setInvoices] = useState<HiwayInvoice[] | null>(null);
   const [invoicesExpanded, setInvoicesExpanded] = useState(false);
+  const [reconnectSuggested, setReconnectSuggested] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const refreshStatus = useCallback(() => {
@@ -67,6 +69,7 @@ export function HiwayInvoicesBlock() {
     if (!result) return;
     if (result === "ok") {
       toast.success("Gmail connecté", { description: "Vous pouvez récupérer vos factures Hiway." });
+      setReconnectSuggested(false);
     } else {
       toast.error("Connexion Gmail échouée", {
         description: gmailOAuthErrorMessage(params.get("gmail_error"))
@@ -102,9 +105,17 @@ export function HiwayInvoicesBlock() {
           id: toastId
         });
       } catch (e) {
-        toast.error("Récupération impossible", {
+        const description = e instanceof Error ? e.message : undefined;
+        const needsReconnect =
+          description === GMAIL_RECONNECT_REQUIRED_MESSAGE ||
+          /invalid_grant|expirée|révoquée/i.test(description ?? "");
+        if (needsReconnect) {
+          setReconnectSuggested(true);
+          setStatus((prev) => (prev ? { ...prev, connected: false, email: null } : prev));
+        }
+        toast.error(needsReconnect ? "Reconnectez Gmail" : "Récupération impossible", {
           id: toastId,
-          description: e instanceof Error ? e.message : undefined
+          description: needsReconnect ? GMAIL_RECONNECT_REQUIRED_MESSAGE : description
         });
       }
     });
@@ -115,6 +126,7 @@ export function HiwayInvoicesBlock() {
       try {
         await disconnectGmail();
         setInvoices(null);
+        setReconnectSuggested(false);
         setStatus((prev) => (prev ? { ...prev, connected: false, email: null } : prev));
         toast.success("Gmail déconnecté");
       } catch (e) {
@@ -160,9 +172,15 @@ export function HiwayInvoicesBlock() {
     content = (
       <div className="space-y-3 text-center">
         <p className="text-[11px] font-medium text-ink-600 dark:text-cyan-50/70">
-          Connectez votre boîte Gmail pour lister vos factures{" "}
-          <span className="font-semibold">DigitPro Consulting - Facture F…</span> envoyées par{" "}
-          <span className="font-mono">noreply@hiway.fr</span>.
+          {reconnectSuggested
+            ? "Votre autorisation Gmail a expiré ou a été révoquée. Reconnectez votre compte pour récupérer factures Hiway et prélèvements Qonto."
+            : "Connectez votre boîte Gmail pour lister vos factures "}
+          {!reconnectSuggested ? (
+            <>
+              <span className="font-semibold">DigitPro Consulting - Facture F…</span> envoyées par{" "}
+              <span className="font-mono">noreply@hiway.fr</span>.
+            </>
+          ) : null}
         </p>
         <button
           type="button"
@@ -171,7 +189,7 @@ export function HiwayInvoicesBlock() {
           className="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60 dark:shadow-[0_8px_24px_-14px_rgba(16,185,129,0.9)]"
         >
           <Plug className="h-4 w-4" strokeWidth={2.2} aria-hidden />
-          Connecter Gmail
+          {reconnectSuggested ? "Reconnecter Gmail" : "Connecter Gmail"}
         </button>
       </div>
     );

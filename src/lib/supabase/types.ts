@@ -288,6 +288,23 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      billable_vacation_days: {
+        Row: {
+          id: string;
+          user_id: string;
+          vacation_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          vacation_date: string;
+        };
+        Update: Partial<{
+          vacation_date: string;
+        }>;
+        Relationships: [];
+      };
       billable_rate_periods: {
         Row: {
           id: string;

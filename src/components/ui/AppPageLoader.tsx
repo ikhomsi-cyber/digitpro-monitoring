@@ -6,13 +6,13 @@ type AppPageLoaderProps = {
 };
 
 /**
- * Écran de chargement plein viewport — logo centré, fond page habituel.
- * Image statique (pas de `useId`) pour éviter les erreurs d’hydratation.
+ * Écran de chargement plein viewport — logo centré, fond uni identique à html/body
+ * (Dynamic Island + safe areas iPhone). Pas de dégradé : transition fluide jusqu’à l’app.
  */
 export function AppPageLoader({ message = "Chargement…" }: AppPageLoaderProps) {
   return (
     <div
-      className="premium-dashboard-page flex min-h-dvh items-center justify-center"
+      className="app-launch-screen"
       role="status"
       aria-live="polite"
       aria-busy="true"

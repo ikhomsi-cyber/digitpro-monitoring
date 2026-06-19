@@ -26,6 +26,8 @@ import { BillableActivityProvider } from "@/components/dashboard/BillableActivit
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
+import { loadUpcomingQontoDebits } from "@/lib/gmail/load-qonto-debits";
+import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import {
   loadBillableActivitySettings,
   loadTransactionYearBounds
@@ -112,30 +114,36 @@ export default async function DashboardPage({
   let transactionsLoadError: string | null = null;
   let transactionYearBounds: { minYear: number; maxYear: number } | null = null;
   let initialBillableWorkDays: string[] = [];
+  let initialBillableVacationDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
   let initialAnnualRevenueTargetHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
+  let upcomingQontoDebits: QontoUpcomingDebit[] = [];
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
+    const [transactionsRes, boundsRes, billableRes, liveBalance, qontoDebitsRes] = await Promise.all([
       loadAllUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
         ? loadBillableActivitySettings(supabase, user.id)
         : Promise.resolve({
             initialBillableWorkDays: [],
+            initialBillableVacationDays: [],
             initialBillableTjmHt: null,
             initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
           }),
-      loadQontoLiveBalanceEur()
+      loadQontoLiveBalanceEur(),
+      user ? loadUpcomingQontoDebits(supabase, user.id) : Promise.resolve([])
     ]);
     qontoLiveBalanceEur = liveBalance;
+    upcomingQontoDebits = qontoDebitsRes;
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
     transactionYearBounds = boundsRes;
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
+    initialBillableVacationDays = billableRes.initialBillableVacationDays;
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
     initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
@@ -173,6 +181,7 @@ export default async function DashboardPage({
       billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
       initialWorkDayIsos={initialBillableWorkDays}
+      initialVacationDayIsos={initialBillableVacationDays}
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <DashboardDesktopSidebar />
@@ -211,6 +220,7 @@ export default async function DashboardPage({
               showContextBanner={showContextBanner}
               demoMode={demoMode}
               loadError={transactionsLoadError}
+              upcomingQontoDebits={upcomingQontoDebits}
             />
             <DashboardFloatingDock />
           </DashboardSectionProvider>

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Auth } from "googleapis";
 import type { Database } from "@/lib/supabase/types";
 import { createGmailOAuthClient } from "@/lib/gmail/oauth";
+import { isInvalidGrantError } from "@/lib/gmail/oauth-grant";
 
 type SupabaseDb = SupabaseClient<Database>;
 
@@ -67,10 +68,21 @@ export async function deleteGmailToken(supabase: SupabaseDb, userId: string): Pr
   }
 }
 
+/** Supprime le jeton stocké si Google renvoie invalid_grant. */
+export async function clearGmailTokenIfInvalidGrant(
+  supabase: SupabaseDb,
+  userId: string,
+  error: unknown
+): Promise<boolean> {
+  if (!isInvalidGrantError(error)) return false;
+  await deleteGmailToken(supabase, userId);
+  return true;
+}
+
 /**
- * Client OAuth2 prêt à l'emploi pour l'utilisateur : injecte le refresh_token stocké et
- * persiste automatiquement chaque nouvel access_token rafraîchi par googleapis.
- * Renvoie `null` si aucun compte Gmail n'est connecté.
+ * Client OAuth2 prêt à l'emploi pour l'utilisateur : injecte le refresh_token stocké,
+ * valide le jeton (refresh si besoin), et purge le token si invalid_grant.
+ * Renvoie `null` si aucun compte Gmail n'est connecté ou si reconnexion requise.
  */
 export async function getAuthorizedGmailClient(
   supabase: SupabaseDb,
@@ -98,5 +110,33 @@ export async function getAuthorizedGmailClient(
     });
   });
 
+  try {
+    await client.getAccessToken();
+  } catch (error) {
+    if (isInvalidGrantError(error)) {
+      await deleteGmailToken(supabase, userId);
+      return null;
+    }
+    throw error;
+  }
+
   return client;
+}
+
+/**
+ * Exécute une action Gmail ; purge le token et renvoie null si invalid_grant.
+ */
+export async function withAuthorizedGmailClient<T>(
+  supabase: SupabaseDb,
+  userId: string,
+  fn: (client: Auth.OAuth2Client) => Promise<T>
+): Promise<T | null> {
+  const client = await getAuthorizedGmailClient(supabase, userId);
+  if (!client) return null;
+  try {
+    return await fn(client);
+  } catch (error) {
+    if (await clearGmailTokenIfInvalidGrant(supabase, userId, error)) return null;
+    throw error;
+  }
 }
