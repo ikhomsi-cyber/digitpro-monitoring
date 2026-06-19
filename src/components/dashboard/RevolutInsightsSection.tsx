@@ -481,6 +481,15 @@ export function RevolutInsightsSection({
     [billable.billableRatePeriods, billable.selected, billable.tjmHt]
   );
 
+  /** Prélèvements Gmail — uniquement mois civil en cours, et seulement si la carte affiche ce mois. */
+  const qontoDebitsThisMonth = useMemo(() => {
+    const nowKey = monthKeyNow();
+    if (monthKey !== nowKey) return [];
+    return qontoDebits
+      .filter((d) => d.debitDateIso.startsWith(nowKey))
+      .sort((a, b) => a.debitDateIso.localeCompare(b.debitDateIso));
+  }, [qontoDebits, monthKey]);
+
   const depensesDelta = filteredDepenses - previousFilteredDepenses;
   const entreesDelta = current.entrees - previous.entrees;
 
@@ -551,7 +560,7 @@ export function RevolutInsightsSection({
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
-          <UpcomingQontoDebitsList debits={qontoDebits} fmt={fmt} />
+          <UpcomingQontoDebitsList debits={qontoDebitsThisMonth} fmt={fmt} />
           <div className="mt-1.5">
             <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />
           </div>
