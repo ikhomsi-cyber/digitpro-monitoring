@@ -38,7 +38,7 @@ export function DashboardInsightPeriodFilter({
   const monthSet = new Set(selectedMonths);
   const monthsForYears = monthOptions
     .filter((m) => yearSet.has(Number(m.slice(0, 4))))
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => b.localeCompare(a));
   const showYearOnPill = selectedYears.length > 1;
 
   return (

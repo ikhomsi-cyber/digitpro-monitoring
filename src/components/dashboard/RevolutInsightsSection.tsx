@@ -352,7 +352,14 @@ function InsightCard({ children }: { children: React.ReactNode }) {
   return <div className={dashboardInsightCard}>{children}</div>;
 }
 
-export function RevolutInsightsSection({ transactions }: { transactions: DashboardTx[] }) {
+export function RevolutInsightsSection({
+  transactions,
+  bncYearTotalEur = 0
+}: {
+  transactions: DashboardTx[];
+  /** BNC versés (virements sortants libellé « BNC ») depuis le 1er janvier, année civile en cours. */
+  bncYearTotalEur?: number;
+}) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
   const [monthKey, setMonthKey] = useState<string>(monthKeyNow());
@@ -482,7 +489,15 @@ export function RevolutInsightsSection({ transactions }: { transactions: Dashboa
 
         <InsightCard>
           <div className="flex items-start justify-between gap-2">
-            <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
+            <div className="min-w-0">
+              <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
+              <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
+                BNC versé depuis le début de l&apos;année ·{" "}
+                <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">
+                  {fmt.euro(bncYearTotalEur)}
+                </span>
+              </p>
+            </div>
             <span
               className={clsx(
                 "shrink-0 text-right text-[11px] font-bold leading-tight tabular-nums",

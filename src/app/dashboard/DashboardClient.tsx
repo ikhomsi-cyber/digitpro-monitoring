@@ -887,7 +887,10 @@ export function DashboardClient({
         aria-hidden={dashboardSection !== "full"}
       >
           <RevolutBalanceHero stats={currentHeroStats} statsReady />
-          <RevolutInsightsSection transactions={transactions} />
+          <RevolutInsightsSection
+            transactions={transactions}
+            bncYearTotalEur={currentHeroStats.bncYearTotalEur}
+          />
           <TaxLiabilityCard
             cashEur={currentHeroStats.soldeQontoEur}
             vatEur={currentHeroStats.detteTvaDepuisDebutEur}
