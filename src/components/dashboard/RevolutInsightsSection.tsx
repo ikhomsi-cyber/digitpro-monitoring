@@ -142,9 +142,8 @@ function ExpenseCategoryBars({
       aria-label="Répartition des dépenses par catégorie"
     >
       <div className="flex min-w-min items-end gap-1.5 pt-6 sm:gap-2.5">
-        {top.map((row, index) => {
+        {top.map((row) => {
           const heightPct = Math.max(22, Math.round((row.amount / max) * 100));
-          const isLeader = index === 0;
 
           return (
             <div
@@ -161,7 +160,7 @@ function ExpenseCategoryBars({
                   <p className="text-[10px] font-semibold leading-tight text-ink-800 dark:text-cyan-50">
                     {row.label}
                   </p>
-                  <p className="mt-0.5 text-[11px] font-bold tabular-nums text-rose-500 dark:text-rose-300">
+                  <p className="mt-0.5 text-[11px] font-bold tabular-nums text-ink-800 dark:text-white/90">
                     {fmt.euro(row.amount)}
                   </p>
                 </div>
@@ -169,21 +168,11 @@ function ExpenseCategoryBars({
 
               <div className="flex h-40 w-12 shrink-0 items-end justify-center sm:h-44 sm:w-[3.25rem]">
                 <div
-                  className={clsx(
-                    "flex w-full min-h-[2.75rem] items-center justify-center rounded-full transition-all duration-200",
-                    isLeader
-                      ? "bg-rose-300/90 shadow-[0_0_16px_-6px_rgba(251,113,133,0.45)] dark:bg-rose-200/55 dark:shadow-[0_0_18px_-6px_rgba(251,113,133,0.35)]"
-                      : "bg-rose-100/85 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
-                  )}
+                  className="flex w-full min-h-[2.75rem] items-center justify-center rounded-full bg-rose-100/85 transition-all duration-200 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
                   style={{ height: `${heightPct}%` }}
                 >
                   <span
-                    className={clsx(
-                      "max-h-full overflow-hidden px-0.5 text-[10px] font-bold leading-none tracking-tight tabular-nums sm:text-[11px]",
-                      isLeader
-                        ? "text-rose-950 dark:text-white"
-                        : "text-ink-800 dark:text-white/90"
-                    )}
+                    className="max-h-full overflow-hidden px-0.5 text-[10px] font-bold leading-none tracking-tight tabular-nums text-ink-800 sm:text-[11px] dark:text-white/90"
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
                     {formatBarAmount(row.amount)}

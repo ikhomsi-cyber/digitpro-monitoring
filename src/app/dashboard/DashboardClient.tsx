@@ -502,12 +502,7 @@ export function DashboardClient({
         .map((name) => ({ name, total: row.values[name] ?? 0 }))
         .filter((x) => x.total > 0);
     }
-    return withTotals
-      .sort((a, b) => {
-        if (a.name === "CESU" && b.name !== "CESU") return -1;
-        if (b.name === "CESU" && a.name !== "CESU") return 1;
-        return b.total - a.total;
-      });
+    return withTotals.sort((a, b) => b.total - a.total);
   }, [activeExpenseMonthKey, expenseCategoryBreakdownMain]);
 
   const VAT_RATE = 0.2;
@@ -1272,7 +1267,7 @@ export function DashboardClient({
                 <div className="space-y-1" data-private>
                   {sasuPanelDonutView.slices.length ? (
                     (() => {
-                      const rows = sasuPanelDonutView.slices;
+                      const rows = [...sasuPanelDonutView.slices].sort((a, b) => b.total - a.total);
                       const visibleRows = showAllSasuCategoryRows ? rows : rows.slice(0, 5);
                       const remainingRows = Math.max(0, rows.length - visibleRows.length);
                       return (

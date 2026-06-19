@@ -4,7 +4,6 @@ import { useId, useMemo } from "react";
 import {
   Bar,
   BarChart,
-  CartesianGrid,
   Cell,
   ResponsiveContainer,
   Tooltip,
@@ -158,7 +157,6 @@ export function BillableInvoiceWorkedDaysChart({
   const uid = useId().replace(/:/g, "");
   const gradId = `inv-grad-encaisse-${uid}`;
   const isDark = useRootIsDark();
-  const gridStroke = isDark ? "#3f3f46" : "#e5e7eb";
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
 
   if (!data.length) {
@@ -221,7 +219,6 @@ export function BillableInvoiceWorkedDaysChart({
                 <stop offset="100%" stopColor="#059669" stopOpacity={0.85} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
             <XAxis
               dataKey="label"
               tickLine={false}
