@@ -139,10 +139,21 @@ const formatFeeWorkDays = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 1
 });
 
+const formatFeeWorkHours = new Intl.NumberFormat("fr-FR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1
+});
+
+const FEE_WORK_DAY_HOURS = 8;
+
 function feeWorkDaysLabel(amountEur: number, tjmHt: number | undefined): string | null {
   if (tjmHt == null || !Number.isFinite(tjmHt) || tjmHt <= 0) return null;
   const days = Math.abs(amountEur) / tjmHt;
   if (!Number.isFinite(days) || days <= 0) return null;
+  if (days < 1) {
+    const hours = days * FEE_WORK_DAY_HOURS;
+    return `${formatFeeWorkHours.format(hours)} h`;
+  }
   return `${formatFeeWorkDays.format(days)} j`;
 }
 
