@@ -25,7 +25,7 @@ export async function loadDashboardHeroStatsFromSupabase(
 
 export async function loadTransactionYearBounds(
   client: SupabaseServerClient
-): Promise<{ minYear: number; maxYear: number } | null> {
+): Promise<{ minYear: number; maxYear: number; minDateIso: string; maxDateIso: string } | null> {
   const [oldest, newest] = await Promise.all([
     client.from("transactions").select("date").order("date", { ascending: true }).limit(1).maybeSingle(),
     client.from("transactions").select("date").order("date", { ascending: false }).limit(1).maybeSingle()
@@ -33,10 +33,12 @@ export async function loadTransactionYearBounds(
   const d0 = oldest.data?.date;
   const d1 = newest.data?.date;
   if (oldest.error || newest.error || d0 == null || d1 == null) return null;
-  const minYear = Number(String(d0).slice(0, 4));
-  const maxYear = Number(String(d1).slice(0, 4));
+  const minDateIso = String(d0).slice(0, 10);
+  const maxDateIso = String(d1).slice(0, 10);
+  const minYear = Number(minDateIso.slice(0, 4));
+  const maxYear = Number(maxDateIso.slice(0, 4));
   if (!Number.isFinite(minYear) || !Number.isFinite(maxYear) || minYear > maxYear) return null;
-  return { minYear, maxYear };
+  return { minYear, maxYear, minDateIso, maxDateIso };
 }
 
 export async function loadBillableActivitySettings(client: SupabaseServerClient, userId: string): Promise<{

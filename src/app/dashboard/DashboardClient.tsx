@@ -241,12 +241,13 @@ export function DashboardClient({
   heroContextMessage,
   showContextBanner,
   demoMode,
-  loadError
+  loadError,
+  syncFullHistoryOnMount = false
 }: {
   syncKey: string;
   initialTransactions: DashboardTx[];
   /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
-  transactionYearBounds: { minYear: number; maxYear: number } | null;
+  transactionYearBounds: { minYear: number; maxYear: number; minDateIso?: string; maxDateIso?: string } | null;
   /** Dérivé de `?scope=` sur `/dashboard` (pro | personal), sinon défaut SASU. */
   initialDashboardScope?: "pro" | "personal" | null;
   heroStats: DashboardHeroStats;
@@ -254,6 +255,8 @@ export function DashboardClient({
   showContextBanner: boolean;
   demoMode: boolean;
   loadError: string | null;
+  /** Charge l’historique complet en arrière-plan après le premier paint. */
+  syncFullHistoryOnMount?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -303,6 +306,34 @@ export function DashboardClient({
     setTransactions(initialTransactions);
     setCurrentHeroStats(heroStats);
   }, [syncKey, initialTransactions, heroStats]);
+
+  useEffect(() => {
+    if (!syncFullHistoryOnMount || demoMode) return;
+    let cancelled = false;
+    console.time("dashboard:transactions-full");
+    void fetch("/api/dashboard/transactions")
+      .then((res) => res.json())
+      .then(
+        (body: {
+          ok?: boolean;
+          transactions?: DashboardTx[];
+          heroStats?: DashboardHeroStats;
+        }) => {
+          if (cancelled || !body.ok || !body.transactions || !body.heroStats) return;
+          setTransactions(body.transactions);
+          setCurrentHeroStats(body.heroStats);
+        }
+      )
+      .catch(() => {
+        // Historique complet indisponible : on conserve la fenêtre initiale.
+      })
+      .finally(() => {
+        console.timeEnd("dashboard:transactions-full");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode, syncFullHistoryOnMount]);
 
   useEffect(() => {
     setRevenueCounterpartyDetail(null);

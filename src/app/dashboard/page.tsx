@@ -11,7 +11,10 @@ import {
   isDashboardDemoPreferenceActive
 } from "@/lib/dashboard-demo-preference";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-transactions";
+import {
+  loadInitialUserTransactionsFromSupabase,
+  needsDashboardFullHistorySync
+} from "@/lib/supabase/fetch-all-transactions";
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
@@ -115,17 +118,32 @@ export default async function DashboardPage({
 
   let rawRowsMapped: DashboardTx[] = [];
   let transactionsLoadError: string | null = null;
-  let transactionYearBounds: { minYear: number; maxYear: number } | null = null;
+  let transactionYearBounds: {
+    minYear: number;
+    maxYear: number;
+    minDateIso: string;
+    maxDateIso: string;
+  } | null = null;
   let initialBillableWorkDays: string[] = [];
   let initialBillableVacationDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
   let initialAnnualRevenueTargetHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
+  let syncFullHistoryOnMount = false;
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
+    const transactionsPromise = (async () => {
+      console.time("dashboard:transactions");
+      try {
+        return await loadInitialUserTransactionsFromSupabase(supabase);
+      } finally {
+        console.timeEnd("dashboard:transactions");
+      }
+    })();
+
     const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
-      loadAllUserTransactionsFromSupabase(supabase),
+      transactionsPromise,
       loadTransactionYearBounds(supabase),
       user
         ? loadBillableActivitySettings(supabase, user.id)
@@ -147,6 +165,10 @@ export default async function DashboardPage({
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
     initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
+    syncFullHistoryOnMount = needsDashboardFullHistorySync(
+      rawRowsMapped,
+      transactionYearBounds?.minDateIso
+    );
     if (transactionsRes.errorMessage) {
       console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
     }
@@ -220,6 +242,7 @@ export default async function DashboardPage({
               showContextBanner={showContextBanner}
               demoMode={demoMode}
               loadError={transactionsLoadError}
+              syncFullHistoryOnMount={syncFullHistoryOnMount}
             />
             <DashboardFloatingDock />
           </DashboardSectionProvider>

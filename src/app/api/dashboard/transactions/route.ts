@@ -16,7 +16,14 @@ export async function GET() {
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
   const [res, qontoLiveBalanceEur] = await Promise.all([
-    loadAllUserTransactionsFromSupabase(supabase),
+    (async () => {
+      console.time("dashboard:transactions-full");
+      try {
+        return await loadAllUserTransactionsFromSupabase(supabase);
+      } finally {
+        console.timeEnd("dashboard:transactions-full");
+      }
+    })(),
     loadQontoLiveBalanceEur()
   ]);
   if (res.errorMessage) {

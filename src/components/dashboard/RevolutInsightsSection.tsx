@@ -407,12 +407,16 @@ export function RevolutInsightsSection({
 
   useEffect(() => {
     let cancelled = false;
+    console.time("dashboard:gmail");
     void fetchUpcomingQontoDebits()
       .then(({ debits }) => {
         if (!cancelled) setQontoDebits(debits);
       })
       .catch(() => {
         // Gmail non connecté ou indisponible : on garde les données SSR le cas échéant.
+      })
+      .finally(() => {
+        console.timeEnd("dashboard:gmail");
       });
     return () => {
       cancelled = true;
