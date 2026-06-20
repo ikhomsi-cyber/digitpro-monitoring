@@ -15,10 +15,15 @@ import { loadAllUserTransactionsFromSupabase } from "@/lib/supabase/fetch-all-tr
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import nextDynamic from "next/dynamic";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
-import { LMNPClient } from "@/app/lmnp/LMNPClient";
+
+const LMNPClient = nextDynamic(
+  () => import("@/app/lmnp/LMNPClient").then((mod) => ({ default: mod.LMNPClient })),
+  { loading: () => null }
+);
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
@@ -26,8 +31,6 @@ import { BillableActivityProvider } from "@/components/dashboard/BillableActivit
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
-import { loadUpcomingQontoDebits } from "@/lib/gmail/load-qonto-debits";
-import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import {
   loadBillableActivitySettings,
   loadTransactionYearBounds
@@ -119,10 +122,9 @@ export default async function DashboardPage({
   let initialAnnualRevenueTargetHt: number | null = null;
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
-  let upcomingQontoDebits: QontoUpcomingDebit[] = [];
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
-    const [transactionsRes, boundsRes, billableRes, liveBalance, qontoDebitsRes] = await Promise.all([
+    const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
       loadAllUserTransactionsFromSupabase(supabase),
       loadTransactionYearBounds(supabase),
       user
@@ -134,11 +136,9 @@ export default async function DashboardPage({
             initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
           }),
-      loadQontoLiveBalanceEur(),
-      user ? loadUpcomingQontoDebits(supabase, user.id) : Promise.resolve([])
+      loadQontoLiveBalanceEur()
     ]);
     qontoLiveBalanceEur = liveBalance;
-    upcomingQontoDebits = qontoDebitsRes;
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
     transactionYearBounds = boundsRes;
@@ -220,7 +220,6 @@ export default async function DashboardPage({
               showContextBanner={showContextBanner}
               demoMode={demoMode}
               loadError={transactionsLoadError}
-              upcomingQontoDebits={upcomingQontoDebits}
             />
             <DashboardFloatingDock />
           </DashboardSectionProvider>

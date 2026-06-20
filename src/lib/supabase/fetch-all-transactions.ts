@@ -8,6 +8,7 @@ type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabase
 
 const DASHBOARD_TX_PAGE_SIZE = 1000;
 const DASHBOARD_TX_MAX_ROWS = 125_000;
+const DASHBOARD_TX_FETCH_CONCURRENCY = 4;
 
 export type SupabaseTxRow = {
   id: string;
@@ -30,37 +31,80 @@ function transactionSelectMissingColumn(errMsg: string, column: string): boolean
   return new RegExp(column, "i").test(blob);
 }
 
+async function fetchDashboardTransactionPage(
+  client: SupabaseServerClient,
+  selectColumns: string,
+  pageIndex: number
+): Promise<{ rows: SupabaseTxRow[]; errorMessage: string | null; complete: boolean }> {
+  const from = pageIndex * DASHBOARD_TX_PAGE_SIZE;
+  const to = from + DASHBOARD_TX_PAGE_SIZE - 1;
+  const { data, error } = await client
+    .from("transactions")
+    .select(selectColumns)
+    .order("date", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
+  if (error) {
+    return { rows: [], errorMessage: error.message, complete: true };
+  }
+  const chunk = (data ?? []) as unknown as SupabaseTxRow[];
+  return {
+    rows: chunk,
+    errorMessage: null,
+    complete: chunk.length < DASHBOARD_TX_PAGE_SIZE
+  };
+}
+
 async function fetchAllDashboardTransactionRows(
   client: SupabaseServerClient,
   selectColumns: string
 ): Promise<{ rows: SupabaseTxRow[]; errorMessage: string | null }> {
-  const rows: SupabaseTxRow[] = [];
-  let from = 0;
-  for (let guard = 0; guard < 10_000; guard++) {
-    if (rows.length >= DASHBOARD_TX_MAX_ROWS) {
+  const firstPage = await fetchDashboardTransactionPage(client, selectColumns, 0);
+  if (firstPage.errorMessage) {
+    return { rows: firstPage.rows, errorMessage: firstPage.errorMessage };
+  }
+
+  const rows = [...firstPage.rows];
+  if (firstPage.complete || rows.length >= DASHBOARD_TX_MAX_ROWS) {
+    return { rows, errorMessage: null };
+  }
+
+  let nextPageIndex = 1;
+  while (rows.length < DASHBOARD_TX_MAX_ROWS) {
+    const pageIndices = Array.from(
+      { length: DASHBOARD_TX_FETCH_CONCURRENCY },
+      (_, offset) => nextPageIndex + offset
+    );
+    nextPageIndex += DASHBOARD_TX_FETCH_CONCURRENCY;
+
+    const batch = await Promise.all(
+      pageIndices.map((pageIndex) => fetchDashboardTransactionPage(client, selectColumns, pageIndex))
+    );
+
+    let reachedEnd = false;
+    for (const page of batch) {
+      if (page.errorMessage) {
+        return { rows, errorMessage: page.errorMessage };
+      }
+      if (page.rows.length === 0) {
+        reachedEnd = true;
+        break;
+      }
+      rows.push(...page.rows);
+      if (page.complete || rows.length >= DASHBOARD_TX_MAX_ROWS) {
+        reachedEnd = true;
+        break;
+      }
+    }
+    if (reachedEnd) {
       break;
     }
-    const to = from + DASHBOARD_TX_PAGE_SIZE - 1;
-    const { data, error } = await client
-      .from("transactions")
-      .select(selectColumns)
-      .order("date", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, to);
-    if (error) {
-      return { rows, errorMessage: error.message };
-    }
-    const chunk = (data ?? []) as unknown as SupabaseTxRow[];
-    if (chunk.length === 0) {
-      return { rows, errorMessage: null };
-    }
-    rows.push(...chunk);
-    from += chunk.length;
-    if (chunk.length < DASHBOARD_TX_PAGE_SIZE) {
-      return { rows, errorMessage: null };
-    }
   }
-  return { rows, errorMessage: null };
+
+  return {
+    rows: rows.slice(0, DASHBOARD_TX_MAX_ROWS),
+    errorMessage: null
+  };
 }
 
 function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {

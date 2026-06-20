@@ -132,13 +132,26 @@ function shouldShowHtTtc(label: string): boolean {
   );
 }
 
+const formatFeeWorkDays = new Intl.NumberFormat("fr-FR", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 1
+});
+
+function feeWorkDaysLabel(amountEur: number, tjmHt: number | undefined): string | null {
+  if (tjmHt == null || !Number.isFinite(tjmHt) || tjmHt <= 0) return null;
+  const days = Math.abs(amountEur) / tjmHt;
+  if (!Number.isFinite(days) || days <= 0) return null;
+  return `${formatFeeWorkDays.format(days)} j`;
+}
+
 function BreakdownPieChart({
   breakdown,
   fmt,
   palette,
   recategorizeOptions,
   onRecategorized,
-  showDetailToggle = true
+  showDetailToggle = true,
+  tjmHt
 }: {
   breakdown: ValeurReelleWaterfallBreakdownRow[];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
@@ -146,6 +159,7 @@ function BreakdownPieChart({
   recategorizeOptions?: readonly string[];
   onRecategorized?: (transactionId: string, category: string) => void;
   showDetailToggle?: boolean;
+  tjmHt?: number;
 }) {
   const [showDetails, setShowDetails] = useState(false);
   const [openCategoryLabel, setOpenCategoryLabel] = useState<string | null>(null);
@@ -239,22 +253,28 @@ function BreakdownPieChart({
             </text>
           </svg>
           <div className="mb-3 grid w-full max-w-md grid-cols-2 gap-1.5">
-            {slices.slice(0, 6).map((slice) => (
+            {slices.slice(0, 6).map((slice) => {
+              const workDays = feeWorkDaysLabel(slice.row.amountEur, tjmHt);
+              const chipMeta = workDays
+                ? `${workDays} · ${fmt.euro(slice.row.amountEur)} · ${slice.percent} %`
+                : `${fmt.euro(slice.row.amountEur)} · ${slice.percent} %`;
+              return (
               <span
                 key={`compact-legend-${slice.row.label}`}
                 className="group/legend relative inline-flex min-w-0 items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
-                title={`${slice.row.label} · ${slice.percent} % · ${fmt.euro(slice.row.amountEur)}`}
+                title={`${slice.row.label} · ${chipMeta}`}
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
                 <span className="truncate">{slice.row.label}</span>
                 <span className="shrink-0 text-ink-500 dark:text-white/45">
-                  · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
+                  · {chipMeta}
                 </span>
                 <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:text-white/80">
-                  {slice.row.label} · {fmt.euro(slice.row.amountEur)} · {slice.percent} %
+                  {slice.row.label} · {chipMeta}
                 </span>
               </span>
-            ))}
+            );
+            })}
             {slices.length > 6 ? (
               <span className="inline-flex min-w-0 items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
                 +{slices.length - 6}
@@ -280,6 +300,7 @@ function BreakdownPieChart({
             const isOpen = openCategoryLabel === slice.row.label;
             const showHtTtc = shouldShowHtTtc(slice.row.label);
             const grossAmountEur = slice.row.grossAmountEur ?? slice.row.amountEur;
+            const workDays = feeWorkDaysLabel(slice.row.amountEur, tjmHt);
             return (
             <div
               key={`legend-${slice.row.label}`}
@@ -311,6 +332,7 @@ function BreakdownPieChart({
                   ) : null}
                 </span>
                 <span className="shrink-0 text-[13px] font-bold tabular-nums text-ink-950 dark:text-white">
+                  {workDays ? `${workDays} · ` : null}
                   {slice.percent} %
                 </span>
               </button>
@@ -749,6 +771,7 @@ function FeesBlock({
   palette,
   fmt,
   caHt,
+  tjmHt,
   recategorizeOptions,
   onRecategorized
 }: {
@@ -759,10 +782,18 @@ function FeesBlock({
   palette: readonly string[];
   fmt: Fmt;
   caHt: number;
+  tjmHt?: number;
   recategorizeOptions?: readonly string[];
   onRecategorized?: (transactionId: string, category: string) => void;
 }) {
   const pctOfCa = caHt > 0 ? Math.round((amount / caHt) * 1000) / 10 : null;
+  const totalWorkDays = feeWorkDaysLabel(amount, tjmHt);
+  const pctSubline =
+    pctOfCa != null && totalWorkDays
+      ? `${pctOfCa} % du CA HT · ${totalWorkDays}`
+      : pctOfCa != null
+        ? `${pctOfCa} % du CA HT`
+        : totalWorkDays;
   return (
     <div className={dashboardInsightCard}>
       <BlockHeader
@@ -773,9 +804,9 @@ function FeesBlock({
             <p className="font-display text-xl font-bold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(amount)}
             </p>
-            {pctOfCa != null ? (
+            {pctSubline ? (
               <p className="text-[11px] font-medium tabular-nums text-ink-500 dark:text-white/40">
-                {pctOfCa} % du CA HT
+                {pctSubline}
               </p>
             ) : null}
           </div>
@@ -786,6 +817,7 @@ function FeesBlock({
           breakdown={breakdown}
           fmt={fmt}
           palette={palette}
+          tjmHt={tjmHt}
           recategorizeOptions={recategorizeOptions}
           onRecategorized={onRecategorized}
         />
@@ -1137,6 +1169,7 @@ export function ValeurReelleClient({
           palette={MANDATORY_FEES_COLORS}
           fmt={fmt}
           caHt={tree.caFactureEur}
+          tjmHt={tjmHtForPeriod}
           recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
           onRecategorized={handleRecategorized}
         />
@@ -1148,6 +1181,7 @@ export function ValeurReelleClient({
           palette={PERSONAL_CHARGES_COLORS}
           fmt={fmt}
           caHt={tree.caFactureEur}
+          tjmHt={tjmHtForPeriod}
           recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
           onRecategorized={handleRecategorized}
         />

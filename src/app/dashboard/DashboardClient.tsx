@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { clsx } from "clsx";
@@ -21,20 +22,15 @@ import {
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
-import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
-import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
 import { RevolutInsightsSection } from "@/components/dashboard/RevolutInsightsSection";
-import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
 import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
 import { computeKpiTrend } from "@/lib/kpi-month-trend";
-import { ValeurReelleClient } from "@/components/dashboard/ValeurReelleClient";
-import { DashboardCategorisationPanel } from "@/app/dashboard/DashboardCategorisationPanel";
 import { CounterpartyLogo } from "@/components/dashboard/CounterpartyLogo";
 import { Card, CardBody, CardHeader, CardTitle, CardValue } from "@/components/ui/Card";
 import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
@@ -100,9 +96,48 @@ import {
   sasuSimplifiedExpenseGroup
 } from "@/lib/sasu-analytics";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
-import { useDashboardSection } from "@/components/dashboard/DashboardSectionContext";
+import { useDashboardSection, type DashboardSection } from "@/components/dashboard/DashboardSectionContext";
 
 export type { DashboardTx };
+
+type LazyDashboardSectionKey = "full" | "activite" | "valeur" | "categorisation" | "sasu-panel";
+
+function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey {
+  if (section === "sasu" || section === "private") return "sasu-panel";
+  return section;
+}
+
+const ValeurReelleClient = dynamic(
+  () =>
+    import("@/components/dashboard/ValeurReelleClient").then((mod) => ({
+      default: mod.ValeurReelleClient
+    })),
+  { loading: () => null }
+);
+
+const DashboardCategorisationPanel = dynamic(
+  () =>
+    import("@/app/dashboard/DashboardCategorisationPanel").then((mod) => ({
+      default: mod.DashboardCategorisationPanel
+    })),
+  { loading: () => null }
+);
+
+const ActivityOverviewPremium = dynamic(
+  () =>
+    import("@/components/dashboard/ActivityOverviewPremium").then((mod) => ({
+      default: mod.ActivityOverviewPremium
+    })),
+  { loading: () => null }
+);
+
+const BillableDaysCalendarBlock = dynamic(
+  () =>
+    import("@/components/dashboard/BillableDaysCalendarBlock").then((mod) => ({
+      default: mod.BillableDaysCalendarBlock
+    })),
+  { loading: () => null }
+);
 
 const dashboardIconToneClass: Record<
   "default" | "revenue" | "expense" | "chart" | "crew",
@@ -206,8 +241,7 @@ export function DashboardClient({
   heroContextMessage,
   showContextBanner,
   demoMode,
-  loadError,
-  upcomingQontoDebits = []
+  loadError
 }: {
   syncKey: string;
   initialTransactions: DashboardTx[];
@@ -220,12 +254,19 @@ export function DashboardClient({
   showContextBanner: boolean;
   demoMode: boolean;
   loadError: string | null;
-  /** Prélèvements Qonto annoncés par email Gmail (date de débit future). */
-  upcomingQontoDebits?: QontoUpcomingDebit[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const { section: dashboardSection, searchParams } = useDashboardSection();
+  const [mountedSections, setMountedSections] = useState<Set<LazyDashboardSectionKey>>(() =>
+    new Set([lazySectionMountKey(dashboardSection)])
+  );
+
+  useEffect(() => {
+    const key = lazySectionMountKey(dashboardSection);
+    setMountedSections((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, [dashboardSection]);
+
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
@@ -881,6 +922,7 @@ export function DashboardClient({
     <main id="dashboard-main" className="relative mt-0 scroll-mt-28 overflow-x-hidden sm:mt-2">
       <SectionThemeSync />
       <div className={clsx("w-full", dashboardSectionStack)}>
+      {mountedSections.has("full") ? (
       <div
         className={clsx(dashboardSection !== "full" && "hidden", dashboardSectionStack)}
         aria-hidden={dashboardSection !== "full"}
@@ -889,7 +931,6 @@ export function DashboardClient({
           <RevolutInsightsSection
             transactions={transactions}
             bncYearTotalEur={currentHeroStats.bncYearTotalEur}
-            upcomingQontoDebits={upcomingQontoDebits}
           />
           <TaxLiabilityCard
             cashEur={currentHeroStats.soldeQontoEur}
@@ -914,6 +955,8 @@ export function DashboardClient({
             showContextBanner={showContextBanner}
           />
       </div>
+      ) : null}
+      {mountedSections.has("activite") ? (
       <div
         className={clsx(dashboardSection !== "activite" && "hidden", dashboardSectionStack)}
         aria-hidden={dashboardSection !== "activite"}
@@ -928,6 +971,8 @@ export function DashboardClient({
           treasuryScope="pro"
         />
       </div>
+      ) : null}
+      {mountedSections.has("valeur") ? (
       <div className={clsx(dashboardSection !== "valeur" && "hidden")} aria-hidden={dashboardSection !== "valeur"}>
         <ValeurReelleClient
           initialTransactions={transactions}
@@ -935,12 +980,16 @@ export function DashboardClient({
           loadError={loadError}
         />
       </div>
+      ) : null}
+      {mountedSections.has("categorisation") ? (
       <div
         className={clsx(dashboardSection !== "categorisation" && "hidden")}
         aria-hidden={dashboardSection !== "categorisation"}
       >
         <DashboardCategorisationPanel />
       </div>
+      ) : null}
+      {mountedSections.has("sasu-panel") ? (
       <div
         className={clsx(dashboardSection !== "sasu" && dashboardSection !== "private" && "hidden")}
         aria-hidden={dashboardSection !== "sasu" && dashboardSection !== "private"}
@@ -2064,6 +2113,7 @@ export function DashboardClient({
           ) : null}
 
       </div>
+      ) : null}
       </div>
     </main>
   );

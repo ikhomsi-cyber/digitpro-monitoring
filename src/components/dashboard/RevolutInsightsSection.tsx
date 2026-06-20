@@ -393,24 +393,17 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 
 export function RevolutInsightsSection({
   transactions,
-  bncYearTotalEur = 0,
-  upcomingQontoDebits = []
+  bncYearTotalEur = 0
 }: {
   transactions: DashboardTx[];
   /** BNC versés (virements sortants libellé « BNC ») depuis le 1er janvier, année civile en cours. */
   bncYearTotalEur?: number;
-  /** Prélèvements Qonto détectés dans Gmail (date de débit future). */
-  upcomingQontoDebits?: QontoUpcomingDebit[];
 }) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
   const [monthKey, setMonthKey] = useState<string>(monthKeyNow());
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
-  const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>(upcomingQontoDebits);
-
-  useEffect(() => {
-    setQontoDebits(upcomingQontoDebits);
-  }, [upcomingQontoDebits]);
+  const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>([]);
 
   useEffect(() => {
     let cancelled = false;
