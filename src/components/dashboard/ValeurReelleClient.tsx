@@ -1138,12 +1138,9 @@ export function ValeurReelleClient({
     [billableRatePeriods]
   );
 
-  const computeInputKey = useMemo(
+  const filterKey = useMemo(
     () =>
       [
-        transactions.length,
-        transactions[0]?.id ?? "",
-        transactions.at(-1)?.id ?? "",
         selectedYears.join(","),
         selectedMonthsForYears.join(","),
         singleMonth ?? "",
@@ -1157,18 +1154,29 @@ export function ValeurReelleClient({
       billableTjmHt,
       selectedMonthsForYears,
       selectedYears,
-      singleMonth,
-      transactions
+      singleMonth
     ]
+  );
+
+  const transactionSyncKey = useMemo(
+    () => `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`,
+    [transactions]
+  );
+
+  const computeInputKey = useMemo(
+    () => `${filterKey}:${transactionSyncKey}`,
+    [filterKey, transactionSyncKey]
   );
 
   const [viewModel, setViewModel] = useState<ValeurReelleViewModel | null>(null);
   const [viewModelKey, setViewModelKey] = useState<string | null>(null);
   const [readyToShow, setReadyToShow] = useState(false);
-  const isComputing = viewModelKey !== computeInputKey;
 
   useEffect(() => {
     setReadyToShow(false);
+  }, [filterKey]);
+
+  useEffect(() => {
     let cancelled = false;
     let timer: number | undefined;
     const frame = requestAnimationFrame(() => {
@@ -1207,15 +1215,16 @@ export function ValeurReelleClient({
     billableSelected,
     billableTjmHt,
     computeInputKey,
+    filterKey,
     selectedMonthsForYears,
     selectedYears,
     singleMonth,
+    transactionSyncKey,
     transactions
   ]);
 
   useEffect(() => {
-    if (isComputing || !viewModel) {
-      setReadyToShow(false);
+    if (viewModelKey !== computeInputKey || !viewModel) {
       return;
     }
     let cancelled = false;
@@ -1228,7 +1237,7 @@ export function ValeurReelleClient({
       cancelled = true;
       cancelAnimationFrame(frame);
     };
-  }, [isComputing, viewModel, computeInputKey]);
+  }, [viewModel, viewModelKey, computeInputKey]);
 
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
     setLocalCategoryOverrides((prev) => ({
@@ -1237,7 +1246,7 @@ export function ValeurReelleClient({
     }));
   }, []);
 
-  const showSkeleton = isComputing || !viewModel || !readyToShow;
+  const showSkeleton = !readyToShow || viewModel === null;
 
   const periodFilter = (
     <DashboardInsightPeriodFilter

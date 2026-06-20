@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -97,7 +98,6 @@ import {
 } from "@/lib/sasu-analytics";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import { useDashboardSection, type DashboardSection } from "@/components/dashboard/DashboardSectionContext";
-import { ValeurReelleSkeleton } from "@/components/dashboard/ValeurReelleSkeleton";
 
 export type { DashboardTx };
 
@@ -113,13 +113,7 @@ const ValeurReelleClient = dynamic(
     import("@/components/dashboard/ValeurReelleClient").then((mod) => ({
       default: mod.ValeurReelleClient
     })),
-  {
-    loading: () => (
-      <div className="scroll-mt-28 overflow-x-hidden space-y-4">
-        <ValeurReelleSkeleton />
-      </div>
-    )
-  }
+  { loading: () => null }
 );
 
 const DashboardCategorisationPanel = dynamic(
@@ -279,6 +273,11 @@ export function DashboardClient({
 
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
+  /** Dette nette / KPIs fiscaux : masqués tant que l’historique complet n’est pas chargé. */
+  const [heroStatsReady, setHeroStatsReady] = useState(
+    () => !syncFullHistoryOnMount || demoMode
+  );
+  const fullHistorySyncedRef = useRef(false);
   const [scope, setScope] = useState<"pro" | "personal">(() =>
     initialDashboardScope === "personal" ? "personal" : "pro"
   );
@@ -310,9 +309,11 @@ export function DashboardClient({
   const shouldComputeSasuPanel = dashboardSection === "sasu" || dashboardSection === "private";
 
   useEffect(() => {
+    fullHistorySyncedRef.current = false;
     setTransactions(initialTransactions);
     setCurrentHeroStats(heroStats);
-  }, [syncKey, initialTransactions, heroStats]);
+    setHeroStatsReady(!syncFullHistoryOnMount || demoMode);
+  }, [syncKey, syncFullHistoryOnMount, demoMode]);
 
   useEffect(() => {
     if (!syncFullHistoryOnMount || demoMode) return;
@@ -327,8 +328,10 @@ export function DashboardClient({
           heroStats?: DashboardHeroStats;
         }) => {
           if (cancelled || !body.ok || !body.transactions || !body.heroStats) return;
+          fullHistorySyncedRef.current = true;
           setTransactions(body.transactions);
           setCurrentHeroStats(body.heroStats);
+          setHeroStatsReady(true);
         }
       )
       .catch(() => {
@@ -336,6 +339,9 @@ export function DashboardClient({
       })
       .finally(() => {
         console.timeEnd("dashboard:transactions-full");
+        if (!cancelled && !fullHistorySyncedRef.current) {
+          setHeroStatsReady(true);
+        }
       });
     return () => {
       cancelled = true;
@@ -965,7 +971,7 @@ export function DashboardClient({
         className={clsx(dashboardSection !== "full" && "hidden", dashboardSectionStack)}
         aria-hidden={dashboardSection !== "full"}
       >
-          <RevolutBalanceHero stats={currentHeroStats} statsReady />
+          <RevolutBalanceHero stats={currentHeroStats} statsReady={heroStatsReady} />
           <RevolutInsightsSection
             transactions={transactions}
             bncYearTotalEur={currentHeroStats.bncYearTotalEur}
@@ -975,7 +981,7 @@ export function DashboardClient({
             vatEur={currentHeroStats.detteTvaDepuisDebutEur}
             csgEur={currentHeroStats.detteCsgDepuisDebutEur}
             totalLiabilityEur={currentHeroStats.detteTotaleDepuisDebutEur}
-            statsReady
+            statsReady={heroStatsReady}
             formatEuro={fmt.euro}
             trend={taxLiabilityTrend}
           />
@@ -988,7 +994,7 @@ export function DashboardClient({
           <DashboardPremiumHero
             stats={currentHeroStats}
             transactions={transactions}
-            statsReady
+            statsReady={heroStatsReady}
             contextMessage={heroContextMessage}
             showContextBanner={showContextBanner}
           />
