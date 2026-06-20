@@ -1169,12 +1169,6 @@ export function ValeurReelleClient({
   );
 
   const [viewModel, setViewModel] = useState<ValeurReelleViewModel | null>(null);
-  const [viewModelKey, setViewModelKey] = useState<string | null>(null);
-  const [readyToShow, setReadyToShow] = useState(false);
-
-  useEffect(() => {
-    setReadyToShow(false);
-  }, [filterKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1194,13 +1188,8 @@ export function ValeurReelleClient({
           });
           if (cancelled) return;
           setViewModel(next);
-          setViewModelKey(computeInputKey);
         } catch (error) {
           console.error("[valeur-reelle] compute failed:", error);
-          if (!cancelled) {
-            setViewModel(null);
-            setViewModelKey(computeInputKey);
-          }
         }
       }, 0);
     });
@@ -1223,22 +1212,6 @@ export function ValeurReelleClient({
     transactions
   ]);
 
-  useEffect(() => {
-    if (viewModelKey !== computeInputKey || !viewModel) {
-      return;
-    }
-    let cancelled = false;
-    const frame = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setReadyToShow(true);
-      });
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(frame);
-    };
-  }, [viewModel, viewModelKey, computeInputKey]);
-
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
     setLocalCategoryOverrides((prev) => ({
       ...prev,
@@ -1246,7 +1219,7 @@ export function ValeurReelleClient({
     }));
   }, []);
 
-  const showSkeleton = !readyToShow || viewModel === null;
+  const showSkeleton = viewModel === null;
 
   const periodFilter = (
     <DashboardInsightPeriodFilter

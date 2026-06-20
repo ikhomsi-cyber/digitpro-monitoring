@@ -19,13 +19,21 @@ export function isHiwayInvoiceSubject(subject: string): boolean {
   );
 }
 
-/** Requêtes Gmail pour les rappels de prélèvement Qonto (essai successif). */
+/** Fenêtre de recherche Gmail pour les prélèvements Qonto (aujourd'hui inclus + 10 jours précédents). */
+export const QONTO_DEBIT_GMAIL_LOOKBACK_DAYS = 10;
+
+function qontoDebitGmailDateWindow(): string {
+  return `newer_than:${QONTO_DEBIT_GMAIL_LOOKBACK_DAYS}d`;
+}
+
+/** Requêtes Gmail pour les rappels de prélèvement Qonto (essai successif, fenêtre récente). */
 export function qontoDebitGmailQueries(): string[] {
+  const window = qontoDebitGmailDateWindow();
   return [
-    "debitera votre compte",
-    "débitera votre compte",
-    "subject:debitera subject:compte",
-    "from:qonto debitera compte"
+    `from:qonto debitera compte ${window}`,
+    `debitera votre compte ${window}`,
+    `débitera votre compte ${window}`,
+    `subject:debitera subject:compte ${window}`
   ];
 }
 

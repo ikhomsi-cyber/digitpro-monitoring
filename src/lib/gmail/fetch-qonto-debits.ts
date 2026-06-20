@@ -11,7 +11,7 @@ import {
   type QontoUpcomingDebit
 } from "@/lib/gmail/qonto-debit-parser";
 
-const MAX_MESSAGES = 100;
+const MAX_MESSAGES = 30;
 
 function decodeBase64Url(data: string | null | undefined): string {
   if (!data) return "";
@@ -65,22 +65,17 @@ async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[]): Promise
   const ids: string[] = [];
 
   for (const q of queries) {
-    let pageToken: string | undefined;
-    do {
-      const listRes = await gmail.users.messages.list({
-        userId: "me",
-        q,
-        maxResults: MAX_MESSAGES,
-        pageToken
-      });
-      for (const message of listRes.data.messages ?? []) {
-        if (message.id && !seen.has(message.id)) {
-          seen.add(message.id);
-          ids.push(message.id);
-        }
+    const listRes = await gmail.users.messages.list({
+      userId: "me",
+      q,
+      maxResults: MAX_MESSAGES
+    });
+    for (const message of listRes.data.messages ?? []) {
+      if (message.id && !seen.has(message.id)) {
+        seen.add(message.id);
+        ids.push(message.id);
       }
-      pageToken = listRes.data.nextPageToken ?? undefined;
-    } while (pageToken && ids.length < MAX_MESSAGES);
+    }
     if (ids.length > 0) break;
   }
 
@@ -88,7 +83,8 @@ async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[]): Promise
 }
 
 /**
- * Recherche les emails Qonto « … débitera votre compte … » et extrait les prélèvements futurs.
+ * Recherche les emails Qonto « … débitera votre compte … » (10 derniers jours)
+ * et extrait les prélèvements futurs.
  */
 export async function fetchQontoUpcomingDebitsFromGmail(
   auth: Auth.OAuth2Client
