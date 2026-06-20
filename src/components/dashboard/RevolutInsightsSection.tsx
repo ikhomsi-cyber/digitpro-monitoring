@@ -47,6 +47,17 @@ function formatDebitDateLabel(iso: string): string {
   }).format(new Date(y, m - 1, d));
 }
 
+function shortenDebitOrganization(name: string): string {
+  const folded = name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (folded.includes("direction generale des finances") || folded.includes("dgfip")) {
+    return "DGFiP";
+  }
+  if (folded.includes("urssaf")) return "Urssaf";
+  if (folded.includes("hiway")) return "Hiway";
+  if (name.length > 14) return `${name.slice(0, 12).trim()}…`;
+  return name;
+}
+
 function UpcomingQontoDebitsList({
   debits,
   fmt
@@ -57,31 +68,40 @@ function UpcomingQontoDebitsList({
   if (!debits.length) return null;
 
   return (
-    <div className="mt-2.5 space-y-1.5 rounded-2xl border border-ink-200/50 bg-ink-50/60 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400 dark:text-white/35">
-        Prochains prélèvements
-      </p>
-      <ul className="space-y-1.5">
-        {debits.map((debit) => (
-          <li key={debit.id} className="flex items-start justify-between gap-2 text-[11px] leading-snug">
-            <span className="min-w-0 truncate font-medium text-ink-700 dark:text-white/70">
-              {debit.organization}
+    <div
+      className="mt-1.5 flex flex-wrap items-center gap-1.5"
+      aria-label="Prochains prélèvements"
+    >
+      <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 dark:text-white/50">
+        Prél.
+      </span>
+      {debits.map((debit) => (
+        <span
+          key={debit.id}
+          title={`${debit.organization} · ${formatDebitDateLabel(debit.debitDateIso)}`}
+          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-ink-200/55 bg-ink-50/70 px-2 py-0.5 text-[10px] leading-none dark:border-white/10 dark:bg-transparent"
+        >
+          <span className="truncate font-semibold text-ink-700 dark:text-white/90">
+            {shortenDebitOrganization(debit.organization)}
+          </span>
+          <span className="shrink-0 text-ink-300 dark:text-white/30" aria-hidden>
+            ·
+          </span>
+          {debit.amountEur != null ? (
+            <span className="shrink-0 font-bold tabular-nums text-ink-900 dark:text-white">
+              {fmt.euro(debit.amountEur)}
             </span>
-            <span className="shrink-0 text-right tabular-nums">
-              {debit.amountEur != null ? (
-                <span className="font-semibold text-ink-900 dark:text-white/85">
-                  {fmt.euro(debit.amountEur)}
-                </span>
-              ) : (
-                <span className="text-ink-400 dark:text-white/35">—</span>
-              )}
-              <span className="ml-1.5 text-ink-400 dark:text-white/38">
-                {formatDebitDateLabel(debit.debitDateIso)}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
+          ) : (
+            <span className="shrink-0 text-ink-400 dark:text-white/45">—</span>
+          )}
+          <span className="shrink-0 text-ink-300 dark:text-white/30" aria-hidden>
+            ·
+          </span>
+          <span className="shrink-0 tabular-nums text-ink-400 dark:text-white/55">
+            {formatDebitDateLabel(debit.debitDateIso)}
+          </span>
+        </span>
+      ))}
     </div>
   );
 }
