@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { clsx } from "clsx";
 import {
   Bar,
@@ -24,12 +24,13 @@ import {
   formatDashboardMonthLabel
 } from "@/lib/dashboard-period";
 import { useBillableActivityOptional } from "@/components/dashboard/BillableActivityContext";
-import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth } from "@/lib/billable-client-days";
+import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import {
   analyzeValeurReelle,
   computeVatSavingsKpis,
   VALEUR_REELLE_EXPENSE_CATEGORIES,
+  type ValeurReelleAnalysis,
   type ValeurReelleVatSavingsKpis
 } from "@/lib/valeur-reelle-analyze";
 import {
@@ -54,6 +55,7 @@ import {
   dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
 import { useRootIsDark } from "@/lib/use-root-is-dark";
+import { ValeurReelleSkeleton } from "@/components/dashboard/ValeurReelleSkeleton";
 
 const SEG_COLORS = {
   net: "#0ea5e9",
@@ -959,6 +961,91 @@ function RecoverableVatMonthlyBlock({
   );
 }
 
+type ValeurReelleViewModel = {
+  analysis: ValeurReelleAnalysis;
+  vatSavingsKpis: ValeurReelleVatSavingsKpis;
+  billableDaysInPeriod: number;
+  gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
+  gainPerDayPoints: TrailingGainPerDayPoint[];
+  tjmHtForPeriod: number;
+};
+
+function computeValeurReelleViewModel(input: {
+  transactions: readonly DashboardTx[];
+  selectedYears: number[];
+  selectedMonthsForYears: string[];
+  singleMonth: string | null;
+  billableSelected: ReadonlySet<string>;
+  billableRatePeriods: readonly BillableRatePeriod[];
+  billableTjmHt: number;
+}): ValeurReelleViewModel {
+  const {
+    transactions,
+    selectedYears,
+    selectedMonthsForYears,
+    singleMonth,
+    billableSelected,
+    billableRatePeriods,
+    billableTjmHt
+  } = input;
+
+  const analysis = analyzeValeurReelle(transactions, {
+    years: selectedYears,
+    months: selectedMonthsForYears.length ? selectedMonthsForYears : null
+  });
+
+  const refMonth = singleMonth ?? dashboardMonthKeyNowLocal();
+  const year = Number(refMonth.slice(0, 4));
+  const yearsForVat = selectedYears.includes(year) ? [year] : [selectedYears[0]!];
+  const vatYearMonthlyRows = analyzeValeurReelle(transactions, {
+    years: yearsForVat,
+    month: null
+  }).vatRecoverableMonthlyRows;
+  const vatSavingsKpis = computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: singleMonth });
+
+  const tjmHt = billableTjmHt;
+  const billableDaysInPeriod =
+    Number.isFinite(tjmHt) && tjmHt > 0
+      ? Math.round((analysis.cashTree.caFactureEur / tjmHt) * 10) / 10
+      : 0;
+
+  const gainPerWorkDayEstimate = singleMonth
+    ? estimateCurrentMonthGainPerWorkDay(
+        transactions,
+        analysis.cashTree,
+        billableSelected,
+        singleMonth
+      )
+    : null;
+
+  const gainPerDayPoints = buildTrailingGainPerWorkDayPoints(
+    transactions,
+    billableSelected,
+    dashboardMonthKeyNowLocal(),
+    12,
+    new Date(),
+    billableRatePeriods,
+    billableTjmHt
+  );
+
+  const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
+  const tjmHtForPeriod = resolveBillableTjmForClientMonth(
+    billableRatePeriods,
+    billableRatePeriods[0]?.clientName ?? "",
+    monthKey,
+    billableTjmHt
+  );
+
+  return {
+    analysis,
+    vatSavingsKpis,
+    billableDaysInPeriod,
+    gainPerWorkDayEstimate,
+    gainPerDayPoints,
+    tjmHtForPeriod
+  };
+}
+
 export function ValeurReelleClient({
   initialTransactions,
   demoMode,
@@ -1035,26 +1122,113 @@ export function ValeurReelleClient({
 
   const singleMonth = selectedMonthsForYears.length === 1 ? selectedMonthsForYears[0]! : null;
 
-  const analysis = useMemo(
+  const billableActivity = useBillableActivityOptional();
+  const billableSelected = billableActivity?.selected ?? new Set<string>();
+  const billableRatePeriods = billableActivity?.billableRatePeriods ?? [];
+  const billableTjmHt = billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT;
+  const billableSelectedKey = useMemo(
+    () => Array.from(billableSelected).sort().join("|"),
+    [billableSelected]
+  );
+  const billableRatePeriodsKey = useMemo(
     () =>
-      analyzeValeurReelle(transactions, {
-        years: selectedYears,
-        months: selectedMonthsForYears.length ? selectedMonthsForYears : null
-      }),
-    [selectedMonthsForYears, selectedYears, transactions]
+      billableRatePeriods
+        .map((period) => `${period.clientName}:${period.startDate}:${period.endDate ?? ""}:${period.tjmHt}`)
+        .join("|"),
+    [billableRatePeriods]
   );
 
-  const vatYearMonthlyRows = useMemo(() => {
-    const refMonth = singleMonth ?? dashboardMonthKeyNowLocal();
-    const year = Number(refMonth.slice(0, 4));
-    const yearsForVat = selectedYears.includes(year) ? [year] : [selectedYears[0]!];
-    return analyzeValeurReelle(transactions, { years: yearsForVat, month: null }).vatRecoverableMonthlyRows;
-  }, [singleMonth, selectedYears, transactions]);
-
-  const vatSavingsKpis = useMemo(
-    () => computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: singleMonth }),
-    [singleMonth, vatYearMonthlyRows]
+  const computeInputKey = useMemo(
+    () =>
+      [
+        transactions.length,
+        transactions[0]?.id ?? "",
+        transactions.at(-1)?.id ?? "",
+        selectedYears.join(","),
+        selectedMonthsForYears.join(","),
+        singleMonth ?? "",
+        billableSelectedKey,
+        billableRatePeriodsKey,
+        billableTjmHt
+      ].join(":"),
+    [
+      billableRatePeriodsKey,
+      billableSelectedKey,
+      billableTjmHt,
+      selectedMonthsForYears,
+      selectedYears,
+      singleMonth,
+      transactions
+    ]
   );
+
+  const [viewModel, setViewModel] = useState<ValeurReelleViewModel | null>(null);
+  const [viewModelKey, setViewModelKey] = useState<string | null>(null);
+  const [readyToShow, setReadyToShow] = useState(false);
+  const isComputing = viewModelKey !== computeInputKey;
+
+  useEffect(() => {
+    setReadyToShow(false);
+    let cancelled = false;
+    let timer: number | undefined;
+    const frame = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        try {
+          const next = computeValeurReelleViewModel({
+            transactions,
+            selectedYears,
+            selectedMonthsForYears,
+            singleMonth,
+            billableSelected,
+            billableRatePeriods,
+            billableTjmHt
+          });
+          if (cancelled) return;
+          setViewModel(next);
+          setViewModelKey(computeInputKey);
+        } catch (error) {
+          console.error("[valeur-reelle] compute failed:", error);
+          if (!cancelled) {
+            setViewModel(null);
+            setViewModelKey(computeInputKey);
+          }
+        }
+      }, 0);
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [
+    billableRatePeriods,
+    billableSelected,
+    billableTjmHt,
+    computeInputKey,
+    selectedMonthsForYears,
+    selectedYears,
+    singleMonth,
+    transactions
+  ]);
+
+  useEffect(() => {
+    if (isComputing || !viewModel) {
+      setReadyToShow(false);
+      return;
+    }
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setReadyToShow(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [isComputing, viewModel, computeInputKey]);
 
   const handleRecategorized = useCallback((transactionId: string, category: string) => {
     setLocalCategoryOverrides((prev) => ({
@@ -1063,74 +1237,24 @@ export function ValeurReelleClient({
     }));
   }, []);
 
-  const billableActivity = useBillableActivityOptional();
-  const billableDaysInPeriod = useMemo(
-    () => {
-      const tjmHt = billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT;
-      if (!Number.isFinite(tjmHt) || tjmHt <= 0) return 0;
-      return Math.round((analysis.cashTree.caFactureEur / tjmHt) * 10) / 10;
-    },
-    [analysis.cashTree.caFactureEur, billableActivity?.tjmHt]
+  const showSkeleton = isComputing || !viewModel || !readyToShow;
+
+  const periodFilter = (
+    <DashboardInsightPeriodFilter
+      eyebrow="Valeur réelle"
+      title="Ce qu'il vous reste vraiment"
+      yearOptions={yearOptions}
+      monthOptions={monthOptions}
+      selectedYears={selectedYears}
+      selectedMonths={selectedMonthsForYears}
+      onToggleYear={onToggleYear}
+      onToggleMonth={onToggleMonth}
+      onClearMonths={onClearMonths}
+    />
   );
 
-  const gainPerWorkDayEstimate = useMemo(
-    () => {
-      if (!singleMonth) return null;
-      return estimateCurrentMonthGainPerWorkDay(
-        transactions,
-        analysis.cashTree,
-        billableActivity?.selected ?? new Set<string>(),
-        singleMonth
-      );
-    },
-    [analysis.cashTree, billableActivity?.selected, singleMonth, transactions]
-  );
-
-  const gainPerDayPoints = useMemo(
-    () =>
-      buildTrailingGainPerWorkDayPoints(
-        transactions,
-        billableActivity?.selected ?? new Set<string>(),
-        dashboardMonthKeyNowLocal(),
-        12,
-        new Date(),
-        billableActivity?.billableRatePeriods ?? [],
-        billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT
-      ),
-    [
-      billableActivity?.billableRatePeriods,
-      billableActivity?.selected,
-      billableActivity?.tjmHt,
-      transactions
-    ]
-  );
-
-  const tjmHtForPeriod = useMemo(() => {
-    const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
-    return resolveBillableTjmForClientMonth(
-      billableActivity?.billableRatePeriods ?? [],
-      billableActivity?.billableRatePeriods[0]?.clientName ?? "",
-      monthKey,
-      billableActivity?.tjmHt ?? BILLABLE_CLIENT_TJM_HT
-    );
-  }, [billableActivity?.billableRatePeriods, billableActivity?.tjmHt, singleMonth]);
-
-  const tree = analysis.cashTree;
-
-  return (
-    <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
-      <DashboardInsightPeriodFilter
-        eyebrow="Valeur réelle"
-        title="Ce qu'il vous reste vraiment"
-        yearOptions={yearOptions}
-        monthOptions={monthOptions}
-        selectedYears={selectedYears}
-        selectedMonths={selectedMonthsForYears}
-        onToggleYear={onToggleYear}
-        onToggleMonth={onToggleMonth}
-        onClearMonths={onClearMonths}
-      />
-
+  const statusBanners = (
+    <>
       {demoMode ? (
         <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Mode démo — montants fictifs.</p>
       ) : null}
@@ -1139,60 +1263,83 @@ export function ValeurReelleClient({
           {loadError}
         </p>
       ) : null}
+    </>
+  );
 
-      <CashAvailableCard
-        tree={tree}
-        fmt={fmt}
-        billableDays={billableDaysInPeriod}
-        gainPerWorkDayEstimate={gainPerWorkDayEstimate}
-        periodLabel={analysis.periodLabel}
-        gainPerDayPoints={gainPerDayPoints}
-      />
+  if (showSkeleton) {
+    return (
+      <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
+        {periodFilter}
+        {statusBanners}
+        <ValeurReelleSkeleton className="scroll-mt-0" />
+      </div>
+    );
+  }
 
-      <div className={dashboardInsightGrid}>
-        <DailyValueBlock
+  const { analysis, vatSavingsKpis, billableDaysInPeriod, gainPerWorkDayEstimate, gainPerDayPoints, tjmHtForPeriod } =
+    viewModel;
+  const tree = analysis.cashTree;
+
+  return (
+    <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
+      {periodFilter}
+      {statusBanners}
+
+      <div className={dashboardSectionStack}>
+        <CashAvailableCard
           tree={tree}
           fmt={fmt}
-          tjmHt={tjmHtForPeriod}
           billableDays={billableDaysInPeriod}
           gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+          periodLabel={analysis.periodLabel}
+          gainPerDayPoints={gainPerDayPoints}
         />
-        <FinancialAllocationBlock tree={tree} fmt={fmt} />
-      </div>
 
-      <div className={dashboardInsightGrid}>
-        <FeesBlock
-          eyebrow="Frais société"
-          title="Frais DigitPro"
-          amount={tree.mandatoryFeesEur}
-          breakdown={tree.mandatoryFeesBreakdown}
-          palette={MANDATORY_FEES_COLORS}
+        <div className={dashboardInsightGrid}>
+          <DailyValueBlock
+            tree={tree}
+            fmt={fmt}
+            tjmHt={tjmHtForPeriod}
+            billableDays={billableDaysInPeriod}
+            gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+          />
+          <FinancialAllocationBlock tree={tree} fmt={fmt} />
+        </div>
+
+        <div className={dashboardInsightGrid}>
+          <FeesBlock
+            eyebrow="Frais société"
+            title="Frais DigitPro"
+            amount={tree.mandatoryFeesEur}
+            breakdown={tree.mandatoryFeesBreakdown}
+            palette={MANDATORY_FEES_COLORS}
+            fmt={fmt}
+            caHt={tree.caFactureEur}
+            tjmHt={tjmHtForPeriod}
+            recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
+            onRecategorized={handleRecategorized}
+          />
+          <FeesBlock
+            eyebrow="Dépenses perso"
+            title="Frais perso"
+            amount={tree.personalChargesEur}
+            breakdown={tree.personalChargesBreakdown}
+            palette={PERSONAL_CHARGES_COLORS}
+            fmt={fmt}
+            caHt={tree.caFactureEur}
+            tjmHt={tjmHtForPeriod}
+            recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
+            onRecategorized={handleRecategorized}
+          />
+        </div>
+
+        <RecoverableVatMonthlyBlock
+          rows={analysis.vatRecoverableMonthlyRows}
+          kpis={vatSavingsKpis}
+          paidTransactions={analysis.vatLiability.paidTransactions}
           fmt={fmt}
-          caHt={tree.caFactureEur}
-          tjmHt={tjmHtForPeriod}
-          recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
-          onRecategorized={handleRecategorized}
-        />
-        <FeesBlock
-          eyebrow="Dépenses perso"
-          title="Frais perso"
-          amount={tree.personalChargesEur}
-          breakdown={tree.personalChargesBreakdown}
-          palette={PERSONAL_CHARGES_COLORS}
-          fmt={fmt}
-          caHt={tree.caFactureEur}
-          tjmHt={tjmHtForPeriod}
-          recategorizeOptions={VALEUR_REELLE_EXPENSE_CATEGORIES}
-          onRecategorized={handleRecategorized}
         />
       </div>
-
-      <RecoverableVatMonthlyBlock
-        rows={analysis.vatRecoverableMonthlyRows}
-        kpis={vatSavingsKpis}
-        paidTransactions={analysis.vatLiability.paidTransactions}
-        fmt={fmt}
-      />
     </div>
   );
 }

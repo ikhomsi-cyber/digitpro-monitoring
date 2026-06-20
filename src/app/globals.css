@@ -203,6 +203,36 @@ body {
     animation: shimmer 1.4s linear infinite;
   }
 
+  /** Skeleton aligné cartes dashboard (dark premium). */
+  .skeleton-dashboard {
+    @apply relative overflow-hidden rounded-md bg-ink-200/50 dark:bg-white/[0.06];
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .dark .skeleton-dashboard {
+    box-shadow: inset 0 1px 0 rgba(186, 230, 253, 0.08);
+  }
+  .skeleton-dashboard::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.55) 48%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+  .dark .skeleton-dashboard::after {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(186, 230, 253, 0.14) 48%,
+      transparent 100%
+    );
+  }
+
   /** Apple-grade hero text */
   .h-display {
     @apply font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 sm:text-5xl md:text-6xl dark:text-ink-50;

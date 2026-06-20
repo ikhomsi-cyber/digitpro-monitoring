@@ -4,6 +4,11 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={clsx("skeleton", className)} aria-hidden="true" />;
 }
 
+/** Os de chargement — palette cartes insight (dark premium). */
+export function DashboardSkeleton({ className }: { className?: string }) {
+  return <div className={clsx("skeleton-dashboard", className)} aria-hidden="true" />;
+}
+
 export function SkeletonText({
   lines = 3,
   className

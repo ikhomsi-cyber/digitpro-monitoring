@@ -97,6 +97,7 @@ import {
 } from "@/lib/sasu-analytics";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import { useDashboardSection, type DashboardSection } from "@/components/dashboard/DashboardSectionContext";
+import { ValeurReelleSkeleton } from "@/components/dashboard/ValeurReelleSkeleton";
 
 export type { DashboardTx };
 
@@ -112,7 +113,13 @@ const ValeurReelleClient = dynamic(
     import("@/components/dashboard/ValeurReelleClient").then((mod) => ({
       default: mod.ValeurReelleClient
     })),
-  { loading: () => null }
+  {
+    loading: () => (
+      <div className="scroll-mt-28 overflow-x-hidden space-y-4">
+        <ValeurReelleSkeleton />
+      </div>
+    )
+  }
 );
 
 const DashboardCategorisationPanel = dynamic(
