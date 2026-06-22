@@ -80,6 +80,8 @@ export function DashboardFloatingDock() {
   const ctx = { scope, panel, hash, section };
   const onDashboardTabClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard") || !sectionCtx) return;
+    // LMNP panel is server-rendered — keep a full navigation when leaving it.
+    if (panel === "lmnp") return;
     event.preventDefault();
     sectionCtx.navigateWithinDashboard(href);
   };
@@ -172,6 +174,8 @@ export function DashboardDesktopSidebar() {
   const ctx = { scope, panel, hash, section };
   const onDashboardTabClick = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!pathname.startsWith("/dashboard") || !href.startsWith("/dashboard") || !sectionCtx) return;
+    // LMNP panel is server-rendered — keep a full navigation when leaving it.
+    if (panel === "lmnp") return;
     event.preventDefault();
     sectionCtx.navigateWithinDashboard(href);
   };

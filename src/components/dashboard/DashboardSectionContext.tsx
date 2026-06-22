@@ -34,10 +34,8 @@ const DashboardSectionContext = createContext<DashboardSectionContextValue | nul
 
 export function DashboardSectionProvider({ children }: { children: ReactNode }) {
   const nextSearchParams = useSearchParams();
-  const [urlSearch, setUrlSearch] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return window.location.search;
-  });
+  const nextSearch = nextSearchParams.toString();
+  const [urlSearch, setUrlSearch] = useState(() => (nextSearch ? `?${nextSearch}` : ""));
 
   useEffect(() => {
     const sync = () => setUrlSearch(window.location.search);
@@ -46,13 +44,14 @@ export function DashboardSectionProvider({ children }: { children: ReactNode }) 
   }, []);
 
   useEffect(() => {
-    const next = nextSearchParams.toString();
-    const current =
-      typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : "";
-    if (next !== current) {
-      setUrlSearch(next ? `?${next}` : "");
+    if (typeof window === "undefined") return;
+    const target = nextSearch ? `?${nextSearch}` : "";
+    // Sync when Next.js router and the URL bar agree (Link / soft navigation).
+    // pushState updates are handled directly by navigateWithinDashboard.
+    if (window.location.search === target) {
+      setUrlSearch(target);
     }
-  }, [nextSearchParams]);
+  }, [nextSearch]);
 
   const searchParams = useMemo(
     () => new URLSearchParams(urlSearch.startsWith("?") ? urlSearch.slice(1) : urlSearch),

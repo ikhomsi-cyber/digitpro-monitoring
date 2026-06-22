@@ -922,20 +922,20 @@ function RecoverableVatMonthlyBlock({
       )}
 
       {paidTransactions.length ? (
-        <div className="mt-4 rounded-2xl border border-ink-200/70 bg-white/55 p-3 dark:border-cyan-100/[0.08] dark:bg-[#06242b]/40" data-private>
+        <div className="mt-4 rounded-2xl border border-ink-200/70 bg-white/55 p-3 dark:border-cyan-100/[0.12] dark:bg-white/[0.04]" data-private>
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/40">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-cyan-50/58">
                 Transactions TVA payées
               </p>
-              <p className="mt-0.5 text-[11px] font-semibold text-ink-500 dark:text-white/35">
+              <p className="mt-0.5 text-[11px] font-semibold text-ink-500 dark:text-cyan-50/48">
                 {paidTransactions.length} ligne{paidTransactions.length > 1 ? "s" : ""}
               </p>
             </div>
             <button
               type="button"
               onClick={() => setShowPaidVatTransactions((prev) => !prev)}
-              className="shrink-0 rounded-full border border-ink-200/80 bg-white/65 px-3 py-1.5 text-[11px] font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-cyan-100/[0.10] dark:bg-white/[0.06] dark:text-white/65 dark:shadow-none dark:hover:bg-white/[0.10] dark:hover:text-white"
+              className="shrink-0 rounded-full border border-ink-200/80 bg-white/65 px-3 py-1.5 text-[11px] font-bold text-ink-700 shadow-sm transition hover:bg-white dark:border-cyan-100/[0.14] dark:bg-cyan-50/[0.08] dark:text-cyan-50/85 dark:shadow-none dark:hover:bg-cyan-50/[0.12] dark:hover:text-cyan-50"
               aria-expanded={showPaidVatTransactions}
             >
               {showPaidVatTransactions ? "Masquer" : "Développer"}
@@ -947,20 +947,20 @@ function RecoverableVatMonthlyBlock({
                 {paidTransactions.slice(0, 12).map((tx) => (
                   <li
                     key={`${tx.id}-${tx.date}`}
-                    className="flex justify-between gap-3 border-b border-ink-200/70 pb-2 last:border-0 last:pb-0 dark:border-cyan-100/[0.06]"
+                    className="flex justify-between gap-3 rounded-lg px-1 py-1.5 transition-colors hover:bg-ink-50/80 dark:border-cyan-100/[0.06] dark:hover:bg-cyan-50/[0.05] [&:not(:last-child)]:border-b [&:not(:last-child)]:border-ink-200/70 [&:not(:last-child)]:pb-2"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-semibold text-ink-800 dark:text-white/78">{tx.label}</span>
-                      <span className="text-ink-500 dark:text-white/35">{tx.date} · {tx.category}</span>
+                      <span className="block truncate font-semibold text-ink-800 dark:text-cyan-50/95">{tx.label}</span>
+                      <span className="text-ink-500 dark:text-cyan-50/55">{tx.date} · {tx.category}</span>
                     </span>
-                    <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-white">
+                    <span className="shrink-0 font-semibold tabular-nums text-ink-900 dark:text-cyan-50">
                       {fmt.euro(Math.abs(tx.amountEur))}
                     </span>
                   </li>
                 ))}
               </ul>
               {paidTransactions.length > 12 ? (
-                <p className="mt-2 text-[11px] font-medium text-ink-500 dark:text-white/38">
+                <p className="mt-2 text-[11px] font-medium text-ink-500 dark:text-cyan-50/50">
                   + {paidTransactions.length - 12} autres transactions TVA
                 </p>
               ) : null}

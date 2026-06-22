@@ -206,7 +206,9 @@ export default async function DashboardPage({
       initialVacationDayIsos={initialBillableVacationDays}
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
-    <DashboardDesktopSidebar />
+    <Suspense fallback={null}>
+      <DashboardSectionProvider>
+        <DashboardDesktopSidebar />
     <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       <DashboardTopNav
         envMode={envMode}
@@ -230,8 +232,6 @@ export default async function DashboardPage({
           loadError={transactionsLoadError}
         />
       ) : (
-        <Suspense fallback={null}>
-          <DashboardSectionProvider>
             <DashboardClient
               syncKey={syncKey}
               initialTransactions={transactions}
@@ -244,10 +244,9 @@ export default async function DashboardPage({
               loadError={transactionsLoadError}
               syncFullHistoryOnMount={syncFullHistoryOnMount}
             />
-            <DashboardFloatingDock />
-          </DashboardSectionProvider>
-        </Suspense>
       )}
+
+      {!showLmnpPanel ? <DashboardFloatingDock /> : null}
 
       <footer className="mt-16 flex flex-col gap-2 border-t border-ink-200/80 pt-8 text-xs text-ink-500 dark:border-white/[0.08] dark:text-white/40 sm:flex-row sm:items-center sm:justify-between">
         {(envMode === "DEMO" || demoPreferenceOn || dummyDataActive) ? (
@@ -267,6 +266,8 @@ export default async function DashboardPage({
         </span>
       </footer>
     </div>
+      </DashboardSectionProvider>
+    </Suspense>
     </BillableActivityProvider>
     </DashboardDummyDataProvider>
   );

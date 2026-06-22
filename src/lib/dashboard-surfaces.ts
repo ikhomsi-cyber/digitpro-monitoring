@@ -126,3 +126,12 @@ export function dashboardFilterPill(active: boolean) {
       : "border-ink-200/70 bg-transparent text-ink-600 hover:border-ink-300 hover:bg-ink-50/50 dark:border-white/[0.08] dark:text-white/70 dark:hover:border-white/16 dark:hover:text-white"
   );
 }
+
+export function dashboardFilterPillAmount(active: boolean) {
+  return clsx(
+    "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
+    active
+      ? "bg-brand-200/75 text-brand-900 dark:bg-white/[0.16] dark:text-cyan-50"
+      : "bg-ink-100 text-ink-600 dark:bg-cyan-50/[0.10] dark:text-cyan-50/88"
+  );
+}

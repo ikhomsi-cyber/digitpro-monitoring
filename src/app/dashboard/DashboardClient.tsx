@@ -23,6 +23,8 @@ import {
 import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
+import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
+import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
@@ -51,6 +53,7 @@ import {
   dashboardEmptyState,
   dashboardEyebrow,
   dashboardFilterPill,
+  dashboardFilterPillAmount,
   dashboardGaugeTrack,
   dashboardInsetPanel,
   dashboardPanelTitle,
@@ -120,22 +123,6 @@ const DashboardCategorisationPanel = dynamic(
   () =>
     import("@/app/dashboard/DashboardCategorisationPanel").then((mod) => ({
       default: mod.DashboardCategorisationPanel
-    })),
-  { loading: () => null }
-);
-
-const ActivityOverviewPremium = dynamic(
-  () =>
-    import("@/components/dashboard/ActivityOverviewPremium").then((mod) => ({
-      default: mod.ActivityOverviewPremium
-    })),
-  { loading: () => null }
-);
-
-const BillableDaysCalendarBlock = dynamic(
-  () =>
-    import("@/components/dashboard/BillableDaysCalendarBlock").then((mod) => ({
-      default: mod.BillableDaysCalendarBlock
     })),
   { loading: () => null }
 );
@@ -1195,7 +1182,7 @@ export function DashboardClient({
                             aria-hidden
                           />
                           <span className="max-w-[11rem] truncate">{item.name}</span>
-                          <span className="rounded-full bg-ink-100 px-2 py-0.5 text-ink-600 dark:bg-white/[0.07] dark:text-white/68">{fmt.euro(item.total)}</span>
+                          <span className={dashboardFilterPillAmount(active)}>{fmt.euro(item.total)}</span>
                         </button>
                       );
                     })}

@@ -26,6 +26,11 @@ type Props = {
   powensPrimaryImportAxis?: "pro" | "personal";
 };
 
+const menuItemClassName =
+  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-semibold text-ink-800 transition hover:bg-ink-50 dark:text-cyan-50/90 dark:hover:bg-cyan-50/[0.12]";
+
+const menuItemIconClassName = "h-4 w-4 shrink-0 text-ink-500 dark:text-cyan-100/70";
+
 export function DashboardDataActionsMenu({
   runtimeMode,
   canWrite,
@@ -253,11 +258,11 @@ export function DashboardDataActionsMenu({
         <div className="absolute right-0 top-14 z-[80] w-72 overflow-hidden rounded-2xl border border-ink-300 bg-white p-2 text-sm text-ink-900 shadow-[0_30px_90px_-24px_rgba(15,23,42,0.45),0_0_0_1px_rgba(15,23,42,0.04)] dark:border-cyan-100/[0.24] dark:bg-[#06242b] dark:text-cyan-50 dark:shadow-[0_32px_100px_-24px_rgba(0,0,0,0.98),0_0_0_1px_rgba(103,232,249,0.10),inset_0_1px_0_rgba(255,255,255,0.08)]">
           <Link
             href="/parametres"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 font-semibold text-ink-800 transition hover:bg-ink-50 dark:text-cyan-50/92 dark:hover:bg-cyan-50/[0.12]"
+            className={menuItemClassName}
             onClick={() => setOpen(false)}
           >
-            <Settings2 className="h-4 w-4 text-ink-500 dark:text-cyan-100/72" aria-hidden />
-            Paramètres
+            <Settings2 className={menuItemIconClassName} aria-hidden />
+            <span>Paramètres</span>
           </Link>
           <div className="my-1 h-px bg-ink-200/80 dark:bg-cyan-100/[0.14]" />
           <MenuButton
@@ -325,10 +330,10 @@ function MenuButton({
       type="button"
       title={title}
       disabled={disabled}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-semibold text-ink-800 transition hover:bg-ink-50 disabled:opacity-50 dark:text-cyan-50/90 dark:hover:bg-cyan-50/[0.12] dark:disabled:opacity-45"
+      className={`${menuItemClassName} disabled:opacity-50 dark:disabled:opacity-45`}
       onClick={onClick}
     >
-      <Icon className="h-4 w-4 text-ink-500 dark:text-cyan-100/70" aria-hidden />
+      <Icon className={menuItemIconClassName} aria-hidden />
       <span>{label}</span>
     </button>
   );
