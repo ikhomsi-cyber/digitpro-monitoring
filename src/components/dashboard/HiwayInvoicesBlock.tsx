@@ -9,14 +9,13 @@ import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
 import {
   disconnectGmail,
   fetchHiwayInvoices,
-  loadHiwayInvoices,
   getGmailConnectUrl,
   getGmailConnectionStatus,
   type GmailConnectionStatus
 } from "@/app/dashboard/gmail-actions";
-import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
 import { GMAIL_RECONNECT_REQUIRED_MESSAGE } from "@/lib/gmail/oauth-grant";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
+import { useHiwayInvoices } from "@/components/dashboard/HiwayInvoicesContext";
 
 const HIWAY_INVOICES_PREVIEW_COUNT = 3;
 
@@ -29,8 +28,8 @@ function formatInvoiceDate(iso: string): string {
 
 export function HiwayInvoicesBlock() {
   const fmt = useDashboardDisplayFormat();
+  const { invoices, setInvoices } = useHiwayInvoices();
   const [status, setStatus] = useState<GmailConnectionStatus | null>(null);
-  const [invoices, setInvoices] = useState<HiwayInvoice[] | null>(null);
   const [invoicesExpanded, setInvoicesExpanded] = useState(false);
   const [reconnectSuggested, setReconnectSuggested] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -45,21 +44,9 @@ export function HiwayInvoicesBlock() {
     });
   }, []);
 
-  const refreshStoredInvoices = useCallback(() => {
-    startTransition(async () => {
-      try {
-        const { invoices: rows } = await loadHiwayInvoices();
-        setInvoices(rows.length > 0 ? rows : null);
-      } catch {
-        // Table pas encore migrée ou mode démo : ignorer silencieusement.
-      }
-    });
-  }, []);
-
   useEffect(() => {
     refreshStatus();
-    refreshStoredInvoices();
-  }, [refreshStatus, refreshStoredInvoices]);
+  }, [refreshStatus]);
 
   // Retour du callback OAuth (/dashboard?gmail_connect=ok|error).
   useEffect(() => {

@@ -16,11 +16,9 @@ function readDarkFromDom(): boolean {
  */
 export function DarkModeToggle({ className }: { className?: string }) {
   const [dark, setDark] = useState(false);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setDark(readDarkFromDom());
-    setReady(true);
   }, []);
 
   const toggle = useCallback(() => {
@@ -42,16 +40,16 @@ export function DarkModeToggle({ className }: { className?: string }) {
       aria-pressed={dark}
       title={dark ? "Passer en thème clair" : "Passer en thème sombre"}
       className={clsx(
-        "inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full border text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950",
-        ready && dark
-          ? "border-amber-400/50 bg-amber-950/40 text-amber-200 hover:bg-amber-900/50"
-          : "border-ink-300 bg-white text-ink-800 hover:border-ink-400 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-100 dark:hover:border-ink-500",
+        "inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-2xl border text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950",
+        "border-ink-200/90 bg-white/90 text-ink-700 hover:bg-white dark:border-cyan-100/[0.16] dark:bg-cyan-50/[0.10] dark:text-white dark:hover:bg-cyan-50/[0.16]",
         className
       )}
     >
-      {ready && dark ? <Sun className="h-5 w-5" strokeWidth={2} aria-hidden /> : null}
-      {ready && !dark ? <Moon className="h-5 w-5" strokeWidth={2} aria-hidden /> : null}
-      {!ready ? <span className="h-5 w-5" aria-hidden /> : null}
+      {/* Les deux icônes sont rendues côté serveur ; la classe `dark` sur <html>
+          (posée par le script inline avant le paint) choisit laquelle afficher.
+          Évite le cercle vide au lancement et tout mismatch d'hydratation. */}
+      <Moon className="h-5 w-5 dark:hidden" strokeWidth={2} aria-hidden />
+      <Sun className="hidden h-5 w-5 dark:block" strokeWidth={2} aria-hidden />
       <span className="sr-only">{dark ? "Thème sombre actif" : "Thème clair actif"}</span>
     </button>
   );

@@ -25,6 +25,15 @@ import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
 import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
+import {
+  HiwayInvoicesProvider,
+  useHiwayInvoicesState
+} from "@/components/dashboard/HiwayInvoicesContext";
+import {
+  additionalCsgFromInvoiceCaHt,
+  localMonthKey,
+  sumHiwayInvoiceHtForMonth
+} from "@/lib/hiway-invoice-aggregate";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
@@ -260,6 +269,29 @@ export function DashboardClient({
 
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
+  /** Factures Hiway (partagées avec le graphique « Jours facturés » et le bloc Factures). */
+  const hiwayInvoicesState = useHiwayInvoicesState(!demoMode);
+  /**
+   * CSG additionnel issu des factures Hiway émises sur le mois civil en cours :
+   * le montant facturé est compté comme CA HT supplémentaire (taux CSG appliqué tel quel).
+   */
+  const additionalCsgEur = useMemo(
+    () =>
+      additionalCsgFromInvoiceCaHt(
+        sumHiwayInvoiceHtForMonth(hiwayInvoicesState.invoices, localMonthKey())
+      ),
+    [hiwayInvoicesState.invoices]
+  );
+  const displayHeroStats = useMemo<DashboardHeroStats>(() => {
+    if (additionalCsgEur <= 0) return currentHeroStats;
+    return {
+      ...currentHeroStats,
+      detteCsgDepuisDebutEur:
+        Math.round((currentHeroStats.detteCsgDepuisDebutEur + additionalCsgEur) * 100) / 100,
+      detteTotaleDepuisDebutEur:
+        Math.round((currentHeroStats.detteTotaleDepuisDebutEur + additionalCsgEur) * 100) / 100
+    };
+  }, [currentHeroStats, additionalCsgEur]);
   /** Dette nette / KPIs fiscaux : masqués tant que l’historique complet n’est pas chargé. */
   const [heroStatsReady, setHeroStatsReady] = useState(
     () => !syncFullHistoryOnMount || demoMode
@@ -950,6 +982,7 @@ export function DashboardClient({
   }, []);
 
   return (
+    <HiwayInvoicesProvider value={hiwayInvoicesState}>
     <main id="dashboard-main" className="relative mt-0 scroll-mt-28 overflow-x-hidden sm:mt-2">
       <SectionThemeSync />
       <div className={clsx("w-full", dashboardSectionStack)}>
@@ -958,28 +991,28 @@ export function DashboardClient({
         className={clsx(dashboardSection !== "full" && "hidden", dashboardSectionStack)}
         aria-hidden={dashboardSection !== "full"}
       >
-          <RevolutBalanceHero stats={currentHeroStats} statsReady={heroStatsReady} />
+          <RevolutBalanceHero stats={displayHeroStats} statsReady={heroStatsReady} />
           <RevolutInsightsSection
             transactions={transactions}
-            bncYearTotalEur={currentHeroStats.bncYearTotalEur}
+            bncYearTotalEur={displayHeroStats.bncYearTotalEur}
           />
           <TaxLiabilityCard
-            cashEur={currentHeroStats.soldeQontoEur}
-            vatEur={currentHeroStats.detteTvaDepuisDebutEur}
-            csgEur={currentHeroStats.detteCsgDepuisDebutEur}
-            totalLiabilityEur={currentHeroStats.detteTotaleDepuisDebutEur}
+            cashEur={displayHeroStats.soldeQontoEur}
+            vatEur={displayHeroStats.detteTvaDepuisDebutEur}
+            csgEur={displayHeroStats.detteCsgDepuisDebutEur}
+            totalLiabilityEur={displayHeroStats.detteTotaleDepuisDebutEur}
             statsReady={heroStatsReady}
             formatEuro={fmt.euro}
             trend={taxLiabilityTrend}
           />
           <RevenueAllocationChart
-            allocation={currentHeroStats.tjmRepartitionMois}
+            allocation={displayHeroStats.tjmRepartitionMois}
             formatEuro={fmt.euro}
             formatInt={fmt.int}
             trend={revenueAllocationTrend}
           />
           <DashboardPremiumHero
-            stats={currentHeroStats}
+            stats={displayHeroStats}
             transactions={transactions}
             statsReady={heroStatsReady}
             contextMessage={heroContextMessage}
@@ -1204,24 +1237,15 @@ export function DashboardClient({
                         const y = 18 + tick * 34;
                         const value = maxSasuMonthlyChartValue * (1 - tick / 3);
                         return (
-                          <g key={`grid-${tick}`}>
-                            <line
-                              x1="30"
-                              x2="312"
-                              y1={y}
-                              y2={y}
-                              stroke="var(--chart-grid)"
-                              strokeDasharray="4 5"
-                            />
-                            <text
-                              x="0"
-                              y={y + 3}
-                              fill="var(--chart-label)"
-                              style={{ fontSize: 7.5, fontWeight: 800 }}
-                            >
-                              {compactEuroAxis(value)}
-                            </text>
-                          </g>
+                          <text
+                            key={`grid-${tick}`}
+                            x="0"
+                            y={y + 3}
+                            fill="var(--chart-label)"
+                            style={{ fontSize: 7.5, fontWeight: 800 }}
+                          >
+                            {compactEuroAxis(value)}
+                          </text>
                         );
                       })}
                       <line x1="30" x2="312" y1="136" y2="136" stroke="var(--chart-axis)" strokeWidth="1.2" />
@@ -2147,5 +2171,6 @@ export function DashboardClient({
       ) : null}
       </div>
     </main>
+    </HiwayInvoicesProvider>
   );
 }

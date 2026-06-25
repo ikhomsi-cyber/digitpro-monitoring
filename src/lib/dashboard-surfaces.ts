@@ -129,9 +129,9 @@ export function dashboardFilterPill(active: boolean) {
 
 export function dashboardFilterPillAmount(active: boolean) {
   return clsx(
-    "rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums",
+    "rounded-full border px-2 py-0.5 text-[10px] font-bold tabular-nums",
     active
-      ? "bg-brand-200/75 text-brand-900 dark:bg-white/[0.16] dark:text-cyan-50"
-      : "bg-ink-100 text-ink-600 dark:bg-cyan-50/[0.10] dark:text-cyan-50/88"
+      ? "border-brand-300/60 bg-brand-200/75 text-brand-900 dark:border-cyan-100/24 dark:bg-white/[0.18] dark:text-white dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+      : "border-transparent bg-ink-100 text-ink-600 dark:border-cyan-100/[0.14] dark:bg-white/[0.10] dark:text-cyan-50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
   );
 }

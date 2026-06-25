@@ -23,6 +23,8 @@ import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { ActivityMonthSummaryCard } from "@/components/dashboard/ActivityMonthSummaryCard";
 import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
+import { useHiwayInvoices } from "@/components/dashboard/HiwayInvoicesContext";
+import { localMonthKey, sumHiwayInvoiceHtForMonth } from "@/lib/hiway-invoice-aggregate";
 import {
   appendAgendaWorkedDayMonths,
   buildInvoiceWorkedDaysPastMonthsSeries
@@ -440,6 +442,13 @@ export function BillableDaysCalendarBlock({
     viewYear
   ]);
 
+  const { invoices: hiwayInvoices } = useHiwayInvoices();
+  /** CA HT facturé (Hiway) sur le mois civil en cours, pour requalifier la barre « À facturer ». */
+  const currentMonthInvoiceCaHt = useMemo(
+    () => sumHiwayInvoiceHtForMonth(hiwayInvoices, localMonthKey(now)),
+    [hiwayInvoices, now]
+  );
+
   const invoiceWorkedDaysSeries = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return [];
     return buildInvoiceWorkedDaysPastMonthsSeries(
@@ -491,8 +500,24 @@ export function BillableDaysCalendarBlock({
       billableRatePeriods,
       tjmHt
     );
-    if (workedDaysChartYear === "all") return withAgenda;
-    let rows = withAgenda.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
+    // Si une facture Hiway a été émise sur le mois en cours, la barre « À facturer »
+    // (estimation agenda) devient « Déjà facturé » au montant réel de la facture.
+    const currentKey = localMonthKey(now);
+    const withInvoice =
+      currentMonthInvoiceCaHt > 0
+        ? withAgenda.map((row) => {
+            if (row.monthKey !== currentKey || row.kind !== "a_facturer") return row;
+            const tjm = row.tjmHt > 0 ? row.tjmHt : tjmHt;
+            return {
+              ...row,
+              kind: "deja_facture" as const,
+              caHt: currentMonthInvoiceCaHt,
+              days: tjm > 0 ? Math.round((currentMonthInvoiceCaHt / tjm) * 10) / 10 : row.days
+            };
+          })
+        : withAgenda;
+    if (workedDaysChartYear === "all") return withInvoice;
+    let rows = withInvoice.filter((r) => r.monthKey.startsWith(`${workedDaysChartYear}-`));
     if (workedDaysChartQuarter !== "full") {
       const q = workedDaysChartQuarter;
       const mStart = (q - 1) * 3 + 1;
@@ -509,6 +534,7 @@ export function BillableDaysCalendarBlock({
     now,
     selected,
     tjmHt,
+    currentMonthInvoiceCaHt,
     workedDaysChartYear,
     workedDaysChartQuarter
   ]);

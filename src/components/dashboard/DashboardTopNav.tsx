@@ -93,7 +93,7 @@ export function DashboardTopNav({
         <div className="flex items-center justify-end gap-1 sm:gap-1.5">
           {showDummyDataToggle ? <DashboardDummyDataToggle active={dummyDataActive} /> : null}
           {showDarkModeToggle ? (
-            <DarkModeToggle className="h-11 w-11 rounded-2xl border-ink-200/90 bg-white/90 dark:border-cyan-100/[0.16] dark:bg-cyan-50/[0.10] dark:text-white dark:hover:bg-cyan-50/[0.16]" />
+            <DarkModeToggle className="h-11 w-11" />
           ) : null}
           <DashboardDataActionsMenu
             runtimeMode={dataMode}
