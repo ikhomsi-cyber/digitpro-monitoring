@@ -49,7 +49,7 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
-export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0;
+export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.008;
 
 export function applyFiscalDebtSafetyMargin(amountEur: number): number {
   if (!Number.isFinite(amountEur) || amountEur <= 0) return amountEur;
