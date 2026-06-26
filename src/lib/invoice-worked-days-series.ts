@@ -228,16 +228,24 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Totaux YTD par mois de prestation (aligné graphique « Jours facturés »). */
+/**
+ * Totaux YTD par mois de prestation (aligné graphique « Jours facturés »).
+ * `currentMonthInvoiceCaHtEur` : si > 0, la barre « À facturer » du mois en cours
+ * est requalifiée en « Déjà facturé » au montant réel de la facture Hiway —
+ * exactement comme la barre du graphique d'activité, pour que le « CA facturé »
+ * affiché coïncide avec le « CA généré ».
+ */
 export function computeYearToDateInvoicingTotals(
   transactions: readonly DashboardTx[],
   selected: ReadonlySet<string>,
   billableRatePeriods: readonly BillableRatePeriod[] = [],
   fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
-  now = new Date()
+  now = new Date(),
+  currentMonthInvoiceCaHtEur = 0
 ): { encaisseHtEur: number; factureHtEur: number } {
   const year = now.getFullYear();
   const yearPrefix = `${year}-`;
+  const currentMonthKey = monthKeyFromYm(year, now.getMonth());
 
   const encaisseRows = buildInvoiceWorkedDaysPastMonthsSeries(
     [...transactions],
@@ -255,10 +263,17 @@ export function computeYearToDateInvoicingTotals(
     now
   );
 
+  const hasCurrentMonthInvoice = currentMonthInvoiceCaHtEur > 0;
+
   let encaisseHtEur = 0;
   let factureHtEur = 0;
   for (const row of rows) {
     if (!row.monthKey.startsWith(yearPrefix)) continue;
+    // Mois en cours avec facture Hiway : compte le montant facturé, pas l'estimation agenda.
+    if (hasCurrentMonthInvoice && row.monthKey === currentMonthKey && row.kind === "a_facturer") {
+      factureHtEur += currentMonthInvoiceCaHtEur;
+      continue;
+    }
     if (row.kind === "encaisse") {
       encaisseHtEur += row.caHt;
       factureHtEur += row.caHt;

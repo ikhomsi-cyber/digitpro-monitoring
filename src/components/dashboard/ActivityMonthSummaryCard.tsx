@@ -45,11 +45,17 @@ export function ActivityMonthSummaryCard({
   countedDays,
   ikTotalEur,
   ikPerDayEur,
+  annualKm,
+  annualBilledDays,
   mealFees
 }: {
   countedDays: number;
   ikTotalEur: number;
   ikPerDayEur: number;
+  /** Kilométrage annuel auto-calculé (A/R × jours facturés sur l'année). */
+  annualKm?: number;
+  /** Jours facturés sur l'année (base du barème). */
+  annualBilledDays?: number;
   mealFees: ActivityMealFeesSummary | null;
 }) {
   const fmt = useDashboardDisplayFormat();
@@ -68,8 +74,16 @@ export function ActivityMonthSummaryCard({
             </p>
           </div>
           <p className="text-xs tabular-nums text-ink-400 dark:text-white/38">
-            {fmt.int(countedDays)} j. × {fmt.euro(ikPerDayEur)} · plafond {fmt.euro(IK_REFERENCE_EUR)}
+            {fmt.int(countedDays)} j. × {fmt.euro(ikPerDayEur)}
+            {annualKm && annualKm > 0 ? (
+              <> · barème {fmt.int(annualKm)} km/an</>
+            ) : null}
           </p>
+          {annualBilledDays && annualBilledDays > 0 ? (
+            <p className="mt-0.5 text-[10px] tabular-nums text-ink-400/80 dark:text-white/30">
+              Barème fiscal 8 CV · {fmt.int(annualBilledDays)} A/R enregistrés cette année
+            </p>
+          ) : null}
           <FeeProgress value={ikTotalEur} max={IK_REFERENCE_EUR} />
         </div>
 

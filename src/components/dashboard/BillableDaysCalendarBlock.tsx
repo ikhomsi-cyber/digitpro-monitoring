@@ -15,7 +15,10 @@ import {
   workedDaysChartPeriodLabel,
   type CalendarMonthCell
 } from "@/lib/billable-calendar-metrics";
-import { indemniteKmPerWorkDayEur } from "@/lib/pluxee-commute-indemnity";
+import {
+  commuteRoundTripKm,
+  indemniteKmPerWorkDayForAnnualDaysEur
+} from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
@@ -114,8 +117,25 @@ export function BillableDaysCalendarBlock({
     return { countedDays, monthTitle, isPast, isCurrent, todayLongFr };
   }, [selected, viewYear, viewMonth0]);
 
-  const ikPerDay = indemniteKmPerWorkDayEur();
-  const ikMoisEncours = selectedViewMonthStats.countedDays * ikPerDay;
+  /**
+   * Kilométrage annuel automatique : un aller-retour par jour facturé/saisi dans le
+   * calendrier, sur l'année affichée. Détermine la tranche du barème fiscal.
+   */
+  const annualBilledDays = useMemo(() => {
+    const prefix = `${viewYear}-`;
+    let count = 0;
+    for (const iso of selected) if (iso.startsWith(prefix)) count++;
+    return count;
+  }, [selected, viewYear]);
+  const annualKm = useMemo(
+    () => Math.round(annualBilledDays * commuteRoundTripKm()),
+    [annualBilledDays]
+  );
+  const ikPerDay = useMemo(
+    () => indemniteKmPerWorkDayForAnnualDaysEur(annualBilledDays),
+    [annualBilledDays]
+  );
+  const ikMoisEncours = Math.round(selectedViewMonthStats.countedDays * ikPerDay * 100) / 100;
 
   const mealFeesForViewedMonth = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return null;
@@ -818,6 +838,8 @@ export function BillableDaysCalendarBlock({
               countedDays={selectedViewMonthStats.countedDays}
               ikTotalEur={ikMoisEncours}
               ikPerDayEur={ikPerDay}
+              annualKm={annualKm}
+              annualBilledDays={annualBilledDays}
               mealFees={mealFeesForViewedMonth}
             />
           </div>

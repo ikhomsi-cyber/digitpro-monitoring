@@ -18,6 +18,10 @@ export const COMMUTE_ONE_WAY_ROAD_KM = 21.5;
  */
 export const IK_EUR_PER_KM = 0.697;
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 /** Distance aller simple domicile → travail, km (estimation). */
 export function commuteOneWayRoadKm(): number {
   return COMMUTE_ONE_WAY_ROAD_KM;
@@ -28,12 +32,41 @@ export function commuteRoundTripKm(): number {
   return Math.round(commuteOneWayRoadKm() * 2 * 10) / 10;
 }
 
-/** Indemnité pour un aller-retour (km A/R × €/km). */
-export function indemniteKmRoundTripEur(): number {
-  return Math.round(commuteRoundTripKm() * IK_EUR_PER_KM * 100) / 100;
+/**
+ * Barème kilométrique progressif — voiture **7 CV et plus** (revenus 2024 / 2025) :
+ * - jusqu'à 5 000 km : d × 0,697
+ * - de 5 001 à 20 000 km : (d × 0,394) + 1 515
+ * - au-delà de 20 000 km : d × 0,472
+ * Retourne l'indemnité **annuelle** pour un kilométrage professionnel total `annualKm`.
+ */
+export function annualMileageAllowanceEur(annualKm: number): number {
+  if (!Number.isFinite(annualKm) || annualKm <= 0) return 0;
+  if (annualKm <= 5000) return round2(annualKm * IK_EUR_PER_KM);
+  if (annualKm <= 20000) return round2(annualKm * 0.394 + 1515);
+  return round2(annualKm * 0.472);
 }
 
-/** Indemnité par jour travaillé sur site (un aller-retour complet). */
+/**
+ * Indemnité par jour travaillé, **dérivée du barème annuel** : le kilométrage annuel
+ * (aller-retours × jours facturés sur l'année) détermine la tranche, puis on répartit
+ * l'indemnité annuelle sur les jours. Aucun kilométrage à saisir manuellement.
+ */
+export function indemniteKmPerWorkDayForAnnualDaysEur(annualBilledDays: number): number {
+  const roundTripKm = commuteRoundTripKm();
+  if (!Number.isFinite(annualBilledDays) || annualBilledDays <= 0) {
+    // Pas encore de trajet enregistré : on retombe sur la tranche ≤ 5 000 km.
+    return round2(roundTripKm * IK_EUR_PER_KM);
+  }
+  const annualKm = annualBilledDays * roundTripKm;
+  return round2(annualMileageAllowanceEur(annualKm) / annualBilledDays);
+}
+
+/** Indemnité pour un aller-retour (km A/R × €/km, tranche ≤ 5 000 km). */
+export function indemniteKmRoundTripEur(): number {
+  return round2(commuteRoundTripKm() * IK_EUR_PER_KM);
+}
+
+/** Indemnité par jour travaillé sur site (un aller-retour complet, tranche ≤ 5 000 km). */
 export function indemniteKmPerWorkDayEur(): number {
   return indemniteKmRoundTripEur();
 }
