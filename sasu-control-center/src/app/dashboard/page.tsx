@@ -181,7 +181,6 @@ export default async function DashboardPage({
         envMode={envMode}
         dataMode={dataMode}
         demoPreferenceOn={demoPreferenceOn}
-        dummyDataActive={dummyDataActive}
         showDummyDataToggle={envMode === "SUPABASE"}
         userEmail={user?.email}
         showDarkModeToggle={showDarkModeToggle}

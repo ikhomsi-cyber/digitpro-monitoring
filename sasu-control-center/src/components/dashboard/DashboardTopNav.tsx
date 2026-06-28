@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { DarkModeToggle } from "@/components/DarkModeToggle";
 import { DashboardDataActionsMenu } from "@/components/dashboard/DashboardDataActionsMenu";
 import { DashboardDummyDataToggle } from "@/components/dashboard/DashboardDummyDataToggle";
+import { useDashboardDummyData } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderProfile";
 import { Logo } from "@/components/ui/Logo";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -12,9 +13,7 @@ type Props = {
   envMode: SupabaseRuntimeMode;
   dataMode: "DEMO" | "SUPABASE";
   demoPreferenceOn: boolean;
-  /** Affichage masqué : montants / chiffres fictifs (cookie). */
-  dummyDataActive: boolean;
-  /** Affiche le toggle (session Supabase réelle). */
+  /** Affiche le toggle (session Supabase réelle). L'état vient du contexte (instantané). */
   showDummyDataToggle: boolean;
   userEmail: string | null | undefined;
   showDarkModeToggle: boolean;
@@ -29,7 +28,6 @@ export function DashboardTopNav({
   envMode,
   dataMode,
   demoPreferenceOn,
-  dummyDataActive,
   showDummyDataToggle,
   userEmail,
   showDarkModeToggle,
@@ -39,6 +37,8 @@ export function DashboardTopNav({
   powensPersonalSyncEnabled = false,
   powensPrimaryImportAxis = "pro"
 }: Props) {
+  // Valeur live du contexte : le label / l'indicateur basculent instantanément avec le toggle.
+  const dummyDataActive = useDashboardDummyData();
   const statusLabel =
     envMode === "DEMO"
       ? "Mode démo"
@@ -91,7 +91,7 @@ export function DashboardTopNav({
         </div>
 
         <div className="flex items-center justify-end gap-1 sm:gap-1.5">
-          {showDummyDataToggle ? <DashboardDummyDataToggle active={dummyDataActive} /> : null}
+          {showDummyDataToggle ? <DashboardDummyDataToggle /> : null}
           {showDarkModeToggle ? (
             <DarkModeToggle className="h-11 w-11 rounded-2xl border-ink-200/90 bg-white/90 dark:border-cyan-100/[0.16] dark:bg-cyan-50/[0.10] dark:text-white dark:hover:bg-cyan-50/[0.16]" />
           ) : null}

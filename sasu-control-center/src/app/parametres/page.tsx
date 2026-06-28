@@ -73,7 +73,6 @@ export default async function ParametresPage() {
           envMode={envMode}
           dataMode={envMode}
           demoPreferenceOn={false}
-          dummyDataActive={dummyDataActive}
           showDummyDataToggle={envMode === "SUPABASE"}
           userEmail={user?.email}
           showDarkModeToggle={showDarkModeToggle}
