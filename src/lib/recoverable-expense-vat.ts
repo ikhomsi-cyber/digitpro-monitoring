@@ -29,6 +29,8 @@ export function recoverableVatRule(
   ) {
     return null;
   }
+  // iGraal (cashback) : remboursement sans TVA → aucune TVA récupérable (HT = TTC).
+  if (b.includes("igraal")) return null;
   if (b.includes("hiway") || bucket === "Compta & admin.") return { label: "Hiway / admin", rate: 0.2 };
   if (b.includes("wemind") || b.includes("we mind") || bucket === "Mutuelle") return null;
   if (bucket === "NDF" || bucket === "Repas dirigeant" || bucket === "Repas d'affaire") {

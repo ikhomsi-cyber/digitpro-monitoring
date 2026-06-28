@@ -1,5 +1,5 @@
-import type { DashboardTx } from "./dashboard-metrics";
-import { effectiveRevenueAnalyticsDateIso } from "./dashboard-metrics";
+import type { DashboardTx, DashboardAnalyticsFilter } from "./dashboard-metrics";
+import { effectiveRevenueAnalyticsDateIso, filterDashboardTransactions } from "./dashboard-metrics";
 import { countAgendaWorkDaysInMonth } from "./billable-calendar-metrics";
 import {
   BILLABLE_CLIENT_TJM_HT,
@@ -13,6 +13,9 @@ const VAT_RATE = 0.2;
 
 /** Premier mois affiché sur l’axe du graphique « Jours facturés » (mois-barre B, format YYYY-MM). */
 export const INVOICE_WORKED_DAYS_FIRST_BAR_MONTH_KEY = "2022-10";
+
+/** Décalage prestation → encaissement : le CA est encaissé ~2 mois après la prestation. */
+export const INVOICE_ENCASHMENT_LAG_MONTHS = 2;
 
 export type InvoiceWorkedDayKind = "encaisse" | "deja_facture" | "a_facturer";
 
@@ -226,6 +229,53 @@ export function appendAgendaWorkedDayMonths(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+export type CashedCaWorkedDays = {
+  /** CA HT encaissé sur la période filtrée. */
+  caHtEur: number;
+  /** Jours travaillés correspondants = Σ (CA HT ligne ÷ TJM du mois d'encaissement). */
+  workedDays: number;
+  /** TJM HT effectif (pondéré par les encaissements) = CA HT ÷ jours travaillés. */
+  effectiveTjmHt: number;
+};
+
+/**
+ * Jours travaillés correspondant au CA HT encaissé sur la période, en utilisant le **TJM réel
+ * du mois d'encaissement** de chaque ligne (et non un TJM par défaut). Sert à afficher
+ * « X j » derrière un montant de CA sans dépendre d'un barème générique.
+ */
+export function computeCashedCaWorkedDays(
+  transactions: readonly DashboardTx[],
+  filter: DashboardAnalyticsFilter,
+  billableRatePeriods: readonly BillableRatePeriod[] = [],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
+  now = new Date()
+): CashedCaWorkedDays {
+  const scoped = filterDashboardTransactions([...transactions], filter, now);
+  let caHt = 0;
+  let days = 0;
+  for (const tx of scoped) {
+    if ((tx.scope ?? "pro") !== "pro") continue;
+    if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
+    const lineCaHt = tx.amount / (1 + VAT_RATE);
+    // Le CA est encaissé ~2 mois après la prestation : on résout le TJM au mois de
+    // prestation (encaissement − 2), comme le graphe « Jours facturés », pour que le
+    // taux reflète la facture réelle et non le tarif en vigueur le mois d'encaissement.
+    const enc = parseMonthKey(effectiveRevenueAnalyticsDateIso(tx).slice(0, 7));
+    const work = addCalendarMonths(enc.y, enc.m0, -INVOICE_ENCASHMENT_LAG_MONTHS);
+    const workMonthKey = monthKeyFromYm(work.y, work.m0);
+    const client = revenueCounterpartyDisplayName(tx);
+    const tjmHt = resolveBillableTjmForClientMonth(billableRatePeriods, client, workMonthKey, fallbackTjmHt);
+    caHt += lineCaHt;
+    if (tjmHt > 0) days += lineCaHt / tjmHt;
+  }
+  const effectiveTjmHt = days > 0 ? caHt / days : fallbackTjmHt;
+  return {
+    caHtEur: round2(caHt),
+    workedDays: Math.round(days * 10) / 10,
+    effectiveTjmHt: round2(effectiveTjmHt)
+  };
 }
 
 /**

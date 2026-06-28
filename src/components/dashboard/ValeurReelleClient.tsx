@@ -41,6 +41,7 @@ import {
   type TrailingGainPerDayPoint
 } from "@/lib/valeur-reelle-gain-per-day";
 import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
+import { computeCashedCaWorkedDays } from "@/lib/invoice-worked-days-series";
 import type {
   ValeurReelleCashTree,
   ValeurReelleVatLiability,
@@ -422,12 +423,22 @@ type Fmt = ReturnType<typeof useDashboardDisplayFormat>;
 type AllocationSegment = { id: string; label: string; amount: number; color: string };
 
 /** Barre d'allocation horizontale empilée — visuel épuré qui remplace le waterfall. */
-function AllocationStackBar({ segments, fmt }: { segments: AllocationSegment[]; fmt: Fmt }) {
+function AllocationStackBar({
+  segments,
+  fmt,
+  tjmHt
+}: {
+  segments: AllocationSegment[];
+  fmt: Fmt;
+  /** TJM HT (mois d'encaissement du CA) : si fourni, affiche l'équivalent en jours par segment. */
+  tjmHt?: number;
+}) {
   const total = segments.reduce((sum, seg) => sum + Math.max(0, seg.amount), 0);
   if (total <= 0) return null;
   const withPct = segments.map((seg) => ({
     ...seg,
-    pct: Math.round((Math.max(0, seg.amount) / total) * 1000) / 10
+    pct: Math.round((Math.max(0, seg.amount) / total) * 1000) / 10,
+    workDays: feeWorkDaysLabel(seg.amount, tjmHt)
   }));
 
   return (
@@ -458,7 +469,10 @@ function AllocationStackBar({ segments, fmt }: { segments: AllocationSegment[]; 
             <p className="mt-0.5 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(seg.amount)}
             </p>
-            <p className="text-[10px] font-medium tabular-nums text-ink-500 dark:text-white/40">{seg.pct} % du total</p>
+            <p className="text-[10px] font-medium tabular-nums text-ink-500 dark:text-white/40">
+              {seg.pct} % du total
+              {seg.workDays ? <span className="text-ink-400 dark:text-white/30"> · {seg.workDays}</span> : null}
+            </p>
           </li>
         ))}
       </ul>
@@ -715,7 +729,8 @@ function DailyValueBlock({
       : (breakdown.estimateNote ?? "estimation");
 
   const segments: AllocationSegment[] = [
-    { id: "net", label: "Valeur retenue", amount: breakdown.netPerDay, color: SEG_COLORS.net },
+    { id: "bnc", label: "BNC versé", amount: breakdown.bncPerDay, color: SEG_COLORS.net },
+    { id: "perso", label: "Frais perso", amount: breakdown.personalChargesPerDay, color: SEG_COLORS.perso },
     { id: "csg", label: "CSG", amount: breakdown.csgPerDay, color: SEG_COLORS.csg },
     { id: "digitpro", label: "Frais DigitPro", amount: breakdown.mandatoryFeesPerDay, color: SEG_COLORS.digitpro }
   ];
@@ -736,18 +751,28 @@ function DailyValueBlock({
       </div>
       <AllocationStackBar segments={segments} fmt={fmt} />
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
-        Valeur retenue = CA HT − CSG − frais DigitPro (frais perso réintégrés).
+        Valeur retenue = BNC versé + frais perso (CA HT − CSG − frais DigitPro).
       </p>
     </div>
   );
 }
 
 /** Bloc « Waterfall financier » simplifié — barre empilée sur la période. */
-function FinancialAllocationBlock({ tree, fmt }: { tree: ValeurReelleCashTree; fmt: Fmt }) {
+function FinancialAllocationBlock({
+  tree,
+  fmt,
+  tjmHt
+}: {
+  tree: ValeurReelleCashTree;
+  fmt: Fmt;
+  /** TJM HT du mois d'encaissement du CA — sert à convertir chaque montant en jours travaillés. */
+  tjmHt?: number;
+}) {
   const caHt = Math.max(0, tree.caFactureEur);
   const valeurNette = Math.max(0, caHt - tree.csgEur - tree.mandatoryFeesEur - tree.personalChargesEur);
   if (caHt <= 0) return null;
   const netPct = caHt > 0 ? Math.round((valeurNette / caHt) * 1000) / 10 : null;
+  const totalWorkDays = feeWorkDaysLabel(caHt, tjmHt);
 
   const segments: AllocationSegment[] = [
     { id: "net", label: "Valeur nette", amount: valeurNette, color: SEG_COLORS.net },
@@ -758,7 +783,10 @@ function FinancialAllocationBlock({ tree, fmt }: { tree: ValeurReelleCashTree; f
 
   return (
     <div className={dashboardInsightCard}>
-      <BlockHeader title="Répartition du CA HT" sub={`Base ${fmt.euro(caHt)}`} />
+      <BlockHeader
+        title="Répartition du CA HT"
+        sub={totalWorkDays ? `Base ${fmt.euro(caHt)} · ${totalWorkDays}` : `Base ${fmt.euro(caHt)}`}
+      />
       <div className="mt-3 flex items-baseline gap-2">
         <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
           {fmt.euro(valeurNette)}
@@ -767,7 +795,7 @@ function FinancialAllocationBlock({ tree, fmt }: { tree: ValeurReelleCashTree; f
           {netPct != null ? `${netPct} % net` : null}
         </span>
       </div>
-      <AllocationStackBar segments={segments} fmt={fmt} />
+      <AllocationStackBar segments={segments} fmt={fmt} tjmHt={tjmHt} />
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
         CA HT → CSG → frais DigitPro → frais perso → valeur nette.
       </p>
@@ -979,6 +1007,8 @@ type ValeurReelleViewModel = {
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   gainPerDayPoints: TrailingGainPerDayPoint[];
   tjmHtForPeriod: number;
+  /** TJM HT effectif pondéré par les mois d'encaissement réels du CA de la période. */
+  caEncashmentTjmHt: number;
 };
 
 function computeValeurReelleViewModel(input: {
@@ -1047,13 +1077,22 @@ function computeValeurReelleViewModel(input: {
     billableTjmHt
   );
 
+  // Jours du CA encaissé via le TJM réel du mois d'encaissement (pas un barème par défaut).
+  const caEncashmentTjmHt = computeCashedCaWorkedDays(
+    transactions,
+    { years: selectedYears, months: selectedMonthsForYears.length ? selectedMonthsForYears : null },
+    billableRatePeriods,
+    billableTjmHt
+  ).effectiveTjmHt;
+
   return {
     analysis,
     vatSavingsKpis,
     billableDaysInPeriod,
     gainPerWorkDayEstimate,
     gainPerDayPoints,
-    tjmHtForPeriod
+    tjmHtForPeriod,
+    caEncashmentTjmHt
   };
 }
 
@@ -1269,8 +1308,15 @@ export function ValeurReelleClient({
     );
   }
 
-  const { analysis, vatSavingsKpis, billableDaysInPeriod, gainPerWorkDayEstimate, gainPerDayPoints, tjmHtForPeriod } =
-    viewModel;
+  const {
+    analysis,
+    vatSavingsKpis,
+    billableDaysInPeriod,
+    gainPerWorkDayEstimate,
+    gainPerDayPoints,
+    tjmHtForPeriod,
+    caEncashmentTjmHt
+  } = viewModel;
   const tree = analysis.cashTree;
 
   return (
@@ -1296,7 +1342,7 @@ export function ValeurReelleClient({
             billableDays={billableDaysInPeriod}
             gainPerWorkDayEstimate={gainPerWorkDayEstimate}
           />
-          <FinancialAllocationBlock tree={tree} fmt={fmt} />
+          <FinancialAllocationBlock tree={tree} fmt={fmt} tjmHt={caEncashmentTjmHt} />
         </div>
 
         <div className={dashboardInsightGrid}>
