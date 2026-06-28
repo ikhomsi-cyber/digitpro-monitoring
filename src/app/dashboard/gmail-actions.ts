@@ -2,8 +2,9 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isGmailConfigured } from "@/lib/gmail/config";
+import { gmailRedirectUriForOrigin, isGmailConfigured, resolveRequestOrigin } from "@/lib/gmail/config";
 import { buildGmailConsentUrl } from "@/lib/gmail/oauth";
 import {
   clearGmailTokenIfInvalidGrant,
@@ -71,7 +72,10 @@ export async function getGmailConnectUrl(): Promise<{ url: string }> {
     );
   }
   await requireUser();
-  return { url: buildGmailConsentUrl(randomUUID()) };
+  // Le redirect_uri suit le domaine réel de la requête (prod vs local) au lieu d'un env figé.
+  const origin = resolveRequestOrigin(await headers());
+  const redirectUri = gmailRedirectUriForOrigin(origin) ?? undefined;
+  return { url: buildGmailConsentUrl(randomUUID(), redirectUri) };
 }
 
 export async function loadHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }> {

@@ -148,11 +148,12 @@ export function HiwayInvoicesBlock() {
   if (status && !status.configured) {
     content = (
       <p className="text-[11px] font-medium text-amber-800 dark:text-amber-100">
-        Gmail non configuré : définissez <code className="font-mono">GOOGLE_CLIENT_ID</code>,{" "}
-        <code className="font-mono">GOOGLE_CLIENT_SECRET</code> et{" "}
-        <code className="font-mono">GOOGLE_REDIRECT_URI</code> dans les variables d&apos;environnement
+        Gmail non configuré : définissez <code className="font-mono">GOOGLE_CLIENT_ID</code> et{" "}
+        <code className="font-mono">GOOGLE_CLIENT_SECRET</code> dans les variables d&apos;environnement
         (Vercel en production, <code className="font-mono">.env.local</code> en local — voir{" "}
-        <code className="font-mono">.env.example</code>).
+        <code className="font-mono">.env.example</code>). Le <code className="font-mono">redirect_uri</code>{" "}
+        suit automatiquement le domaine ; déclarez{" "}
+        <code className="font-mono">https://VOTRE-DOMAINE/api/gmail/callback</code> dans la console Google.
       </p>
     );
   } else if (status && !status.connected) {

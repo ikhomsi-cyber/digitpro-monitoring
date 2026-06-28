@@ -40,22 +40,47 @@ export function qontoDebitGmailQueries(): string[] {
 export type GmailOAuthConfig = {
   clientId: string;
   clientSecret: string;
-  redirectUri: string;
+  /** Optionnel : requis pour le consentement/échange, inutile pour le rafraîchissement de jeton. */
+  redirectUri?: string;
 };
 
 function getEnv(name: string): string | undefined {
   return process.env[name]?.trim() || undefined;
 }
 
-/** Configuration OAuth Google lue depuis l'environnement (server-only). */
-export function getGmailOAuthConfig(): GmailOAuthConfig | null {
+/**
+ * Origine publique de la requête courante (gère le proxy Vercel).
+ * Sert à construire un `redirect_uri` qui suit le domaine réel (prod vs local)
+ * au lieu d'un `GOOGLE_REDIRECT_URI` figé sur localhost.
+ */
+export function resolveRequestOrigin(headerList: { get(name: string): string | null }): string | null {
+  const forwardedHost = headerList.get("x-forwarded-host");
+  const host = forwardedHost || headerList.get("host");
+  if (!host) return null;
+  const proto =
+    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+/** `redirect_uri` OAuth pour une origine donnée (doit être déclarée dans la console Google). */
+export function gmailRedirectUriForOrigin(origin: string | null | undefined): string | null {
+  if (origin) return `${origin.replace(/\/$/, "")}/api/gmail/callback`;
+  return getEnv("GOOGLE_REDIRECT_URI") ?? null;
+}
+
+/**
+ * Configuration OAuth Google. `redirectUriOverride` (dérivé de l'origine de la requête)
+ * prime sur `GOOGLE_REDIRECT_URI` pour fonctionner en production sans variable figée.
+ */
+export function getGmailOAuthConfig(redirectUriOverride?: string): GmailOAuthConfig | null {
   const clientId = getEnv("GOOGLE_CLIENT_ID");
   const clientSecret = getEnv("GOOGLE_CLIENT_SECRET");
-  const redirectUri = getEnv("GOOGLE_REDIRECT_URI");
-  if (!clientId || !clientSecret || !redirectUri) return null;
+  if (!clientId || !clientSecret) return null;
+  const redirectUri = redirectUriOverride?.trim() || getEnv("GOOGLE_REDIRECT_URI");
   return { clientId, clientSecret, redirectUri };
 }
 
+/** Gmail est configuré dès que l'app cliente OAuth est connue (le redirect_uri peut être dynamique). */
 export function isGmailConfigured(): boolean {
-  return getGmailOAuthConfig() !== null;
+  return Boolean(getEnv("GOOGLE_CLIENT_ID") && getEnv("GOOGLE_CLIENT_SECRET"));
 }

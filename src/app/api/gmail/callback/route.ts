@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createGmailOAuthClient, exchangeGmailCode } from "@/lib/gmail/oauth";
+import { gmailRedirectUriForOrigin, resolveRequestOrigin } from "@/lib/gmail/config";
 import { fetchGmailAddress } from "@/lib/gmail/fetch-invoices";
 import { saveGmailToken } from "@/lib/gmail/tokens";
 
@@ -11,7 +12,11 @@ import { saveGmailToken } from "@/lib/gmail/tokens";
  */
 export async function GET(req: NextRequest) {
   const u = req.nextUrl;
-  const target = new URL("/dashboard", u.origin);
+  // Origine réelle (proxy Vercel) : sert au redirect_uri d'échange ET à la redirection finale,
+  // pour ne jamais retomber sur localhost en production.
+  const origin = resolveRequestOrigin(req.headers) ?? u.origin;
+  const redirectUri = gmailRedirectUriForOrigin(origin) ?? undefined;
+  const target = new URL("/dashboard", origin);
   target.searchParams.set("section", "activite");
 
   const error = u.searchParams.get("error");
@@ -36,7 +41,7 @@ export async function GET(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("not_authenticated");
 
-    const tokens = await exchangeGmailCode(code);
+    const tokens = await exchangeGmailCode(code, redirectUri);
     if (!tokens.refreshToken) {
       // Google ne renvoie le refresh_token qu'au 1er consentement : on force prompt=consent
       // côté URL, donc une absence ici signale un consentement révoqué à retenter.
@@ -45,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     let email: string | null = null;
     if (tokens.accessToken) {
-      const client = createGmailOAuthClient();
+      const client = createGmailOAuthClient(redirectUri);
       client.setCredentials({
         access_token: tokens.accessToken,
         refresh_token: tokens.refreshToken,
