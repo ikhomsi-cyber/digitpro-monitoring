@@ -21,8 +21,9 @@ export type ActivityMealFeesSummary = {
   pendingNdfTransactions: DashboardTx[];
 };
 
-const IK_REFERENCE_EUR = 550;
-const MEALS_REFERENCE_EUR = 650;
+/** Plafonds de repli si l'historique 12 mois est indisponible (aucune donnée). */
+const IK_REFERENCE_FALLBACK_EUR = 550;
+const MEALS_REFERENCE_FALLBACK_EUR = 650;
 
 function clamp01(x: number): number {
   if (!Number.isFinite(x)) return 0;
@@ -47,7 +48,11 @@ export function ActivityMonthSummaryCard({
   ikPerDayEur,
   annualKm,
   annualBilledDays,
-  mealFees
+  mealFees,
+  ikReferenceEur,
+  ikReferenceMonths,
+  mealsReferenceEur,
+  mealsReferenceMonths
 }: {
   countedDays: number;
   ikTotalEur: number;
@@ -57,11 +62,24 @@ export function ActivityMonthSummaryCard({
   /** Jours facturés sur l'année (base du barème). */
   annualBilledDays?: number;
   mealFees: ActivityMealFeesSummary | null;
+  /** Plafond IK = moyenne mensuelle des IK versées (repli sur une valeur fixe sinon). */
+  ikReferenceEur?: number;
+  /** Nombre de mois réellement comptés dans la moyenne IK (≤ 12). */
+  ikReferenceMonths?: number;
+  /** Plafond Repas = moyenne mensuelle (Repas dirigeant + Repas d'affaire) versés (repli sinon). */
+  mealsReferenceEur?: number;
+  /** Nombre de mois réellement comptés dans la moyenne Repas (≤ 12). */
+  mealsReferenceMonths?: number;
 }) {
   const fmt = useDashboardDisplayFormat();
   const [ndfListOpen, setNdfListOpen] = useState(false);
 
   const mealsTotal = mealFees?.total ?? 0;
+  const ikHasHistory = Boolean(ikReferenceEur && ikReferenceEur > 0 && ikReferenceMonths);
+  const mealsHasHistory = Boolean(mealsReferenceEur && mealsReferenceEur > 0 && mealsReferenceMonths);
+  const ikMax = ikHasHistory ? (ikReferenceEur as number) : IK_REFERENCE_FALLBACK_EUR;
+  const mealsMax = mealsHasHistory ? (mealsReferenceEur as number) : MEALS_REFERENCE_FALLBACK_EUR;
+  const monthsLabel = (n?: number) => (n && n > 0 ? `moyenne sur ${n} mois` : "valeur de référence");
 
   return (
     <article className={clsx(dashboardInsightCard, "w-full")}>
@@ -84,7 +102,10 @@ export function ActivityMonthSummaryCard({
               Barème fiscal 8 CV · {fmt.int(annualBilledDays)} A/R enregistrés cette année
             </p>
           ) : null}
-          <FeeProgress value={ikTotalEur} max={IK_REFERENCE_EUR} />
+          <FeeProgress value={ikTotalEur} max={ikMax} />
+          <p className="mt-1 text-[10px] tabular-nums text-ink-400/80 dark:text-white/30">
+            Plafond {fmt.euro(ikMax)} · {monthsLabel(ikHasHistory ? ikReferenceMonths : undefined)}
+          </p>
         </div>
 
         <div>
@@ -99,7 +120,10 @@ export function ActivityMonthSummaryCard({
               Dirigeant {fmt.euro(mealFees.dirigeant)} · NDF {fmt.euro(mealFees.ndfAffiche)}
             </p>
           ) : null}
-          <FeeProgress value={mealsTotal} max={MEALS_REFERENCE_EUR} />
+          <FeeProgress value={mealsTotal} max={mealsMax} />
+          <p className="mt-1 text-[10px] tabular-nums text-ink-400/80 dark:text-white/30">
+            Plafond {fmt.euro(mealsMax)} · {monthsLabel(mealsHasHistory ? mealsReferenceMonths : undefined)}
+          </p>
 
           {mealFees &&
           (mealFees.ndfTransactions.length > 0 || mealFees.pendingNdfTransactions.length > 0) ? (

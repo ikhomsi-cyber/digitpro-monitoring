@@ -1,20 +1,20 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { clsx } from "clsx";
-import { setDashboardDummyDataMode } from "@/app/dashboard/actions";
+import { useDashboardDummyDataControls } from "@/components/dashboard/DashboardDisplayFormatContext";
 
-export function DashboardDummyDataToggle({ active }: { active: boolean }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+/**
+ * Bascule l'affichage « données fictives ». 100 % client : flippe l'état du contexte (re-render
+ * instantané des montants masqués) et persiste un cookie lisible au SSR — aucun appel BDD.
+ */
+export function DashboardDummyDataToggle() {
+  const { active, toggle } = useDashboardDummyDataControls();
   const Icon = active ? EyeOff : Eye;
 
   return (
     <button
       type="button"
-      disabled={pending}
       aria-pressed={active}
       aria-label={active ? "Désactiver les données fictives à l’affichage" : "Activer les données fictives à l’affichage"}
       title={
@@ -22,12 +22,7 @@ export function DashboardDummyDataToggle({ active }: { active: boolean }) {
           ? "Afficher les montants et chiffres réels"
           : "Remplacer montants et indicateurs par des valeurs fictives (données réelles inchangées)"
       }
-      onClick={() =>
-        start(async () => {
-          await setDashboardDummyDataMode(!active);
-          router.refresh();
-        })
-      }
+      onClick={toggle}
       className={clsx(
         "group relative inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#06242b]",
         active

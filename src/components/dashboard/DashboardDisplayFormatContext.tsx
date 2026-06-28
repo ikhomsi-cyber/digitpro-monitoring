@@ -1,10 +1,35 @@
 "use client";
 
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { eur, formatEurChartAxis, formatSignedEur } from "@/lib/format";
 import { maskMoneyAmount, maskPercent0to100, maskPositiveInt } from "@/lib/dummy-display-numbers";
+import { DASHBOARD_DUMMY_DATA_COOKIE } from "@/lib/dashboard-dummy-data-preference";
 
-const DummyDataContext = createContext(false);
+type DummyDataContextValue = {
+  active: boolean;
+  setActive: (next: boolean) => void;
+  toggle: () => void;
+};
+
+const DummyDataContext = createContext<DummyDataContextValue>({
+  active: false,
+  setActive: () => {},
+  toggle: () => {}
+});
+
+/**
+ * Persiste la préférence dans un cookie **lisible côté serveur** (non httpOnly) afin que le
+ * SSR initial reflète le bon état au rechargement, sans aucun aller-retour serveur au clic.
+ */
+function persistDummyDataCookie(active: boolean) {
+  if (typeof document === "undefined") return;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  if (active) {
+    document.cookie = `${DASHBOARD_DUMMY_DATA_COOKIE}=1; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax${secure}`;
+  } else {
+    document.cookie = `${DASHBOARD_DUMMY_DATA_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  }
+}
 
 export function DashboardDummyDataProvider({
   active,
@@ -13,11 +38,37 @@ export function DashboardDummyDataProvider({
   active: boolean;
   children: ReactNode;
 }) {
-  return <DummyDataContext.Provider value={active}>{children}</DummyDataContext.Provider>;
+  const [isActive, setIsActive] = useState(active);
+
+  const setActive = useCallback((next: boolean) => {
+    setIsActive(next);
+    persistDummyDataCookie(next);
+  }, []);
+
+  const toggle = useCallback(() => {
+    setIsActive((prev) => {
+      const next = !prev;
+      persistDummyDataCookie(next);
+      return next;
+    });
+  }, []);
+
+  const value = useMemo<DummyDataContextValue>(
+    () => ({ active: isActive, setActive, toggle }),
+    [isActive, setActive, toggle]
+  );
+
+  return <DummyDataContext.Provider value={value}>{children}</DummyDataContext.Provider>;
 }
 
 export function useDashboardDummyData(): boolean {
-  return useContext(DummyDataContext);
+  return useContext(DummyDataContext).active;
+}
+
+/** Contrôle le mode « données fictives » côté client (instantané, sans appel serveur/BDD). */
+export function useDashboardDummyDataControls() {
+  const { active, setActive, toggle } = useContext(DummyDataContext);
+  return { active, setActive, toggle };
 }
 
 /**

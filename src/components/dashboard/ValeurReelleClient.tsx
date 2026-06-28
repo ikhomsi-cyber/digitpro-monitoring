@@ -286,33 +286,44 @@ function BreakdownPieChart({
             {slices.slice(0, 6).map((slice) => {
               const workDays = feeWorkDaysLabel(slice.row.amountEur, tjmHt);
               const ikKm = ikKmFromAmount(slice.row.label, slice.row.amountEur);
-              const metaParts = [
+              // Détail secondaire discret (jours travaillés ou km) ; le montant € reste la donnée principale.
+              const detail = workDays ?? (ikKm != null ? `${fmt.int(ikKm)} km` : null);
+              const fullMeta = [
                 workDays,
                 ikKm != null ? `${fmt.int(ikKm)} km` : null,
                 fmt.euro(slice.row.amountEur),
                 `${slice.percent} %`
-              ].filter(Boolean);
-              const chipMeta = metaParts.join(" · ");
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
-              <span
-                key={`compact-legend-${slice.row.label}`}
-                className="group/legend relative inline-flex min-w-0 items-center gap-1.5 rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65"
-                title={`${slice.row.label} · ${chipMeta}`}
-              >
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
-                <span className="truncate">{slice.row.label}</span>
-                <span className="shrink-0 text-ink-500 dark:text-white/45">
-                  · {chipMeta}
-                </span>
-                <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:text-white/80">
-                  {slice.row.label} · {chipMeta}
-                </span>
-              </span>
-            );
+                <div
+                  key={`compact-legend-${slice.row.label}`}
+                  className="group/legend relative flex min-w-0 items-center gap-2 rounded-xl border border-ink-200/70 bg-white/60 px-2.5 py-1.5 shadow-sm transition hover:border-ink-300/70 hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20 dark:hover:bg-white/[0.07]"
+                  title={`${slice.row.label} · ${fullMeta}`}
+                >
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
+                  <span className="min-w-0 flex-1 leading-tight">
+                    <span className="block truncate text-[11px] font-semibold text-ink-700 dark:text-white/70">
+                      {slice.row.label}
+                    </span>
+                    <span className="block truncate text-[10px] font-medium tabular-nums text-ink-400 dark:text-white/40">
+                      {fmt.euro(slice.row.amountEur)}
+                      {detail ? <span className="text-ink-300 dark:text-white/30"> · {detail}</span> : null}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[11px] font-bold tabular-nums text-ink-900 dark:text-white">
+                    {slice.percent} %
+                  </span>
+                  <span className="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden w-max max-w-[min(20rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-ink-200 bg-white px-3 py-2 text-center text-[11px] font-bold text-ink-800 opacity-0 shadow-[0_18px_60px_-24px_rgba(0,0,0,0.35)] transition group-hover/legend:block group-hover/legend:opacity-100 dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:text-white/80">
+                    {slice.row.label} · {fullMeta}
+                  </span>
+                </div>
+              );
             })}
             {slices.length > 6 ? (
-              <span className="inline-flex min-w-0 items-center rounded-full border border-ink-200/70 bg-white/60 px-2.5 py-1 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/45">
-                +{slices.length - 6}
+              <span className="inline-flex min-w-0 items-center justify-center rounded-xl border border-dashed border-ink-200/70 bg-white/40 px-2.5 py-1.5 text-[11px] font-semibold text-ink-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                +{slices.length - 6} autres
               </span>
             ) : null}
           </div>

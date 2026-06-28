@@ -23,6 +23,7 @@ import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import { IK_CATEGORY_LABEL } from "@/lib/expense-category-map";
 import { ActivityMonthSummaryCard } from "@/components/dashboard/ActivityMonthSummaryCard";
 import { BillableInvoiceWorkedDaysChart } from "@/components/dashboard/BillableInvoiceWorkedDaysChart";
 import { HiwayInvoicesBlock } from "@/components/dashboard/HiwayInvoicesBlock";
@@ -170,6 +171,67 @@ export function BillableDaysCalendarBlock({
       total: dirigeant + ndf.totalEur
     };
   }, [treasuryTransactions, treasuryScope, viewYear, viewMonth0]);
+
+  /** Clés des 12 derniers mois **complétés** (mois en cours exclu) pour les plafonds moyens. */
+  const trailing12MonthKeys = useMemo(() => {
+    const keys: string[] = [];
+    const d = new Date(now.getFullYear(), now.getMonth(), 1);
+    for (let i = 1; i <= 12; i++) {
+      d.setMonth(d.getMonth() - 1);
+      keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return keys;
+  }, [now]);
+
+  /**
+   * Plafond IK = moyenne mensuelle des indemnités kilométriques **réellement versées**, calculée
+   * sur les **seuls mois disposant de données** (≤ 12 derniers mois) pour ne pas écraser la moyenne
+   * quand l'historique est court (ex. activité récente de 2 mois).
+   */
+  const ikReference = useMemo(() => {
+    if (treasuryTransactions == null || treasuryScope == null) return { eur: 0, months: 0 };
+    const keySet = new Set(trailing12MonthKeys);
+    const perMonth = new Map<string, number>();
+    for (const tx of treasuryTransactions) {
+      if (tx.amount >= 0) continue;
+      if ((tx.scope ?? "pro") !== treasuryScope) continue;
+      const key = tx.date.slice(0, 7);
+      if (!keySet.has(key)) continue;
+      if (deriveExpenseBucket(tx) === IK_CATEGORY_LABEL) {
+        perMonth.set(key, (perMonth.get(key) ?? 0) + Math.abs(tx.amount));
+      }
+    }
+    const months = perMonth.size;
+    if (months <= 0) return { eur: 0, months: 0 };
+    let total = 0;
+    for (const v of perMonth.values()) total += v;
+    return { eur: Math.round((total / months) * 100) / 100, months };
+  }, [treasuryTransactions, treasuryScope, trailing12MonthKeys]);
+
+  /**
+   * Plafond Repas = moyenne mensuelle des **Repas dirigeant + Repas d'affaire** réellement versés,
+   * sur les seuls mois disposant de données (≤ 12 derniers mois).
+   */
+  const mealsReference = useMemo(() => {
+    if (treasuryTransactions == null || treasuryScope == null) return { eur: 0, months: 0 };
+    const keySet = new Set(trailing12MonthKeys);
+    const perMonth = new Map<string, number>();
+    for (const tx of treasuryTransactions) {
+      if (tx.amount >= 0) continue;
+      if ((tx.scope ?? "pro") !== treasuryScope) continue;
+      const key = tx.date.slice(0, 7);
+      if (!keySet.has(key)) continue;
+      const bucket = deriveExpenseBucket(tx);
+      if (bucket === "Repas dirigeant" || bucket === "Repas d'affaire") {
+        perMonth.set(key, (perMonth.get(key) ?? 0) + Math.abs(tx.amount));
+      }
+    }
+    const months = perMonth.size;
+    if (months <= 0) return { eur: 0, months: 0 };
+    let total = 0;
+    for (const v of perMonth.values()) total += v;
+    return { eur: Math.round((total / months) * 100) / 100, months };
+  }, [treasuryTransactions, treasuryScope, trailing12MonthKeys]);
 
   const calendarRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -841,6 +903,10 @@ export function BillableDaysCalendarBlock({
               annualKm={annualKm}
               annualBilledDays={annualBilledDays}
               mealFees={mealFeesForViewedMonth}
+              ikReferenceEur={ikReference.eur}
+              ikReferenceMonths={ikReference.months}
+              mealsReferenceEur={mealsReference.eur}
+              mealsReferenceMonths={mealsReference.months}
             />
           </div>
       </div>
