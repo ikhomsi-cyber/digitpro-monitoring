@@ -42,6 +42,7 @@ import {
 } from "@/lib/valeur-reelle-gain-per-day";
 import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
 import { computeCashedCaWorkedDays } from "@/lib/invoice-worked-days-series";
+import { kmFromMileageAllowanceEur } from "@/lib/pluxee-commute-indemnity";
 import type {
   ValeurReelleCashTree,
   ValeurReelleVatLiability,
@@ -146,6 +147,21 @@ const formatFeeWorkHours = new Intl.NumberFormat("fr-FR", {
 });
 
 const FEE_WORK_DAY_HOURS = 8;
+
+function isIkLabel(label: string): boolean {
+  return label
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .includes("kilometriq");
+}
+
+/** Kilométrage approximatif (barème) derrière un montant d'IK, ou null si non applicable. */
+function ikKmFromAmount(label: string, amountEur: number): number | null {
+  if (!isIkLabel(label)) return null;
+  const km = kmFromMileageAllowanceEur(Math.abs(amountEur));
+  return km > 0 ? km : null;
+}
 
 function feeWorkDaysLabel(amountEur: number, tjmHt: number | undefined): string | null {
   if (tjmHt == null || !Number.isFinite(tjmHt) || tjmHt <= 0) return null;
@@ -269,9 +285,14 @@ function BreakdownPieChart({
           <div className="mb-3 grid w-full max-w-md grid-cols-2 gap-1.5">
             {slices.slice(0, 6).map((slice) => {
               const workDays = feeWorkDaysLabel(slice.row.amountEur, tjmHt);
-              const chipMeta = workDays
-                ? `${workDays} · ${fmt.euro(slice.row.amountEur)} · ${slice.percent} %`
-                : `${fmt.euro(slice.row.amountEur)} · ${slice.percent} %`;
+              const ikKm = ikKmFromAmount(slice.row.label, slice.row.amountEur);
+              const metaParts = [
+                workDays,
+                ikKm != null ? `${fmt.int(ikKm)} km` : null,
+                fmt.euro(slice.row.amountEur),
+                `${slice.percent} %`
+              ].filter(Boolean);
+              const chipMeta = metaParts.join(" · ");
               return (
               <span
                 key={`compact-legend-${slice.row.label}`}
@@ -315,6 +336,7 @@ function BreakdownPieChart({
             const showHtTtc = shouldShowHtTtc(slice.row.label);
             const grossAmountEur = slice.row.grossAmountEur ?? slice.row.amountEur;
             const workDays = feeWorkDaysLabel(slice.row.amountEur, tjmHt);
+            const ikKm = ikKmFromAmount(slice.row.label, slice.row.amountEur);
             return (
             <div
               key={`legend-${slice.row.label}`}
@@ -362,6 +384,11 @@ function BreakdownPieChart({
                 ) : (
                   <p>{fmt.euro(slice.row.amountEur)}</p>
                 )}
+                {ikKm != null ? (
+                  <p className="text-[10px] font-medium text-ink-400 dark:text-white/35">
+                    {fmt.int(ikKm)} km parcourus
+                  </p>
+                ) : null}
               </div>
               {isOpen && hasTransactions ? (
                 <div className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1">
@@ -769,16 +796,20 @@ function FinancialAllocationBlock({
   tjmHt?: number;
 }) {
   const caHt = Math.max(0, tree.caFactureEur);
-  const valeurNette = Math.max(0, caHt - tree.csgEur - tree.mandatoryFeesEur - tree.personalChargesEur);
+  const personalCharges = Math.max(0, tree.personalChargesEur);
+  // BNC versé = CA HT − CSG − frais DigitPro − frais perso.
+  const bnc = Math.max(0, caHt - tree.csgEur - tree.mandatoryFeesEur - tree.personalChargesEur);
+  // Valeur nette = ce qui te revient réellement = BNC versé + frais perso (réintégrés).
+  const valeurNette = bnc + personalCharges;
   if (caHt <= 0) return null;
   const netPct = caHt > 0 ? Math.round((valeurNette / caHt) * 1000) / 10 : null;
   const totalWorkDays = feeWorkDaysLabel(caHt, tjmHt);
 
   const segments: AllocationSegment[] = [
-    { id: "net", label: "Valeur nette", amount: valeurNette, color: SEG_COLORS.net },
+    { id: "bnc", label: "BNC versé", amount: bnc, color: SEG_COLORS.net },
+    { id: "perso", label: "Frais perso", amount: personalCharges, color: SEG_COLORS.perso },
     { id: "csg", label: "CSG", amount: tree.csgEur, color: SEG_COLORS.csg },
-    { id: "digitpro", label: "Frais DigitPro", amount: tree.mandatoryFeesEur, color: SEG_COLORS.digitpro },
-    { id: "perso", label: "Frais perso", amount: tree.personalChargesEur, color: SEG_COLORS.perso }
+    { id: "digitpro", label: "Frais DigitPro", amount: tree.mandatoryFeesEur, color: SEG_COLORS.digitpro }
   ];
 
   return (
@@ -797,7 +828,7 @@ function FinancialAllocationBlock({
       </div>
       <AllocationStackBar segments={segments} fmt={fmt} tjmHt={tjmHt} />
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
-        CA HT → CSG → frais DigitPro → frais perso → valeur nette.
+        Valeur nette = BNC versé + frais perso (CA HT − CSG − frais DigitPro).
       </p>
     </div>
   );

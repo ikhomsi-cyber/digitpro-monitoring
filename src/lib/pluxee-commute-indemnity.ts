@@ -47,6 +47,19 @@ export function annualMileageAllowanceEur(annualKm: number): number {
 }
 
 /**
+ * Inverse du barème : kilométrage approximatif correspondant à une indemnité `allowanceEur`.
+ * Sert à afficher « X km » derrière un montant d'IK déjà calculé/remboursé.
+ */
+export function kmFromMileageAllowanceEur(allowanceEur: number): number {
+  if (!Number.isFinite(allowanceEur) || allowanceEur <= 0) return 0;
+  const tier1Max = 5000 * IK_EUR_PER_KM; // ≤ 5 000 km
+  const tier2Max = 20000 * 0.394 + 1515; // ≤ 20 000 km
+  if (allowanceEur <= tier1Max) return Math.round(allowanceEur / IK_EUR_PER_KM);
+  if (allowanceEur <= tier2Max) return Math.round((allowanceEur - 1515) / 0.394);
+  return Math.round(allowanceEur / 0.472);
+}
+
+/**
  * Indemnité par jour travaillé, **dérivée du barème annuel** : le kilométrage annuel
  * (aller-retours × jours facturés sur l'année) détermine la tranche, puis on répartit
  * l'indemnité annuelle sur les jours. Aucun kilométrage à saisir manuellement.

@@ -11,13 +11,16 @@ export function djb2Hash32(str: string): number {
   return h >>> 0;
 }
 
-/** Montant en € : conserve le signe, ordre de grandeur proche, valeur différente. */
+/**
+ * Montant en € : conserve le signe, valeur différente mais **toujours plus basse** que le réel
+ * (18 %–58 % du montant), pour ne jamais sur-représenter l'activité lors d'une démo/capture.
+ */
 export function maskMoneyAmount(real: number): number {
   if (!Number.isFinite(real) || real === 0) return real;
   const h = djb2Hash32(`eur|${real.toExponential(12)}`);
   const sign = real < 0 ? -1 : 1;
   const abs = Math.abs(real);
-  const factor = 0.32 + (h % 10_000) / 10_000 * 1.55;
+  const factor = 0.18 + (h % 10_000) / 10_000 * 0.4;
   const flat = (((h >>> 12) % 2001) - 1000) / 100;
   const scaled = abs * factor + flat * (abs >= 800 ? 1 : abs >= 80 ? 0.1 : 0.01);
   const out = Math.round(Math.max(Math.abs(scaled), 0.01) * 100) / 100;
@@ -30,8 +33,9 @@ export function maskPositiveInt(n: number): number {
   const r = Math.round(n);
   if (r <= 0) return r;
   const h = djb2Hash32(`int|${r}`);
-  const lo = Math.max(1, Math.floor(r * 0.45));
-  const hi = Math.max(lo + 1, Math.ceil(r * 1.65));
+  // Toujours en dessous du réel : 30 %–85 % de la valeur.
+  const lo = Math.max(1, Math.floor(r * 0.3));
+  const hi = Math.max(lo + 1, Math.ceil(r * 0.85));
   const span = hi - lo;
   return lo + (h % (span + 1));
 }
