@@ -49,6 +49,7 @@ import { bankinSubcategoryLabel } from "@/lib/bankin/categorize";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { categoryGlyph } from "@/lib/category-glyph";
 import { counterpartyLogoHref } from "@/lib/counterparty-logo";
+import { CATEGORISATION_REFRESH_EVENT } from "@/lib/categorisation-refresh-bus";
 import {
   buildDashboardMonthOptions,
   defaultDashboardPeriodFilter,
@@ -326,6 +327,20 @@ export function DashboardClient({
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
   const shouldComputeSasuPanel = dashboardSection === "sasu" || dashboardSection === "private";
+  const refreshDashboardTransactions = useCallback(async () => {
+    const res = await fetch("/api/dashboard/transactions", { cache: "no-store" });
+    const body = (await res.json().catch(() => null)) as null | {
+      ok?: boolean;
+      transactions?: DashboardTx[];
+      heroStats?: DashboardHeroStats;
+    };
+    if (!res.ok || !body?.ok || !body.transactions || !body.heroStats) return false;
+    fullHistorySyncedRef.current = true;
+    setTransactions(body.transactions);
+    setCurrentHeroStats(body.heroStats);
+    setHeroStatsReady(true);
+    return true;
+  }, []);
 
   useEffect(() => {
     fullHistorySyncedRef.current = false;
@@ -338,21 +353,7 @@ export function DashboardClient({
     if (!syncFullHistoryOnMount || demoMode) return;
     let cancelled = false;
     console.time("dashboard:transactions-full");
-    void fetch("/api/dashboard/transactions")
-      .then((res) => res.json())
-      .then(
-        (body: {
-          ok?: boolean;
-          transactions?: DashboardTx[];
-          heroStats?: DashboardHeroStats;
-        }) => {
-          if (cancelled || !body.ok || !body.transactions || !body.heroStats) return;
-          fullHistorySyncedRef.current = true;
-          setTransactions(body.transactions);
-          setCurrentHeroStats(body.heroStats);
-          setHeroStatsReady(true);
-        }
-      )
+    void refreshDashboardTransactions()
       .catch(() => {
         // Historique complet indisponible : on conserve la fenêtre initiale.
       })
@@ -365,7 +366,18 @@ export function DashboardClient({
     return () => {
       cancelled = true;
     };
-  }, [demoMode, syncFullHistoryOnMount]);
+  }, [demoMode, refreshDashboardTransactions, syncFullHistoryOnMount]);
+
+  useEffect(() => {
+    if (demoMode) return;
+
+    const onCategorisationRefresh = () => {
+      void refreshDashboardTransactions();
+    };
+
+    window.addEventListener(CATEGORISATION_REFRESH_EVENT, onCategorisationRefresh);
+    return () => window.removeEventListener(CATEGORISATION_REFRESH_EVENT, onCategorisationRefresh);
+  }, [demoMode, refreshDashboardTransactions]);
 
   useEffect(() => {
     setRevenueCounterpartyDetail(null);

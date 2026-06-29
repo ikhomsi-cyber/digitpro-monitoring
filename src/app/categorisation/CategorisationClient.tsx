@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { NDF_DIGITPRO_CATEGORY } from "@/lib/ndf-digitpro";
 import { resolveNdfRejectionCategory } from "@/lib/categorisation-candidates";
+import { requestCategorisationRefresh } from "@/lib/categorisation-refresh-bus";
 import { PullToRefreshIndicator } from "@/components/categorisation/PullToRefreshIndicator";
 import { useCategorisationRemoteRefresh } from "@/hooks/useCategorisationRemoteRefresh";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -490,6 +491,7 @@ export function CategorisationClient({
         if (!res.ok || !body?.ok) throw new Error(body?.error ?? "Impossible d’enregistrer");
         toast.success(successMessage);
         removeTransaction(transactionId, onSuccess);
+        requestCategorisationRefresh({ source: "manual" });
       } catch (error) {
         toast.error("Impossible d’enregistrer", {
           description: error instanceof Error ? error.message : undefined
