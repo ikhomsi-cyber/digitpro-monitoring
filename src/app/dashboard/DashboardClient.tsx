@@ -38,6 +38,7 @@ import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardIn
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
+import { BncPaymentHistoryCard } from "@/components/dashboard/BncPaymentHistoryCard";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
 import { RevolutInsightsSection } from "@/components/dashboard/RevolutInsightsSection";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
@@ -1023,6 +1024,7 @@ export function DashboardClient({
             formatInt={fmt.int}
             trend={revenueAllocationTrend}
           />
+          <BncPaymentHistoryCard transactions={transactions} />
           <DashboardPremiumHero
             stats={displayHeroStats}
             transactions={transactions}
