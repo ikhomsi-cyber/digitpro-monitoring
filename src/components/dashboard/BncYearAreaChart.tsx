@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { useRootIsDark } from "@/lib/use-root-is-dark";
 
 type MonthPoint = { month: string; bncEur: number; ikEur: number; ndfEur: number };
 type SeriesKey = "bncEur" | "ikEur" | "ndfEur";
@@ -38,12 +37,11 @@ const MONTH_LABELS = [
 const SERIES: Array<{
   key: SeriesKey;
   label: string;
-  light: string;
-  dark: string;
+  color: string;
 }> = [
-  { key: "bncEur", label: "BNC", light: "#10b981", dark: "#34d399" },
-  { key: "ikEur", label: "IK", light: "#0ea5e9", dark: "#38bdf8" },
-  { key: "ndfEur", label: "NDF", light: "#f59e0b", dark: "#fbbf24" }
+  { key: "bncEur", label: "BNC", color: "var(--bnc-chart-bnc)" },
+  { key: "ikEur", label: "IK", color: "var(--bnc-chart-ik)" },
+  { key: "ndfEur", label: "NDF", color: "var(--bnc-chart-ndf)" }
 ];
 
 function monthAxisLabel(monthKey: string): string {
@@ -97,26 +95,18 @@ function buildAreaPath(points: Array<{ x: number; y: number }>, baseline: number
 
 export function BncYearAreaChart({ monthly, formatEuro }: Props) {
   const uid = useId().replace(/:/g, "");
-  const isDark = useRootIsDark();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const palette = isDark
-    ? {
-        axis: "rgba(255,255,255,0.38)",
-        tooltipBg: "rgba(6,36,43,0.96)",
-        tooltipMonth: "rgba(255,255,255,0.48)",
-        markerFill: "#0b3038",
-        fillTopOpacity: 0.32,
-        fillBottomOpacity: 0.02
-      }
-    : {
-        axis: "#8D899D",
-        tooltipBg: "#F4F1FF",
-        tooltipMonth: "#8D899D",
-        markerFill: "#ffffff",
-        fillTopOpacity: 0.305698,
-        fillBottomOpacity: 0.01
-      };
+  const palette = {
+    axis: "var(--bnc-chart-axis)",
+    tooltipBg: "var(--bnc-chart-tooltip-bg)",
+    tooltipStroke: "var(--bnc-chart-tooltip-stroke)",
+    tooltipMonth: "var(--bnc-chart-tooltip-muted)",
+    tooltipValue: "var(--bnc-chart-tooltip-value)",
+    markerFill: "var(--bnc-chart-marker-fill)",
+    fillTopOpacity: 0.305698,
+    fillBottomOpacity: 0.01
+  };
 
   const defaultIndex = useMemo(() => {
     for (let i = monthly.length - 1; i >= 0; i--) {
@@ -148,12 +138,12 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
         points,
         areaPath: buildAreaPath(points, CHART.bottom),
         linePath: buildSmoothLinePath(points),
-        color: isDark ? series.dark : series.light
+        color: series.color
       };
     });
 
     return { maxY, ticks, pointsBySeries, xForIndex };
-  }, [isDark, monthly]);
+  }, [monthly]);
 
   const activePoint =
     activeIndex != null ? monthly[activeIndex] : monthly[defaultIndex] ?? monthly[monthly.length - 1];
@@ -165,7 +155,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
           ...series,
           amount: formatEuro(activePoint[series.key]),
           value: activePoint[series.key],
-          color: isDark ? series.dark : series.light
+          color: series.color
         })),
         month: monthAxisLabel(activePoint.month),
         width: 132,
@@ -181,7 +171,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
   return (
     <svg
       viewBox="0 0 387 212"
-      className="h-auto w-full"
+      className="h-auto w-full [--bnc-chart-axis:#8D899D] [--bnc-chart-bnc:#10b981] [--bnc-chart-ik:#0ea5e9] [--bnc-chart-marker-fill:#ffffff] [--bnc-chart-ndf:#f59e0b] [--bnc-chart-tooltip-bg:#F4F1FF] [--bnc-chart-tooltip-muted:#8D899D] [--bnc-chart-tooltip-stroke:rgba(52,40,99,0.08)] [--bnc-chart-tooltip-value:#342863] dark:[--bnc-chart-axis:rgba(255,255,255,0.38)] dark:[--bnc-chart-bnc:#34d399] dark:[--bnc-chart-ik:#38bdf8] dark:[--bnc-chart-marker-fill:#0b3038] dark:[--bnc-chart-ndf:#fbbf24] dark:[--bnc-chart-tooltip-bg:rgba(6,36,43,0.96)] dark:[--bnc-chart-tooltip-muted:rgba(255,255,255,0.48)] dark:[--bnc-chart-tooltip-stroke:rgba(56,189,248,0.22)] dark:[--bnc-chart-tooltip-value:rgba(255,255,255,0.88)]"
       role="img"
       aria-label={monthly
         .map((row) =>
@@ -250,7 +240,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
             height={tooltip.height}
             rx={8}
             fill={palette.tooltipBg}
-            stroke={isDark ? "rgba(56,189,248,0.22)" : "rgba(52,40,99,0.08)"}
+            stroke={palette.tooltipStroke}
             strokeWidth={1}
           />
           <text x={tooltip.x + 10} y={tooltip.y + 14} fill={palette.tooltipMonth} style={{ fontSize: 10, fontWeight: 600 }}>
@@ -266,7 +256,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
                 x={tooltip.x + tooltip.width - 10}
                 y={tooltip.y + 33 + index * 14}
                 textAnchor="end"
-                fill={isDark ? "rgba(255,255,255,0.88)" : "#342863"}
+                fill={palette.tooltipValue}
                 style={{ fontSize: 10, fontWeight: 700 }}
               >
                 {row.amount}
