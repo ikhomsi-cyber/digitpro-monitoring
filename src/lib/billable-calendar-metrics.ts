@@ -125,6 +125,16 @@ export function computeTjmWorkdayGauge(
   return { countedBillable, remainingBillable, totalBillableMonth, isCurrent };
 }
 
+/** Jours ouvrés facturables cochés sur un mois (lun–ven hors fériés, même règle que le TJM). */
+export function countBillableWorkDaysInMonth(
+  selected: ReadonlySet<string>,
+  year: number,
+  month0: number,
+  refDate = new Date()
+): number {
+  return computeTjmWorkdayGauge(selected, year, month0, refDate).countedBillable;
+}
+
 /**
  * Jours cochés dans l’agenda pour un mois civil (tous les jours sélectionnés, pas seulement ouvrés).
  * Mois passé : tous les jours du mois · mois en cours : date ≤ aujourd’hui · mois futur : tous cochés.
@@ -153,6 +163,48 @@ export function countAgendaWorkDaysInMonth(
     }
   }
   return n;
+}
+
+function monthKeysForCalendarFilter(
+  years: number[] | null,
+  month: string | null,
+  months: string[] | null,
+  now: Date
+): string[] {
+  if (month) return [month];
+  if (months != null && months.length > 0) return [...months];
+  if (years != null && years.length > 0) {
+    const keys: string[] = [];
+    for (const year of years) {
+      for (let month0 = 0; month0 < 12; month0++) {
+        keys.push(`${year}-${String(month0 + 1).padStart(2, "0")}`);
+      }
+    }
+    return keys;
+  }
+  const cursor = new Date(now.getFullYear(), now.getMonth(), 1);
+  return Array.from({ length: 12 }, () => {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+    cursor.setMonth(cursor.getMonth() - 1);
+    return key;
+  });
+}
+
+/** Jours cochés dans le calendrier sur la période filtrée (même logique que l'agenda activité). */
+export function countAgendaWorkDaysForFilter(
+  selected: ReadonlySet<string>,
+  options: { years: number[] | null; month: string | null; months: string[] | null },
+  now = new Date()
+): number {
+  const monthKeys = monthKeysForCalendarFilter(options.years, options.month, options.months, now);
+  let total = 0;
+  for (const monthKey of monthKeys) {
+    const year = Number(monthKey.slice(0, 4));
+    const month0 = Number(monthKey.slice(5, 7)) - 1;
+    if (!Number.isFinite(year) || !Number.isFinite(month0)) continue;
+    total += countAgendaWorkDaysInMonth(selected, year, month0, now);
+  }
+  return total;
 }
 
 export type WorkedDaysChartQuarterFilter = "full" | 1 | 2 | 3 | 4;
@@ -270,6 +322,19 @@ export function computeCurrentMonthOverview(
     workdayGauge: gauge,
     tjmEnVigueurHt
   };
+}
+
+/** Jours cochés dans l'agenda sur une année civile (tous les mois, pour le barème IK). */
+export function countAnnualAgendaBillableDays(
+  selected: ReadonlySet<string>,
+  year: number
+): number {
+  const prefix = `${year}-`;
+  let count = 0;
+  for (const iso of selected) {
+    if (iso.startsWith(prefix)) count++;
+  }
+  return count;
 }
 
 /** CA HT estimé sur l’activité agenda (jours ouvrés cochés × TJM), pas l’encaissé. */

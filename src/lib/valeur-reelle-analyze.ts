@@ -56,6 +56,26 @@ export function applyFiscalDebtSafetyMargin(amountEur: number): number {
   return Math.round(amountEur * (1 + FISCAL_DEBT_SAFETY_MARGIN_RATE) * 100) / 100;
 }
 
+/** Recalcule la CSG pour un CA HT donné en conservant les réintégrations sociales du mois de référence. */
+export function computeCsgEurForCaFacture(
+  caFactureEur: number,
+  mandatoryFeesEur: number,
+  personalChargesEur: number,
+  reference: Pick<ValeurReelleCashTree, "caFactureEur" | "csgEur">
+): number {
+  const refOperating = reference.caFactureEur - mandatoryFeesEur - personalChargesEur;
+  const refCsgCore =
+    reference.csgEur > 0
+      ? reference.csgEur / (1 + FISCAL_DEBT_SAFETY_MARGIN_RATE)
+      : 0;
+  const refBase = refCsgCore > 0 ? refCsgCore / CSG_ON_BNC_RATE : 0;
+  const reintegrations = Math.max(0, refBase - Math.max(0, refOperating));
+
+  const operating = caFactureEur - mandatoryFeesEur - personalChargesEur;
+  const base = Math.max(0, operating + reintegrations);
+  return applyFiscalDebtSafetyMargin(Math.round(base * CSG_ON_BNC_RATE * 100) / 100);
+}
+
 function fold(raw: string): string {
   return (raw ?? "")
     .normalize("NFD")

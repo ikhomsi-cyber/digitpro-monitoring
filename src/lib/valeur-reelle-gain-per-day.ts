@@ -40,7 +40,7 @@ function workedBillableDaysInMonth(
   return computeTjmWorkdayGauge(selected, y, month0, refDate).countedBillable;
 }
 
-function previousMonthKey(monthKey: string): string {
+export function previousMonthKey(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
   const cursor = new Date(y, m - 2, 1);
   return `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;

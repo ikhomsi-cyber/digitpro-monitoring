@@ -231,6 +231,37 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Jours facturés d'une ligne de CA encaissé : TJM du **mois de prestation**
+ * (encaissement − 2 mois), aligné sur le graphique « Jours facturés ».
+ */
+export function resolveRevenueEncashmentBillableDays(
+  tx: DashboardTx,
+  billableRatePeriods: readonly BillableRatePeriod[],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT
+): { caHtEur: number; tjmHt: number; billedDays: number; prestationMonthKey: string } {
+  if (!isRevenueCategory(tx.category) || tx.amount <= 0) {
+    return { caHtEur: 0, tjmHt: fallbackTjmHt, billedDays: 0, prestationMonthKey: "" };
+  }
+  const lineCaHt = tx.amount / (1 + VAT_RATE);
+  const enc = parseMonthKey(effectiveRevenueAnalyticsDateIso(tx).slice(0, 7));
+  const work = addCalendarMonths(enc.y, enc.m0, -INVOICE_ENCASHMENT_LAG_MONTHS);
+  const prestationMonthKey = monthKeyFromYm(work.y, work.m0);
+  const client = revenueCounterpartyDisplayName(tx);
+  const tjmHt = resolveBillableTjmForClientMonth(
+    billableRatePeriods,
+    client,
+    prestationMonthKey,
+    fallbackTjmHt
+  );
+  return {
+    caHtEur: round2(lineCaHt),
+    tjmHt,
+    billedDays: tjmHt > 0 ? lineCaHt / tjmHt : 0,
+    prestationMonthKey
+  };
+}
+
 export type CashedCaWorkedDays = {
   /** CA HT encaissé sur la période filtrée. */
   caHtEur: number;
@@ -257,18 +288,10 @@ export function computeCashedCaWorkedDays(
   let days = 0;
   for (const tx of scoped) {
     if ((tx.scope ?? "pro") !== "pro") continue;
-    if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
-    const lineCaHt = tx.amount / (1 + VAT_RATE);
-    // Le CA est encaissé ~2 mois après la prestation : on résout le TJM au mois de
-    // prestation (encaissement − 2), comme le graphe « Jours facturés », pour que le
-    // taux reflète la facture réelle et non le tarif en vigueur le mois d'encaissement.
-    const enc = parseMonthKey(effectiveRevenueAnalyticsDateIso(tx).slice(0, 7));
-    const work = addCalendarMonths(enc.y, enc.m0, -INVOICE_ENCASHMENT_LAG_MONTHS);
-    const workMonthKey = monthKeyFromYm(work.y, work.m0);
-    const client = revenueCounterpartyDisplayName(tx);
-    const tjmHt = resolveBillableTjmForClientMonth(billableRatePeriods, client, workMonthKey, fallbackTjmHt);
-    caHt += lineCaHt;
-    if (tjmHt > 0) days += lineCaHt / tjmHt;
+    const line = resolveRevenueEncashmentBillableDays(tx, billableRatePeriods, fallbackTjmHt);
+    if (line.billedDays <= 0) continue;
+    caHt += line.caHtEur;
+    days += line.billedDays;
   }
   const effectiveTjmHt = days > 0 ? caHt / days : fallbackTjmHt;
   return {

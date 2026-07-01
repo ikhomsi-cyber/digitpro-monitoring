@@ -26,11 +26,12 @@ function pctOfDaily(amount: number, caHt: number): number {
 
 function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWaterfallSvgStep[] {
   const afterCsg = b.caHtPerDay - b.csgPerDay;
-  const afterBusiness = afterCsg - b.mandatoryFeesPerDay;
+  const afterIk = afterCsg - b.ikPerDay;
+  const afterBusiness = afterIk - b.mandatoryFeesPerDay;
   const afterPersonal = afterBusiness - b.personalChargesPerDay;
   const ca = b.caHtPerDay;
 
-  return [
+  const steps: ValeurReelleWaterfallSvgStep[] = [
     {
       id: "revenue",
       label: "CA HT",
@@ -46,7 +47,21 @@ function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWa
       cumulativeEur: afterCsg,
       kind: "decrease",
       pctOfCaHt: pctOfDaily(b.csgPerDay, ca)
-    },
+    }
+  ];
+
+  if (b.ikPerDay > 0.01) {
+    steps.push({
+      id: "ik",
+      label: "IK",
+      deltaEur: -b.ikPerDay,
+      cumulativeEur: afterIk,
+      kind: "decrease",
+      pctOfCaHt: pctOfDaily(b.ikPerDay, ca)
+    });
+  }
+
+  steps.push(
     {
       id: "business",
       label: "Frais DigitPro",
@@ -71,7 +86,9 @@ function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWa
       kind: "total",
       pctOfCaHt: pctOfDaily(b.netPerDay, ca)
     }
-  ];
+  );
+
+  return steps;
 }
 
 function formatWorkedDaysLabel(

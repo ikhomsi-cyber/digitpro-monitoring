@@ -81,9 +81,9 @@ import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
-  isCounterpartyBillableDaysAtTjm,
-  resolveBillableTjmForClientMonth
+  isCounterpartyBillableDaysAtTjm
 } from "@/lib/billable-client-days";
+import { resolveRevenueEncashmentBillableDays } from "@/lib/invoice-worked-days-series";
 import { isRevenueCategory, revenueCounterpartyDisplayName } from "@/lib/revenue-category";
 import {
   BNC_PAYROLL_EXPENSE_CATEGORY,
@@ -1109,7 +1109,13 @@ export function DashboardClient({
                       <button
                         type="button"
                         key={item.label}
-                        onClick={() => setSasuAnalysisMode(item.mode)}
+                        onClick={() => {
+                          setSasuAnalysisMode(item.mode);
+                          if (item.mode === "revenues") {
+                            setSasuBreakdownMode("categories");
+                            setSasuMonthlyCategoryFilters([]);
+                          }
+                        }}
                         className={dashboardSegmentBtn(sasuAnalysisMode === item.mode)}
                       >
                         {item.label}
@@ -1173,7 +1179,12 @@ export function DashboardClient({
                     </div>
                   </div>
                 </div>
-                <div className={clsx(dashboardSegmentShell("mx-auto mt-3 grid max-w-sm grid-cols-2 gap-2"))}>
+                <div
+                  className={clsx(
+                    dashboardSegmentShell("mx-auto mt-3 grid max-w-sm gap-2"),
+                    sasuAnalysisMode === "expenses" ? "grid-cols-2" : "grid-cols-1"
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => {
@@ -1184,16 +1195,18 @@ export function DashboardClient({
                   >
                     {sasuAnalysisMode === "revenues" ? "Revenus" : "Catégories"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSasuBreakdownMode("simplified");
-                      setSasuMonthlyCategoryFilters([]);
-                    }}
-                    className={dashboardSegmentBtn(sasuBreakdownMode === "simplified")}
-                  >
-                    Simplifié
-                  </button>
+                  {sasuAnalysisMode === "expenses" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSasuBreakdownMode("simplified");
+                        setSasuMonthlyCategoryFilters([]);
+                      }}
+                      className={dashboardSegmentBtn(sasuBreakdownMode === "simplified")}
+                    >
+                      Simplifié
+                    </button>
+                  ) : null}
                 </div>
 
                 {sasuMonthlyEvolutionOptions.length ? (
@@ -1419,13 +1432,14 @@ export function DashboardClient({
                         : [];
                       const billedDaysForRevenue = billableRevenue
                         ? categoryRevenueTransactions.reduce((sum, tx) => {
-                            const tjmHt = resolveBillableTjmForClientMonth(
-                              billableActivity.billableRatePeriods,
-                              name,
-                              tx.date.slice(0, 7),
-                              BILLABLE_CLIENT_TJM_HT
+                            return (
+                              sum +
+                              resolveRevenueEncashmentBillableDays(
+                                tx,
+                                billableActivity.billableRatePeriods,
+                                BILLABLE_CLIENT_TJM_HT
+                              ).billedDays
                             );
-                            return sum + (tx.amount / (1 + VAT_RATE)) / tjmHt;
                           }, 0)
                         : 0;
                       return (
@@ -1508,19 +1522,16 @@ export function DashboardClient({
                               {detailTransactions.length ? (
                                 <div className="space-y-2">
                                   {detailTransactions.slice(0, 8).map((tx) => {
-                                    const txTjmHt =
-                                      sasuAnalysisMode === "revenues"
-                                        ? resolveBillableTjmForClientMonth(
+                                    const revenueBillable =
+                                      sasuAnalysisMode === "revenues" && billableRevenue
+                                        ? resolveRevenueEncashmentBillableDays(
+                                            tx,
                                             billableActivity.billableRatePeriods,
-                                            name,
-                                            tx.date.slice(0, 7),
                                             BILLABLE_CLIENT_TJM_HT
                                           )
-                                        : 0;
-                                    const txBilledDays =
-                                      sasuAnalysisMode === "revenues" && billableRevenue
-                                        ? (tx.amount / (1 + VAT_RATE)) / txTjmHt
-                                        : 0;
+                                        : null;
+                                    const txTjmHt = revenueBillable?.tjmHt ?? 0;
+                                    const txBilledDays = revenueBillable?.billedDays ?? 0;
                                     return (
                                       <div
                                         key={tx.id}
@@ -1777,13 +1788,25 @@ export function DashboardClient({
                         const showBillableDays =
                           kpiMode !== "personal" && isCounterpartyBillableDaysAtTjm(name);
                         const htForClient = totalHt;
-                        const clientTjmHt = resolveBillableTjmForClientMonth(
-                          billableActivity.billableRatePeriods,
-                          name,
-                          dashboardMonthKeyNowLocal(),
-                          BILLABLE_CLIENT_TJM_HT
-                        );
-                        const workedDays = showBillableDays ? htForClient / clientTjmHt : 0;
+                        let workedDays = 0;
+                        let billedCaHt = 0;
+                        if (showBillableDays) {
+                          for (const tx of filteredTx) {
+                            if (!isRevenueCategory(tx.category) || tx.amount <= 0) continue;
+                            if (revenueCounterpartyDisplayName(tx) !== name) continue;
+                            const line = resolveRevenueEncashmentBillableDays(
+                              tx,
+                              billableActivity.billableRatePeriods,
+                              BILLABLE_CLIENT_TJM_HT
+                            );
+                            workedDays += line.billedDays;
+                            billedCaHt += line.caHtEur;
+                          }
+                        }
+                        const clientTjmHt =
+                          workedDays > 0
+                            ? Math.round((billedCaHt / workedDays) * 100) / 100
+                            : BILLABLE_CLIENT_TJM_HT;
                         const open = revenueCounterpartyDetail === name;
                         return (
                           <li
