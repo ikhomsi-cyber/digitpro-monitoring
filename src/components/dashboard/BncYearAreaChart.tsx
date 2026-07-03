@@ -9,10 +9,12 @@ type Props = {
   formatEuro: (value: number) => string;
 };
 
-const W = 387;
+const W = 400;
 const H = 268;
 
-const MARGIN = { left: 40, right: 6, top: 8 } as const;
+const MARGIN = { left: 40, right: 16, top: 8 } as const;
+/** Marge intérieure pour que le 1er / dernier mois ne soient pas rognés. */
+const PLOT_INSET_X = 12;
 
 /** Panneau BNC (zone principale). */
 const BNC_PANEL = { top: 28, bottom: 138 } as const;
@@ -108,12 +110,14 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
 
   const chart = useMemo(() => {
     const plotRight = W - MARGIN.right;
-    const plotWidth = plotRight - MARGIN.left;
+    const plotLeft = MARGIN.left + PLOT_INSET_X;
+    const plotRightInset = plotRight - PLOT_INSET_X;
+    const innerWidth = plotRightInset - plotLeft;
 
     const xForIndex = (index: number) =>
       monthly.length <= 1
-        ? (MARGIN.left + plotRight) / 2
-        : MARGIN.left + (index / Math.max(1, monthly.length - 1)) * plotWidth;
+        ? (plotLeft + plotRightInset) / 2
+        : plotLeft + (index / Math.max(1, monthly.length - 1)) * innerWidth;
 
     const bncMax = niceYMax(Math.max(1, ...monthly.map((row) => row.bncEur)), 5000);
     const bncHeight = BNC_PANEL.bottom - BNC_PANEL.top;
@@ -135,7 +139,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
     const perksY = (value: number) => PERKS_PANEL.bottom - (value / perksMax) * perksHeight;
     const perksTicks = Array.from({ length: 3 }, (_, i) => (perksMax / 2) * i);
 
-    const slotWidth = monthly.length > 0 ? plotWidth / monthly.length : plotWidth;
+    const slotWidth = monthly.length > 0 ? innerWidth / monthly.length : innerWidth;
     const barWidth = Math.min(14, Math.max(6, slotWidth * 0.28));
     const barGap = 3;
 
@@ -165,7 +169,10 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
 
     return {
       plotRight,
-      plotWidth,
+      plotLeft,
+      plotRightInset,
+      innerWidth,
+      slotWidth,
       xForIndex,
       bncMax,
       bncTicks,
@@ -182,6 +189,8 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
 
   const hoverPoint = activeIndex != null ? monthly[activeIndex] : null;
   const hoverX = activeIndex != null ? chart.xForIndex(activeIndex) : 0;
+
+  const lastMonthIndex = monthly.length > 0 ? monthly.length - 1 : -1;
 
   const tooltip =
     hoverPoint && activeIndex != null
@@ -205,7 +214,7 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
-      className={`h-auto w-full ${cssVars}`}
+      className={`h-auto w-full touch-manipulation [-webkit-tap-highlight-color:transparent] ${cssVars}`}
       role="img"
       aria-label={monthly
         .map(
@@ -265,6 +274,19 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
           strokeWidth={2.5}
           strokeLinecap="round"
           strokeLinejoin="round"
+        />
+      ) : null}
+
+      {/* Point BNC sur le dernier mois (données partielles visibles) */}
+      {lastMonthIndex >= 0 && monthly[lastMonthIndex]!.bncEur > 0 ? (
+        <circle
+          cx={chart.xForIndex(lastMonthIndex)}
+          cy={chart.bncY(monthly[lastMonthIndex]!.bncEur)}
+          r={4.5}
+          fill={palette.markerFill}
+          stroke={SERIES.bnc.color}
+          strokeWidth={2}
+          opacity={activeIndex === lastMonthIndex ? 1 : 0.9}
         />
       ) : null}
 
@@ -405,19 +427,22 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
       {/* Zones interactives */}
       {monthly.map((row, index) => {
         const x = chart.xForIndex(index);
+        const hitHalf = Math.max(18, chart.slotWidth * 0.48);
         return (
           <rect
             key={row.month}
-            x={x - 20}
+            x={x - hitHalf}
             y={BNC_PANEL.top}
-            width={40}
+            width={hitHalf * 2}
             height={PERKS_PANEL.bottom - BNC_PANEL.top + 28}
             fill="transparent"
-            className="cursor-pointer"
+            className="cursor-pointer outline-none"
             onMouseEnter={() => setActiveIndex(index)}
-            onFocus={() => setActiveIndex(index)}
-            tabIndex={0}
-            aria-label={`${monthAxisLabel(row.month)} BNC ${formatEuro(row.bncEur)}, IK ${formatEuro(row.ikEur)}, NDF ${formatEuro(row.ndfEur)}`}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              setActiveIndex(index);
+            }}
+            aria-hidden
           />
         );
       })}
@@ -425,14 +450,18 @@ export function BncYearAreaChart({ monthly, formatEuro }: Props) {
       {monthly.map((row, index) => {
         const x = chart.xForIndex(index);
         const active = activeIndex === index;
+        const isLast = index === lastMonthIndex;
+        const isFirst = index === 0;
+        const labelX = isFirst ? chart.plotLeft : isLast ? chart.plotRightInset : x;
+        const labelAnchor = isFirst ? "start" : isLast ? "end" : "middle";
         return (
           <text
             key={`${row.month}-axis`}
-            x={x}
+            x={labelX}
             y={MONTH_LABEL_Y}
-            textAnchor="middle"
-            fill={active ? palette.tooltipValue : palette.axis}
-            style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}
+            textAnchor={labelAnchor}
+            fill={active || isLast ? palette.tooltipValue : palette.axis}
+            style={{ fontSize: 10, fontWeight: active || isLast ? 700 : 500 }}
           >
             {monthAxisLabel(row.month)}
           </text>

@@ -1,6 +1,6 @@
 import type { DashboardTx, DashboardAnalyticsFilter } from "./dashboard-metrics";
 import { effectiveRevenueAnalyticsDateIso, filterDashboardTransactions } from "./dashboard-metrics";
-import { countAgendaWorkDaysInMonth } from "./billable-calendar-metrics";
+import { countAgendaWorkDaysInMonth, countSelectedDaysInMonth } from "./billable-calendar-metrics";
 import {
   BILLABLE_CLIENT_TJM_HT,
   resolveBillableTjmForClientMonth,
@@ -32,6 +32,10 @@ export type InvoiceWorkedDayMonth = {
   /** Mois d’encaissement du CA (deux mois après le mois de la barre). */
   sourceMonthKey: string;
   kind: InvoiceWorkedDayKind;
+  /** Jours facturables cochés sur le mois (planification), mois en cours uniquement. */
+  plannedDays?: number;
+  /** CA HT prévu = jours facturables cochés × TJM, mois en cours uniquement. */
+  plannedCaHt?: number;
 };
 
 export function monthKeyFromYm(y: number, month0: number): string {
@@ -219,9 +223,15 @@ export function appendAgendaWorkedDayMonths(
 
   const currentKey = monthKeyFromYm(cy, cm0);
   if (!existingKeys.has(currentKey)) {
-    const days = countAgendaWorkDaysInMonth(selected, cy, cm0, refDate);
+    const workedDays = countAgendaWorkDaysInMonth(selected, cy, cm0, refDate);
+    const billedDays = countSelectedDaysInMonth(selected, cy, cm0);
     const tjmHt = resolveBillableTjmForMonth(billableRatePeriods, currentKey, fallbackTjmHt);
-    extras.push(agendaMonthBar(cy, cm0, days, tjmHt, "a_facturer"));
+    const bar = agendaMonthBar(cy, cm0, workedDays, tjmHt, "a_facturer");
+    extras.push({
+      ...bar,
+      plannedDays: billedDays,
+      plannedCaHt: Math.round(billedDays * tjmHt * 100) / 100
+    });
   }
 
   return [...base, ...extras].sort((a, b) => a.monthKey.localeCompare(b.monthKey));

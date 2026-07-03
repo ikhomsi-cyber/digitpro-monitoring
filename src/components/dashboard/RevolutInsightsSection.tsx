@@ -562,7 +562,16 @@ export function RevolutInsightsSection({
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(filteredDepenses)}
             </p>
-            <span className="text-sm font-medium tabular-nums text-rose-500 dark:text-rose-400">
+            <span
+              className={clsx(
+                "text-sm font-medium tabular-nums",
+                depensesDelta > 0
+                  ? "text-rose-500 dark:text-rose-400"
+                  : depensesDelta < 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-ink-400 dark:text-white/45"
+              )}
+            >
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
@@ -603,7 +612,16 @@ export function RevolutInsightsSection({
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(current.entrees)}
             </p>
-            <span className="text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+            <span
+              className={clsx(
+                "text-sm font-medium tabular-nums",
+                entreesDelta > 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : entreesDelta < 0
+                    ? "text-rose-500 dark:text-rose-400"
+                    : "text-ink-400 dark:text-white/45"
+              )}
+            >
               {entreesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(entreesDelta))}
             </span>
           </div>

@@ -165,6 +165,39 @@ export function countAgendaWorkDaysInMonth(
   return n;
 }
 
+/** Tous les jours cochés (facturables) sur un mois civil, sans filtre de date. */
+export function countSelectedDaysInMonth(
+  selected: ReadonlySet<string>,
+  year: number,
+  month0: number
+): number {
+  const prefix = `${year}-${String(month0 + 1).padStart(2, "0")}-`;
+  let n = 0;
+  for (const iso of selected) {
+    if (iso.startsWith(prefix)) n++;
+  }
+  return n;
+}
+
+/** Jauge agenda : jours travaillés (cochés, règle mois courant) / jours facturables cochés sur le mois. */
+export function computeAgendaBillableGauge(
+  selected: ReadonlySet<string>,
+  viewYear: number,
+  viewMonth0: number,
+  refDate = new Date()
+): ActivityWorkdayGauge {
+  const workedDays = countAgendaWorkDaysInMonth(selected, viewYear, viewMonth0, refDate);
+  const totalBillable = countSelectedDaysInMonth(selected, viewYear, viewMonth0);
+  const isCurrent =
+    viewYear === refDate.getFullYear() && viewMonth0 === refDate.getMonth();
+  return {
+    countedBillable: workedDays,
+    totalBillableMonth: totalBillable,
+    remainingBillable: Math.max(0, totalBillable - workedDays),
+    isCurrent
+  };
+}
+
 function monthKeysForCalendarFilter(
   years: number[] | null,
   month: string | null,
@@ -315,11 +348,10 @@ export function computeCurrentMonthOverview(
     monthKey,
     fallbackTjmHt
   );
-  const gauge = computeTjmWorkdayGauge(selected, y, m0, refDate);
   return {
     monthTitle: monthTitleFr(y, m0),
     kpis: computeCalendarStickyKpis(selected, tjmEnVigueurHt, y, m0, refDate),
-    workdayGauge: gauge,
+    workdayGauge: computeAgendaBillableGauge(selected, y, m0, refDate),
     tjmEnVigueurHt
   };
 }

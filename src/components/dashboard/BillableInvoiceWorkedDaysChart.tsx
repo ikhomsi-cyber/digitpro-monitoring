@@ -37,7 +37,7 @@ const KIND_META: Record<
     label: "À facturer",
     fill: "#a78bfa",
     fillDark: "#8b5cf6",
-    tooltipHint: "Jours cochés dans l’agenda (1er → aujourd’hui)"
+    tooltipHint: "CA prévu sur jours facturés cochés dans l’agenda"
   }
 };
 
@@ -88,13 +88,19 @@ function ChartTooltip({
       <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500 dark:text-ink-400">
         {meta.label}
       </div>
-      <div className="mt-1 tabular-nums text-ink-700 dark:text-ink-300">
-        <span className={`font-semibold ${toneClass}`}>{fmt.int(p.days)} j.</span>
-      </div>
+      {p.kind !== "a_facturer" ? (
+        <div className="mt-1 tabular-nums text-ink-700 dark:text-ink-300">
+          <span className={`font-semibold ${toneClass}`}>{fmt.int(p.days)} j.</span>
+        </div>
+      ) : null}
       <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">{meta.tooltipHint}</div>
       {p.kind === "encaisse" ? (
         <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
           CA HT ({sourceLabel(p.sourceMonthKey)}) : {fmt.euro(p.caHt)}
+        </div>
+      ) : p.kind === "a_facturer" && p.plannedCaHt != null && p.plannedDays != null ? (
+        <div className="mt-0.5 text-[11px] font-semibold text-violet-800 dark:text-violet-300">
+          CA prévu : {fmt.euro(p.plannedCaHt)} HT · {fmt.int(p.plannedDays)} j. facturés
         </div>
       ) : (
         <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
