@@ -223,8 +223,8 @@ export function BillableActivityProvider({
   const sortedIsos = useMemo(() => [...selected].sort(), [selected]);
 
   const overview = useMemo(
-    () => computeCurrentMonthOverview(selected, billableRatePeriods, tjmHt),
-    [billableRatePeriods, selected, tjmHt]
+    () => computeCurrentMonthOverview(selected, billableRatePeriods, tjmHt, new Date(), vacationDays),
+    [billableRatePeriods, selected, tjmHt, vacationDays]
   );
 
   const value = useMemo<BillableActivityContextValue>(

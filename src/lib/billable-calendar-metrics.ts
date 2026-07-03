@@ -76,12 +76,11 @@ export function computeTjmWorkdayGauge(
   selected: ReadonlySet<string>,
   viewYear: number,
   viewMonth0: number,
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): ActivityWorkdayGauge & { isCurrent: boolean } {
   const nowY = refDate.getFullYear();
   const nowM0 = refDate.getMonth();
-  const todayD = refDate.getDate();
-  const todayIso = toBillableIso(nowY, nowM0, todayD);
   const lastDate = new Date(viewYear, viewMonth0 + 1, 0);
   const lastDay = lastDate.getDate();
   const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
@@ -100,25 +99,16 @@ export function computeTjmWorkdayGauge(
   let countedBillable = 0;
   for (const iso of selected) {
     if (!iso.startsWith(prefix)) continue;
+    if (vacationDays.has(iso)) continue;
     if (!isBillableWorkdayIso(iso, publicHolidays)) continue;
-    if (isPast) countedBillable++;
-    else if (isCurrent) {
-      if (iso <= todayIso) countedBillable++;
-    } else {
-      countedBillable++;
-    }
+    countedBillable++;
   }
 
   let remainingBillable = 0;
-  if (isPast) {
-    remainingBillable = 0;
-  } else if (isCurrent) {
+  if (!isPast) {
     for (const iso of billableIsos) {
-      if (iso > todayIso) remainingBillable++;
-    }
-  } else {
-    for (const iso of billableIsos) {
-      if (!selected.has(iso)) remainingBillable++;
+      if (selected.has(iso) && !vacationDays.has(iso)) continue;
+      remainingBillable++;
     }
   }
 
@@ -126,31 +116,22 @@ export function computeTjmWorkdayGauge(
 }
 
 /**
- * Jours cochés dans l’agenda pour un mois civil (tous les jours sélectionnés, pas seulement ouvrés).
- * Mois passé : tous les jours du mois · mois en cours : date ≤ aujourd’hui · mois futur : tous cochés.
+ * Jours cochés « facturés » dans l’agenda pour un mois civil, hors vacances personnelles.
  */
 export function countAgendaWorkDaysInMonth(
   selected: ReadonlySet<string>,
   year: number,
   month0: number,
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): number {
-  const nowY = refDate.getFullYear();
-  const nowM0 = refDate.getMonth();
-  const todayIso = toBillableIso(nowY, nowM0, refDate.getDate());
   const prefix = `${year}-${String(month0 + 1).padStart(2, "0")}-`;
-  const isPast = year < nowY || (year === nowY && month0 < nowM0);
-  const isCurrent = year === nowY && month0 === nowM0;
 
   let n = 0;
   for (const iso of selected) {
     if (!iso.startsWith(prefix)) continue;
-    if (isPast) n++;
-    else if (isCurrent) {
-      if (iso <= todayIso) n++;
-    } else {
-      n++;
-    }
+    if (vacationDays.has(iso)) continue;
+    n++;
   }
   return n;
 }
@@ -209,12 +190,13 @@ export function countAgendaWorkDaysInPeriod(
   year: number | "all",
   quarter: WorkedDaysChartQuarterFilter,
   seriesMonthKeys: readonly string[],
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): number {
   const months = listMonthsInWorkedDaysChartFilter(year, quarter, seriesMonthKeys, refDate);
   let total = 0;
   for (const { y, m0 } of months) {
-    total += countAgendaWorkDaysInMonth(selected, y, m0, refDate);
+    total += countAgendaWorkDaysInMonth(selected, y, m0, refDate, vacationDays);
   }
   return total;
 }
@@ -233,9 +215,10 @@ export function computeCalendarStickyKpis(
   tjmHt: number,
   viewYear: number,
   viewMonth0: number,
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): ActivityOverviewKpis {
-  const gauge = computeTjmWorkdayGauge(selected, viewYear, viewMonth0, refDate);
+  const gauge = computeTjmWorkdayGauge(selected, viewYear, viewMonth0, refDate, vacationDays);
   const jours = gauge.countedBillable;
   const caEstime = jours * tjmHt;
   const resteAFacturer = Math.max(0, gauge.totalBillableMonth - jours) * tjmHt;
@@ -247,7 +230,8 @@ export function computeCurrentMonthOverview(
   selected: ReadonlySet<string>,
   billableRatePeriods: readonly BillableRatePeriod[],
   fallbackTjmHt: number,
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): {
   monthTitle: string;
   kpis: ActivityOverviewKpis;
@@ -263,10 +247,10 @@ export function computeCurrentMonthOverview(
     monthKey,
     fallbackTjmHt
   );
-  const gauge = computeTjmWorkdayGauge(selected, y, m0, refDate);
+  const gauge = computeTjmWorkdayGauge(selected, y, m0, refDate, vacationDays);
   return {
     monthTitle: monthTitleFr(y, m0),
-    kpis: computeCalendarStickyKpis(selected, tjmEnVigueurHt, y, m0, refDate),
+    kpis: computeCalendarStickyKpis(selected, tjmEnVigueurHt, y, m0, refDate, vacationDays),
     workdayGauge: gauge,
     tjmEnVigueurHt
   };
@@ -278,7 +262,8 @@ export function computeMonthActivityCaHt(
   billableRatePeriods: readonly BillableRatePeriod[],
   fallbackTjmHt: number,
   monthKey: string,
-  refDate = new Date()
+  refDate = new Date(),
+  vacationDays: ReadonlySet<string> = new Set()
 ): { caHtEur: number; billableDays: number; tjmHt: number } {
   const [y, m] = monthKey.split("-").map((part) => Number(part));
   const month0 = (m || 1) - 1;
@@ -288,7 +273,7 @@ export function computeMonthActivityCaHt(
     monthKey,
     fallbackTjmHt
   );
-  const gauge = computeTjmWorkdayGauge(selected, y, month0, refDate);
+  const gauge = computeTjmWorkdayGauge(selected, y, month0, refDate, vacationDays);
   const caHtEur = Math.round(gauge.countedBillable * tjmHt * 100) / 100;
   return { caHtEur, billableDays: gauge.countedBillable, tjmHt };
 }

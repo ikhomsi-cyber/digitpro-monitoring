@@ -80,33 +80,19 @@ export function BillableDaysCalendarBlock({
   const publicHolidays = useMemo(() => getFrenchPublicHolidaysForYear(viewYear), [viewYear]);
 
   /**
-   * Mois affiché dans le calendrier (viewYear / viewMonth0) : jours pris en compte pour brut + IK.
-   * - Mois passé : tous les jours cochés du mois.
-   * - Mois en cours : jours cochés avec date ≤ aujourd’hui.
-   * - Mois futur : tous les jours cochés sur la grille (planification).
+   * Mois affiché dans le calendrier : jours facturés (verts), hors vacances personnelles.
    */
   const selectedViewMonthStats = useMemo(() => {
     const d = new Date();
-    const nowY = d.getFullYear();
-    const nowM0 = d.getMonth();
-    const todayIso = toBillableIso(nowY, nowM0, d.getDate());
     const prefix = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}-`;
     const monthTitle = monthTitleFr(viewYear, viewMonth0);
-
-    const isPast =
-      viewYear < nowY || (viewYear === nowY && viewMonth0 < nowM0);
-    const isCurrent = viewYear === nowY && viewMonth0 === nowM0;
 
     let countedDays = 0;
     for (const iso of selected) {
       if (!iso.startsWith(prefix)) continue;
-      if (isPast) {
-        countedDays++;
-      } else if (isCurrent) {
-        if (iso <= todayIso) countedDays++;
-      } else {
-        countedDays++;
-      }
+      if (vacationDays.has(iso)) continue;
+      if (!isBillableWorkdayIso(iso, publicHolidays)) continue;
+      countedDays++;
     }
 
     const todayLongFr = new Intl.DateTimeFormat("fr-FR", {
@@ -115,8 +101,13 @@ export function BillableDaysCalendarBlock({
       year: "numeric"
     }).format(d);
 
+    const nowY = d.getFullYear();
+    const nowM0 = d.getMonth();
+    const isPast = viewYear < nowY || (viewYear === nowY && viewMonth0 < nowM0);
+    const isCurrent = viewYear === nowY && viewMonth0 === nowM0;
+
     return { countedDays, monthTitle, isPast, isCurrent, todayLongFr };
-  }, [selected, viewYear, viewMonth0]);
+  }, [publicHolidays, selected, vacationDays, viewYear, viewMonth0]);
 
   /**
    * Kilométrage annuel automatique : un aller-retour par jour facturé/saisi dans le
@@ -125,9 +116,13 @@ export function BillableDaysCalendarBlock({
   const annualBilledDays = useMemo(() => {
     const prefix = `${viewYear}-`;
     let count = 0;
-    for (const iso of selected) if (iso.startsWith(prefix)) count++;
+    for (const iso of selected) {
+      if (!iso.startsWith(prefix)) continue;
+      if (vacationDays.has(iso)) continue;
+      count++;
+    }
     return count;
-  }, [selected, viewYear]);
+  }, [selected, vacationDays, viewYear]);
   const annualKm = useMemo(
     () => Math.round(annualBilledDays * commuteRoundTripKm()),
     [annualBilledDays]
