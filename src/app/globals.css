@@ -74,16 +74,19 @@ body {
 }
 
 @layer components {
-  /** Écran de lancement / loading — fond uni edge-to-edge (Dynamic Island, encoches). */
+  /** Écran de lancement — même dégradé que le dashboard, edge-to-edge iOS. */
   .app-launch-screen {
-    @apply fixed inset-0 z-[9999] flex items-center justify-center bg-ink-100 dark:bg-[#06242b];
-    min-height: 100dvh;
-    min-height: -webkit-fill-available;
-    padding:
-      env(safe-area-inset-top, 0px)
-      env(safe-area-inset-right, 0px)
-      env(safe-area-inset-bottom, 0px)
-      env(safe-area-inset-left, 0px);
+    @apply fixed z-[9999] flex items-center justify-center bg-ink-100;
+    top: calc(-1 * env(safe-area-inset-top, 0px));
+    left: 0;
+    right: 0;
+    min-height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .dark .app-launch-screen {
+    background-color: var(--pg-grad-top);
+    background-image: var(--pg-page-bg);
   }
 
   /** Fond immersif dashboard — gris-bleu clair en light, teal en dark. */

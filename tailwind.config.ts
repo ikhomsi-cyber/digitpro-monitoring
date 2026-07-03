@@ -107,6 +107,27 @@ const config: Config = {
           "0%, 100%": { opacity: "0.7", transform: "scale(0.985)" },
           "50%": { opacity: "1", transform: "scale(1.015)" }
         },
+        /** Logo splash — scale + halo cyan synchronisés. */
+        launchLogo: {
+          "0%, 100%": {
+            opacity: "0.92",
+            transform: "scale(1) translateY(0)"
+          },
+          "50%": {
+            opacity: "1",
+            transform: "scale(1.07) translateY(-2px)"
+          }
+        },
+        launchGlow: {
+          "0%, 100%": {
+            opacity: "0.35",
+            transform: "scale(0.92)"
+          },
+          "50%": {
+            opacity: "0.65",
+            transform: "scale(1.12)"
+          }
+        },
         /** Barre de progression indéterminée (slide). */
         loaderBar: {
           "0%": { transform: "translateX(-110%)" },
@@ -117,6 +138,8 @@ const config: Config = {
         shimmer: "shimmer 1.4s linear infinite",
         floatIn: "floatIn 0.4s ease-out both",
         breathe: "breathe 2.6s ease-in-out infinite",
+        launchLogo: "launchLogo 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+        launchGlow: "launchGlow 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite",
         loaderBar: "loaderBar 1.25s cubic-bezier(0.65,0,0.35,1) infinite"
       },
       letterSpacing: {
