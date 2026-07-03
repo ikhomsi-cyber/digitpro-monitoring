@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
-import { APP_LAUNCH_BG_DARK, APP_LAUNCH_BG_LIGHT } from "@/lib/app-launch-theme";
+import { APP_LAUNCH_BG_LIGHT, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,8 +36,8 @@ export const viewport: Viewport = {
   themeColor: APP_LAUNCH_BG_LIGHT
 };
 
-/** Inline script : privacy + thème + fond/status bar unifiés avant le premier paint. */
-const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(dark)d.classList.add('dark');var bg=dark?'${APP_LAUNCH_BG_DARK}':'${APP_LAUNCH_BG_LIGHT}';d.style.backgroundColor=bg;d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=bg}else{m=document.createElement('meta');m.name='theme-color';m.content=bg;document.head.appendChild(m)}}catch(e){}`;
+/** Inline script : privacy + thème + theme-color avant le premier paint (fond via CSS sur html). */
+const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(dark)d.classList.add('dark');var theme=dark?'${APP_THEME_COLOR_DARK}':'${APP_LAUNCH_BG_LIGHT}';d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=theme}else{m=document.createElement('meta');m.name='theme-color';m.content=theme;document.head.appendChild(m)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${inter.variable} ${display.variable} font-sans text-ink-900 transition-colors duration-200 dark:text-ink-50`}
         suppressHydrationWarning
       >
-        <div className="min-h-dvh min-h-[100dvh]">{children}</div>
+        <div className="min-h-dvh min-h-[100dvh] bg-transparent">{children}</div>
         <Toaster
           position="top-center"
           closeButton

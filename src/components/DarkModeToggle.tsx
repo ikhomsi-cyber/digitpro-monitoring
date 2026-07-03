@@ -4,6 +4,7 @@ import { Moon, Sun } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { clsx } from "clsx";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
+import { syncAppChromeTheme } from "@/lib/sync-app-chrome-theme";
 
 function readDarkFromDom(): boolean {
   if (typeof document === "undefined") return false;
@@ -30,6 +31,7 @@ export function DarkModeToggle({ className }: { className?: string }) {
     } catch {
       /* no-op */
     }
+    syncAppChromeTheme(next);
     setDark(next);
   }, []);
 

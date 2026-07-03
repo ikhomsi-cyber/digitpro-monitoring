@@ -3,8 +3,8 @@
   "short_name": "DigitPro",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#06242b",
-  "theme_color": "#06242b",
+  "background_color": "#0c5361",
+  "theme_color": "#0c5361",
   "icons": [
     {
       "src": "/icons/digitpro-icon.svg",
