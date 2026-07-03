@@ -56,7 +56,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${inter.variable} ${display.variable} font-sans text-ink-900 transition-colors duration-200 dark:text-ink-50`}
         suppressHydrationWarning
       >
-        <div className="min-h-dvh min-h-[100dvh] bg-transparent">{children}</div>
+        <div className="safe-area-top-chrome" aria-hidden />
+        <div className="relative z-[1] min-h-dvh min-h-[100dvh] bg-transparent">{children}</div>
         <Toaster
           position="top-center"
           closeButton

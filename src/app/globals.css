@@ -28,18 +28,51 @@ html.dark {
   --pg-glow-1: rgba(24, 160, 176, 0.45);
   --pg-glow-2: rgba(45, 212, 191, 0.18);
   --pg-glow-3: rgba(14, 116, 144, 0.24);
+  /* Fallback uni — barre Dynamic Island / theme-color iOS. */
+  background-color: var(--pg-grad-top);
+}
+
+/**
+ * Fond dark edge-to-edge (iOS : `background-attachment: fixed` ne peint pas la safe area).
+ * Le calque déborde volontairement sous la Dynamic Island.
+ */
+html.dark::before {
+  content: "";
+  position: fixed;
+  top: calc(-1 * env(safe-area-inset-top, 0px));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  pointer-events: none;
+  min-height: calc(100dvh + env(safe-area-inset-top, 0px));
   background-color: var(--pg-base);
   background-image:
     radial-gradient(900px 620px at 50% -10%, var(--pg-glow-1), transparent 62%),
     radial-gradient(760px 520px at 10% 6%, var(--pg-glow-2), transparent 54%),
     radial-gradient(700px 520px at 90% 0%, var(--pg-glow-3), transparent 52%),
     linear-gradient(180deg, var(--pg-grad-top) 0%, var(--pg-grad-mid) 42%, var(--pg-grad-bot) 100%);
-  background-attachment: fixed;
 }
 
 body {
   background-color: transparent;
   font-feature-settings: "ss01", "cv01", "cv11";
+}
+
+/** Bandeau safe-area — filet de sécurité si le calque ::before est rogné (Safari iOS). */
+.safe-area-top-chrome {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  height: env(safe-area-inset-top, 0px);
+  pointer-events: none;
+  background-color: #f5f5f7;
+}
+
+.dark .safe-area-top-chrome {
+  background-color: var(--pg-grad-top, #0c5361);
 }
 
 * {
