@@ -29,7 +29,7 @@ const LMNPClient = nextDynamic(
 );
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
-import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
+import { DashboardSettingsSheet } from "@/components/dashboard/DashboardSettingsSheet";
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
@@ -177,8 +177,8 @@ export default async function DashboardPage({
   const transactions: DashboardTx[] = dataMode === "DEMO" ? demoTransactions : rawRowsMapped;
 
   const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
-  const showDarkModeToggle = isDarkModeUiEnabled();
   const demoMode = dataMode === "DEMO" || demoPreferenceOn;
+  const showDarkModeToggle = isDarkModeUiEnabled();
   const powensCloudEnabled = isPowensCloudConfigured();
   const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
   const powensPrimaryAxis = powensPrimaryImportAxis();
@@ -209,21 +209,20 @@ export default async function DashboardPage({
     <Suspense fallback={null}>
       <DashboardSectionProvider>
         <DashboardDesktopSidebar />
-    <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
-      <DashboardTopNav
-        envMode={envMode}
-        dataMode={dataMode}
-        demoPreferenceOn={demoPreferenceOn}
-        showDummyDataToggle={envMode === "SUPABASE"}
-        userEmail={user?.email}
-        showDarkModeToggle={showDarkModeToggle}
-        showLogout={envMode !== "DEMO"}
-        canWrite={dataMode === "SUPABASE"}
-        powensCloudEnabled={powensCloudEnabled}
-        powensPersonalSyncEnabled={powensPersonalSyncEnabled}
-        powensPrimaryImportAxis={powensPrimaryAxis}
-      />
-
+        <DashboardSettingsSheet
+          envMode={envMode}
+          dataMode={dataMode}
+          demoPreferenceOn={demoPreferenceOn}
+          showDummyDataToggle={envMode === "SUPABASE"}
+          showDarkModeToggle={showDarkModeToggle}
+          showLogout={envMode !== "DEMO"}
+          userEmail={user?.email}
+          canWrite={dataMode === "SUPABASE"}
+          powensCloudEnabled={powensCloudEnabled}
+          powensPersonalSyncEnabled={powensPersonalSyncEnabled}
+          powensPrimaryImportAxis={powensPrimaryAxis}
+        />
+    <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(3.75rem,calc(env(safe-area-inset-top)+3.25rem))] sm:px-6 md:pb-10 md:pt-[max(0.75rem,env(safe-area-inset-top))] lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       {showLmnpPanel ? (
         <LMNPClient
           analysis={analyzeLmnp(transactions)}

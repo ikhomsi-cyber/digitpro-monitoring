@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
-import { APP_LAUNCH_BG_LIGHT, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
+import { APP_LAUNCH_BG_LIGHT, APP_LAUNCH_BG_DARK, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,7 +37,7 @@ export const viewport: Viewport = {
 };
 
 /** Inline script : privacy + thème + theme-color avant le premier paint (fond via CSS sur html). */
-const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(dark)d.classList.add('dark');var theme=dark?'${APP_THEME_COLOR_DARK}':'${APP_LAUNCH_BG_LIGHT}';d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=theme}else{m=document.createElement('meta');m.name='theme-color';m.content=theme;document.head.appendChild(m)}}catch(e){}`;
+const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(dark){d.classList.add('dark');d.style.backgroundColor='${APP_LAUNCH_BG_DARK}'}else{d.style.backgroundColor='${APP_LAUNCH_BG_LIGHT}'}var theme=dark?'${APP_THEME_COLOR_DARK}':'${APP_LAUNCH_BG_LIGHT}';d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=theme}else{m=document.createElement('meta');m.name='theme-color';m.content=theme;document.head.appendChild(m)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -11,13 +11,12 @@ import {
   normalizeCategory,
   type CategorisationCandidateRow
 } from "@/lib/categorisation-candidates";
+import { ArrowLeft } from "lucide-react";
 import { CategorisationClient, type CategorisationTx } from "./CategorisationClient";
-import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { formatDashboardMonthLabel } from "@/lib/dashboard-period";
 import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
-import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +26,6 @@ export default async function CategorisationPage() {
   const supabase = envMode === "SUPABASE" ? await createSupabaseServerClient() : null;
   const user = !supabase ? null : (await supabase.auth.getUser()).data.user;
   const dummyDataActive = isDashboardDummyDataActive(cookieStore);
-  const showDarkModeToggle = isDarkModeUiEnabled();
 
   if (envMode === "SUPABASE" && !user) {
     return (
@@ -86,18 +84,16 @@ export default async function CategorisationPage() {
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
       <DashboardDesktopSidebar />
-      <div data-page="categorisation" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:ml-32 lg:mr-auto lg:px-8">
-        <DashboardTopNav
-          envMode={envMode}
-          dataMode={envMode}
-          demoPreferenceOn={false}
-          showDummyDataToggle={envMode === "SUPABASE"}
-          userEmail={user?.email}
-          showDarkModeToggle={showDarkModeToggle}
-          showLogout={envMode !== "DEMO"}
-        />
+      <div data-page="categorisation" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(1.5rem,calc(env(safe-area-inset-top)+1rem))] sm:px-6 md:pb-10 md:pt-[max(0.75rem,env(safe-area-inset-top))] lg:ml-32 lg:mr-auto lg:px-8">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-ink-500 transition hover:text-ink-900 dark:text-white/45 dark:hover:text-white"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+          Retour dashboard
+        </Link>
 
-        <main className="mt-5">
+        <main className="mt-4">
           {loadError ? (
             <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-sm text-rose-800 dark:text-rose-200">
               {loadError}

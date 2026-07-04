@@ -1,14 +1,23 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarClock } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
+import {
+  getDashboardEffectiveDataMode,
+  isDashboardDemoPreferenceActive
+} from "@/lib/dashboard-demo-preference";
 import { Logo } from "@/components/ui/Logo";
-import { DashboardTopNav } from "@/components/dashboard/DashboardTopNav";
 import { AppSectionNav } from "@/components/AppSectionNav";
+import { SettingsControls } from "@/components/dashboard/SettingsControls";
 import { DashboardDummyDataProvider } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { isDashboardDummyDataActive } from "@/lib/dashboard-dummy-data-preference";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
+import { isPowensCloudConfigured } from "@/lib/powens/cloud-api";
+import {
+  powensPersonalSyncUiEnabled,
+  powensPrimaryImportAxis
+} from "@/lib/powens/config";
 import { ParametresClient, type BillableRatePeriod } from "./ParametresClient";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +37,12 @@ export default async function ParametresPage() {
   const user = !supabase ? null : (await supabase.auth.getUser()).data.user;
   const dummyDataActive = isDashboardDummyDataActive(cookieStore);
   const showDarkModeToggle = isDarkModeUiEnabled();
+  const dataMode = getDashboardEffectiveDataMode(envMode, cookieStore);
+  const demoPreferenceOn =
+    envMode === "SUPABASE" && isDashboardDemoPreferenceActive(cookieStore);
+  const powensCloudEnabled = isPowensCloudConfigured();
+  const powensPersonalSyncEnabled = powensCloudEnabled && powensPersonalSyncUiEnabled();
+  const powensPrimaryAxis = powensPrimaryImportAxis();
 
   if (envMode === "SUPABASE" && !user) {
     return (
@@ -71,19 +86,9 @@ export default async function ParametresPage() {
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
       <div data-page="parametres" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 md:pb-10 lg:px-8">
-        <DashboardTopNav
-          envMode={envMode}
-          dataMode={envMode}
-          demoPreferenceOn={false}
-          showDummyDataToggle={envMode === "SUPABASE"}
-          userEmail={user?.email}
-          showDarkModeToggle={showDarkModeToggle}
-          showLogout={envMode !== "DEMO"}
-        />
-
         <AppSectionNav />
 
-        <header className="mt-5 rounded-[2rem] border border-ink-200 bg-white p-5 shadow-[0_16px_60px_-28px_rgba(0,0,0,0.28)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:shadow-[0_32px_100px_-24px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-7">
+        <header className="mt-3 rounded-[2rem] border border-ink-200 bg-white p-5 shadow-[0_16px_60px_-28px_rgba(0,0,0,0.28)] dark:border-cyan-100/[0.12] dark:bg-[#0b3038] dark:shadow-[0_32px_100px_-24px_rgba(0,22,28,0.72),inset_0_1px_0_rgba(255,255,255,0.08)] sm:p-7">
           <Link
             href="/dashboard"
             className="mb-5 inline-flex items-center gap-2 text-xs font-semibold text-ink-500 transition hover:text-ink-900 dark:text-white/45 dark:hover:text-white"
@@ -93,27 +98,46 @@ export default async function ParametresPage() {
           </Link>
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/15 dark:text-emerald-300">
-              <CalendarClock className="h-5 w-5" aria-hidden />
+              <SlidersHorizontal className="h-5 w-5" aria-hidden />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
                 Paramètres
               </p>
               <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-ink-950 dark:text-white">
-                TJM par client et par période
+                Réglages de l’application
               </h1>
             </div>
           </div>
         </header>
 
-        <main className="mt-5">
-          {loadError ? (
-            <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-sm text-rose-800 dark:text-rose-200">
-              {loadError}
-            </div>
-          ) : (
-            <ParametresClient periods={periods} />
-          )}
+        <main className="mt-5 space-y-8">
+          <SettingsControls
+            envMode={envMode}
+            dataMode={dataMode}
+            demoPreferenceOn={demoPreferenceOn}
+            showDummyDataToggle={envMode === "SUPABASE"}
+            showDarkModeToggle={showDarkModeToggle}
+            showLogout={envMode !== "DEMO"}
+            userEmail={user?.email}
+            canWrite={dataMode === "SUPABASE"}
+            powensCloudEnabled={powensCloudEnabled}
+            powensPersonalSyncEnabled={powensPersonalSyncEnabled}
+            powensPrimaryImportAxis={powensPrimaryAxis}
+          />
+
+          <section>
+            <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
+              TJM par client et par période
+            </p>
+            {loadError ? (
+              <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-5 text-sm text-rose-800 dark:text-rose-200">
+                {loadError}
+              </div>
+            ) : (
+              <ParametresClient periods={periods} />
+            )}
+          </section>
         </main>
       </div>
     </DashboardDummyDataProvider>

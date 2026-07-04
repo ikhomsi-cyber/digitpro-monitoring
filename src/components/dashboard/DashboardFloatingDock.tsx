@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
@@ -216,6 +216,21 @@ export function DashboardDesktopSidebar() {
             );
           })}
         </nav>
+        <Link
+          href="/parametres"
+          prefetch
+          aria-current={pathname === "/parametres" ? "page" : undefined}
+          className={clsx(
+            "mt-2 flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center transition",
+            pathname === "/parametres"
+              ? "border-emerald-300/60 bg-emerald-50 text-emerald-700 shadow-sm dark:border-emerald-400/45 dark:bg-emerald-500/[0.16] dark:text-white dark:shadow-[0_0_26px_rgba(16,185,129,0.18)]"
+              : "border-ink-200/70 bg-white/60 text-ink-500 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-800 dark:border-white/8 dark:bg-white/[0.035] dark:text-white/48 dark:hover:bg-white/[0.07] dark:hover:text-white/78"
+          )}
+          aria-label="Paramètres"
+        >
+          <Settings className="h-[21px] w-[21px]" strokeWidth={1.85} aria-hidden />
+          <span className="text-[11px] font-semibold leading-tight tracking-tight">Réglages</span>
+        </Link>
       </div>
     </aside>
   );

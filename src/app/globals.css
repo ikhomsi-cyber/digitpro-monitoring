@@ -37,9 +37,11 @@ html.dark {
       var(--pg-grad-top) 0%,
       var(--pg-grad-top) 14%,
       var(--pg-grad-mid) 46%,
+      var(--pg-grad-bot) 88%,
       var(--pg-grad-bot) 100%
     );
-  background-color: var(--pg-grad-top);
+  /* Fallback sous la home bar iOS = teinte basse du dégradé (évite le bandeau clair). */
+  background-color: var(--pg-grad-bot);
 }
 
 body {
@@ -59,12 +61,12 @@ body {
   display: block;
   position: fixed;
   top: calc(-1 * env(safe-area-inset-top, 0px));
-  left: 0;
   right: 0;
-  height: calc(100dvh + env(safe-area-inset-top, 0px));
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+  left: 0;
   z-index: 0;
   pointer-events: none;
-  background-color: var(--pg-grad-top);
+  background-color: var(--pg-grad-bot);
   background-image: var(--pg-page-bg);
 }
 
@@ -74,18 +76,17 @@ body {
 }
 
 @layer components {
-  /** Écran de lancement — même dégradé que le dashboard, edge-to-edge iOS. */
+  /** Écran de lancement — même dégradé que le dashboard, edge-to-edge iOS (Dynamic Island + home bar). */
   .app-launch-screen {
     @apply fixed z-[9999] flex items-center justify-center bg-ink-100;
     top: calc(-1 * env(safe-area-inset-top, 0px));
-    left: 0;
     right: 0;
-    min-height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+    left: 0;
   }
 
   .dark .app-launch-screen {
-    background-color: var(--pg-grad-top);
+    background-color: var(--pg-grad-bot);
     background-image: var(--pg-page-bg);
   }
 
