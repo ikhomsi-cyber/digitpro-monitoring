@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
+import { safeSyncPowensCloudTransactions } from "@/app/dashboard/actions";
 import type { CategorisationTx } from "@/app/categorisation/CategorisationClient";
 import {
   CATEGORISATION_REFRESH_EVENT,
@@ -52,6 +53,17 @@ export function useCategorisationRemoteRefresh({
   const refreshFromApi = useCallback(
     async (detail?: CategorisationRefreshDetail) => {
       const previousIds = new Set(transactionsRef.current.map((tx) => tx.id));
+      let insertedFromSync = detail?.insertedCount ?? 0;
+
+      if (detail?.source === "pull") {
+        const syncResult = await safeSyncPowensCloudTransactions();
+        if (syncResult.ok) {
+          insertedFromSync = syncResult.inserted;
+        } else if (!syncResult.noAccount) {
+          toast.warning("Synchro Powens impossible", { description: syncResult.error });
+        }
+      }
+
       const payload = await fetchCategorisationPayload();
       const newCount = payload.transactions.filter((tx) => !previousIds.has(tx.id)).length;
 
@@ -59,10 +71,22 @@ export function useCategorisationRemoteRefresh({
       setCategories(payload.categories);
 
       if (detail?.source === "pull") {
-        if (newCount > 0) {
+        if (insertedFromSync > 0) {
+          toast.success(
+            `${insertedFromSync} transaction${insertedFromSync > 1 ? "s" : ""} importée${insertedFromSync > 1 ? "s" : ""} depuis Powens`,
+            {
+              description:
+                newCount > 0
+                  ? `${newCount} en attente de catégorisation`
+                  : "Aucun nouveau paiement carte à traiter pour ce mois."
+            }
+          );
+        } else if (newCount > 0) {
           toast.success(`${newCount} nouvelle${newCount > 1 ? "s" : ""} transaction${newCount > 1 ? "s" : ""}`);
         } else {
-          toast.message("Liste à jour");
+          toast.message("Liste à jour", {
+            description: "Aucune nouvelle transaction Powens pour ce mois."
+          });
         }
         return payload;
       }

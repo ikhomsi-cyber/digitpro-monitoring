@@ -37,6 +37,9 @@ import {
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
+import { PullToRefreshIndicator } from "@/components/categorisation/PullToRefreshIndicator";
+import { useDashboardRemoteRefresh } from "@/hooks/useDashboardRemoteRefresh";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { BncPaymentHistoryCard } from "@/components/dashboard/BncPaymentHistoryCard";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
@@ -342,6 +345,23 @@ export function DashboardClient({
     setHeroStatsReady(true);
     return true;
   }, []);
+
+  const pullRefreshEnabled =
+    dashboardSection === "full" || dashboardSection === "sasu";
+
+  const { refreshWithQontoSync } = useDashboardRemoteRefresh({
+    refreshDashboardTransactions,
+    demoMode
+  });
+
+  const { pullDistance, progress, isRefreshing, isPulling } = usePullToRefresh(
+    async () => {
+      await refreshWithQontoSync("pull");
+    },
+    { disabled: !pullRefreshEnabled }
+  );
+
+  const showPullIndicator = pullRefreshEnabled && (isPulling || isRefreshing);
 
   useEffect(() => {
     fullHistorySyncedRef.current = false;
@@ -996,6 +1016,12 @@ export function DashboardClient({
 
   return (
     <HiwayInvoicesProvider value={hiwayInvoicesState}>
+    <PullToRefreshIndicator
+      visible={showPullIndicator}
+      pullDistance={pullDistance}
+      progress={progress}
+      refreshing={isRefreshing}
+    />
     <main id="dashboard-main" className="relative mt-0 scroll-mt-28 overflow-x-hidden sm:mt-2">
       <SectionThemeSync />
       <div className={clsx("w-full", dashboardSectionStack)}>

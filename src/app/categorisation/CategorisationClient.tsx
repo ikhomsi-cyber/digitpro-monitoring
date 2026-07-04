@@ -567,7 +567,7 @@ export function CategorisationClient({
           <p className="mt-2 max-w-sm text-sm font-medium text-ink-500 dark:text-white/50">
             {validatedCount > 0 || rejectedCount > 0
               ? `${validatedCount} NDF validée${validatedCount > 1 ? "s" : ""}${rejectedCount > 0 ? ` · ${rejectedCount} exclue${rejectedCount > 1 ? "s" : ""}` : ""}.`
-              : `Aucun paiement carte en attente pour ${monthLabel.toLowerCase()}. Tirez vers le bas pour rafraîchir ou lancez une synchro Powens.`}
+              : `Aucun paiement carte en attente pour ${monthLabel.toLowerCase()}. Tirez vers le bas pour synchroniser Powens.`}
           </p>
         </div>
       </>
