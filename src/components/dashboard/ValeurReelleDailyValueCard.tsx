@@ -26,7 +26,8 @@ function pctOfDaily(amount: number, caHt: number): number {
 
 function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWaterfallSvgStep[] {
   const afterCsg = b.caHtPerDay - b.csgPerDay;
-  const afterIk = afterCsg - b.ikPerDay;
+  const afterImpots = afterCsg - b.impotPerDay;
+  const afterIk = afterImpots - b.ikPerDay;
   const afterBusiness = afterIk - b.mandatoryFeesPerDay;
   const afterPersonal = afterBusiness - b.personalChargesPerDay;
   const ca = b.caHtPerDay;
@@ -49,6 +50,17 @@ function buildDailyWaterfallSteps(b: ValeurReelleDailyBreakdown): ValeurReelleWa
       pctOfCaHt: pctOfDaily(b.csgPerDay, ca)
     }
   ];
+
+  if (b.impotPerDay > 0.01) {
+    steps.push({
+      id: "impots",
+      label: "Impôts",
+      deltaEur: -b.impotPerDay,
+      cumulativeEur: afterImpots,
+      kind: "decrease",
+      pctOfCaHt: pctOfDaily(b.impotPerDay, ca)
+    });
+  }
 
   if (b.ikPerDay > 0.01) {
     steps.push({
@@ -125,6 +137,11 @@ function DetailPanel({
       label: "CSG imputée",
       sub: "Part journalière de la CSG sur la période",
       value: -breakdown.csgPerDay
+    },
+    {
+      label: "Impôts imputés",
+      sub: "Impôt sur le revenu payé ou estimé sur le BNC",
+      value: -breakdown.impotPerDay
     },
     {
       label: "Frais société imputés",

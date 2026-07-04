@@ -118,7 +118,13 @@ import { useDashboardSection, type DashboardSection } from "@/components/dashboa
 
 export type { DashboardTx };
 
-type LazyDashboardSectionKey = "full" | "activite" | "valeur" | "categorisation" | "sasu-panel";
+type LazyDashboardSectionKey =
+  | "full"
+  | "activite"
+  | "valeur"
+  | "categorisation"
+  | "impots"
+  | "sasu-panel";
 
 function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey {
   if (section === "sasu" || section === "private") return "sasu-panel";
@@ -137,6 +143,14 @@ const DashboardCategorisationPanel = dynamic(
   () =>
     import("@/app/dashboard/DashboardCategorisationPanel").then((mod) => ({
       default: mod.DashboardCategorisationPanel
+    })),
+  { loading: () => null }
+);
+
+const ImpotsSection = dynamic(
+  () =>
+    import("@/components/dashboard/impots/ImpotsSection").then((mod) => ({
+      default: mod.ImpotsSection
     })),
   { loading: () => null }
 );
@@ -1091,6 +1105,14 @@ export function DashboardClient({
         aria-hidden={dashboardSection !== "categorisation"}
       >
         <DashboardCategorisationPanel />
+      </div>
+      ) : null}
+      {mountedSections.has("impots") ? (
+      <div
+        className={clsx(dashboardSection !== "impots" && "hidden")}
+        aria-hidden={dashboardSection !== "impots"}
+      >
+        <ImpotsSection />
       </div>
       ) : null}
       {mountedSections.has("sasu-panel") ? (

@@ -11,6 +11,7 @@ export type RevenueAllocationInput = {
   caHtEur: number;
   bncEur: number;
   fraisPersoEur: number;
+  impotsEur?: number;
   csgEur: number;
   fraisDigitProEur: number;
 };
@@ -33,16 +34,17 @@ type Props = {
 };
 
 function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] {
+  const impotsEur = Math.max(0, allocation.impotsEur ?? 0);
   return [
     {
       id: "bnc",
-      label: "BNC",
-      flowLabel: "BNC",
-      valueEur: Math.max(0, allocation.bncEur),
+      label: "BNC net",
+      flowLabel: "BNC net",
+      valueEur: Math.max(0, allocation.bncEur - impotsEur),
       colorClass: "bg-emerald-500 dark:bg-emerald-400",
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
-        "Honoraires versés en BNC (rémunération dirigeant), estimés à partir de la répartition Valeur réelle du mois."
+        "BNC après impôt sur le revenu, estimé à partir de la répartition Valeur réelle du mois."
     },
     {
       id: "personal",
@@ -53,6 +55,16 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Charges personnelles couvertes sur l'activité : repas, indemnités kilométriques et frais perso refacturés."
+    },
+    {
+      id: "impots",
+      label: "Impôts",
+      flowLabel: "Impôts",
+      valueEur: impotsEur,
+      colorClass: "bg-yellow-400 dark:bg-yellow-300",
+      textClass: "text-ink-600 dark:text-white/65",
+      tooltip:
+        "Impôt sur le revenu payé ou estimé sur le BNC, isolé pour obtenir le vrai net après impôt."
     },
     {
       id: "csg",
@@ -143,7 +155,7 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
       <div
         className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/[0.08]"
         role="img"
-        aria-label="Répartition du revenu mensuel entre BNC, charges perso, CSG et dépenses"
+        aria-label="Répartition du revenu mensuel entre BNC net, impôts, charges perso, CSG et dépenses"
       >
         {segments.map((segment) => {
           const pct = (segment.valueEur / barDenominator) * 100;

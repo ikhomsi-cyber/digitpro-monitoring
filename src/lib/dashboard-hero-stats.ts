@@ -59,6 +59,7 @@ export type DashboardHeroStats = {
     caHtEur: number;
     bncEur: number;
     fraisPersoEur: number;
+    impotsEur: number;
     csgEur: number;
     fraisDigitProEur: number;
   };
@@ -108,6 +109,7 @@ function computeMomKpis(
     caHtEur: Math.max(0, prevValueAnalysis.cashTree.caFactureEur),
     bncEur: Math.max(0, prevValueAnalysis.cashTree.bncEur),
     fraisPersoEur: Math.max(0, prevValueAnalysis.cashTree.personalChargesEur),
+    impotsEur: Math.max(0, prevValueAnalysis.cashTree.impotUtiliseEur),
     csgEur: Math.max(0, prevValueAnalysis.cashTree.csgEur),
     fraisDigitProEur: Math.max(0, prevValueAnalysis.cashTree.mandatoryFeesEur)
   };
@@ -148,6 +150,7 @@ function computeMomKpis(
       caHtEur: Math.round(prevTjmRepartitionMois.caHtEur * 100) / 100,
       bncEur: Math.round(prevTjmRepartitionMois.bncEur * 100) / 100,
       fraisPersoEur: Math.round(prevTjmRepartitionMois.fraisPersoEur * 100) / 100,
+      impotsEur: Math.round(prevTjmRepartitionMois.impotsEur * 100) / 100,
       csgEur: Math.round(prevTjmRepartitionMois.csgEur * 100) / 100,
       fraisDigitProEur: Math.round(prevTjmRepartitionMois.fraisDigitProEur * 100) / 100
     },
@@ -228,6 +231,7 @@ export function computeDashboardHeroStats(
     caHtEur: Math.max(0, valueAnalysis.cashTree.caFactureEur),
     bncEur: Math.max(0, valueAnalysis.cashTree.bncEur),
     fraisPersoEur: Math.max(0, valueAnalysis.cashTree.personalChargesEur),
+    impotsEur: Math.max(0, valueAnalysis.cashTree.impotUtiliseEur),
     csgEur: Math.max(0, valueAnalysis.cashTree.csgEur),
     fraisDigitProEur: Math.max(0, valueAnalysis.cashTree.mandatoryFeesEur)
   };
@@ -303,6 +307,7 @@ export function computeDashboardHeroStats(
       caHtEur: Math.round(tjmRepartitionMois.caHtEur * 100) / 100,
       bncEur: Math.round(tjmRepartitionMois.bncEur * 100) / 100,
       fraisPersoEur: Math.round(tjmRepartitionMois.fraisPersoEur * 100) / 100,
+      impotsEur: Math.round(tjmRepartitionMois.impotsEur * 100) / 100,
       csgEur: Math.round(tjmRepartitionMois.csgEur * 100) / 100,
       fraisDigitProEur: Math.round(tjmRepartitionMois.fraisDigitProEur * 100) / 100
     },

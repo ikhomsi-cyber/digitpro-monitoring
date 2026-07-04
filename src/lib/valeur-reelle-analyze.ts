@@ -20,6 +20,7 @@ import {
 
 export { amountNetOfRecoverableVat } from "@/lib/recoverable-expense-vat";
 import { categorizeHiwayExpense, HIWAY_EXPENSE_CATEGORIES, type HiwayExpenseCategory } from "@/lib/hiway-categorisation";
+import { allocateIncomeTaxToPeriod } from "@/lib/impots/tax-analysis";
 import { matchesLoyersRecusSubcategory } from "@/lib/lmnp-analyze";
 import { isRevenueCategory } from "@/lib/revenue-category";
 import {
@@ -838,9 +839,10 @@ export function analyzeValeurReelle(
   const csgBaseEur = Math.max(0, csgOperatingResultEur + csgSocialReintegrationsEur);
   const csgEur = applyFiscalDebtSafetyMargin(Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100);
   const bncRestantApresChargesEur = bncBrutEur;
-  const impotEstimeEur = Math.round(bncBrutEur * DEFAULT_IR_ON_BNC_RATE * 100) / 100;
-  const impotEstime = true;
-  const impotUtiliseEur = impotEstimeEur;
+  const periodIncomeTax = allocateIncomeTaxToPeriod({ years, month, months, now }, bncBrutEur);
+  const impotEstimeEur = periodIncomeTax.amountEur;
+  const impotEstime = periodIncomeTax.estimated;
+  const impotUtiliseEur = periodIncomeTax.amountEur;
   const netCashEur = caFactureEur - digitProChargesEur - impotUtiliseEur;
   const revenusIndirectsEur = ndfIkRecoveredEur;
   const netReelEur = netCashEur + revenusIndirectsEur;
@@ -864,7 +866,7 @@ export function analyzeValeurReelle(
     chargesUtilesRecupereesEur: ndfIkRecoveredEur,
     bncBrutEur,
     bncRestantApresChargesEur,
-    impotPayeEur,
+    impotPayeEur: periodIncomeTax.estimated ? 0 : periodIncomeTax.amountEur,
     impotEstimeEur,
     impotUtiliseEur,
     impotEstime,

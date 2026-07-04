@@ -63,6 +63,7 @@ import { ValeurReelleSkeleton } from "@/components/dashboard/ValeurReelleSkeleto
 const SEG_COLORS = {
   net: "#0ea5e9",
   csg: "#f59e0b",
+  impots: "#facc15",
   digitpro: "#fb7185",
   perso: "#34d399",
   ik: "#a78bfa"
@@ -787,11 +788,12 @@ function DailyValueBlock({
   const segments: AllocationSegment[] = [
     {
       id: "bnc",
-      label: breakdown.isEstimate ? "BNC à verser" : "BNC versé",
+      label: breakdown.isEstimate ? "BNC net à verser" : "BNC net",
       amount: breakdown.bncPerDay,
       color: SEG_COLORS.net
     },
     { id: "perso", label: "Frais perso", amount: fraisPersoPerDay, color: SEG_COLORS.perso },
+    { id: "impots", label: "Impôts", amount: breakdown.impotPerDay, color: SEG_COLORS.impots },
     { id: "csg", label: "CSG", amount: breakdown.csgPerDay, color: SEG_COLORS.csg },
     { id: "digitpro", label: "Frais DigitPro", amount: breakdown.mandatoryFeesPerDay, color: SEG_COLORS.digitpro }
   ];
@@ -813,8 +815,8 @@ function DailyValueBlock({
       <AllocationStackBar segments={segments} fmt={fmt} percentBasis={breakdown.caHtPerDay} />
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
         {breakdown.isEstimate && breakdown.estimateNote
-          ? `${breakdown.estimateNote} · retenu / jour = BNC à verser + frais perso (incl. IK).`
-          : "Valeur retenue / jour = BNC versé + frais perso · montants période ÷ jours cochés au calendrier."}
+          ? `${breakdown.estimateNote} · retenu / jour = BNC net après impôt + frais perso (incl. IK).`
+          : "Valeur retenue / jour = BNC net après impôt + frais perso · montants période ÷ jours cochés au calendrier."}
       </p>
     </div>
   );
@@ -833,16 +835,18 @@ function FinancialAllocationBlock({
 }) {
   const caHt = Math.max(0, tree.caFactureEur);
   const personalCharges = Math.max(0, tree.personalChargesEur);
+  const impots = Math.max(0, tree.impotUtiliseEur);
   // BNC versé = virements sortants libellés « BNC » sur la période (tree.bncEur), pas un résidu théorique.
-  const bnc = Math.max(0, tree.bncEur);
+  const bnc = Math.max(0, tree.bncEur - impots);
   const valeurNette = bnc + personalCharges;
   if (caHt <= 0) return null;
   const netPct = caHt > 0 ? Math.round((valeurNette / caHt) * 1000) / 10 : null;
   const totalWorkDays = feeWorkDaysLabel(caHt, tjmHt);
 
   const segments: AllocationSegment[] = [
-    { id: "bnc", label: "BNC versé", amount: bnc, color: SEG_COLORS.net },
+    { id: "bnc", label: "BNC net", amount: bnc, color: SEG_COLORS.net },
     { id: "perso", label: "Frais perso", amount: personalCharges, color: SEG_COLORS.perso },
+    { id: "impots", label: tree.impotEstime ? "Impôts estimés" : "Impôts payés", amount: impots, color: SEG_COLORS.impots },
     { id: "csg", label: "CSG", amount: tree.csgEur, color: SEG_COLORS.csg },
     { id: "digitpro", label: "Frais DigitPro", amount: tree.mandatoryFeesEur, color: SEG_COLORS.digitpro }
   ];
@@ -863,7 +867,7 @@ function FinancialAllocationBlock({
       </div>
       <AllocationStackBar segments={segments} fmt={fmt} tjmHt={tjmHt} />
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
-        Valeur nette = BNC versé + frais perso · BNC = virements sortants libellés BNC sur la période.
+        Valeur nette = BNC net après impôt + frais perso · les impôts payés ou estimés sont isolés dans la répartition.
       </p>
     </div>
   );

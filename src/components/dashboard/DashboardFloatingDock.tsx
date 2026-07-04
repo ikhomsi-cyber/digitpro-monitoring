@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Banknote, ChartNoAxesCombined, Gauge, House, ScanSearch, Settings } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, ScanSearch, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
@@ -46,6 +46,12 @@ const TABS: Tab[] = [
     label: "SASU",
     icon: ChartNoAxesCombined,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
+  },
+  {
+    href: "/dashboard?section=impots",
+    label: "Impôts",
+    icon: Landmark,
+    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "impots"
   },
   {
     href: "/dashboard?section=categorisation",

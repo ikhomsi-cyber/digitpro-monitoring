@@ -11,7 +11,14 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 
-export type DashboardSection = "full" | "activite" | "valeur" | "sasu" | "private" | "categorisation";
+export type DashboardSection =
+  | "full"
+  | "activite"
+  | "valeur"
+  | "sasu"
+  | "private"
+  | "categorisation"
+  | "impots";
 
 export function parseDashboardSection(search: string): DashboardSection {
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -21,6 +28,7 @@ export function parseDashboardSection(search: string): DashboardSection {
   if (s === "sasu") return "sasu";
   if (s === "private") return "private";
   if (s === "categorisation") return "categorisation";
+  if (s === "impots") return "impots";
   return "full";
 }
 
