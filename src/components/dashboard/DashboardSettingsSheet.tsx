@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarClock, ChevronRight, Settings, X } from "lucide-react";
@@ -39,6 +39,7 @@ export function DashboardSettingsSheet(props: Props) {
   const dragLastY = useRef(0);
   const dragLastT = useRef(0);
   const dragVelocity = useRef(0);
+  const suppressNextClick = useRef(false);
 
   const close = useCallback(() => {
     setDragging(false);
@@ -74,12 +75,20 @@ export function DashboardSettingsSheet(props: Props) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setDragging(false);
+    suppressNextClick.current = dragY > 8;
     if (dragY > DRAG_CLOSE_THRESHOLD_PX || dragVelocity.current > DRAG_CLOSE_VELOCITY_PX_MS) {
       close();
       return;
     }
     setDragY(0);
   }, [close, dragY, dragging]);
+
+  const handleClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    if (!suppressNextClick.current) return;
+    suppressNextClick.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -136,16 +145,17 @@ export function DashboardSettingsSheet(props: Props) {
               show ? "translate-y-0" : "translate-y-full"
             )}
             style={show ? { transform: `translateY(${dragY}px)` } : undefined}
+            onPointerDown={handleDragStart}
+            onPointerMove={handleDragMove}
+            onPointerUp={handleDragEnd}
+            onPointerCancel={handleDragEnd}
+            onClickCapture={handleClickCapture}
           >
             <div
               className={clsx(
                 "flex shrink-0 touch-none flex-col items-center pt-2.5",
                 dragging ? "cursor-grabbing" : "cursor-grab"
               )}
-              onPointerDown={handleDragStart}
-              onPointerMove={handleDragMove}
-              onPointerUp={handleDragEnd}
-              onPointerCancel={handleDragEnd}
             >
               <span className="h-1.5 w-11 rounded-full bg-ink-300/80 dark:bg-white/20" aria-hidden />
             </div>
