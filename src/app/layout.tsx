@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
+import { AppLaunchOverlay } from "@/components/ui/AppLaunchOverlay";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
 import { APP_LAUNCH_BG_LIGHT, APP_LAUNCH_BG_DARK, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
 
@@ -57,7 +58,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <div className="app-page-background" aria-hidden />
-        <div className="relative z-[1] min-h-dvh min-h-[100dvh] bg-transparent">{children}</div>
+        <AppLaunchOverlay />
+        <div className="app-shell relative z-[1] min-h-dvh min-h-[100dvh] bg-transparent">{children}</div>
         <Toaster
           position="top-center"
           closeButton

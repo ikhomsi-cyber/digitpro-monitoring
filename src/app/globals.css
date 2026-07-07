@@ -83,11 +83,33 @@ body {
     right: 0;
     bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
     left: 0;
+    opacity: 1;
+    visibility: visible;
+    transition:
+      opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0.48s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity;
+  }
+
+  .app-launch-screen--exit {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .dark .app-launch-screen {
     background-color: var(--pg-grad-bot);
     background-image: var(--pg-page-bg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .app-launch-screen {
+      transition: none;
+    }
+    .app-launch-screen .animate-launchLogo,
+    .app-launch-screen .animate-launchGlow {
+      animation: none;
+    }
   }
 
   /** Fond immersif dashboard — gris-bleu clair en light, teal en dark. */

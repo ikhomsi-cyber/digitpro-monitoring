@@ -42,9 +42,9 @@ export type ValeurReelleDailyBreakdown = {
   personalChargesPerDay: number;
   /** Indemnités kilométriques / jour (barème annuel, mois en cours). */
   ikPerDay: number;
-  /** BNC net après impôt / jour. */
+  /** BNC versé / jour, avant affichage informatif de l'IR. */
   bncPerDay: number;
-  /** BNC + frais perso + IK / jour — aligné sur « net disponible réel » et gain / jour. */
+  /** BNC + frais perso + IK / jour — l'IR reste isolé à titre informatif. */
   netPerDay: number;
   /** Valeur retenue > TJM (avantages perso récupérés en plus du CA facturé). */
   netExceedsTjm: boolean;
@@ -87,8 +87,8 @@ function computeCsgPerDayOnTjm(
  * - DigitPro facturés ÷ jours facturés du mois
  * - Frais perso = quote-part repas d'affaire du mois passé ÷ jours cochés (1 jour)
  * - CSG = 9,7 % (+ marge) × (TJM − DigitPro − frais perso)
- * - IR = impôt annuel réel/proratisé par le module Impôts
- * - BNC à verser = TJM − DigitPro − frais perso − IK − CSG − IR
+ * - IR = impôt annuel réel/proratisé par le module Impôts (isolé, non déduit du retenu)
+ * - BNC à verser = TJM − DigitPro − frais perso − IK − CSG
  * - Retenu = BNC + frais perso + IK
  */
 function computeCurrentMonthDailyBreakdown(input: {
@@ -159,10 +159,10 @@ function computeCurrentMonthDailyBreakdown(input: {
   // L'IR vient du module Impôts (annuel / mensuel). Sur le mois en cours, on le lisse
   // sur tous les jours facturables prévus du mois, pas seulement sur les jours déjà faits.
   const impotPerDay = perPlannedBillableDay(tree.impotUtiliseEur);
-  const bncPerDay = round2(Math.max(0, bncBeforeIrPerDay - impotPerDay));
+  const bncPerDay = bncBeforeIrPerDay;
 
   const netPerDay = round2(bncPerDay + personalChargesPerDay + ikPerDay);
-  const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay + ikPerDay + impotPerDay);
+  const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay + ikPerDay);
 
   return {
     caHtPerDay,
@@ -226,8 +226,8 @@ export function computeValeurReelleDailyBreakdown(input: {
     const personalChargesPerDay = round2(tree.personalChargesEur / workedDays);
     const csgPerDay = round2(tree.csgEur / workedDays);
     const impotPerDay = round2(tree.impotUtiliseEur / workedDays);
-    const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay + impotPerDay);
-    const bncPerDay = round2(Math.max(0, tree.bncEur - tree.impotUtiliseEur) / workedDays);
+    const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay);
+    const bncPerDay = round2(Math.max(0, tree.bncEur) / workedDays);
     const netPerDay = round2(bncPerDay + personalChargesPerDay);
 
     return {
@@ -260,8 +260,8 @@ export function computeValeurReelleDailyBreakdown(input: {
   const impotPerDay = round2(caHtPerDay * impotRatio);
   const mandatoryFeesPerDay = round2(caHtPerDay * mandatoryRatio);
   const personalChargesPerDay = round2(caHtPerDay * personalRatio);
-  const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay + impotPerDay);
-  const bncPerDay = round2(Math.max(0, caHtPerDay * bncRatio - impotPerDay));
+  const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay);
+  const bncPerDay = round2(Math.max(0, caHtPerDay * bncRatio));
   const netPerDay = round2(bncPerDay + personalChargesPerDay);
 
   return {

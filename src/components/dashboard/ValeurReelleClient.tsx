@@ -788,15 +788,15 @@ function DailyValueBlock({
   const segments: AllocationSegment[] = [
     {
       id: "bnc",
-      label: breakdown.isEstimate ? "BNC net à verser" : "BNC net",
+      label: "BNC à verser",
       amount: breakdown.bncPerDay,
       color: SEG_COLORS.net
     },
     { id: "perso", label: "Frais perso", amount: fraisPersoPerDay, color: SEG_COLORS.perso },
-    { id: "impots", label: "Impôts", amount: breakdown.impotPerDay, color: SEG_COLORS.impots },
     { id: "csg", label: "CSG", amount: breakdown.csgPerDay, color: SEG_COLORS.csg },
     { id: "digitpro", label: "Frais DigitPro", amount: breakdown.mandatoryFeesPerDay, color: SEG_COLORS.digitpro }
   ];
+  const impotsLabel = breakdown.isEstimate ? "Impôts estimés" : "Impôts payés";
 
   return (
     <div className={dashboardInsightCard}>
@@ -813,10 +813,23 @@ function DailyValueBlock({
         </span>
       </div>
       <AllocationStackBar segments={segments} fmt={fmt} percentBasis={breakdown.caHtPerDay} />
+      {breakdown.impotPerDay > 0 ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 dark:border-amber-200/15 dark:bg-amber-300/10">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: SEG_COLORS.impots }} aria-hidden />
+            <span className="truncate text-xs font-semibold text-ink-600 dark:text-white/60">
+              {impotsLabel} · info, non déduit ici
+            </span>
+          </div>
+          <span className="shrink-0 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
+            {fmt.euro(breakdown.impotPerDay)}
+          </span>
+        </div>
+      ) : null}
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
         {breakdown.isEstimate && breakdown.estimateNote
-          ? `${breakdown.estimateNote} · retenu / jour = BNC net après impôt + frais perso (incl. IK).`
-          : "Valeur retenue / jour = BNC net après impôt + frais perso · montants période ÷ jours cochés au calendrier."}
+          ? `${breakdown.estimateNote} · retenu / jour = BNC à verser + frais perso (incl. IK).`
+          : "Valeur retenue / jour = BNC à verser + frais perso · l'impôt reste affiché à titre informatif."}
       </p>
     </div>
   );
@@ -837,19 +850,19 @@ function FinancialAllocationBlock({
   const personalCharges = Math.max(0, tree.personalChargesEur);
   const impots = Math.max(0, tree.impotUtiliseEur);
   // BNC versé = virements sortants libellés « BNC » sur la période (tree.bncEur), pas un résidu théorique.
-  const bnc = Math.max(0, tree.bncEur - impots);
+  const bnc = Math.max(0, tree.bncEur);
   const valeurNette = bnc + personalCharges;
   if (caHt <= 0) return null;
   const netPct = caHt > 0 ? Math.round((valeurNette / caHt) * 1000) / 10 : null;
   const totalWorkDays = feeWorkDaysLabel(caHt, tjmHt);
 
   const segments: AllocationSegment[] = [
-    { id: "bnc", label: "BNC net", amount: bnc, color: SEG_COLORS.net },
+    { id: "bnc", label: "BNC versé", amount: bnc, color: SEG_COLORS.net },
     { id: "perso", label: "Frais perso", amount: personalCharges, color: SEG_COLORS.perso },
-    { id: "impots", label: tree.impotEstime ? "Impôts estimés" : "Impôts payés", amount: impots, color: SEG_COLORS.impots },
     { id: "csg", label: "CSG", amount: tree.csgEur, color: SEG_COLORS.csg },
     { id: "digitpro", label: "Frais DigitPro", amount: tree.mandatoryFeesEur, color: SEG_COLORS.digitpro }
   ];
+  const impotsLabel = tree.impotEstime ? "Impôts estimés" : "Impôts payés";
 
   return (
     <div className={dashboardInsightCard}>
@@ -866,8 +879,21 @@ function FinancialAllocationBlock({
         </span>
       </div>
       <AllocationStackBar segments={segments} fmt={fmt} tjmHt={tjmHt} />
+      {impots > 0 ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 dark:border-amber-200/15 dark:bg-amber-300/10">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: SEG_COLORS.impots }} aria-hidden />
+            <span className="truncate text-xs font-semibold text-ink-600 dark:text-white/60">
+              {impotsLabel} · info, non déduit ici
+            </span>
+          </div>
+          <span className="shrink-0 font-display text-sm font-bold tabular-nums text-ink-900 dark:text-white">
+            {fmt.euro(impots)}
+          </span>
+        </div>
+      ) : null}
       <p className="mt-3 text-xs text-ink-400 dark:text-white/35">
-        Valeur nette = BNC net après impôt + frais perso · les impôts payés ou estimés sont isolés dans la répartition.
+        Valeur nette = BNC versé + frais perso · les impôts payés ou estimés restent affichés à titre informatif.
       </p>
     </div>
   );

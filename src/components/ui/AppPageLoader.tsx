@@ -1,20 +1,23 @@
 import Image from "next/image";
+import { clsx } from "clsx";
 
 type AppPageLoaderProps = {
   /** Texte de chargement — accessibilité uniquement (non affiché). */
   message?: string;
+  /** Transition de sortie (overlay global). */
+  exiting?: boolean;
 };
 
 /**
  * Écran de chargement plein viewport — même fond que le dashboard dark (dégradé teal).
  */
-export function AppPageLoader({ message = "Chargement…" }: AppPageLoaderProps) {
+export function AppPageLoader({ message = "Chargement…", exiting = false }: AppPageLoaderProps) {
   return (
     <div
-      className="app-launch-screen"
+      className={clsx("app-launch-screen", exiting && "app-launch-screen--exit")}
       role="status"
       aria-live="polite"
-      aria-busy="true"
+      aria-busy={!exiting}
       aria-label={message}
     >
       <div className="relative flex items-center justify-center">
