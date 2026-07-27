@@ -13,6 +13,7 @@ import {
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
+import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
@@ -271,7 +272,8 @@ function computeExpenseMacroBreakdown(
     const label = expenseMacroLabel(tx);
     if (!label) continue;
     if (!expenseMatchesKindFilter(tx, kindFilter)) continue;
-    byLabel.set(label, (byLabel.get(label) ?? 0) + Math.abs(tx.amount));
+    const amount = kindFilter === "digitpro" ? dashboardSasuExpenseAmountHt(tx) : Math.abs(tx.amount);
+    byLabel.set(label, (byLabel.get(label) ?? 0) + amount);
   }
   return Array.from(byLabel.entries())
     .map(([label, amount]) => ({ label, amount }))
