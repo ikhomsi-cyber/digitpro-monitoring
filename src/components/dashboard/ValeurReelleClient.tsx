@@ -557,23 +557,38 @@ function formatGainDayCompact(amount: number): string {
   }).format(amount);
 }
 
-function GainPerDayChart({ points, fmt }: { points: TrailingGainPerDayPoint[]; fmt: Fmt }) {
+function GainPerDayChart({
+  points,
+  fmt,
+  currentMonthDailyNetPerDay
+}: {
+  points: TrailingGainPerDayPoint[];
+  fmt: Fmt;
+  currentMonthDailyNetPerDay?: number | null;
+}) {
   const uid = useId().replace(/:/g, "");
   const isDark = useRootIsDark();
   const gradId = `gain-per-day-${uid}`;
   const tickFill = isDark ? "#a1a1aa" : "#86868B";
   const labelFill = isDark ? "#ecfdf5" : "#064e3b";
+  const currentMonthKey = dashboardMonthKeyNowLocal();
 
   const data = useMemo(
     () =>
-      points.map((point) => ({
-        monthKey: point.monthKey,
-        label: point.monthLabel.split(" ")[0] ?? point.monthLabel,
-        fullLabel: point.monthLabel,
-        gain: point.gainPerDayEur,
-        amountLabel: point.gainPerDayEur > 0 ? formatGainDayCompact(point.gainPerDayEur) : ""
-      })),
-    [points]
+      points.map((point) => {
+        const gain =
+          point.monthKey === currentMonthKey && typeof currentMonthDailyNetPerDay === "number"
+            ? currentMonthDailyNetPerDay
+            : point.gainPerDayEur;
+        return {
+          monthKey: point.monthKey,
+          label: point.monthLabel.split(" ")[0] ?? point.monthLabel,
+          fullLabel: point.monthLabel,
+          gain,
+          amountLabel: gain > 0 ? formatGainDayCompact(gain) : ""
+        };
+      }),
+    [points, currentMonthDailyNetPerDay, currentMonthKey]
   );
 
   if (!data.some((entry) => entry.gain > 0)) return null;
@@ -673,6 +688,7 @@ function CashAvailableCard({
   fmt,
   billableDays,
   gainPerWorkDayEstimate,
+  currentMonthDailyNetPerDay,
   periodLabel,
   gainPerDayPoints
 }: {
@@ -680,6 +696,7 @@ function CashAvailableCard({
   fmt: Fmt;
   billableDays: number;
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
+  currentMonthDailyNetPerDay?: number | null;
   periodLabel: string;
   gainPerDayPoints: TrailingGainPerDayPoint[];
 }) {
@@ -733,7 +750,11 @@ function CashAvailableCard({
       </p>
       {gainPerDayPoints.some((p) => p.gainPerDayEur > 0) ? (
         <div className="mt-5 w-full max-w-lg px-1">
-          <GainPerDayChart points={gainPerDayPoints} fmt={fmt} />
+          <GainPerDayChart
+            points={gainPerDayPoints}
+            fmt={fmt}
+            currentMonthDailyNetPerDay={currentMonthDailyNetPerDay}
+          />
           <p className="mt-2 text-xs text-ink-400 dark:text-white/35">
             Gain moyen / jour · {formatTrailingGainPerDayRange(gainPerDayPoints)}
           </p>
@@ -1374,6 +1395,29 @@ export function ValeurReelleClient({
 
   const showSkeleton = viewModel === null;
 
+  const currentMonthProjection: ValeurReelleCurrentMonthProjectionInput | null =
+    singleMonth && singleMonth === dashboardMonthKeyNowLocal()
+      ? {
+          monthKey: singleMonth,
+          transactions,
+          billableSelected,
+          billableRatePeriods,
+          fallbackTjmHt: billableTjmHt
+        }
+      : null;
+
+  const currentMonthDailyBreakdown = useMemo(() => {
+    if (!viewModel || !currentMonthProjection) return null;
+    const { analysis, tjmHtForPeriod, billableDaysInPeriod, gainPerWorkDayEstimate } = viewModel;
+    return computeValeurReelleDailyBreakdown({
+      tree: analysis.cashTree,
+      tjmHt: tjmHtForPeriod,
+      billableDays: billableDaysInPeriod,
+      gainPerWorkDayEstimate,
+      currentMonthProjection
+    });
+  }, [viewModel, currentMonthProjection]);
+
   const periodFilter = (
     <DashboardInsightPeriodFilter
       eyebrow="Valeur réelle"
@@ -1422,17 +1466,6 @@ export function ValeurReelleClient({
   } = viewModel;
   const tree = analysis.cashTree;
 
-  const currentMonthProjection: ValeurReelleCurrentMonthProjectionInput | null =
-    singleMonth && singleMonth === dashboardMonthKeyNowLocal()
-      ? {
-          monthKey: singleMonth,
-          transactions,
-          billableSelected,
-          billableRatePeriods,
-          fallbackTjmHt: billableTjmHt
-        }
-      : null;
-
   return (
     <div className={clsx("scroll-mt-28 overflow-x-hidden", dashboardSectionStack)}>
       {periodFilter}
@@ -1444,6 +1477,7 @@ export function ValeurReelleClient({
           fmt={fmt}
           billableDays={billableDaysInPeriod}
           gainPerWorkDayEstimate={gainPerWorkDayEstimate}
+          currentMonthDailyNetPerDay={currentMonthDailyBreakdown?.netPerDay ?? null}
           periodLabel={analysis.periodLabel}
           gainPerDayPoints={gainPerDayPoints}
         />

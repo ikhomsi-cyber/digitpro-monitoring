@@ -1,23 +1,10 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { AppLaunchOverlay } from "@/components/ui/AppLaunchOverlay";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
 import { APP_LAUNCH_BG_LIGHT, APP_LAUNCH_BG_DARK, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans"
-});
-
-const display = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["500", "600", "700", "800"],
-  variable: "--font-display"
-});
 
 export const metadata: Metadata = {
   title: "DigitPro Consultion Monitoring (by Iliass KHOMSI)",
@@ -54,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body
-        className={`${inter.variable} ${display.variable} font-sans text-ink-900 transition-colors duration-200 dark:text-ink-50`}
+        className="font-sans text-ink-900 transition-colors duration-200 dark:text-ink-50"
         suppressHydrationWarning
       >
         <div className="app-page-background" aria-hidden />

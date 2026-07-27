@@ -1,21 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
-
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-sans"
-});
-
-const display = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["500", "600", "700", "800"],
-  variable: "--font-display"
-});
 
 export const metadata: Metadata = {
   title: "DigitPro Consultion Monitoring (by Iliass KHOMSI)",
@@ -38,9 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#06242b" media="(prefers-color-scheme: dark)" />
         <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
       </head>
-      <body
-        className={`${inter.variable} ${display.variable} font-sans bg-white text-ink-900 transition-colors duration-200 dark:bg-[#06242b] dark:text-ink-50`}
-      >
+      <body className="font-sans bg-white text-ink-900 transition-colors duration-200 dark:bg-[#06242b] dark:text-ink-50">
         <div className="min-h-dvh">{children}</div>
         <Toaster
           position="top-center"
