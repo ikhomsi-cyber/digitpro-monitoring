@@ -50,7 +50,7 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
-export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.003;
+export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.01;
 
 export function applyFiscalDebtSafetyMargin(amountEur: number): number {
   if (!Number.isFinite(amountEur) || amountEur <= 0) return amountEur;
@@ -748,9 +748,8 @@ export function analyzeValeurReelle(
       hiddenExpensesGrossEur += amtAbs;
       hiddenValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
-        personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur, amtAbs));
+        personalChargesEur += amtAbs;
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), amtAbs, breakdownTransaction(tx, amtAbs, amtAbs));
       }
       if (
         classified.bucket === "NDF" ||
@@ -768,9 +767,8 @@ export function analyzeValeurReelle(
       mixedExpensesEur += amtAbs;
       mixedValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        const personalChargeAmountEur = amountNetOfRecoverableVat(tx, bucket, amtAbs);
-        personalChargesEur += personalChargeAmountEur;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), personalChargeAmountEur, breakdownTransaction(tx, personalChargeAmountEur, amtAbs));
+        personalChargesEur += amtAbs;
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), amtAbs, breakdownTransaction(tx, amtAbs, amtAbs));
       }
       if (classified.bucket === "NDF" || classified.sublabel.toLowerCase().includes("note de frais")) {
         ndfIkGrossEur += amtAbs;

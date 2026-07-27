@@ -1,5 +1,6 @@
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket, type DerivedExpenseBucket } from "@/lib/derived-expense-bucket";
+import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
 
 function fold(raw: string): string {
   return (raw ?? "")
@@ -61,9 +62,28 @@ export function amountNetOfRecoverableVat(
   return Math.max(0, Math.round((grossEur - vatIncludedInGross(grossEur, rule.rate)) * 100) / 100);
 }
 
-/** Montant dépense SASU dashboard : HT si TVA récupérable, sinon TTC. */
+/** Montant HT si la ligne a une TVA récupérable (sinon HT = TTC). */
+export function expenseAmountHasRecoverableVat(amountEur: number, grossAmountEur?: number): boolean {
+  const gross = grossAmountEur ?? amountEur;
+  return gross > amountEur + 0.004;
+}
+
+export function isDigitProExpense(tx: DashboardTx): boolean {
+  if (tx.amount >= 0) return false;
+  const bucket = deriveExpenseBucket(tx);
+  return resolveSasuSimplifiedExpenseGroup(tx, bucket) === "Frais DigitPro";
+}
+
+/** Montant affiché : HT pour DigitPro + TVA récupérable, TTC sinon. */
 export function dashboardSasuExpenseAmountHt(tx: DashboardTx): number {
   if (tx.amount >= 0) return 0;
+  const grossEur = Math.abs(tx.amount);
+  if (!isDigitProExpense(tx)) return grossEur;
   const bucket = deriveExpenseBucket(tx);
-  return amountNetOfRecoverableVat(tx, bucket, Math.abs(tx.amount));
+  return amountNetOfRecoverableVat(tx, bucket, grossEur);
+}
+
+/** Montant dépense SASU dashboard : alias explicite. */
+export function dashboardSasuExpenseDisplayAmount(tx: DashboardTx): number {
+  return dashboardSasuExpenseAmountHt(tx);
 }
