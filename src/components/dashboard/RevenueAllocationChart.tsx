@@ -34,17 +34,20 @@ type Props = {
 };
 
 function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] {
-  const impotsEur = Math.max(0, allocation.impotsEur ?? 0);
+  // NOTE: Impôts are displayed for information only and must not be included
+  // in the allocation slices or percentage calculations. Keep the BNC value
+  // as the real BNC (before deducting impôts) so the UI shows the true BNC.
   return [
     {
       id: "bnc",
       label: "BNC net",
       flowLabel: "BNC net",
-      valueEur: Math.max(0, allocation.bncEur - impotsEur),
+      // Do not subtract impôts here: show the real BNC amount
+      valueEur: Math.max(0, allocation.bncEur),
       colorClass: "bg-emerald-500 dark:bg-emerald-400",
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
-        "BNC après impôt sur le revenu, estimé à partir de la répartition Valeur réelle du mois."
+        "BNC réel (avant prise en compte informative des impôts)."
     },
     {
       id: "personal",
@@ -55,16 +58,6 @@ function buildSegments(allocation: RevenueAllocationInput): AllocationSegment[] 
       textClass: "text-ink-700 dark:text-white/75",
       tooltip:
         "Charges personnelles couvertes sur l'activité : repas, indemnités kilométriques et frais perso refacturés."
-    },
-    {
-      id: "impots",
-      label: "Impôts",
-      flowLabel: "Impôts",
-      valueEur: impotsEur,
-      colorClass: "bg-yellow-400 dark:bg-yellow-300",
-      textClass: "text-ink-600 dark:text-white/65",
-      tooltip:
-        "Impôt sur le revenu payé ou estimé sur le BNC, isolé pour obtenir le vrai net après impôt."
     },
     {
       id: "csg",
@@ -114,13 +107,17 @@ function AllocationTooltip({
 
 export function RevenueAllocationChart({ allocation, formatEuro, formatInt, trend }: Props) {
   const revenueEur = Math.max(0, allocation.caHtEur);
+  const impotsEur = Math.max(0, allocation.impotsEur ?? 0);
   const segments = useMemo(() => buildSegments(allocation), [allocation]);
   const allocatedTotal = segments.reduce((sum, s) => sum + s.valueEur, 0);
   const barDenominator = Math.max(revenueEur, allocatedTotal, 1);
 
+  // Keep Impôts visible in the breadcrumb/flow steps for context but do not
+  // include it in the chart slices or percentage calculations.
   const flowSteps = [
     { label: "Revenue", valueEur: revenueEur, emphasized: true },
-    ...segments.map((s) => ({ label: s.flowLabel, valueEur: s.valueEur, emphasized: false }))
+    ...segments.map((s) => ({ label: s.flowLabel, valueEur: s.valueEur, emphasized: false })),
+    ...(impotsEur > 0 ? [{ label: "Impôts", valueEur: impotsEur, emphasized: false }] : [])
   ];
 
   return (
@@ -194,6 +191,17 @@ export function RevenueAllocationChart({ allocation, formatEuro, formatInt, tren
           );
         })}
       </ul>
+
+      {/* Impôts shown as informational only (not included in chart slices or % totals) */}
+      {impotsEur > 0 ? (
+        <div className="mt-2 flex items-center gap-3 text-xs text-ink-600 dark:text-white/60">
+          <span className="rounded-full bg-yellow-400/20 px-2 py-0.5 text-sm font-medium text-yellow-700 dark:text-yellow-200">
+            Impôts
+          </span>
+          <span className="font-medium tabular-nums">{formatEuro(impotsEur)}</span>
+          <span className="text-ink-500 dark:text-white/45">affiché à titre informatif — non inclus dans la répartition</span>
+        </div>
+      ) : null}
     </div>
   );
 }
