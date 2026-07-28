@@ -16,8 +16,8 @@ import {
   type CalendarMonthCell
 } from "@/lib/billable-calendar-metrics";
 import {
+  annualMileageAllowanceEur,
   commuteRoundTripKm,
-  indemniteKmPerWorkDayForAnnualDaysEur
 } from "@/lib/pluxee-commute-indemnity";
 import { getFrenchPublicHolidaysForYear } from "@/lib/fr-public-holidays";
 import { getParisZoneCSchoolVacationLabel } from "@/lib/fr-school-holidays-paris";
@@ -41,7 +41,7 @@ import {
 /** En-têtes courts (2 lettres), calendrier compact. */
 const WEEKDAYS_SHORT = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"] as const;
 
-type CalendarPaintMode = "billable" | "vacation";
+type CalendarPaintMode = "billable" | "commute" | "vacation";
 
 function monthMatrix(year: number, month0: number): CalendarMonthCell[] {
   const first = new Date(year, month0, 1);
@@ -67,6 +67,10 @@ export function BillableDaysCalendarBlock({
     setSelected,
     vacationDays,
     setVacationDays,
+    commuteDays,
+    setCommuteDays,
+    mileageExtraKmByMonth,
+    setMileageExtraKmByMonth,
     tjmHt,
     billableRatePeriods,
     persistToSupabase
@@ -118,25 +122,58 @@ export function BillableDaysCalendarBlock({
     return { countedDays, monthTitle, isPast, isCurrent, todayLongFr };
   }, [selected, viewYear, viewMonth0]);
 
-  /**
-   * Kilométrage annuel automatique : un aller-retour par jour facturé/saisi dans le
-   * calendrier, sur l'année affichée. Détermine la tranche du barème fiscal.
-   */
+  /** Jours « voiture » et kilomètres libres, tous deux pris en compte par le barème Hiway. */
   const annualBilledDays = useMemo(() => {
     const prefix = `${viewYear}-`;
     let count = 0;
-    for (const iso of selected) if (iso.startsWith(prefix)) count++;
+    for (const iso of commuteDays) if (iso.startsWith(prefix)) count++;
     return count;
-  }, [selected, viewYear]);
-  const annualKm = useMemo(
-    () => Math.round(annualBilledDays * commuteRoundTripKm()),
-    [annualBilledDays]
-  );
-  const ikPerDay = useMemo(
-    () => indemniteKmPerWorkDayForAnnualDaysEur(annualBilledDays),
-    [annualBilledDays]
-  );
-  const ikMoisEncours = Math.round(selectedViewMonthStats.countedDays * ikPerDay * 100) / 100;
+  }, [commuteDays, viewYear]);
+  const annualKm = useMemo(() => {
+    const extra = Object.entries(mileageExtraKmByMonth).reduce(
+      (sum, [month, km]) => (month.startsWith(`${viewYear}-`) ? sum + km : sum),
+      0
+    );
+    return Math.round((annualBilledDays * commuteRoundTripKm() + extra) * 10) / 10;
+  }, [annualBilledDays, mileageExtraKmByMonth, viewYear]);
+  const ikForViewedMonth = useMemo(() => {
+    const yearPrefix = `${viewYear}-`;
+    const monthKey = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`;
+    const todayIso = toBillableIso(now.getFullYear(), now.getMonth(), now.getDate());
+    const events = [
+      ...[...commuteDays]
+        .filter((iso) => iso.startsWith(yearPrefix))
+        .map((iso) => ({ sort: iso, month: iso.slice(0, 7), km: commuteRoundTripKm(), isCommute: true })),
+      ...Object.entries(mileageExtraKmByMonth)
+        .filter(([month, km]) => month.startsWith(yearPrefix) && km > 0)
+        .map(([month, km]) => ({ sort: `${month}-99`, month, km, isCommute: false }))
+    ].sort((a, b) => a.sort.localeCompare(b.sort));
+    let cumulativeKm = 0;
+    let total = 0;
+    let commuteCount = 0;
+    let lastCommuteAllowance = 0;
+    for (const event of events) {
+      const before = annualMileageAllowanceEur(cumulativeKm);
+      cumulativeKm += event.km;
+      const allowance = annualMileageAllowanceEur(cumulativeKm) - before;
+      if (event.month !== monthKey) continue;
+      if (selectedViewMonthStats.isCurrent && event.isCommute && event.sort > todayIso) continue;
+      total += allowance;
+      if (event.isCommute) {
+        commuteCount++;
+        lastCommuteAllowance = allowance;
+      }
+    }
+    return {
+      total: Math.round(total * 100) / 100,
+      commuteCount,
+      lastCommuteAllowance: Math.round(lastCommuteAllowance * 100) / 100
+    };
+  }, [commuteDays, mileageExtraKmByMonth, now, selectedViewMonthStats.isCurrent, viewMonth0, viewYear]);
+  const ikMoisEncours = ikForViewedMonth.total;
+  const ikPerDay = ikForViewedMonth.commuteCount > 0
+    ? ikForViewedMonth.lastCommuteAllowance
+    : 0;
 
   const mealFeesForViewedMonth = useMemo(() => {
     if (treasuryTransactions == null || treasuryScope == null) return null;
@@ -259,6 +296,13 @@ export function BillableDaysCalendarBlock({
           next.delete(iso);
           return next;
         });
+      } else if (paintMode === "commute") {
+        setCommuteDays((prev) => {
+          const next = new Set(prev);
+          if (next.has(iso)) next.delete(iso);
+          else next.add(iso);
+          return next;
+        });
       } else {
         setSelected((prev) => {
           const next = new Set(prev);
@@ -274,7 +318,7 @@ export function BillableDaysCalendarBlock({
         });
       }
     },
-    [paintMode, setSelected, setVacationDays]
+    [paintMode, setCommuteDays, setSelected, setVacationDays]
   );
 
   const applyDayPaint = useCallback(
@@ -294,6 +338,13 @@ export function BillableDaysCalendarBlock({
             return next;
           });
         }
+      } else if (paintMode === "commute") {
+        setCommuteDays((prev) => {
+          const next = new Set(prev);
+          if (mode === "add") next.add(iso);
+          else next.delete(iso);
+          return next;
+        });
       } else {
         setSelected((prev) => {
           const next = new Set(prev);
@@ -311,7 +362,7 @@ export function BillableDaysCalendarBlock({
         }
       }
     },
-    [paintMode, setSelected, setVacationDays]
+    [paintMode, setCommuteDays, setSelected, setVacationDays]
   );
 
   const selectAllBillableInMonth = useCallback(() => {
@@ -332,15 +383,18 @@ export function BillableDaysCalendarBlock({
     (iso: string, event: React.PointerEvent<HTMLButtonElement>) => {
       if (event.button !== 0) return;
       event.preventDefault();
-      const active =
-        paintMode === "vacation" ? vacationDays.has(iso) : selected.has(iso);
+      const active = paintMode === "vacation"
+        ? vacationDays.has(iso)
+        : paintMode === "commute"
+          ? commuteDays.has(iso)
+          : selected.has(iso);
       const mode = active ? "remove" : "add";
       dragRef.current = { active: true, mode, moved: false, startIso: iso };
       setIsDragging(true);
       setFocusedIso(iso);
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [paintMode, selected, vacationDays]
+    [commuteDays, paintMode, selected, vacationDays]
   );
 
   const handleDayPointerEnter = useCallback(
@@ -381,7 +435,17 @@ export function BillableDaysCalendarBlock({
       }
       return next;
     });
-  }, [setSelected, setVacationDays, viewYear, viewMonth0]);
+    setCommuteDays((prev) => {
+      const next = new Set(prev);
+      for (const d of prev) if (d.startsWith(prefix)) next.delete(d);
+      return next;
+    });
+    setMileageExtraKmByMonth((prev) => {
+      const next = { ...prev };
+      delete next[`${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`];
+      return next;
+    });
+  }, [setCommuteDays, setMileageExtraKmByMonth, setSelected, setVacationDays, viewYear, viewMonth0]);
 
   const goPrevMonth = useCallback(() => {
     if (viewMonth0 === 0) {
@@ -699,6 +763,7 @@ export function BillableDaysCalendarBlock({
                   {(
                     [
                       { id: "billable" as const, label: "Facturé" },
+                      { id: "commute" as const, label: "Voiture" },
                       { id: "vacation" as const, label: "Vacances" }
                     ] as const
                   ).map((item) => (
@@ -712,6 +777,8 @@ export function BillableDaysCalendarBlock({
                         paintMode === item.id
                           ? item.id === "vacation"
                             ? "bg-sky-500 text-white shadow-sm dark:bg-sky-500/90"
+                            : item.id === "commute"
+                            ? "bg-violet-500 text-white shadow-sm dark:bg-violet-500/90"
                             : "bg-emerald-500 text-white shadow-sm dark:bg-emerald-500/90"
                           : "text-ink-500 hover:text-ink-800 dark:text-white/45 dark:hover:text-white/75"
                       )}
@@ -722,6 +789,40 @@ export function BillableDaysCalendarBlock({
                 </div>
               </div>
 
+              {paintMode === "commute" ? (
+                <div className="mb-3 rounded-2xl border border-violet-200/70 bg-violet-50/80 p-3 text-sm dark:border-violet-400/20 dark:bg-violet-500/[0.08]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-800 dark:text-violet-200">
+                        Kilomètres supplémentaires
+                      </p>
+                      <p className="text-[10px] text-ink-500 dark:text-white/50">
+                        Déplacements pro hors trajet classique.
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputMode="decimal"
+                      value={mileageExtraKmByMonth[`${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`] ?? ""}
+                      onChange={(event) => {
+                        const month = `${viewYear}-${String(viewMonth0 + 1).padStart(2, "0")}`;
+                        const value = Number(event.target.value);
+                        setMileageExtraKmByMonth((prev) => {
+                          const next = { ...prev };
+                          if (!Number.isFinite(value) || value <= 0) delete next[month];
+                          else next[month] = Math.round(value * 10) / 10;
+                          return next;
+                        });
+                      }}
+                      className="h-9 w-24 rounded-2xl border border-violet-200 bg-white px-3 text-sm font-semibold tabular-nums text-ink-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-400/50 dark:border-violet-300/20 dark:bg-black/20 dark:text-white"
+                      placeholder="0"
+                      aria-label="Kilomètres supplémentaires du mois"
+                    />
+                  </div>
+                </div>
+              ) : null}
               <div className="grid grid-cols-7 gap-y-0.5 gap-x-0.5">
                 {WEEKDAYS_SHORT.map((w) => (
                   <div
@@ -737,6 +838,7 @@ export function BillableDaysCalendarBlock({
                   }
                   const iso = toBillableIso(viewYear, viewMonth0, cell.day);
                   const on = selected.has(iso);
+                  const byCar = commuteDays.has(iso);
                   const isPersonalVacation = vacationDays.has(iso);
                   const isToday = iso === todayIsoLive;
                   const dow = new Date(viewYear, viewMonth0, cell.day).getDay();
@@ -750,7 +852,8 @@ export function BillableDaysCalendarBlock({
                   const ariaExtra = [
                     holidayLabel ? holidayLabel : null,
                     schoolVacLabel ? schoolVacLabel : null,
-                    isPersonalVacation ? "vacances personnelles" : null
+                    isPersonalVacation ? "vacances personnelles" : null,
+                    byCar ? "trajet voiture" : null
                   ]
                     .filter(Boolean)
                     .join(", ");
@@ -780,11 +883,11 @@ export function BillableDaysCalendarBlock({
                     <button
                       key={iso}
                       type="button"
-                      aria-pressed={paintMode === "vacation" ? isPersonalVacation : on}
+                      aria-pressed={paintMode === "vacation" ? isPersonalVacation : paintMode === "commute" ? byCar : on}
                       title={dayTitle}
                       tabIndex={isFocused ? 0 : -1}
                       aria-label={`${iso}${ariaExtra ? `, ${ariaExtra}` : ""}${
-                        isPersonalVacation ? ", vacances" : on ? ", facturé" : ""
+                        isPersonalVacation ? ", vacances" : on ? ", facturé" : ""}${byCar ? ", voiture" : ""
                       }${isToday ? ", aujourd’hui" : ""}${isFocused ? ", focus clavier" : ""}`}
                       onPointerDown={(event) => handleDayPointerDown(iso, event)}
                       onPointerEnter={() => handleDayPointerEnter(iso)}
@@ -795,6 +898,7 @@ export function BillableDaysCalendarBlock({
                         "relative flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-semibold tabular-nums transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-[#0a0a0a]",
                         isFocused && "z-[2] ring-2 ring-emerald-300/80 ring-offset-1 dark:ring-emerald-400/70",
                         isDragging && "cursor-crosshair",
+                        byCar && "ring-2 ring-violet-400/80 ring-offset-1 dark:ring-violet-400/70 dark:ring-offset-[#0a0a0a]",
                         isPersonalVacation
                           ? clsx(
                               "bg-sky-50 font-semibold text-sky-950 ring-2 ring-sky-400/85 dark:bg-sky-950/55 dark:text-sky-100 dark:ring-sky-400/70",
@@ -838,6 +942,7 @@ export function BillableDaysCalendarBlock({
                       )}
                     >
                       {cell.day}
+                      {byCar ? <span className="pointer-events-none absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-violet-200 shadow-[0_0_5px_rgba(139,92,246,0.9)]" aria-hidden /> : null}
                       {isToday ? (
                         <span
                           className={clsx(
@@ -889,6 +994,10 @@ export function BillableDaysCalendarBlock({
                 Facturé
               </span>
               <span className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(139,92,246,0.55)]" aria-hidden />
+                Voiture
+              </span>
+              <span className="inline-flex items-center gap-1">
                 <span className="h-2 w-2 rounded bg-sky-500" aria-hidden />
                 Prévu
               </span>
@@ -897,7 +1006,7 @@ export function BillableDaysCalendarBlock({
 
           <div className="min-w-0 w-full sm:max-w-sm sm:flex-1 lg:max-w-[340px]">
             <ActivityMonthSummaryCard
-              countedDays={selectedViewMonthStats.countedDays}
+              countedDays={ikForViewedMonth.commuteCount}
               ikTotalEur={ikMoisEncours}
               ikPerDayEur={ikPerDay}
               annualKm={annualKm}

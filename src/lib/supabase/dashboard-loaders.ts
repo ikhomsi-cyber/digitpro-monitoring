@@ -44,11 +44,13 @@ export async function loadTransactionYearBounds(
 export async function loadBillableActivitySettings(client: SupabaseServerClient, userId: string): Promise<{
   initialBillableWorkDays: string[];
   initialBillableVacationDays: string[];
+  initialBillableCommuteDays: string[];
+  initialMileageExtraKmByMonth: Record<string, number>;
   initialBillableTjmHt: number | null;
   initialAnnualRevenueTargetHt: number | null;
   billableRatePeriods: BillableRatePeriod[];
 }> {
-  const [daysRes, vacationRes, setRes, ratesRes] = await Promise.all([
+  const [daysRes, vacationRes, commuteRes, mileageRes, setRes, ratesRes] = await Promise.all([
     client
       .from("billable_work_days")
       .select("work_date")
@@ -59,6 +61,8 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
       .select("vacation_date")
       .eq("user_id", userId)
       .order("vacation_date", { ascending: true }),
+    client.from("billable_commute_days").select("commute_date").eq("user_id", userId),
+    client.from("billable_mileage_adjustments").select("month_date,extra_km").eq("user_id", userId),
     client
       .from("user_billable_settings")
       .select("tjm_ht,annual_revenue_target_ht")
@@ -81,6 +85,15 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
           String((r as { vacation_date: string }).vacation_date).slice(0, 10)
         )
       : [];
+  const initialBillableCommuteDays = !commuteRes.error && commuteRes.data
+    ? commuteRes.data.map((r) => String((r as { commute_date: string }).commute_date).slice(0, 10))
+    : [];
+  const initialMileageExtraKmByMonth: Record<string, number> = {};
+  if (!mileageRes.error) for (const r of mileageRes.data ?? []) {
+    const month = String((r as { month_date: string }).month_date).slice(0, 7);
+    const km = Number((r as { extra_km: number | string }).extra_km);
+    if (/^\d{4}-\d{2}$/.test(month) && Number.isFinite(km) && km > 0) initialMileageExtraKmByMonth[month] = km;
+  }
 
   let initialBillableTjmHt: number | null = null;
   let initialAnnualRevenueTargetHt: number | null = null;
@@ -120,6 +133,8 @@ export async function loadBillableActivitySettings(client: SupabaseServerClient,
   return {
     initialBillableWorkDays,
     initialBillableVacationDays,
+    initialBillableCommuteDays,
+    initialMileageExtraKmByMonth,
     initialBillableTjmHt,
     initialAnnualRevenueTargetHt,
     billableRatePeriods

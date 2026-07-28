@@ -11,7 +11,7 @@ import {
   type ReactNode
 } from "react";
 import { toast } from "sonner";
-import { replaceBillableWorkDays, replaceBillableVacationDays, updateAnnualRevenueTarget } from "@/app/dashboard/actions";
+import { replaceBillableCommuteDays, replaceBillableMileageAdjustments, replaceBillableWorkDays, replaceBillableVacationDays, updateAnnualRevenueTarget } from "@/app/dashboard/actions";
 import { computeCurrentMonthOverview } from "@/lib/billable-calendar-metrics";
 import type { BillableRatePeriod } from "@/lib/billable-client-days";
 import type {
@@ -22,6 +22,8 @@ import type {
 const STORAGE_KEY = "digitpro:billable-work-days-iso";
 const VACATION_STORAGE_KEY = "digitpro:billable-vacation-days-iso";
 const ANNUAL_TARGET_STORAGE_KEY = "digitpro:annual-revenue-target-ht";
+const COMMUTE_STORAGE_KEY = "digitpro:billable-commute-days-iso";
+const MILEAGE_EXTRA_STORAGE_KEY = "digitpro:billable-mileage-extra-km";
 
 function parseStored(raw: string | null): Set<string> {
   if (!raw) return new Set();
@@ -39,6 +41,13 @@ function parseStored(raw: string | null): Set<string> {
 function persistSignature(sortedDates: string[], tjm: number): string {
   return sortedDates.join(",") + "|" + tjm;
 }
+function parseMonthlyKm(raw: string | null): Record<string, number> {
+  if (!raw) return {};
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(value).filter(([month, km]) => /^\d{4}-\d{2}$/.test(month) && Number.isFinite(Number(km)) && Number(km) > 0).map(([month, km]) => [month, Number(km)]));
+  } catch { return {}; }
+}
 
 type BillableActivityContextValue = {
   tjmHt: number;
@@ -48,6 +57,10 @@ type BillableActivityContextValue = {
   setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
   vacationDays: Set<string>;
   setVacationDays: React.Dispatch<React.SetStateAction<Set<string>>>;
+  commuteDays: Set<string>;
+  setCommuteDays: React.Dispatch<React.SetStateAction<Set<string>>>;
+  mileageExtraKmByMonth: Record<string, number>;
+  setMileageExtraKmByMonth: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   hydrated: boolean;
   sortedIsos: readonly string[];
   overviewMonthTitle: string;
@@ -67,6 +80,8 @@ export function BillableActivityProvider({
   persistToSupabase,
   initialWorkDayIsos,
   initialVacationDayIsos = [],
+  initialCommuteDayIsos = [],
+  initialMileageExtraKmByMonth = {},
   initialAnnualRevenueTargetHt = null
 }: {
   children: ReactNode;
@@ -75,6 +90,8 @@ export function BillableActivityProvider({
   persistToSupabase: boolean;
   initialWorkDayIsos: string[];
   initialVacationDayIsos?: string[];
+  initialCommuteDayIsos?: string[];
+  initialMileageExtraKmByMonth?: Record<string, number>;
   initialAnnualRevenueTargetHt?: number | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() =>
@@ -83,6 +100,8 @@ export function BillableActivityProvider({
   const [vacationDays, setVacationDays] = useState<Set<string>>(() =>
     persistToSupabase ? new Set(initialVacationDayIsos) : new Set()
   );
+  const [commuteDays, setCommuteDays] = useState<Set<string>>(() => persistToSupabase ? new Set(initialCommuteDayIsos) : new Set());
+  const [mileageExtraKmByMonth, setMileageExtraKmByMonth] = useState<Record<string, number>>(() => persistToSupabase ? initialMileageExtraKmByMonth : {});
   const [hydrated, setHydrated] = useState(false);
   const [annualRevenueTargetHt, setAnnualRevenueTargetHt] = useState<number | null>(
     initialAnnualRevenueTargetHt
@@ -92,8 +111,14 @@ export function BillableActivityProvider({
   selectedRef.current = selected;
   const vacationDaysRef = useRef(vacationDays);
   vacationDaysRef.current = vacationDays;
+  const commuteDaysRef = useRef(commuteDays);
+  commuteDaysRef.current = commuteDays;
+  const mileageExtraRef = useRef(mileageExtraKmByMonth);
+  mileageExtraRef.current = mileageExtraKmByMonth;
   const lastPersistedRef = useRef<string | null>(null);
   const lastVacationPersistedRef = useRef<string | null>(null);
+  const lastCommutePersistedRef = useRef<string | null>(null);
+  const lastMileageExtraPersistedRef = useRef<string | null>(null);
   const lastTargetPersistedRef = useRef<number | null | undefined>(undefined);
 
   const serverDaysKey = useMemo(
@@ -108,16 +133,24 @@ export function BillableActivityProvider({
     () => (initialAnnualRevenueTargetHt == null ? "" : String(initialAnnualRevenueTargetHt)),
     [initialAnnualRevenueTargetHt]
   );
+  const serverCommuteKey = useMemo(() => [...initialCommuteDayIsos].sort().join("|"), [initialCommuteDayIsos]);
+  const serverMileageKey = useMemo(() => JSON.stringify(initialMileageExtraKmByMonth), [initialMileageExtraKmByMonth]);
 
   useEffect(() => {
     if (persistToSupabase) {
       setSelected(new Set(initialWorkDayIsos));
       setVacationDays(new Set(initialVacationDayIsos));
+      setCommuteDays(new Set(initialCommuteDayIsos));
+      setMileageExtraKmByMonth(initialMileageExtraKmByMonth);
       lastPersistedRef.current = persistSignature([...initialWorkDayIsos].sort(), tjmHt);
       lastVacationPersistedRef.current = [...initialVacationDayIsos].sort().join(",");
+      lastCommutePersistedRef.current = [...initialCommuteDayIsos].sort().join(",");
+      lastMileageExtraPersistedRef.current = JSON.stringify(initialMileageExtraKmByMonth);
     } else if (typeof window !== "undefined") {
       setSelected(parseStored(localStorage.getItem(STORAGE_KEY)));
       setVacationDays(parseStored(localStorage.getItem(VACATION_STORAGE_KEY)));
+      setCommuteDays(parseStored(localStorage.getItem(COMMUTE_STORAGE_KEY)));
+      setMileageExtraKmByMonth(parseMonthlyKm(localStorage.getItem(MILEAGE_EXTRA_STORAGE_KEY)));
       lastPersistedRef.current = null;
       lastVacationPersistedRef.current = null;
     }
@@ -130,7 +163,7 @@ export function BillableActivityProvider({
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- clés serveur résument les props initiales.
-  }, [persistToSupabase, serverDaysKey, serverVacationDaysKey, serverTargetKey, tjmHt, initialAnnualRevenueTargetHt]);
+  }, [persistToSupabase, serverDaysKey, serverVacationDaysKey, serverTargetKey, serverCommuteKey, serverMileageKey, tjmHt, initialAnnualRevenueTargetHt, initialCommuteDayIsos, initialMileageExtraKmByMonth]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
@@ -141,6 +174,8 @@ export function BillableActivityProvider({
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
     localStorage.setItem(VACATION_STORAGE_KEY, JSON.stringify([...vacationDays].sort()));
   }, [vacationDays, hydrated, persistToSupabase]);
+  useEffect(() => { if (hydrated && typeof window !== "undefined" && !persistToSupabase) localStorage.setItem(COMMUTE_STORAGE_KEY, JSON.stringify([...commuteDays].sort())); }, [commuteDays, hydrated, persistToSupabase]);
+  useEffect(() => { if (hydrated && typeof window !== "undefined" && !persistToSupabase) localStorage.setItem(MILEAGE_EXTRA_STORAGE_KEY, JSON.stringify(mileageExtraKmByMonth)); }, [mileageExtraKmByMonth, hydrated, persistToSupabase]);
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined" || persistToSupabase) return;
@@ -219,6 +254,20 @@ export function BillableActivityProvider({
     }, 500);
     return () => clearTimeout(t);
   }, [vacationDays, hydrated, persistToSupabase]);
+  useEffect(() => {
+    if (!hydrated || !persistToSupabase) return;
+    const sig = [...commuteDaysRef.current].sort().join(",");
+    if (sig === lastCommutePersistedRef.current) return;
+    const t = setTimeout(() => startTransition(() => { void replaceBillableCommuteDays([...commuteDaysRef.current].sort()).then(() => { lastCommutePersistedRef.current = [...commuteDaysRef.current].sort().join(","); }).catch((e) => toast.error("Enregistrement des trajets voiture impossible", { description: e instanceof Error ? e.message : undefined })); }), 500);
+    return () => clearTimeout(t);
+  }, [commuteDays, hydrated, persistToSupabase]);
+  useEffect(() => {
+    if (!hydrated || !persistToSupabase) return;
+    const sig = JSON.stringify(mileageExtraRef.current);
+    if (sig === lastMileageExtraPersistedRef.current) return;
+    const t = setTimeout(() => startTransition(() => { void replaceBillableMileageAdjustments(mileageExtraRef.current).then(() => { lastMileageExtraPersistedRef.current = JSON.stringify(mileageExtraRef.current); }).catch((e) => toast.error("Enregistrement des kilomètres supplémentaires impossible", { description: e instanceof Error ? e.message : undefined })); }), 500);
+    return () => clearTimeout(t);
+  }, [mileageExtraKmByMonth, hydrated, persistToSupabase]);
 
   const sortedIsos = useMemo(() => [...selected].sort(), [selected]);
 
@@ -236,6 +285,10 @@ export function BillableActivityProvider({
       setSelected,
       vacationDays,
       setVacationDays,
+      commuteDays,
+      setCommuteDays,
+      mileageExtraKmByMonth,
+      setMileageExtraKmByMonth,
       hydrated,
       sortedIsos,
       overviewMonthTitle: overview.monthTitle,
@@ -245,7 +298,7 @@ export function BillableActivityProvider({
       annualRevenueTargetHt,
       setAnnualRevenueTargetHt
     }),
-    [tjmHt, billableRatePeriods, persistToSupabase, selected, vacationDays, hydrated, sortedIsos, overview, annualRevenueTargetHt]
+    [tjmHt, billableRatePeriods, persistToSupabase, selected, vacationDays, commuteDays, mileageExtraKmByMonth, hydrated, sortedIsos, overview, annualRevenueTargetHt]
   );
 
   return (

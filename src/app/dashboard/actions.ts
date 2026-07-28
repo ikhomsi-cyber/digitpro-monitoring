@@ -1630,6 +1630,44 @@ export async function replaceBillableVacationDays(isoDates: string[]): Promise<v
   revalidatePath("/dashboard");
 }
 
+/** Remplace les dates où le trajet domicile-travail a été fait en voiture. */
+export async function replaceBillableCommuteDays(isoDates: string[]): Promise<void> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  if (isoDates.some((date) => !isValidIsoCalendarDate(date))) throw new Error("Date de trajet invalide");
+  const { error: delErr } = await supabase.from("billable_commute_days").delete().eq("user_id", user.id);
+  if (delErr) throw new Error(delErr.message);
+  const unique = [...new Set(isoDates)];
+  if (unique.length) {
+    const { error } = await supabase.from("billable_commute_days").insert(unique.map((commute_date) => ({ user_id: user.id, commute_date })));
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/dashboard");
+}
+
+/** Remplace les kilomètres professionnels additionnels, regroupés par mois. */
+export async function replaceBillableMileageAdjustments(values: Record<string, number>): Promise<void> {
+  await assertSupabaseWritesEnabled();
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const rows = Object.entries(values).flatMap(([month, km]) => {
+    if (!/^\d{4}-\d{2}$/.test(month) || !Number.isFinite(km) || km < 0 || km > 1_000_000) throw new Error("Kilométrage supplémentaire invalide");
+    return km > 0 ? [{ user_id: user.id, month_date: `${month}-01`, extra_km: Math.round(km * 10) / 10 }] : [];
+  });
+  const { error: delErr } = await supabase.from("billable_mileage_adjustments").delete().eq("user_id", user.id);
+  if (delErr) throw new Error(delErr.message);
+  if (rows.length) {
+    const { error } = await supabase.from("billable_mileage_adjustments").insert(rows);
+    if (error) throw new Error(error.message);
+  }
+  revalidatePath("/dashboard");
+}
+
 /** Enregistre l'objectif annuel de CA HT (table `user_billable_settings`). */
 export async function updateAnnualRevenueTarget(targetHtEur: number | null): Promise<void> {
   await assertSupabaseWritesEnabled();

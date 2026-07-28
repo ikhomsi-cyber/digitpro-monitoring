@@ -128,6 +128,8 @@ export default async function DashboardPage({
   let initialBillableVacationDays: string[] = [];
   let initialBillableTjmHt: number | null = null;
   let initialAnnualRevenueTargetHt: number | null = null;
+  let initialBillableCommuteDays: string[] = [];
+  let initialMileageExtraKmByMonth: Record<string, number> = {};
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
   let syncFullHistoryOnMount = false;
@@ -150,6 +152,8 @@ export default async function DashboardPage({
         : Promise.resolve({
             initialBillableWorkDays: [],
             initialBillableVacationDays: [],
+            initialBillableCommuteDays: [],
+            initialMileageExtraKmByMonth: {},
             initialBillableTjmHt: null,
             initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
@@ -162,6 +166,8 @@ export default async function DashboardPage({
     transactionYearBounds = boundsRes;
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
     initialBillableVacationDays = billableRes.initialBillableVacationDays;
+    initialBillableCommuteDays = billableRes.initialBillableCommuteDays;
+    initialMileageExtraKmByMonth = billableRes.initialMileageExtraKmByMonth;
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
     initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
@@ -204,6 +210,8 @@ export default async function DashboardPage({
       persistToSupabase={persistBillableToSupabase}
       initialWorkDayIsos={initialBillableWorkDays}
       initialVacationDayIsos={initialBillableVacationDays}
+      initialCommuteDayIsos={initialBillableCommuteDays}
+      initialMileageExtraKmByMonth={initialMileageExtraKmByMonth}
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <Suspense fallback={null}>

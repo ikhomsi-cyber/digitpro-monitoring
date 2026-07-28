@@ -305,6 +305,18 @@ export type Database = {
         }>;
         Relationships: [];
       };
+      billable_commute_days: {
+        Row: { id: string; user_id: string; commute_date: string; created_at: string; };
+        Insert: { id?: string; user_id?: string; commute_date: string; };
+        Update: Partial<{ commute_date: string; }>;
+        Relationships: [];
+      };
+      billable_mileage_adjustments: {
+        Row: { id: string; user_id: string; month_date: string; extra_km: number; created_at: string; updated_at: string; };
+        Insert: { id?: string; user_id?: string; month_date: string; extra_km: number; };
+        Update: Partial<{ month_date: string; extra_km: number; }>;
+        Relationships: [];
+      };
       billable_rate_periods: {
         Row: {
           id: string;
@@ -339,4 +351,3 @@ export type Database = {
     CompositeTypes: Record<string, never>;
   };
 };
-

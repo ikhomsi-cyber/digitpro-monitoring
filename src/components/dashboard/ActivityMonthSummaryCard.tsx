@@ -92,14 +92,14 @@ export function ActivityMonthSummaryCard({
             </p>
           </div>
           <p className="text-xs tabular-nums text-ink-400 dark:text-white/38">
-            {fmt.int(countedDays)} j. × {fmt.euro(ikPerDayEur)}
+            {fmt.int(countedDays)} j. · dernier trajet {fmt.euro(ikPerDayEur)}
             {annualKm && annualKm > 0 ? (
               <> · barème {fmt.int(annualKm)} km/an</>
             ) : null}
           </p>
           {annualBilledDays && annualBilledDays > 0 ? (
             <p className="mt-0.5 text-[10px] tabular-nums text-ink-400/80 dark:text-white/30">
-              Barème fiscal 8 CV · {fmt.int(annualBilledDays)} A/R enregistrés cette année
+              Barème fiscal 7 CV et plus · {fmt.int(annualBilledDays)} A/R voiture enregistrés cette année
             </p>
           ) : null}
           <FeeProgress value={ikTotalEur} max={ikMax} />

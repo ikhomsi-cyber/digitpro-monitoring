@@ -1,16 +1,16 @@
 /**
  * Indemnité kilométrique domicile (Sartrouville) → Pluxee (Issy-les-Moulineaux).
- * Distance route retenue + barème fiscal €/km (8 CV, tranche &lt; 5000 km/an).
+ * Distance route et catégorie utilisées dans Hiway (7 CV et plus).
  */
 
-export const COMMUTE_HOME_LABEL = "Avenue Maurice Berteaux, 78500 Sartrouville";
-export const COMMUTE_WORK_LABEL = "Pluxee · Issy-les-Moulineaux";
+export const COMMUTE_HOME_LABEL = "226 Avenue Maurice Berteaux, 78500 Sartrouville";
+export const COMMUTE_WORK_LABEL = "16 Rue du Passeur de Boulogne, Issy-les-Moulineaux";
 
 /** Chevaux fiscaux (barème « 7 CV et plus » dès 7 CV, identique pour 8 CV). */
-export const IK_VEHICLE_CHEVAUX_FISCAUX = 8;
+export const IK_VEHICLE_CHEVAUX_FISCAUX = 7;
 
-/** Distance route aller simple retenue pour coller au simulateur Hiway (~43 km A/R). */
-export const COMMUTE_ONE_WAY_ROAD_KM = 21.5;
+/** Distance route Hiway : 43,9 km aller-retour. */
+export const COMMUTE_ONE_WAY_ROAD_KM = 21.95;
 
 /**
  * Barème kilométrique €/km — véhicule **7 CV et plus**, distance pro. **≤ 5000 km/an**
@@ -36,14 +36,16 @@ export function commuteRoundTripKm(): number {
  * Barème kilométrique progressif — voiture **7 CV et plus** (revenus 2024 / 2025) :
  * - jusqu'à 5 000 km : d × 0,697
  * - de 5 001 à 20 000 km : (d × 0,394) + 1 515
- * - au-delà de 20 000 km : d × 0,472
- * Retourne l'indemnité **annuelle** pour un kilométrage professionnel total `annualKm`.
+ * - au-delà de 20 000 km : d × 0,470
+ *
+ * Le calcul des trajets est fait par différence entre deux cumuls annuels : cela
+ * applique les coefficients Hiway par palier, sans lisser le total sur tous les jours.
  */
 export function annualMileageAllowanceEur(annualKm: number): number {
   if (!Number.isFinite(annualKm) || annualKm <= 0) return 0;
   if (annualKm <= 5000) return round2(annualKm * IK_EUR_PER_KM);
   if (annualKm <= 20000) return round2(annualKm * 0.394 + 1515);
-  return round2(annualKm * 0.472);
+  return round2(annualKm * 0.47);
 }
 
 /**
@@ -56,22 +58,23 @@ export function kmFromMileageAllowanceEur(allowanceEur: number): number {
   const tier2Max = 20000 * 0.394 + 1515; // ≤ 20 000 km
   if (allowanceEur <= tier1Max) return Math.round(allowanceEur / IK_EUR_PER_KM);
   if (allowanceEur <= tier2Max) return Math.round((allowanceEur - 1515) / 0.394);
-  return Math.round(allowanceEur / 0.472);
+  return Math.round(allowanceEur / 0.47);
 }
 
 /**
- * Indemnité par jour travaillé, **dérivée du barème annuel** : le kilométrage annuel
- * (aller-retours × jours facturés sur l'année) détermine la tranche, puis on répartit
- * l'indemnité annuelle sur les jours. Aucun kilométrage à saisir manuellement.
+ * Indemnité du trajet A/R placé à la position `annualBilledDays` dans le cumul annuel.
  */
 export function indemniteKmPerWorkDayForAnnualDaysEur(annualBilledDays: number): number {
   const roundTripKm = commuteRoundTripKm();
   if (!Number.isFinite(annualBilledDays) || annualBilledDays <= 0) {
-    // Pas encore de trajet enregistré : on retombe sur la tranche ≤ 5 000 km.
+    // Estimation du premier trajet.
     return round2(roundTripKm * IK_EUR_PER_KM);
   }
-  const annualKm = annualBilledDays * roundTripKm;
-  return round2(annualMileageAllowanceEur(annualKm) / annualBilledDays);
+  const trip = Math.floor(annualBilledDays);
+  return round2(
+    annualMileageAllowanceEur(trip * roundTripKm) -
+      annualMileageAllowanceEur(Math.max(0, trip - 1) * roundTripKm)
+  );
 }
 
 /** Indemnité pour un aller-retour (km A/R × €/km, tranche ≤ 5 000 km). */
