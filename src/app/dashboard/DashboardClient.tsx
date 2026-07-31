@@ -81,6 +81,7 @@ import {
   dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
 import type { DashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
 import {
   BILLABLE_CLIENT_TJM_HT,
   formatWorkedDaysFr,
@@ -526,6 +527,41 @@ export function DashboardClient({
 
   const sasuSingleMonth = sasuMonthsForYears.length === 1 ? sasuMonthsForYears[0]! : null;
   const effectiveMonth = dashboardSection === "sasu" ? sasuSingleMonth : selectedMonth;
+
+  const selectedMonthAllocation = useMemo(() => {
+    if (!effectiveMonth) return displayHeroStats.tjmRepartitionMois;
+    const now = new Date(`${effectiveMonth}-01`);
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: effectiveMonth, now });
+    return {
+      caHtEur: Math.max(0, analysis.cashTree.caFactureEur),
+      bncEur: Math.max(0, analysis.cashTree.bncEur),
+      fraisPersoEur: Math.max(0, analysis.cashTree.personalChargesEur),
+      impotsEur: Math.max(0, analysis.cashTree.impotUtiliseEur),
+      csgEur: Math.max(0, analysis.cashTree.csgEur),
+      fraisDigitProEur: Math.max(0, analysis.cashTree.mandatoryFeesEur)
+    };
+  }, [effectiveMonth, transactions, displayHeroStats.tjmRepartitionMois]);
+
+  const selectedMonthRevenueAllocationTrend = useMemo(() => {
+    if (!effectiveMonth) return revenueAllocationTrend;
+    const [year, month] = effectiveMonth.split("-");
+    const prev = new Date(Number(year), Number(month) - 2, 1);
+    const currentAnalysis = analyzeValeurReelle(transactions, {
+      years: null,
+      month: effectiveMonth,
+      now: new Date(`${effectiveMonth}-01`)
+    });
+    const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+    const previousAnalysis = analyzeValeurReelle(transactions, {
+      years: null,
+      month: previousMonthKey,
+      now: prev
+    });
+    return computeKpiTrend(
+      Math.max(0, currentAnalysis.cashTree.caFactureEur),
+      Math.max(0, previousAnalysis.cashTree.caFactureEur)
+    );
+  }, [effectiveMonth, transactions, revenueAllocationTrend]);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),
@@ -993,10 +1029,9 @@ export function DashboardClient({
 
   const onSasuToggleMonth = useCallback((m: string) => {
     setSelectedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(m)) next.delete(m);
-      else next.add(m);
-      return Array.from(next).sort((a, b) => a.localeCompare(b));
+      // The dashboard allocation is a monthly metric: selecting a month must
+      // replace the previous one instead of silently retaining the current month.
+      return prev.length === 1 && prev[0] === m ? [] : [m];
     });
   }, []);
 
@@ -1059,10 +1094,10 @@ export function DashboardClient({
             trend={taxLiabilityTrend}
           />
           <RevenueAllocationChart
-            allocation={displayHeroStats.tjmRepartitionMois}
+            allocation={selectedMonthAllocation}
             formatEuro={fmt.euro}
             formatInt={fmt.int}
-            trend={revenueAllocationTrend}
+            trend={selectedMonthRevenueAllocationTrend}
           />
           <BncPaymentHistoryCard transactions={transactions} />
           <DashboardPremiumHero

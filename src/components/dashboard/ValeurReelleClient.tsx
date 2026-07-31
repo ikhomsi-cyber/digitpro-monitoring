@@ -1285,10 +1285,9 @@ export function ValeurReelleClient({
 
   const onToggleMonth = useCallback((m: string) => {
     setSelectedMonths((prev) => {
-      const next = new Set(prev);
-      if (next.has(m)) next.delete(m);
-      else next.add(m);
-      return Array.from(next).sort((a, b) => a.localeCompare(b));
+      // The allocation cards describe one calendar month. Replacing the active
+      // month avoids combining it with the default current-month selection.
+      return prev.length === 1 && prev[0] === m ? [] : [m];
     });
   }, []);
 
