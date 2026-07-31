@@ -415,15 +415,19 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 
 export function RevolutInsightsSection({
   transactions,
-  bncYearTotalEur = 0
+  bncYearTotalEur = 0,
+  monthKey,
+  onMonthChange
 }: {
   transactions: DashboardTx[];
   /** BNC versés (virements sortants libellé « BNC ») depuis le 1er janvier, année civile en cours. */
   bncYearTotalEur?: number;
+  /** Mois affiché par le navigateur du dashboard principal. */
+  monthKey: string;
+  onMonthChange: (monthKey: string) => void;
 }) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
-  const [monthKey, setMonthKey] = useState<string>(monthKeyNow());
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
   const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>([]);
 
@@ -507,7 +511,7 @@ export function RevolutInsightsSection({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setMonthKey((m) => shiftMonthKey(m, -1))}
+            onClick={() => onMonthChange(shiftMonthKey(monthKey, -1))}
             className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
             aria-label="Mois précédent"
           >
@@ -518,7 +522,7 @@ export function RevolutInsightsSection({
           </span>
           <button
             type="button"
-            onClick={() => setMonthKey((m) => shiftMonthKey(m, 1))}
+            onClick={() => onMonthChange(shiftMonthKey(monthKey, 1))}
             className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
             aria-label="Mois suivant"
           >

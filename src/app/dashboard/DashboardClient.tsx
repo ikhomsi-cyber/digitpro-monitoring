@@ -332,6 +332,8 @@ export function DashboardClient({
   const [selectedMonths, setSelectedMonths] = useState<string[]>(
     () => [defaultDashboardPeriodFilter().selectedMonth]
   );
+  /** Mois contrôlé par le navigateur au sommet du dashboard principal. */
+  const [overviewMonthKey, setOverviewMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) via clic sur le graphique. */
   const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
@@ -491,15 +493,6 @@ export function DashboardClient({
     });
   }, [currentHeroStats]);
 
-  const revenueAllocationTrend = useMemo(() => {
-    const mom = currentHeroStats.momKpis;
-    if (!mom) return null;
-    return computeKpiTrend(
-      currentHeroStats.tjmRepartitionMois.caHtEur,
-      mom.tjmRepartitionMois.caHtEur
-    );
-  }, [currentHeroStats]);
-
   const billableActivity = useBillableActivity();
   const { sortedIsos: billableWorkDayIsos } = billableActivity;
 
@@ -529,9 +522,8 @@ export function DashboardClient({
   const effectiveMonth = dashboardSection === "sasu" ? sasuSingleMonth : selectedMonth;
 
   const selectedMonthAllocation = useMemo(() => {
-    if (!effectiveMonth) return displayHeroStats.tjmRepartitionMois;
-    const now = new Date(`${effectiveMonth}-01`);
-    const analysis = analyzeValeurReelle(transactions, { years: null, month: effectiveMonth, now });
+    const now = new Date(`${overviewMonthKey}-01`);
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: overviewMonthKey, now });
     return {
       caHtEur: Math.max(0, analysis.cashTree.caFactureEur),
       bncEur: Math.max(0, analysis.cashTree.bncEur),
@@ -540,16 +532,15 @@ export function DashboardClient({
       csgEur: Math.max(0, analysis.cashTree.csgEur),
       fraisDigitProEur: Math.max(0, analysis.cashTree.mandatoryFeesEur)
     };
-  }, [effectiveMonth, transactions, displayHeroStats.tjmRepartitionMois]);
+  }, [overviewMonthKey, transactions]);
 
   const selectedMonthRevenueAllocationTrend = useMemo(() => {
-    if (!effectiveMonth) return revenueAllocationTrend;
-    const [year, month] = effectiveMonth.split("-");
+    const [year, month] = overviewMonthKey.split("-");
     const prev = new Date(Number(year), Number(month) - 2, 1);
     const currentAnalysis = analyzeValeurReelle(transactions, {
       years: null,
-      month: effectiveMonth,
-      now: new Date(`${effectiveMonth}-01`)
+      month: overviewMonthKey,
+      now: new Date(`${overviewMonthKey}-01`)
     });
     const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
     const previousAnalysis = analyzeValeurReelle(transactions, {
@@ -561,7 +552,7 @@ export function DashboardClient({
       Math.max(0, currentAnalysis.cashTree.caFactureEur),
       Math.max(0, previousAnalysis.cashTree.caFactureEur)
     );
-  }, [effectiveMonth, transactions, revenueAllocationTrend]);
+  }, [overviewMonthKey, transactions]);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),
@@ -1083,6 +1074,8 @@ export function DashboardClient({
           <RevolutInsightsSection
             transactions={transactions}
             bncYearTotalEur={displayHeroStats.bncYearTotalEur}
+            monthKey={overviewMonthKey}
+            onMonthChange={setOverviewMonthKey}
           />
           <TaxLiabilityCard
             cashEur={displayHeroStats.soldeQontoEur}
