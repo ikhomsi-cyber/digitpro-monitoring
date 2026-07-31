@@ -22,7 +22,7 @@ export function AppPageLoader({ message = "Chargement…", exiting = false }: Ap
     >
       <div className="relative flex items-center justify-center">
         <div
-          className="pointer-events-none absolute h-28 w-28 rounded-full bg-cyan-300/25 blur-2xl dark:bg-cyan-400/30 animate-launchGlow"
+          className="pointer-events-none absolute h-28 w-28 rounded-full bg-cyan-300/25 blur-2xl dark:bg-cyan-400/30"
           aria-hidden
         />
         <Image
@@ -31,7 +31,7 @@ export function AppPageLoader({ message = "Chargement…", exiting = false }: Ap
           width={76}
           height={76}
           priority
-          className="relative drop-shadow-[0_12px_28px_rgba(0,0,0,0.35)] animate-launchLogo"
+          className="relative drop-shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
         />
       </div>
     </div>

@@ -119,13 +119,11 @@ export function ImpotsSection() {
 
       {/* Hero */}
       <section className={dashboardHeroSection}>
-        <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-ink-500 dark:text-white/42">
-          Impôts · foyer fiscal
-        </p>
-        <p className="mt-3 font-display text-5xl font-bold tabular-nums tracking-tight text-ink-950 dark:text-white" data-private>
+        <p className="text-sm font-medium text-ink-500 dark:text-white/55">Impôts · foyer fiscal</p>
+        <p className="mt-2 font-display text-4xl font-bold tabular-nums tracking-apple-tight text-ink-950 dark:text-white sm:text-5xl" data-private>
           {fmt.euro(selectedAnalysis.impotTotal)}
         </p>
-        <p className="mt-2 text-sm font-medium text-ink-500 dark:text-white/55">
+        <p className="mt-4 text-sm font-medium text-ink-500 dark:text-white/55">
           Impôt {selectedAnalysis.notice.revenusYear} · {fmt.euro(selectedAnalysis.impotMensuel)} / mois
           {selectedAnalysis.notice.declarative ? " · estimation déclarative" : ""}
         </p>
