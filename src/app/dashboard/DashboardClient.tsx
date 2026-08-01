@@ -1623,24 +1623,32 @@ export function DashboardClient({
                                           ) : null}
                                         </span>
                                         <span className="shrink-0 text-right font-semibold tabular-nums text-ink-900 dark:text-white">
-                                          <span className="inline-flex items-baseline gap-1">
-                                            {fmt.euro(
+                                         {(() => {
+                                           const amount =
                                               sasuAnalysisMode === "expenses"
                                                 ? dashboardSasuExpenseAmountHt(tx)
-                                                : Math.abs(tx.amount)
-                                            )}
-                                            {sasuAnalysisMode === "expenses" ? (
-                                              <span className="text-[10px] font-medium text-ink-500 dark:text-white/42">
-                                                HT
-                                              </span>
-                                            ) : null}
-                                          </span>
-                                          {sasuAnalysisMode === "expenses" &&
-                                          dashboardSasuExpenseAmountHt(tx) !== Math.abs(tx.amount) ? (
-                                            <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
-                                              TTC {fmt.euro(Math.abs(tx.amount))}
-                                            </span>
-                                          ) : null}
+                                               : Math.abs(tx.amount);
+                                           const isNetHt =
+                                             sasuAnalysisMode === "expenses" &&
+                                             amount !== Math.abs(tx.amount);
+                                           return (
+                                             <>
+                                               <span className="inline-flex items-baseline gap-1">
+                                                 {fmt.euro(amount)}
+                                                 {isNetHt ? (
+                                                   <span className="text-[10px] font-medium text-ink-500 dark:text-white/42">
+                                                     HT
+                                                   </span>
+                                                 ) : null}
+                                               </span>
+                                               {isNetHt ? (
+                                                 <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
+                                                   TTC {fmt.euro(Math.abs(tx.amount))}
+                                                 </span>
+                                               ) : null}
+                                             </>
+                                           );
+                                         })()}
                                         </span>
                                       </div>
                                     );
