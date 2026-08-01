@@ -1623,11 +1623,18 @@ export function DashboardClient({
                                           ) : null}
                                         </span>
                                         <span className="shrink-0 text-right font-semibold tabular-nums text-ink-900 dark:text-white">
-                                          {fmt.euro(
-                                            sasuAnalysisMode === "expenses"
-                                              ? dashboardSasuExpenseAmountHt(tx)
-                                              : Math.abs(tx.amount)
-                                          )}
+                                          <span className="inline-flex items-baseline gap-1">
+                                            {fmt.euro(
+                                              sasuAnalysisMode === "expenses"
+                                                ? dashboardSasuExpenseAmountHt(tx)
+                                                : Math.abs(tx.amount)
+                                            )}
+                                            {sasuAnalysisMode === "expenses" ? (
+                                              <span className="text-[10px] font-medium text-ink-500 dark:text-white/42">
+                                                HT
+                                              </span>
+                                            ) : null}
+                                          </span>
                                           {sasuAnalysisMode === "expenses" &&
                                           dashboardSasuExpenseAmountHt(tx) !== Math.abs(tx.amount) ? (
                                             <span className="mt-0.5 block text-[10px] font-medium text-ink-500 dark:text-white/42">
