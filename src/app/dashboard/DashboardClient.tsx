@@ -1140,7 +1140,7 @@ export function DashboardClient({
         className={clsx(dashboardSection !== "impots" && "hidden")}
         aria-hidden={dashboardSection !== "impots"}
       >
-        <ImpotsSection />
+        <ImpotsSection transactions={transactions} />
       </div>
       ) : null}
       {mountedSections.has("sasu-panel") ? (

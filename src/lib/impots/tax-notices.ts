@@ -82,7 +82,6 @@ export const TAX_NOTICES: TaxNotice[] = [
     revenusYear: 2025,
     avisYear: 2026,
     parts: 3,
-    declarative: true,
     lmnpImposable: 311,
     declarants: [
       { label: "Déclarant 1", salaireNetImposable: 0, bncImposable: 158566 },
@@ -100,6 +99,10 @@ export const TAX_NOTICES: TaxNotice[] = [
       impotBareme: 27472,
       impotNet: 25283,
       prelevementsSociaux: 58,
+      prelevementSource: 1741,
+      acomptesPreleves: 1710,
+      avanceCreditsImpots: 1210,
+      soldeRestantAPayer: 23042,
       revenuFiscalReference: 179594,
       tauxMoyen: 16.9,
       tauxMarginal: 30

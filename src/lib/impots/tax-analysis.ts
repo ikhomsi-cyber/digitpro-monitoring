@@ -1,5 +1,5 @@
 import { baremeTax, computeBareme, tauxMarginal } from "./tax-engine";
-import { TAX_NOTICES } from "./tax-notices";
+import { getLatestNotice, TAX_NOTICES } from "./tax-notices";
 import type {
   TaxNotice,
   TaxOptimizationBreakdown,
@@ -69,6 +69,7 @@ export function analyzeNotice(notice: TaxNotice): TaxYearAnalysis {
   const impotNet = notice.avis.impotNet;
   const prelevementsSociaux = notice.avis.prelevementsSociaux ?? 0;
   const impotTotal = impotNet + prelevementsSociaux;
+  const soldeRestantAPayer = notice.avis.soldeRestantAPayer ?? null;
 
   // Attribution marginale de l'IR au BNC : différence de barème avec / sans BNC,
   // pondérée par le ratio impôt net / impôt barème (répartit réductions & crédits).
@@ -91,6 +92,7 @@ export function analyzeNotice(notice: TaxNotice): TaxYearAnalysis {
     impotNet,
     prelevementsSociaux,
     impotTotal,
+    soldeRestantAPayer,
     impotMensuel: Math.round(impotTotal / 12),
     tauxMoyen: notice.avis.tauxMoyen,
     tauxMarginal: notice.avis.tauxMarginal,
@@ -110,6 +112,74 @@ export function analyzeNotice(notice: TaxNotice): TaxYearAnalysis {
 
 export function analyzeAllNotices(): TaxYearAnalysis[] {
   return TAX_NOTICES.map(analyzeNotice).sort((a, b) => a.notice.revenusYear - b.notice.revenusYear);
+}
+
+export type CurrentYearTaxProjection = {
+  analysis: TaxYearAnalysis;
+  bncYtdEur: number;
+  bncProjectedEur: number;
+  elapsedYearRatio: number;
+};
+
+/**
+ * Simulation de l'avis qui sera établi l'année suivante : le BNC déjà encaissé
+ * est annualisé au prorata des jours écoulés et les autres paramètres reprennent
+ * le dernier avis connu du foyer. Ce n'est pas un avis fiscal définitif.
+ */
+export function projectCurrentYearTaxFromBnc(
+  bncYtdEur: number,
+  now = new Date()
+): CurrentYearTaxProjection {
+  const reference = getLatestNotice();
+  const year = now.getFullYear();
+  const start = new Date(year, 0, 1);
+  const next = new Date(year + 1, 0, 1);
+  const elapsedDays = Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1);
+  const daysInYear = Math.round((next.getTime() - start.getTime()) / 86_400_000);
+  const elapsedYearRatio = Math.min(1, elapsedDays / daysInYear);
+  const bncProjectedEur = Math.round((Math.max(0, bncYtdEur) / elapsedYearRatio) * 100) / 100;
+  const declarants = reference.declarants.map((declarant, index) => ({
+    ...declarant,
+    bncImposable: index === 0 ? bncProjectedEur : declarant.bncImposable
+  }));
+  const revenuBrutGlobal =
+    declarants.reduce((sum, declarant) => sum + declarant.salaireNetImposable + declarant.bncImposable, 0) +
+    (reference.lmnpImposable ?? 0);
+  const chargesDeductibles = reference.chargesDeductibles.reduce((sum, charge) => sum + charge.amount, 0);
+  const revenuImposable = Math.max(0, revenuBrutGlobal - chargesDeductibles);
+  const impotBareme = baremeTax(revenuImposable, reference.parts, year);
+  const credits = reference.credits.reduce((sum, credit) => sum + credit.amount, 0);
+  const reductions = reference.reductions.reduce((sum, reduction) => sum + reduction.amount, 0);
+  const impotNet = Math.max(0, impotBareme - credits - reductions);
+  const notice: TaxNotice = {
+    revenusYear: year,
+    avisYear: year + 1,
+    parts: reference.parts,
+    declarative: true,
+    lmnpImposable: reference.lmnpImposable,
+    declarants,
+    chargesDeductibles: reference.chargesDeductibles,
+    reductions: reference.reductions,
+    credits: reference.credits,
+    avis: {
+      revenuBrutGlobal,
+      revenuImposable,
+      impotBareme,
+      impotNet,
+      // Le dernier avis ne comporte que des prélèvements sociaux LMNP ; on le reconduit à titre d'hypothèse.
+      prelevementsSociaux: reference.avis.prelevementsSociaux,
+      revenuFiscalReference: revenuBrutGlobal,
+      tauxMoyen: revenuImposable > 0 ? (impotNet / revenuImposable) * 100 : 0,
+      tauxMarginal: tauxMarginal(revenuImposable, reference.parts, year)
+    }
+  };
+
+  return {
+    analysis: analyzeNotice(notice),
+    bncYtdEur: Math.round(Math.max(0, bncYtdEur) * 100) / 100,
+    bncProjectedEur,
+    elapsedYearRatio
+  };
 }
 
 function last12MonthKeys(now: Date): string[] {

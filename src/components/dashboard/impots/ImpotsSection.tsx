@@ -25,8 +25,11 @@ import {
   dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
 import { analyzeAllNotices } from "@/lib/impots/tax-analysis";
+import { projectCurrentYearTaxFromBnc } from "@/lib/impots/tax-analysis";
 import type { TaxOptimizationKind } from "@/lib/impots/types";
 import { TaxHistoryChart, type TaxHistoryPoint } from "./TaxHistoryChart";
+import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
 
 const OPTIMIZATION_META: Record<
   TaxOptimizationKind,
@@ -65,15 +68,27 @@ function KpiCell({
   );
 }
 
-export function ImpotsSection() {
+export function ImpotsSection({ transactions }: { transactions: DashboardTx[] }) {
   const fmt = useDashboardDisplayFormat();
   const analyses = useMemo(() => analyzeAllNotices(), []);
   const latest = analyses[analyses.length - 1];
-  const yearOptions = useMemo(() => analyses.map((a) => a.notice.revenusYear), [analyses]);
-  const [selectedYear, setSelectedYear] = useState(() => latest.notice.revenusYear);
+  const projection = useMemo(() => {
+    const now = new Date();
+    const value = analyzeValeurReelle(transactions, { years: [now.getFullYear()], now });
+    return projectCurrentYearTaxFromBnc(value.cashTree.bncBrutEur, now);
+  }, [transactions]);
+  const projectedYear = projection.analysis.notice.revenusYear;
+  const yearOptions = useMemo(
+    () => [...new Set([...analyses.map((a) => a.notice.revenusYear), projectedYear])].sort((a, b) => a - b),
+    [analyses, projectedYear]
+  );
+  const [selectedYear, setSelectedYear] = useState(() => projectedYear);
   const selectedAnalysis = useMemo(
-    () => analyses.find((a) => a.notice.revenusYear === selectedYear) ?? latest,
-    [analyses, selectedYear, latest]
+    () =>
+      selectedYear === projectedYear
+        ? projection.analysis
+        : analyses.find((a) => a.notice.revenusYear === selectedYear) ?? latest,
+    [analyses, latest, projectedYear, projection.analysis, selectedYear]
   );
   const yearOptimizations = useMemo(
     () => [...selectedAnalysis.optimizations].sort((a, b) => b.economie - a.economie),
@@ -99,7 +114,7 @@ export function ImpotsSection() {
           <p className={dashboardEyebrow}>Impôts</p>
           <h2 className={clsx(dashboardPanelTitle, "mt-1")}>Année fiscale</h2>
           <p className="mt-1 text-[11px] font-medium text-ink-500 dark:text-white/45">
-            Avis d'impôt et estimation BNC par année de revenus
+            Avis d'impôt et projection BNC par année de revenus
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Année des revenus">
@@ -127,6 +142,16 @@ export function ImpotsSection() {
           Impôt {selectedAnalysis.notice.revenusYear} · {fmt.euro(selectedAnalysis.impotMensuel)} / mois
           {selectedAnalysis.notice.declarative ? " · estimation déclarative" : ""}
         </p>
+        {selectedYear === projectedYear ? (
+          <p className="mt-1 text-xs text-ink-500 dark:text-white/45" data-private>
+            BNC réel 2026 à date : {fmt.euro(projection.bncYtdEur)} · projection annuelle : {fmt.euro(projection.bncProjectedEur)}
+          </p>
+        ) : null}
+        {selectedAnalysis.soldeRestantAPayer != null ? (
+          <p className="mt-1 text-sm font-semibold text-amber-700 dark:text-amber-300" data-private>
+            Reste à payer selon l&apos;avis : {fmt.euro(selectedAnalysis.soldeRestantAPayer)}
+          </p>
+        ) : null}
         <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-300">
           <Wallet className="h-4 w-4" aria-hidden />
           <span data-private>{fmt.euro(selectedAnalysis.bncNetApresImpot)}</span> nets de BNC après impôt
@@ -137,6 +162,9 @@ export function ImpotsSection() {
       <section className={dashboardInsightCard}>
         <div className={dashboardDenseKpiGrid(4)}>
           <KpiCell label={`Impôt ${selectedAnalysis.notice.revenusYear}`} value={fmt.euro(selectedAnalysis.impotTotal)} sub={`${fmt.euro(selectedAnalysis.impotMensuel)} / mois`} />
+          {selectedAnalysis.soldeRestantAPayer != null ? (
+            <KpiCell label="Solde à payer" value={fmt.euro(selectedAnalysis.soldeRestantAPayer)} sub="Après PAS et acomptes" />
+          ) : null}
           <KpiCell label="BNC brut" value={fmt.euro(selectedAnalysis.bncBrut)} sub={`IR attribué ${fmt.euro(selectedAnalysis.irAttribuableBnc)}`} />
           <KpiCell label="BNC net après IR" value={fmt.euro(selectedAnalysis.bncNetApresImpot)} sub={`${selectedAnalysis.tauxEffectifBnc.toFixed(1)} % d'imposition`} />
           <KpiCell label="Taux moyen / marginal" value={`${selectedAnalysis.tauxMoyen.toFixed(1)} %`} sub={`marginal ${selectedAnalysis.tauxMarginal} %`} privateValue={false} />
@@ -194,6 +222,9 @@ export function ImpotsSection() {
             <MiniStat label="IR sur BNC" value={fmt.euro(selectedAnalysis.irAttribuableBnc)} />
             <MiniStat label="BNC net" value={fmt.euro(selectedAnalysis.bncNetApresImpot)} highlight />
             <MiniStat label="Taux BNC" value={`${selectedAnalysis.tauxEffectifBnc.toFixed(1)} %`} priv={false} />
+            {selectedYear === projectedYear ? (
+              <MiniStat label="BNC réel à date" value={fmt.euro(projection.bncYtdEur)} />
+            ) : null}
           </div>
         </section>
 

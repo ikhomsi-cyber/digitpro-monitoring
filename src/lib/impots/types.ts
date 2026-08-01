@@ -55,6 +55,14 @@ export type TaxNotice = {
     impotNet: number;
     /** Prélèvements sociaux nets (CSG/CRDS/prél. solidarité sur revenus du patrimoine). */
     prelevementsSociaux?: number;
+    /** Prélèvement à la source déjà retenu sur l'année de revenus. */
+    prelevementSource?: number;
+    /** Acomptes déjà prélevés sur le compte bancaire. */
+    acomptesPreleves?: number;
+    /** Avance de réductions ou crédits d'impôt perçue. */
+    avanceCreditsImpots?: number;
+    /** Solde officiel restant à payer selon l'avis. */
+    soldeRestantAPayer?: number;
     revenuFiscalReference: number;
     tauxMoyen: number;
     tauxMarginal: number;
@@ -104,6 +112,8 @@ export type TaxYearAnalysis = {
   impotNet: number;
   prelevementsSociaux: number;
   impotTotal: number;
+  /** Solde officiel restant à payer, une fois le PAS, les acomptes et avances imputés. */
+  soldeRestantAPayer: number | null;
   impotMensuel: number;
   tauxMoyen: number;
   tauxMarginal: number;
