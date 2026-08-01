@@ -31,7 +31,7 @@ const KIND_META: Record<
     label: "Déjà facturé",
     fill: "#38bdf8",
     fillDark: "#0ea5e9",
-    tooltipHint: "Jours cochés dans l’agenda (mois dernier)"
+    tooltipHint: "Facture émise, en attente d’encaissement"
   },
   a_facturer: {
     label: "À facturer",
@@ -104,7 +104,7 @@ function ChartTooltip({
         </div>
       ) : (
         <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">
-          CA HT estimé : {fmt.euro(p.caHt)}
+          CA HT facturé : {fmt.euro(p.caHt)}
         </div>
       )}
       <div className="mt-0.5 text-[11px] text-ink-500 dark:text-ink-400">

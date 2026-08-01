@@ -78,8 +78,11 @@ export function isDigitProExpense(tx: DashboardTx): boolean {
 export function dashboardSasuExpenseAmountHt(tx: DashboardTx): number {
   if (tx.amount >= 0) return 0;
   const grossEur = Math.abs(tx.amount);
-  if (!isDigitProExpense(tx)) return grossEur;
   const bucket = deriveExpenseBucket(tx);
+  // Les repas restent affichés TTC dans le dashboard. Leur HT est réservé
+  // aux calculs et affichages de la section « Valeur ».
+  if (bucket === "Repas dirigeant" || bucket === "Repas d'affaire") return grossEur;
+  if (!isDigitProExpense(tx)) return grossEur;
   return amountNetOfRecoverableVat(tx, bucket, grossEur);
 }
 

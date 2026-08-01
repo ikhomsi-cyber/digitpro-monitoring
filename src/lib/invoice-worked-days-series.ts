@@ -8,6 +8,8 @@ import {
   type BillableRatePeriod
 } from "./billable-client-days";
 import { isRevenueCategory, revenueCounterpartyDisplayName } from "./revenue-category";
+import type { HiwayInvoice } from "./gmail/hiway-invoice-parser";
+import { hiwayInvoiceHtEur } from "./hiway-invoice-aggregate";
 
 const VAT_RATE = 0.2;
 
@@ -237,6 +239,57 @@ export function appendAgendaWorkedDayMonths(
   return [...base, ...extras].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
 }
 
+/**
+ * Remplace les mois sans encaissement par les montants des factures Hiway émises.
+ * Une facture reste ainsi « Déjà facturé » jusqu'à l'apparition du CA encaissé
+ * sur le même mois de prestation (la barre redevient alors « Encaissé »).
+ */
+export function mergeIssuedHiwayInvoicesIntoWorkedDays(
+  rows: readonly InvoiceWorkedDayMonth[],
+  invoices: readonly HiwayInvoice[] | null | undefined,
+  billableRatePeriods: readonly BillableRatePeriod[] = [],
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
+  now = new Date()
+): InvoiceWorkedDayMonth[] {
+  if (!invoices?.length) return [...rows];
+
+  const byMonth = new Map<string, { caHt: number; days: number; weightedTjm: number }>();
+  const currentMonthKey = monthKeyFromYm(now.getFullYear(), now.getMonth());
+  for (const invoice of invoices) {
+    const monthKey = invoice.date?.slice(0, 7);
+    const caHt = hiwayInvoiceHtEur(invoice);
+    if (!monthKey || monthKey > currentMonthKey || caHt <= 0) continue;
+    const tjmHt = invoice.tjmHtEur && invoice.tjmHtEur > 0
+      ? invoice.tjmHtEur
+      : resolveBillableTjmForClientMonth(billableRatePeriods, invoice.client, monthKey, fallbackTjmHt);
+    const days = invoice.billedDays && invoice.billedDays > 0 ? invoice.billedDays : caHt / tjmHt;
+    const current = byMonth.get(monthKey) ?? { caHt: 0, days: 0, weightedTjm: 0 };
+    current.caHt += caHt;
+    current.days += days;
+    current.weightedTjm += tjmHt * caHt;
+    byMonth.set(monthKey, current);
+  }
+
+  const output = new Map(rows.map((row) => [row.monthKey, { ...row }]));
+  for (const [monthKey, invoice] of byMonth) {
+    const existing = output.get(monthKey);
+    // Une barre encaissée non nulle est le rapprochement de la facture : elle prévaut.
+    if (existing?.kind === "encaisse" && existing.caHt > 0) continue;
+    const { y, m0 } = parseMonthKey(monthKey);
+    const tjmHt = invoice.caHt > 0 ? invoice.weightedTjm / invoice.caHt : fallbackTjmHt;
+    output.set(monthKey, {
+      monthKey,
+      label: chartLabelFmt.format(new Date(y, m0, 1)),
+      days: Math.round(invoice.days * 10) / 10,
+      caHt: round2(invoice.caHt),
+      tjmHt: round2(tjmHt),
+      sourceMonthKey: monthKey,
+      kind: "deja_facture"
+    });
+  }
+  return [...output.values()].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+}
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -313,10 +366,7 @@ export function computeCashedCaWorkedDays(
 
 /**
  * Totaux YTD par mois de prestation (aligné graphique « Jours facturés »).
- * `currentMonthInvoiceCaHtEur` : si > 0, la barre « À facturer » du mois en cours
- * est requalifiée en « Déjà facturé » au montant réel de la facture Hiway —
- * exactement comme la barre du graphique d'activité, pour que le « CA facturé »
- * affiché coïncide avec le « CA généré ».
+ * Les factures Hiway émises et non encore encaissées sont incluses au CA facturé.
  */
 export function computeYearToDateInvoicingTotals(
   transactions: readonly DashboardTx[],
@@ -324,11 +374,10 @@ export function computeYearToDateInvoicingTotals(
   billableRatePeriods: readonly BillableRatePeriod[] = [],
   fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
   now = new Date(),
-  currentMonthInvoiceCaHtEur = 0
+  invoices: readonly HiwayInvoice[] | null | undefined = null
 ): { encaisseHtEur: number; factureHtEur: number } {
   const year = now.getFullYear();
   const yearPrefix = `${year}-`;
-  const currentMonthKey = monthKeyFromYm(year, now.getMonth());
 
   const encaisseRows = buildInvoiceWorkedDaysPastMonthsSeries(
     [...transactions],
@@ -346,17 +395,18 @@ export function computeYearToDateInvoicingTotals(
     now
   );
 
-  const hasCurrentMonthInvoice = currentMonthInvoiceCaHtEur > 0;
+  const mergedRows = mergeIssuedHiwayInvoicesIntoWorkedDays(
+    rows,
+    invoices,
+    billableRatePeriods,
+    fallbackTjmHt,
+    now
+  );
 
   let encaisseHtEur = 0;
   let factureHtEur = 0;
-  for (const row of rows) {
+  for (const row of mergedRows) {
     if (!row.monthKey.startsWith(yearPrefix)) continue;
-    // Mois en cours avec facture Hiway : compte le montant facturé, pas l'estimation agenda.
-    if (hasCurrentMonthInvoice && row.monthKey === currentMonthKey && row.kind === "a_facturer") {
-      factureHtEur += currentMonthInvoiceCaHtEur;
-      continue;
-    }
     if (row.kind === "encaisse") {
       encaisseHtEur += row.caHt;
       factureHtEur += row.caHt;

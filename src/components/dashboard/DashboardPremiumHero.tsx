@@ -12,7 +12,6 @@ import { YearEndProjectionChart } from "@/components/dashboard/YearEndProjection
 import { dashboardFlatHero, dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { computeYearToDateInvoicingTotals } from "@/lib/invoice-worked-days-series";
 import { useHiwayInvoicesOptional } from "@/components/dashboard/HiwayInvoicesContext";
-import { localMonthKey, sumHiwayInvoiceHtForMonth } from "@/lib/hiway-invoice-aggregate";
 
 type Props = {
   stats: DashboardHeroStats;
@@ -128,10 +127,6 @@ export function DashboardPremiumHero({ stats, transactions, statsReady, contextM
   );
 
   const hiwayInvoices = useHiwayInvoicesOptional()?.invoices ?? null;
-  const currentMonthInvoiceCaHt = useMemo(
-    () => sumHiwayInvoiceHtForMonth(hiwayInvoices, localMonthKey()),
-    [hiwayInvoices]
-  );
 
   const ytdInvoicing = useMemo(
     () =>
@@ -141,14 +136,14 @@ export function DashboardPremiumHero({ stats, transactions, statsReady, contextM
         billable.billableRatePeriods,
         billable.tjmHt,
         new Date(),
-        currentMonthInvoiceCaHt
+        hiwayInvoices
       ),
     [
       billable.billableRatePeriods,
       billable.sortedIsos,
       billable.tjmHt,
       transactions,
-      currentMonthInvoiceCaHt
+      hiwayInvoices
     ]
   );
 

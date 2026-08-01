@@ -458,6 +458,14 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
   );
 }
 
+/** Les frais de repas sont présentés HT dans la section « Valeur » (TVA 10 %). */
+function valeurReelleExpenseAmount(tx: DashboardTx, bucket: DerivedExpenseBucket | null, grossEur: number): number {
+  if (bucket === "Repas d'affaire" || bucket === "Repas dirigeant") {
+    return amountNetOfRecoverableVat(tx, bucket, grossEur);
+  }
+  return grossEur;
+}
+
 function isCsgSocialReintegrationLine(bucket: DerivedExpenseBucket | null): boolean {
   return bucket === "Urssaf";
 }
@@ -663,6 +671,7 @@ export function analyzeValeurReelle(
     const kind = classified.kind;
     const amtAbs = Math.abs(tx.amount);
     const bucket = classified.bucket;
+    const valeurExpenseEur = valeurReelleExpenseAmount(tx, bucket, amtAbs);
 
     if (isProScope(tx) && outgoingTransferLabelIsBnc(tx)) {
       bncPaidEur += amtAbs;
@@ -748,8 +757,8 @@ export function analyzeValeurReelle(
       hiddenExpensesGrossEur += amtAbs;
       hiddenValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        personalChargesEur += amtAbs;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), amtAbs, breakdownTransaction(tx, amtAbs, amtAbs));
+        personalChargesEur += valeurExpenseEur;
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), valeurExpenseEur, breakdownTransaction(tx, valeurExpenseEur, amtAbs));
       }
       if (
         classified.bucket === "NDF" ||
@@ -767,8 +776,8 @@ export function analyzeValeurReelle(
       mixedExpensesEur += amtAbs;
       mixedValueRecoveredEur += hiddenValueEur;
       if (isValeurReellePersonalChargeLine(bucket)) {
-        personalChargesEur += amtAbs;
-        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), amtAbs, breakdownTransaction(tx, amtAbs, amtAbs));
+        personalChargesEur += valeurExpenseEur;
+        addBreakdownRow(personalChargesBreakdown, valeurReelleExpenseCategoryLabel(tx, bucket), valeurExpenseEur, breakdownTransaction(tx, valeurExpenseEur, amtAbs));
       }
       if (classified.bucket === "NDF" || classified.sublabel.toLowerCase().includes("note de frais")) {
         ndfIkGrossEur += amtAbs;
@@ -777,9 +786,10 @@ export function analyzeValeurReelle(
     }
 
     const catKey = `${group}:${classified.sublabel}`;
+    const categoryAmountEur = group === "active_income" || group === "passive_income" ? tx.amount : valeurExpenseEur;
     const prev = categoryMap.get(catKey);
     if (prev) {
-      prev.totalEur += group === "active_income" || group === "passive_income" ? tx.amount : amtAbs;
+      prev.totalEur += categoryAmountEur;
       prev.count += 1;
       prev.hiddenValueEur += hiddenValueEur;
     } else {
@@ -788,7 +798,7 @@ export function analyzeValeurReelle(
         label: classified.sublabel,
         group,
         kind,
-        totalEur: group === "active_income" || group === "passive_income" ? tx.amount : amtAbs,
+        totalEur: categoryAmountEur,
         count: 1,
         hiddenValueEur
       });
