@@ -58,6 +58,19 @@ function parseDashboardScopeParam(
   return null;
 }
 
+/** Empreinte légère des données visibles : une recatégorisation doit rafraîchir le client. */
+function dashboardTransactionsSyncKey(transactions: readonly DashboardTx[]): string {
+  let hash = 2_166_136_261;
+  for (const tx of transactions) {
+    const value = `${tx.id}:${tx.category}:${tx.categoryManual ? "1" : "0"}:${tx.scope ?? "pro"}`;
+    for (let index = 0; index < value.length; index++) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 16_777_619);
+    }
+  }
+  return `${transactions.length}:${(hash >>> 0).toString(36)}`;
+}
+
 import { parseDashboardPanelParam } from "@/lib/dashboard-panel";
 
 /** Always evaluate Supabase env + session at request time. */
@@ -182,7 +195,7 @@ export default async function DashboardPage({
 
   const transactions: DashboardTx[] = dataMode === "DEMO" ? demoTransactions : rawRowsMapped;
 
-  const syncKey = `${transactions.length}:${transactions[0]?.id ?? ""}:${transactions.at(-1)?.id ?? ""}`;
+  const syncKey = dashboardTransactionsSyncKey(transactions);
   const demoMode = dataMode === "DEMO" || demoPreferenceOn;
   const showDarkModeToggle = isDarkModeUiEnabled();
   const powensCloudEnabled = isPowensCloudConfigured();

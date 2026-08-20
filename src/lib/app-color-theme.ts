@@ -24,6 +24,24 @@ export const APP_COLOR_THEMES = [
     label: "Corail",
     description: "Énergie premium",
     swatch: "#fb7185"
+  },
+  {
+    id: "pearl",
+    label: "Gris perle",
+    description: "Neutre et lumineux",
+    swatch: "#94a3b8"
+  },
+  {
+    id: "mist",
+    label: "Gris clair",
+    description: "Minimal et très doux",
+    swatch: "#cbd5e1"
+  },
+  {
+    id: "sand",
+    label: "Sable",
+    description: "Beige très clair",
+    swatch: "#c6a36a"
   }
 ] as const;
 
@@ -35,7 +53,10 @@ const APP_THEME_COLOR_VALUES: Record<AppColorTheme, { light: string; darkBackgro
   emerald: { light: "#F5F5F7", darkBackground: "#03191f", darkChrome: "#0c5361" },
   sapphire: { light: "#F5F7FF", darkBackground: "#07152f", darkChrome: "#123f7a" },
   amethyst: { light: "#F8F5FF", darkBackground: "#1c1033", darkChrome: "#4c277a" },
-  coral: { light: "#FFF6F5", darkBackground: "#2a1119", darkChrome: "#74293d" }
+  coral: { light: "#FFF6F5", darkBackground: "#2a1119", darkChrome: "#74293d" },
+  pearl: { light: "#F6F7F9", darkBackground: "#121820", darkChrome: "#334155" },
+  mist: { light: "#F8FAFC", darkBackground: "#17202b", darkChrome: "#475569" },
+  sand: { light: "#FBF8F1", darkBackground: "#211B12", darkChrome: "#655136" }
 };
 
 export function parseAppColorTheme(value: string | null | undefined): AppColorTheme {

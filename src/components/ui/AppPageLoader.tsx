@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { clsx } from "clsx";
 
 type AppPageLoaderProps = {
@@ -9,7 +8,8 @@ type AppPageLoaderProps = {
 };
 
 /**
- * Écran de chargement plein viewport — même fond que le dashboard dark (dégradé teal).
+ * Écran de chargement autonome : aucun média externe ne doit pouvoir laisser
+ * un écran vide pendant l'hydratation ou sur une connexion mobile lente.
  */
 export function AppPageLoader({ message = "Chargement…", exiting = false }: AppPageLoaderProps) {
   return (
@@ -20,19 +20,20 @@ export function AppPageLoader({ message = "Chargement…", exiting = false }: Ap
       aria-busy={!exiting}
       aria-label={message}
     >
-      <div className="relative flex items-center justify-center">
-        <div
-          className="pointer-events-none absolute h-28 w-28 rounded-full bg-cyan-300/25 blur-2xl dark:bg-cyan-400/30"
-          aria-hidden
-        />
-        <Image
-          src="/icons/digitpro-icon.svg"
-          alt="DigitPro"
-          width={76}
-          height={76}
-          priority
-          className="relative drop-shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
-        />
+      <div className="app-launch-aurora" aria-hidden />
+      <div className="app-launch-loader">
+        <div className="app-launch-mark" aria-hidden>
+          <span className="app-launch-mark__core">D</span>
+          <span className="app-launch-mark__orbit" />
+          <span className="app-launch-mark__spark app-launch-mark__spark--one" />
+          <span className="app-launch-mark__spark app-launch-mark__spark--two" />
+        </div>
+        <p className="app-launch-brand">DIGITPRO</p>
+        <p className="app-launch-caption">Pilotage financier</p>
+        <div className="app-launch-progress" aria-hidden>
+          <span />
+        </div>
+        <p className="app-launch-message">{message}</p>
       </div>
     </div>
   );

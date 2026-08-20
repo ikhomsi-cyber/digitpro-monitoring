@@ -37,6 +37,30 @@ html[data-color-theme="coral"] {
   --app-page-light: #fff6f5;
 }
 
+html[data-color-theme="pearl"] {
+  --app-accent: #64748b;
+  --app-accent-deep: #334155;
+  --app-accent-soft: rgba(100, 116, 139, 0.11);
+  --app-accent-glow: rgba(100, 116, 139, 0.46);
+  --app-page-light: #f6f7f9;
+}
+
+html[data-color-theme="mist"] {
+  --app-accent: #94a3b8;
+  --app-accent-deep: #64748b;
+  --app-accent-soft: rgba(148, 163, 184, 0.12);
+  --app-accent-glow: rgba(148, 163, 184, 0.42);
+  --app-page-light: #f8fafc;
+}
+
+html[data-color-theme="sand"] {
+  --app-accent: #a67c43;
+  --app-accent-deep: #7c5a2d;
+  --app-accent-soft: rgba(166, 124, 67, 0.12);
+  --app-accent-glow: rgba(166, 124, 67, 0.45);
+  --app-page-light: #fbf8f1;
+}
+
 .dark {
   color-scheme: dark;
 }
@@ -105,6 +129,36 @@ html.dark[data-color-theme="coral"] {
   --pg-glow-3: rgba(251, 146, 60, 0.16);
 }
 
+html.dark[data-color-theme="pearl"] {
+  --pg-base: #121820;
+  --pg-grad-top: #334155;
+  --pg-grad-mid: #1f2937;
+  --pg-grad-bot: #121820;
+  --pg-glow-1: rgba(148, 163, 184, 0.23);
+  --pg-glow-2: rgba(203, 213, 225, 0.1);
+  --pg-glow-3: rgba(100, 116, 139, 0.18);
+}
+
+html.dark[data-color-theme="mist"] {
+  --pg-base: #17202b;
+  --pg-grad-top: #475569;
+  --pg-grad-mid: #263443;
+  --pg-grad-bot: #17202b;
+  --pg-glow-1: rgba(203, 213, 225, 0.2);
+  --pg-glow-2: rgba(148, 163, 184, 0.1);
+  --pg-glow-3: rgba(100, 116, 139, 0.16);
+}
+
+html.dark[data-color-theme="sand"] {
+  --pg-base: #211b12;
+  --pg-grad-top: #655136;
+  --pg-grad-mid: #3d301f;
+  --pg-grad-bot: #211b12;
+  --pg-glow-1: rgba(214, 181, 122, 0.2);
+  --pg-glow-2: rgba(251, 191, 36, 0.08);
+  --pg-glow-3: rgba(180, 140, 81, 0.16);
+}
+
 body {
   background-color: transparent;
   font-feature-settings: "ss01", "cv01", "cv11";
@@ -139,11 +193,15 @@ body {
 @layer components {
   /** Écran de lancement — même dégradé que le dashboard, edge-to-edge iOS (Dynamic Island + home bar). */
   .app-launch-screen {
-    @apply fixed z-[9999] flex items-center justify-center bg-ink-100;
+    @apply fixed z-[9999] flex items-center justify-center overflow-hidden;
     top: calc(-1 * env(safe-area-inset-top, 0px));
     right: 0;
     bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
     left: 0;
+    isolation: isolate;
+    background:
+      radial-gradient(58% 36% at 50% 42%, var(--app-accent-soft), transparent 72%),
+      var(--app-page-light);
     opacity: 1;
     visibility: visible;
     transition:
@@ -163,12 +221,149 @@ body {
     background-image: var(--pg-page-bg);
   }
 
+  .app-launch-aurora {
+    position: absolute;
+    width: min(92vw, 34rem);
+    aspect-ratio: 1;
+    border-radius: 999px;
+    opacity: 0.65;
+    background: radial-gradient(circle, var(--app-accent-glow) 0%, transparent 66%);
+    filter: blur(28px);
+    animation: app-launch-aurora 3.8s ease-in-out infinite;
+  }
+
+  .app-launch-loader {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: center;
+    width: min(20rem, calc(100vw - 3rem));
+    color: #0f172a;
+    text-align: center;
+  }
+
+  .dark .app-launch-loader {
+    color: rgba(255, 255, 255, 0.96);
+  }
+
+  .app-launch-mark {
+    position: relative;
+    display: grid;
+    width: 5.6rem;
+    height: 5.6rem;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--app-accent) 48%, transparent);
+    border-radius: 1.75rem;
+    background: linear-gradient(145deg, color-mix(in srgb, white 82%, var(--app-accent)) 0%, color-mix(in srgb, var(--app-accent) 12%, transparent) 100%);
+    box-shadow:
+      0 18px 44px color-mix(in srgb, var(--app-accent) 18%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  }
+
+  .dark .app-launch-mark {
+    border-color: color-mix(in srgb, var(--app-accent) 52%, transparent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--app-accent) 30%, #0a1824) 0%, rgba(255, 255, 255, 0.045) 100%);
+    box-shadow:
+      0 20px 56px color-mix(in srgb, var(--app-accent) 30%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .app-launch-mark__core {
+    font-family: var(--font-display);
+    font-size: 2.8rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.15em;
+    color: var(--app-accent-deep);
+  }
+
+  .dark .app-launch-mark__core {
+    color: color-mix(in srgb, var(--app-accent) 72%, white);
+  }
+
+  .app-launch-mark__orbit {
+    position: absolute;
+    inset: 0.58rem;
+    border: 2px solid transparent;
+    border-top-color: var(--app-accent);
+    border-right-color: color-mix(in srgb, var(--app-accent) 35%, transparent);
+    border-radius: 999px;
+    animation: app-launch-orbit 1.15s linear infinite;
+  }
+
+  .app-launch-mark__spark {
+    position: absolute;
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 999px;
+    background: var(--app-accent);
+    box-shadow: 0 0 14px var(--app-accent-glow);
+  }
+
+  .app-launch-mark__spark--one { top: 0.55rem; right: 1.18rem; }
+  .app-launch-mark__spark--two { bottom: 1.02rem; left: 0.58rem; opacity: 0.65; }
+
+  .app-launch-brand {
+    margin-top: 1.4rem;
+    font-size: 0.73rem;
+    font-weight: 800;
+    letter-spacing: 0.32em;
+  }
+
+  .app-launch-caption {
+    margin-top: 0.42rem;
+    font-size: 0.88rem;
+    font-weight: 500;
+    opacity: 0.62;
+  }
+
+  .app-launch-progress {
+    width: 8.5rem;
+    height: 0.25rem;
+    margin-top: 1.7rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 13%, transparent);
+  }
+
+  .app-launch-progress span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--app-accent-deep), var(--app-accent));
+    box-shadow: 0 0 16px var(--app-accent-glow);
+    animation: app-launch-progress 1.35s ease-in-out infinite;
+  }
+
+  .app-launch-message {
+    margin-top: 0.82rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.58;
+  }
+
+  @keyframes app-launch-orbit {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes app-launch-progress {
+    0% { transform: translateX(-125%); }
+    52%, 100% { transform: translateX(295%); }
+  }
+
+  @keyframes app-launch-aurora {
+    0%, 100% { transform: scale(0.88); opacity: 0.38; }
+    50% { transform: scale(1.12); opacity: 0.72; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .app-launch-screen {
       transition: none;
     }
-    .app-launch-screen .animate-launchLogo,
-    .app-launch-screen .animate-launchGlow {
+    .app-launch-aurora,
+    .app-launch-mark__orbit,
+    .app-launch-progress span {
       animation: none;
     }
   }

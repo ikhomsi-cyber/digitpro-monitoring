@@ -27,6 +27,8 @@ export const DERIVED_EXPENSE_BUCKETS = [
   "NDF",
   IK_CATEGORY_LABEL,
   "Repas d'affaire",
+  "Cadeau client",
+  "ANCV",
   "Repas dirigeant",
   "CESU",
   "Mobile et Internet",
@@ -60,8 +62,12 @@ function hiwayCategoryToBucket(hiway: ReturnType<typeof categorizeHiwayExpense>)
       return IK_CATEGORY_LABEL;
     case "CESU":
       return "CESU";
+    case "ANCV":
+      return "ANCV";
     case "Repas d’affaires":
       return "Repas d'affaire";
+    case "Cadeau client":
+      return "Cadeau client";
     case "Repas du dirigeant":
       return "Repas dirigeant";
     case "Abonnement Hiway":
@@ -105,7 +111,9 @@ export function deriveExpenseBucketFromStoredCategory(category: string): Derived
   if (mapped === IK_CATEGORY_LABEL) return IK_CATEGORY_LABEL;
   if (mapped === MUTUELLE_CATEGORY_LABEL) return MUTUELLE_CATEGORY_LABEL;
   if (mapped === "CESU") return "CESU";
+  if (mapped === "ANCV") return "ANCV";
   if (mapped === "Repas d'affaire") return "Repas d'affaire";
+  if (mapped === "Cadeau client") return "Cadeau client";
   if (mapped === "Repas dirigeant") return "Repas dirigeant";
   if (mapped === "Mobile et Internet") return "Mobile et Internet";
   if (mapped === ICLOUD_IA_STORE_CATEGORY_LABEL) return ICLOUD_IA_STORE_CATEGORY_LABEL;

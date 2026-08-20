@@ -3,7 +3,9 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 export const HIWAY_EXPENSE_CATEGORIES = [
   "Indemnités kilométriques",
   "CESU",
+  "ANCV",
   "Repas d’affaires",
+  "Cadeau client",
   "Abonnement Hiway",
   "Urssaf",
   "Mutuelle",
@@ -135,7 +137,9 @@ export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayEx
   const aliases: Array<[HiwayExpenseCategory, string[]]> = [
     ["Indemnités kilométriques", ["indemnites kilometriques", "travel expenses", "frais de voyage", "mileage", "note ik"]],
     ["CESU", ["cesu", "achat cesu", "ticket cesu", "cheque domicile", "chèque domicile", "domiserve", "up cesu", "bimpli cesu"]],
+    ["ANCV", ["ancv", "cheque vacances", "chèque vacances"]],
     ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
+    ["Cadeau client", ["cadeau client", "igraal"]],
     ["Abonnement Hiway", ["abonnement hiway"]],
     ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
     ["Mutuelle", ["mutuelle", "wemind", "we mind", "prevoyance", "prévoyance", "prevoyance collective", "prévoyance collective"]],
@@ -180,6 +184,9 @@ export function categorizeHiwayExpense(
   const mapped = mapHiwayExpenseCategory(tx.category);
 
   if (labelStartsWithDgfipTva(tx)) return "Paiement TVA";
+  // iGraal est une règle métier explicite : elle prime sur l'ancienne catégorie
+  // importée (« Repas d'affaires ») afin de conserver le classement Cadeau client.
+  if (source.includes("igraal") || source.includes("cadeau client")) return "Cadeau client";
   if (mapped === "Frais bancaires") return "Frais bancaires";
   if (mapped && mapped !== "Non catégorisé") return mapped;
   if (label.includes("dgfip")) return "Impôt";

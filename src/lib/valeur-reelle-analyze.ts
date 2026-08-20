@@ -442,7 +442,9 @@ export function isValeurReellePersonalChargeLine(bucket: DerivedExpenseBucket | 
     bucket === "NDF" ||
     bucket === "Indemnités kilométriques" ||
     bucket === "CESU" ||
+    bucket === "ANCV" ||
     bucket === "Repas d'affaire" ||
+    bucket === "Cadeau client" ||
     bucket === "Repas dirigeant" ||
     bucket === "Mutuelle" ||
     bucket === "iCloud IA Store"

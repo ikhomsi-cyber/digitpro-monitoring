@@ -9,6 +9,8 @@ import {
 describe("app color themes", () => {
   it("keeps supported themes and falls back safely", () => {
     expect(parseAppColorTheme("sapphire")).toBe("sapphire");
+    expect(parseAppColorTheme("pearl")).toBe("pearl");
+    expect(parseAppColorTheme("mist")).toBe("mist");
     expect(parseAppColorTheme("unknown")).toBe(DEFAULT_APP_COLOR_THEME);
     expect(parseAppColorTheme(null)).toBe(DEFAULT_APP_COLOR_THEME);
   });
