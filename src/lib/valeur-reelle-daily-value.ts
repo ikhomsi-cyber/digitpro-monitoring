@@ -11,7 +11,6 @@ import { summarizeNdfDigitProForMonth } from "@/lib/ndf-digitpro";
 import { indemniteKmPerWorkDayForAnnualDaysEur } from "@/lib/pluxee-commute-indemnity";
 import {
   analyzeValeurReelle,
-  applyFiscalDebtSafetyMargin,
   CSG_ON_BNC_RATE,
   type ValeurReelleCashTree,
   type ValeurReelleWaterfallBreakdownRow
@@ -79,14 +78,14 @@ function computeCsgPerDayOnTjm(
   personalPerDay: number
 ): number {
   const operatingPerDay = Math.max(0, tjmHt - digitProPerDay - personalPerDay);
-  return applyFiscalDebtSafetyMargin(round2(operatingPerDay * CSG_ON_BNC_RATE));
+  return round2(operatingPerDay * CSG_ON_BNC_RATE);
 }
 
 /**
  * Mois en cours — décomposition / jour sur base TJM :
  * - DigitPro facturés ÷ jours facturés du mois
  * - Frais perso = quote-part repas d'affaire du mois passé ÷ jours cochés (1 jour)
- * - CSG = 9,7 % (+ marge) × (TJM − DigitPro − frais perso)
+ * - CSG = 9,7 % × (TJM − DigitPro − frais perso)
  * - IR = impôt annuel réel/proratisé par le module Impôts (isolé, non déduit du retenu)
  * - BNC à verser = TJM − DigitPro − frais perso − IK − CSG
  * - Retenu = BNC + frais perso + IK

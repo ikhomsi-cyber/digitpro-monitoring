@@ -17,18 +17,8 @@ import {
 } from "@/lib/valeur-reelle-analyze";
 
 const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
-
-function isCsgExpenseLine(tx: DashboardTx): boolean {
-  const blob = `${tx.label ?? ""} ${tx.category ?? ""} ${tx.company ?? ""}`
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase();
-  return (
-    blob.includes("csg") ||
-    blob.includes("contribution sociale") ||
-    blob.includes("cotisation sociale")
-  );
-}
+/** Correction manuelle demandée sur la dette CSG calculée. */
+const CSG_DEBT_ADJUSTMENT_EUR = 1_000;
 
 export type DashboardHeroStats = {
   /**
@@ -123,7 +113,7 @@ function computeMomKpis(
       now: endPrevMonth
     }
   );
-  const prevDetteCsg = Math.max(0, prevAllTimeValueAnalysis.cashTree.csgEur);
+  const prevDetteCsg = Math.max(0, prevAllTimeValueAnalysis.cashTree.csgEur - CSG_DEBT_ADJUSTMENT_EUR);
   const prevDetteTva =
     Math.round(
       Math.max(0, prevAllTimeValueAnalysis.vatLiability.remainingVatEur) *
@@ -250,9 +240,7 @@ export function computeDashboardHeroStats(
   let depensesDigitProMoisEur = 0;
   let depensesPersoMoisEur = 0;
   let depensesQontoSasuMoisHtEur = 0;
-  const currentYearSasuTxs = filterDashboardTransactions(proTxs, { years: [currentYear] }, now).filter(
-    (tx) => !isCsgExpenseLine(tx)
-  );
+  const currentYearSasuTxs = filterDashboardTransactions(proTxs, { years: [currentYear] }, now);
   const currentYearMonthlyMetrics = computeDashboardMonthlyMetrics(
     currentYearSasuTxs,
     { years: [currentYear], kpiMode: "sasu" },
@@ -276,7 +264,7 @@ export function computeDashboardHeroStats(
   }
 
   const soldeQontoEur = resolveQontoBalanceEur(transactions, options.qontoLiveBalanceEur, "pro");
-  const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur);
+  const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur - CSG_DEBT_ADJUSTMENT_EUR);
   const detteTvaDepuisDebutEur =
     Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
     100;

@@ -50,12 +50,6 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
-export const FISCAL_DEBT_SAFETY_MARGIN_RATE = 0.01;
-
-export function applyFiscalDebtSafetyMargin(amountEur: number): number {
-  if (!Number.isFinite(amountEur) || amountEur <= 0) return amountEur;
-  return Math.round(amountEur * (1 + FISCAL_DEBT_SAFETY_MARGIN_RATE) * 100) / 100;
-}
 
 /** Recalcule la CSG pour un CA HT donné en conservant les réintégrations sociales du mois de référence. */
 export function computeCsgEurForCaFacture(
@@ -65,16 +59,13 @@ export function computeCsgEurForCaFacture(
   reference: Pick<ValeurReelleCashTree, "caFactureEur" | "csgEur">
 ): number {
   const refOperating = reference.caFactureEur - mandatoryFeesEur - personalChargesEur;
-  const refCsgCore =
-    reference.csgEur > 0
-      ? reference.csgEur / (1 + FISCAL_DEBT_SAFETY_MARGIN_RATE)
-      : 0;
+  const refCsgCore = reference.csgEur > 0 ? reference.csgEur : 0;
   const refBase = refCsgCore > 0 ? refCsgCore / CSG_ON_BNC_RATE : 0;
   const reintegrations = Math.max(0, refBase - Math.max(0, refOperating));
 
   const operating = caFactureEur - mandatoryFeesEur - personalChargesEur;
   const base = Math.max(0, operating + reintegrations);
-  return applyFiscalDebtSafetyMargin(Math.round(base * CSG_ON_BNC_RATE * 100) / 100);
+  return Math.round(base * CSG_ON_BNC_RATE * 100) / 100;
 }
 
 function fold(raw: string): string {
@@ -845,7 +836,7 @@ export function analyzeValeurReelle(
   const csgOperatingExpensesEur = mandatoryFeesEur + personalChargesEur;
   const csgOperatingResultEur = caFactureEur - csgOperatingExpensesEur;
   const csgBaseEur = Math.max(0, csgOperatingResultEur + csgSocialReintegrationsEur);
-  const csgEur = applyFiscalDebtSafetyMargin(Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100);
+  const csgEur = Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100;
   const bncRestantApresChargesEur = bncBrutEur;
   const periodIncomeTax = allocateIncomeTaxToPeriod({ years, month, months, now }, bncBrutEur);
   const impotEstimeEur = periodIncomeTax.amountEur;
