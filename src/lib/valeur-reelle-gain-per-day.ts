@@ -13,7 +13,7 @@ import {
 
 export type GainPerWorkDayEstimate = {
   gainPerDayEur: number;
-  /** Jours ouvrés cochés du mois passé — dénominateur du gain moyen. */
+  /** Jours ouvrés cochés du mois courant — dénominateur du gain moyen estimé. */
   workedDays: number;
   /** Clé `YYYY-MM` du mois passé utilisé pour le gain moyen. */
   gainAverageMonthKey: string;
@@ -27,6 +27,28 @@ export type GainPerWorkDayEstimate = {
 
 function gainEurFromCashTree(tree: ValeurReelleCashTree): number {
   return Math.max(0, tree.bncEur + tree.personalChargesEur);
+}
+
+function capGainToCa(gainEur: number, caHtEur: number): number {
+  if (caHtEur <= 0) return Math.max(0, gainEur);
+  return Math.min(Math.max(0, gainEur), caHtEur);
+}
+
+/**
+ * Le gain de l'activité ne peut pas dépasser le CA HT généré par jour.
+ * Les remboursements de frais ou sorties BNC peuvent être décalés dans le temps :
+ * ils restent visibles dans le cash disponible, mais ne gonflent pas le gain/jour.
+ */
+export function computeCappedGainPerWorkDay(
+  gainEur: number,
+  caHtEur: number,
+  workedDays: number
+): number {
+  if (!Number.isFinite(workedDays) || workedDays <= 0) return 0;
+  const gainPerDay = Math.max(0, gainEur) / workedDays;
+  const caHtPerDay = caHtEur > 0 ? caHtEur / workedDays : null;
+  const bounded = caHtPerDay == null ? gainPerDay : Math.min(gainPerDay, caHtPerDay);
+  return Math.round(bounded * 100) / 100;
 }
 
 function workedBillableDaysInMonth(
@@ -76,7 +98,7 @@ function computeHistoricalGainSignals(
   for (const monthKey of listPastMonthKeys(now)) {
     const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now });
     const caHt = analysis.cashTree.caFactureEur;
-    const gain = gainEurFromCashTree(analysis.cashTree);
+    const gain = capGainToCa(gainEurFromCashTree(analysis.cashTree), caHt);
     const workedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
     if (workedDays <= 0 || gain <= 0) continue;
 
@@ -116,7 +138,7 @@ export function estimateCurrentMonthGainPerWorkDay(
     now
   );
   const gainAverageWorkedDays =
-    previousMonthWorkedDays > 0 ? previousMonthWorkedDays : currentMonthWorkedDays;
+    currentMonthWorkedDays > 0 ? currentMonthWorkedDays : previousMonthWorkedDays;
 
   const actualGain = gainEurFromCashTree(cashTree);
   const caHt = cashTree.caFactureEur;
@@ -126,7 +148,7 @@ export function estimateCurrentMonthGainPerWorkDay(
   let usesHistoricalEstimate = false;
 
   if (history.marginPerCaHt != null && caHt > 0) {
-    const fromCa = Math.round(caHt * history.marginPerCaHt * 100) / 100;
+    const fromCa = Math.round(caHt * Math.min(1, history.marginPerCaHt) * 100) / 100;
     if (fromCa > estimatedGain) {
       estimatedGain = fromCa;
       usesHistoricalEstimate = true;
@@ -139,9 +161,13 @@ export function estimateCurrentMonthGainPerWorkDay(
     }
   }
 
+  if (caHt > 0) {
+    estimatedGain = Math.min(estimatedGain, caHt);
+  }
+
   if (gainAverageWorkedDays > 0) {
     return {
-      gainPerDayEur: Math.round((estimatedGain / gainAverageWorkedDays) * 100) / 100,
+      gainPerDayEur: computeCappedGainPerWorkDay(estimatedGain, caHt, gainAverageWorkedDays),
       workedDays: gainAverageWorkedDays,
       gainAverageMonthKey,
       currentMonthWorkedDays,
@@ -177,6 +203,19 @@ function billableDaysFromCaHt(caHt: number, tjmHt: number): number {
   return Math.round((caHt / tjmHt) * 10) / 10;
 }
 
+/**
+ * Les jours cochés sont la source principale, mais un encaissement peut couvrir
+ * davantage de jours que ceux déjà renseignés dans l'agenda. On ne doit jamais
+ * diviser le gain par moins de jours que le CA le permet au TJM configuré.
+ */
+export function resolveWorkedDaysForGain(
+  calendarWorkedDays: number,
+  caHtEur: number,
+  tjmHt: number
+): number {
+  return Math.max(Math.max(0, calendarWorkedDays), billableDaysFromCaHt(caHtEur, tjmHt));
+}
+
 function resolveGainDenominatorDays(
   transactions: readonly DashboardTx[],
   monthKey: string,
@@ -185,9 +224,6 @@ function resolveGainDenominatorDays(
   fallbackTjmHt: number,
   now: Date
 ): number {
-  const workedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
-  if (workedDays > 0) return workedDays;
-
   const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now });
   const tjmHt = resolveBillableTjmForClientMonth(
     billableRatePeriods,
@@ -195,7 +231,8 @@ function resolveGainDenominatorDays(
     monthKey,
     fallbackTjmHt
   );
-  return billableDaysFromCaHt(analysis.cashTree.caFactureEur, tjmHt);
+  const calendarWorkedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
+  return resolveWorkedDaysForGain(calendarWorkedDays, analysis.cashTree.caFactureEur, tjmHt);
 }
 
 function gainPerDayForMonth(
@@ -228,7 +265,7 @@ function gainPerDayForMonth(
     fallbackTjmHt,
     now
   );
-  return workedDays > 0 ? Math.round((gain / workedDays) * 100) / 100 : 0;
+  return computeCappedGainPerWorkDay(gain, analysis.cashTree.caFactureEur, workedDays);
 }
 
 /** Point mensuel — gain moyen / jour (sparkline Cash disponible). */

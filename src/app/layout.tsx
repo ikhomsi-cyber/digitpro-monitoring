@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import { AppLaunchOverlay } from "@/components/ui/AppLaunchOverlay";
 import { DARK_MODE_LOCAL_STORAGE_KEY } from "@/lib/dark-mode-flag";
 import { APP_LAUNCH_BG_LIGHT, APP_LAUNCH_BG_DARK, APP_THEME_COLOR_DARK } from "@/lib/app-launch-theme";
+import { APP_COLOR_THEME_STORAGE_KEY } from "@/lib/app-color-theme";
 
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export const viewport: Viewport = {
 };
 
 /** Inline script : privacy + thème + theme-color avant le premier paint (fond via CSS sur html). */
-const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');if(dark){d.classList.add('dark');d.style.backgroundColor='${APP_LAUNCH_BG_DARK}'}else{d.style.backgroundColor='${APP_LAUNCH_BG_LIGHT}'}var theme=dark?'${APP_THEME_COLOR_DARK}':'${APP_LAUNCH_BG_LIGHT}';d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=theme}else{m=document.createElement('meta');m.name='theme-color';m.content=theme;document.head.appendChild(m)}}catch(e){}`;
+const htmlBootstrap = `try{var d=document.documentElement;var dark=localStorage.getItem('${DARK_MODE_LOCAL_STORAGE_KEY}')==='1';var themes={emerald:['${APP_LAUNCH_BG_LIGHT}','${APP_LAUNCH_BG_DARK}','${APP_THEME_COLOR_DARK}'],sapphire:['#F5F7FF','#07152f','#123f7a'],amethyst:['#F8F5FF','#1c1033','#4c277a'],coral:['#FFF6F5','#2a1119','#74293d']};var c=localStorage.getItem('${APP_COLOR_THEME_STORAGE_KEY}');if(!themes[c])c='emerald';d.dataset.colorTheme=c;if(localStorage.getItem('privacyBlur')==='1')d.classList.add('privacy-blur');var palette=themes[c];if(dark){d.classList.add('dark');d.style.backgroundColor=palette[1]}else{d.style.backgroundColor=palette[0]}var theme=dark?palette[2]:palette[0];d.style.colorScheme=dark?'dark':'light';var m=document.querySelector('meta[name="theme-color"]');if(m){m.content=theme}else{m=document.createElement('meta');m.name='theme-color';m.content=theme;document.head.appendChild(m)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

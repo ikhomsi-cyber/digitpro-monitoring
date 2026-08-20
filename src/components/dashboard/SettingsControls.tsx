@@ -6,6 +6,8 @@ import { DashboardDataActionsMenu } from "@/components/dashboard/DashboardDataAc
 import { DashboardDummyDataToggle } from "@/components/dashboard/DashboardDummyDataToggle";
 import { useDashboardDummyData } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { DashboardHeaderProfile } from "@/components/dashboard/DashboardHeaderProfile";
+import { MobilePasskeySettings } from "@/components/MobilePasskeySettings";
+import { AppColorThemePicker } from "@/components/AppColorThemePicker";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
 type Props = {
@@ -87,6 +89,8 @@ export function SettingsControls({
         ) : null}
       </section>
 
+      {envMode === "SUPABASE" && userEmail ? <MobilePasskeySettings /> : null}
+
       {/* Préférences d’affichage */}
       <section className={cardClassName}>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
@@ -121,9 +125,7 @@ export function SettingsControls({
               <DashboardDummyDataToggle />
             </div>
           ) : null}
-          {!showDarkModeToggle && !showDummyDataToggle ? (
-            <p className="py-2 text-sm text-ink-500 dark:text-white/45">Aucune préférence disponible.</p>
-          ) : null}
+          <AppColorThemePicker />
         </div>
       </section>
 

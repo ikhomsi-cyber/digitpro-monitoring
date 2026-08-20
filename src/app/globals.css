@@ -6,6 +6,35 @@
   color-scheme: light;
   --font-sans: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Helvetica", Arial, sans-serif;
   --font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Helvetica", Arial, sans-serif;
+  --app-accent: #10b981;
+  --app-accent-deep: #059669;
+  --app-accent-soft: rgba(16, 185, 129, 0.1);
+  --app-accent-glow: rgba(16, 185, 129, 0.55);
+  --app-page-light: #f5f5f7;
+}
+
+html[data-color-theme="sapphire"] {
+  --app-accent: #0ea5e9;
+  --app-accent-deep: #2563eb;
+  --app-accent-soft: rgba(14, 165, 233, 0.11);
+  --app-accent-glow: rgba(14, 165, 233, 0.58);
+  --app-page-light: #f5f7ff;
+}
+
+html[data-color-theme="amethyst"] {
+  --app-accent: #8b5cf6;
+  --app-accent-deep: #6d28d9;
+  --app-accent-soft: rgba(139, 92, 246, 0.12);
+  --app-accent-glow: rgba(139, 92, 246, 0.58);
+  --app-page-light: #f8f5ff;
+}
+
+html[data-color-theme="coral"] {
+  --app-accent: #f43f5e;
+  --app-accent-deep: #be123c;
+  --app-accent-soft: rgba(244, 63, 94, 0.11);
+  --app-accent-glow: rgba(244, 63, 94, 0.56);
+  --app-page-light: #fff6f5;
 }
 
 .dark {
@@ -44,6 +73,36 @@ html.dark {
     );
   /* Fallback sous la home bar iOS = teinte basse du dégradé (évite le bandeau clair). */
   background-color: var(--pg-grad-bot);
+}
+
+html.dark[data-color-theme="sapphire"] {
+  --pg-base: #07152f;
+  --pg-grad-top: #123f7a;
+  --pg-grad-mid: #0b2655;
+  --pg-grad-bot: #07152f;
+  --pg-glow-1: rgba(56, 189, 248, 0.34);
+  --pg-glow-2: rgba(59, 130, 246, 0.2);
+  --pg-glow-3: rgba(99, 102, 241, 0.2);
+}
+
+html.dark[data-color-theme="amethyst"] {
+  --pg-base: #1c1033;
+  --pg-grad-top: #4c277a;
+  --pg-grad-mid: #2e1955;
+  --pg-grad-bot: #1c1033;
+  --pg-glow-1: rgba(167, 139, 250, 0.34);
+  --pg-glow-2: rgba(192, 132, 252, 0.18);
+  --pg-glow-3: rgba(129, 140, 248, 0.18);
+}
+
+html.dark[data-color-theme="coral"] {
+  --pg-base: #2a1119;
+  --pg-grad-top: #74293d;
+  --pg-grad-mid: #4a1a2a;
+  --pg-grad-bot: #2a1119;
+  --pg-glow-1: rgba(251, 113, 133, 0.3);
+  --pg-glow-2: rgba(244, 63, 94, 0.18);
+  --pg-glow-3: rgba(251, 146, 60, 0.16);
 }
 
 body {
@@ -116,7 +175,8 @@ body {
 
   /** Fond immersif dashboard — gris-bleu clair en light, teal en dark. */
   .premium-dashboard-page {
-    @apply bg-ink-100 transition-colors;
+    @apply transition-colors;
+    background-color: var(--app-page-light);
   }
   /**
    * Fond teal unifié pour toutes les sections (dashboard, activité, SASU, etc.).
@@ -201,13 +261,14 @@ body {
 
   .premium-cta {
     @apply rounded-full px-8 py-3.5 text-sm font-semibold text-white shadow-lg transition;
-    background: linear-gradient(135deg, #34d399 0%, #10b981 45%, #059669 100%);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 72%, white) 0%, var(--app-accent) 45%, var(--app-accent-deep) 100%);
   }
   .premium-cta:hover {
     filter: brightness(1.07);
   }
   .premium-cta:focus-visible {
-    @apply outline-none ring-2 ring-emerald-300/80 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
+    @apply outline-none ring-2 ring-offset-2 ring-offset-white dark:ring-offset-[#050505];
+    --tw-ring-color: var(--app-accent-glow);
   }
   .surface-card {
     @apply rounded-2xl border border-ink-200 bg-white dark:border-cyan-100/[0.12] dark:bg-[#0b3038];
@@ -224,7 +285,12 @@ body {
 
   /** Pill primary button — premium emerald CTA */
   .btn-primary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:focus-visible:ring-offset-[#06242b];
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#06242b];
+    background: linear-gradient(135deg, var(--app-accent), var(--app-accent-deep));
+    --tw-ring-color: var(--app-accent-glow);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
   }
   /** Pill secondary button (white pill / subtle dark) */
   .btn-secondary {

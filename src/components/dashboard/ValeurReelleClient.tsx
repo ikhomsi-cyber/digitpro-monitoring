@@ -709,7 +709,9 @@ function CashAvailableCard({
   const netDisponiblePctCa =
     tree.caFactureEur > 0 ? Math.round((netDisponibleReel / tree.caFactureEur) * 1000) / 10 : null;
   const reelParJour = isCurrentMonthEstimate
-    ? gainPerWorkDayEstimate.gainPerDayEur
+    ? typeof currentMonthDailyNetPerDay === "number" && currentMonthDailyNetPerDay >= 0
+      ? currentMonthDailyNetPerDay
+      : gainPerWorkDayEstimate.gainPerDayEur
     : gainDayDenominator > 0
       ? Math.round((netDisponibleReel / gainDayDenominator) * 100) / 100
       : null;
@@ -800,7 +802,7 @@ function DailyValueBlock({
     breakdown.workedDays > 0
       ? breakdown.isEstimate
         ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. facturés`
-        : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. cochés`
+        : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. retenus`
       : (breakdown.estimateNote ?? "estimation");
 
   const fraisPersoPerDay =
@@ -1161,18 +1163,24 @@ function computeValeurReelleViewModel(input: {
   }).vatRecoverableMonthlyRows;
   const vatSavingsKpis = computeVatSavingsKpis(vatYearMonthlyRows, { referenceMonthKey: singleMonth });
 
-  const tjmHt = billableTjmHt;
+  const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
+  const tjmHtForPeriod = resolveBillableTjmForClientMonth(
+    billableRatePeriods,
+    billableRatePeriods[0]?.clientName ?? "",
+    monthKey,
+    billableTjmHt
+  );
   const calendarWorkedDays = countAgendaWorkDaysForFilter(billableSelected, {
     years: selectedYears,
     month: singleMonth,
     months: selectedMonthsForYears.length ? selectedMonthsForYears : null
   });
+  const inferredBilledDays =
+    tjmHtForPeriod > 0
+      ? Math.round((analysis.cashTree.caFactureEur / tjmHtForPeriod) * 10) / 10
+      : 0;
   const billableDaysInPeriod =
-    calendarWorkedDays > 0
-      ? calendarWorkedDays
-      : Number.isFinite(tjmHt) && tjmHt > 0
-        ? Math.round((analysis.cashTree.caFactureEur / tjmHt) * 10) / 10
-        : 0;
+    Math.max(calendarWorkedDays, inferredBilledDays);
 
   const gainPerWorkDayEstimate = singleMonth
     ? estimateCurrentMonthGainPerWorkDay(
@@ -1190,14 +1198,6 @@ function computeValeurReelleViewModel(input: {
     12,
     new Date(),
     billableRatePeriods,
-    billableTjmHt
-  );
-
-  const monthKey = singleMonth ?? dashboardMonthKeyNowLocal();
-  const tjmHtForPeriod = resolveBillableTjmForClientMonth(
-    billableRatePeriods,
-    billableRatePeriods[0]?.clientName ?? "",
-    monthKey,
     billableTjmHt
   );
 
@@ -1394,28 +1394,51 @@ export function ValeurReelleClient({
 
   const showSkeleton = viewModel === null;
 
-  const currentMonthProjection: ValeurReelleCurrentMonthProjectionInput | null =
-    singleMonth && singleMonth === dashboardMonthKeyNowLocal()
-      ? {
-          monthKey: singleMonth,
-          transactions,
-          billableSelected,
-          billableRatePeriods,
-          fallbackTjmHt: billableTjmHt
-        }
-      : null;
+  // Le graphique reste une série glissante, même lorsqu'un filtre annuel est actif.
+  // Calcule donc août isolément pour éviter qu'il reprenne une estimation basée sur
+  // le cumul de l'année sélectionnée.
+  const currentMonthKey = dashboardMonthKeyNowLocal();
+  const currentMonthProjection = useMemo<ValeurReelleCurrentMonthProjectionInput>(
+    () => ({
+      monthKey: currentMonthKey,
+      transactions,
+      billableSelected,
+      billableRatePeriods,
+      fallbackTjmHt: billableTjmHt
+    }),
+    [billableRatePeriods, billableSelected, billableTjmHt, currentMonthKey, transactions]
+  );
 
   const currentMonthDailyBreakdown = useMemo(() => {
-    if (!viewModel || !currentMonthProjection) return null;
-    const { analysis, tjmHtForPeriod, billableDaysInPeriod, gainPerWorkDayEstimate } = viewModel;
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: currentMonthKey });
+    const tjmHt = resolveBillableTjmForClientMonth(
+      billableRatePeriods,
+      billableRatePeriods[0]?.clientName ?? "",
+      currentMonthKey,
+      billableTjmHt
+    );
+    const billableDays = countAgendaWorkDaysForFilter(billableSelected, {
+      years: [Number(currentMonthKey.slice(0, 4))],
+      month: currentMonthKey,
+      months: null
+    });
     return computeValeurReelleDailyBreakdown({
       tree: analysis.cashTree,
-      tjmHt: tjmHtForPeriod,
-      billableDays: billableDaysInPeriod,
-      gainPerWorkDayEstimate,
+      tjmHt,
+      billableDays,
       currentMonthProjection
     });
-  }, [viewModel, currentMonthProjection]);
+  }, [
+    billableRatePeriods,
+    billableSelected,
+    billableTjmHt,
+    currentMonthKey,
+    currentMonthProjection,
+    transactions
+  ]);
+
+  const currentMonthProjectionForSelectedPeriod =
+    singleMonth === currentMonthKey ? currentMonthProjection : null;
 
   const periodFilter = (
     <DashboardInsightPeriodFilter
@@ -1488,7 +1511,7 @@ export function ValeurReelleClient({
             tjmHt={tjmHtForPeriod}
             billableDays={billableDaysInPeriod}
             gainPerWorkDayEstimate={gainPerWorkDayEstimate}
-            currentMonthProjection={currentMonthProjection}
+            currentMonthProjection={currentMonthProjectionForSelectedPeriod}
           />
           <FinancialAllocationBlock tree={tree} fmt={fmt} tjmHt={caEncashmentTjmHt} />
         </div>
