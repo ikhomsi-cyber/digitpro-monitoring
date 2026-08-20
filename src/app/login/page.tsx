@@ -50,25 +50,23 @@ export default function LoginPage() {
       </aside>
 
       {/* ───────────── FORM PANEL ──────────────────────────────── */}
-      <main className="flex flex-col px-6 py-10 sm:px-12 lg:px-16">
-        {/* Mobile-only mini brand bar */}
-        <div className="lg:hidden">
-          <Logo />
-        </div>
+      <main className="relative flex flex-col overflow-hidden px-6 py-8 sm:px-12 lg:px-16">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl lg:hidden" />
 
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-10">
-          {/* Mobile-only big logo (split screen invisible on mobile) */}
-          <div className="mb-10 lg:hidden">
+        <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-8 sm:py-10">
+          <div className="mb-9 lg:hidden">
             <Logo hero tagline="Pilotage financier moderne pour freelances et SASU." />
           </div>
 
           <div className="text-center lg:text-left">
-            <div className="h-eyebrow">Bienvenue</div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> Connexion sécurisée
+            </div>
             <h1 className="mt-2 font-display text-4xl font-semibold leading-[1.05] tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
-              Se connecter.
+              Bon retour.
             </h1>
             <p className="mt-3 text-base text-ink-600 dark:text-white/55">
-              Accédez à votre dashboard sécurisé.
+              Retrouvez vos indicateurs financiers en quelques secondes.
             </p>
           </div>
 
@@ -89,7 +87,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <footer className="mx-auto mt-6 w-full max-w-sm text-center text-xs text-ink-500 dark:text-white/40 lg:hidden">
+        <footer className="relative mx-auto mt-6 w-full max-w-md text-center text-xs text-ink-500 dark:text-white/40 lg:hidden">
           © {new Date().getFullYear()} DigitPro · Iliass KHOMSI
         </footer>
       </main>

@@ -7,6 +7,11 @@ import { getSupabaseEnv } from "./config";
 export function createSupabaseBrowserClient() {
   const env = getSupabaseEnv();
   if (!env) return null;
-  return createBrowserClient<Database>(env.url, env.anonKey);
+  return createBrowserClient<Database>(env.url, env.anonKey, {
+    auth: {
+      experimental: {
+        passkey: true
+      }
+    }
+  });
 }
-

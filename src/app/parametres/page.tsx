@@ -19,6 +19,7 @@ import {
   powensPrimaryImportAxis
 } from "@/lib/powens/config";
 import { ParametresClient, type BillableRatePeriod } from "./ParametresClient";
+import { MobilePasskeySettings } from "@/components/MobilePasskeySettings";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,8 @@ export default async function ParametresPage() {
             powensPersonalSyncEnabled={powensPersonalSyncEnabled}
             powensPrimaryImportAxis={powensPrimaryAxis}
           />
+
+          {envMode === "SUPABASE" && user ? <MobilePasskeySettings /> : null}
 
           <section>
             <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-[0.2em] text-ink-500 dark:text-white/45">
