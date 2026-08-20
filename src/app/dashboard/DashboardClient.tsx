@@ -31,8 +31,7 @@ import {
 } from "@/components/dashboard/HiwayInvoicesContext";
 import {
   additionalCsgFromInvoiceCaHt,
-  localMonthKey,
-  sumHiwayInvoiceHtForMonth
+  sumOutstandingHiwayInvoiceHt
 } from "@/lib/hiway-invoice-aggregate";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
@@ -291,27 +290,24 @@ export function DashboardClient({
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   /** Factures Hiway (partagées avec le graphique « Jours facturés » et le bloc Factures). */
   const hiwayInvoicesState = useHiwayInvoicesState(!demoMode);
-  /**
-   * CSG additionnel issu des factures Hiway émises sur le mois civil en cours :
-   * le montant facturé est compté comme CA HT supplémentaire (taux CSG appliqué tel quel).
-   */
-  const additionalCsgEur = useMemo(
+  /** CSG à provisionner sur toutes les factures Hiway émises mais pas encore encaissées. */
+  const outstandingInvoiceCsgEur = useMemo(
     () =>
       additionalCsgFromInvoiceCaHt(
-        sumHiwayInvoiceHtForMonth(hiwayInvoicesState.invoices, localMonthKey())
+        sumOutstandingHiwayInvoiceHt(hiwayInvoicesState.invoices, transactions)
       ),
-    [hiwayInvoicesState.invoices]
+    [hiwayInvoicesState.invoices, transactions]
   );
   const displayHeroStats = useMemo<DashboardHeroStats>(() => {
-    if (additionalCsgEur <= 0) return currentHeroStats;
+    if (outstandingInvoiceCsgEur <= 0) return currentHeroStats;
     return {
       ...currentHeroStats,
       detteCsgDepuisDebutEur:
-        Math.round((currentHeroStats.detteCsgDepuisDebutEur + additionalCsgEur) * 100) / 100,
+        Math.round((currentHeroStats.detteCsgDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100,
       detteTotaleDepuisDebutEur:
-        Math.round((currentHeroStats.detteTotaleDepuisDebutEur + additionalCsgEur) * 100) / 100
+        Math.round((currentHeroStats.detteTotaleDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100
     };
-  }, [currentHeroStats, additionalCsgEur]);
+  }, [currentHeroStats, outstandingInvoiceCsgEur]);
   /** Dette nette / KPIs fiscaux : masqués tant que l’historique complet n’est pas chargé. */
   const [heroStatsReady, setHeroStatsReady] = useState(
     () => !syncFullHistoryOnMount || demoMode
