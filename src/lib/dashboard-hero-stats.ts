@@ -18,7 +18,7 @@ import {
 
 const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
 /** Correction manuelle demandée sur la dette CSG calculée. */
-const CSG_DEBT_ADJUSTMENT_EUR = 1_000;
+const CSG_DEBT_ADJUSTMENT_EUR = 1_200;
 
 export type DashboardHeroStats = {
   /**

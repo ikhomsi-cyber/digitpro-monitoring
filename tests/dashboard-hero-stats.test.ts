@@ -16,10 +16,10 @@ function revenue(amount: number): DashboardTx {
 }
 
 describe("computeDashboardHeroStats", () => {
-  it("applique la correction CSG fixe de 1 000 € sans produire de dette négative", () => {
+  it("applique la correction CSG fixe de 1 200 € sans produire de dette négative", () => {
     const now = new Date(2026, 7, 20);
 
-    expect(computeDashboardHeroStats([revenue(24_000)], now).detteCsgDepuisDebutEur).toBe(940);
+    expect(computeDashboardHeroStats([revenue(24_000)], now).detteCsgDepuisDebutEur).toBe(740);
     expect(computeDashboardHeroStats([revenue(1_200)], now).detteCsgDepuisDebutEur).toBe(0);
   });
 });
