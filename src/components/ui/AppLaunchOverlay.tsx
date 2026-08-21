@@ -3,12 +3,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AppPageLoader } from "@/components/ui/AppPageLoader";
+import {
+  DASHBOARD_READY_DATASET,
+  DASHBOARD_READY_EVENT,
+  DASHBOARD_TRANSITION_DATASET,
+  DASHBOARD_TRANSITION_START_EVENT
+} from "@/lib/dashboard-transition";
 
 const MIN_VISIBLE_MS = 560;
 const FADE_MS = 480;
-const DASHBOARD_READY_EVENT = "digitpro:dashboard-ready";
-const DASHBOARD_READY_DATASET = "digitproDashboardReady";
-const DASHBOARD_TRANSITION_DATASET = "digitproDashboardTransition";
 const MAX_DASHBOARD_WAIT_MS = 6_000;
 
 /**
@@ -20,6 +23,15 @@ export function AppLaunchOverlay() {
   const pathname = usePathname() ?? "";
   const [phase, setPhase] = useState<"visible" | "fading" | "hidden">("visible");
   const previousPathname = useRef(pathname);
+
+  // La connexion déclenche cet événement avant router.push/replace. Le CSS
+  // bloque déjà l'app-shell à ce stade ; ce composant prend ensuite le relais
+  // avec le loader premium dès le prochain rendu React.
+  useEffect(() => {
+    const showLoader = () => setPhase("visible");
+    window.addEventListener(DASHBOARD_TRANSITION_START_EVENT, showLoader);
+    return () => window.removeEventListener(DASHBOARD_TRANSITION_START_EVENT, showLoader);
+  }, []);
 
   // Après la connexion, Next remplace la page sans remonter le layout racine.
   // Bloque l'app-shell avant le paint : même un loading.tsx qui se démonte vite

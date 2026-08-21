@@ -187,12 +187,74 @@ body {
 
 /* Évite tout flash du dashboard entre le loading de route et le splash global. */
 .app-shell {
-  transition: opacity 0.32s ease-out;
+  transition: opacity 0.32s ease-out, visibility 0s linear 0.32s;
 }
 
 html[data-digitpro-dashboard-transition="loading"] .app-shell {
   pointer-events: none;
   opacity: 0;
+}
+
+/*
+ * Filet de sécurité sans JavaScript : l'attribut est écrit synchroniquement
+ * avant la navigation depuis la connexion. Il protège donc aussi le tout
+ * premier paint du dashboard, avant que le splash React soit remonté.
+ */
+html[data-digitpro-dashboard-transition]::before {
+  position: fixed;
+  z-index: 9998;
+  top: calc(-1 * env(safe-area-inset-top, 0px));
+  right: 0;
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+  left: 0;
+  content: "";
+  pointer-events: all;
+  opacity: 1;
+  background:
+    radial-gradient(58% 36% at 50% 42%, var(--app-accent-soft), transparent 72%),
+    var(--app-page-light);
+  transition: opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.48s;
+}
+
+html[data-digitpro-dashboard-transition]::after {
+  position: fixed;
+  z-index: 9998;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 5.6rem;
+  height: 5.6rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--app-accent) 32%, transparent);
+  border-radius: 1.75rem;
+  content: "D";
+  color: var(--app-accent);
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 1;
+  background: color-mix(in srgb, var(--app-accent-soft) 88%, transparent);
+  box-shadow: 0 18px 60px -24px var(--app-accent-glow);
+  transform: translate(-50%, -50%);
+  animation: dashboard-transition-mark 1.2s ease-in-out infinite;
+  transition: opacity 0.32s ease-out;
+}
+
+html.dark[data-digitpro-dashboard-transition]::before {
+  background:
+    radial-gradient(58% 36% at 50% 42%, var(--app-accent-soft), transparent 72%),
+    var(--pg-grad-bot);
+}
+
+html[data-digitpro-dashboard-transition="revealing"]::before,
+html[data-digitpro-dashboard-transition="revealing"]::after {
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+@keyframes dashboard-transition-mark {
+  50% { transform: translate(-50%, -50%) scale(1.06); }
 }
 
 * {

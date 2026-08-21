@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { ArrowRight, Eye, EyeOff, KeyRound, LoaderCircle, Mail } from "lucide-react";
 import { getSafeAuthRedirect } from "@/lib/auth-redirect";
+import { beginDashboardTransition } from "@/lib/dashboard-transition";
 import { PasskeyLoginButton } from "@/components/PasskeyLoginButton";
 
 type Mode = "login" | "signup";
@@ -87,6 +88,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         toast.success("Compte créé", { description: email });
       }
 
+      beginDashboardTransition();
       router.push(next);
       router.refresh();
     });

@@ -5,6 +5,7 @@ import { Fingerprint, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { beginDashboardTransition } from "@/lib/dashboard-transition";
 
 function hasMobilePasskeySupport(): boolean {
   return (
@@ -53,6 +54,7 @@ export function PasskeyLoginButton({ nextPath }: { nextPath: string }) {
     }
 
     toast.success("Connexion sécurisée");
+    beginDashboardTransition();
     router.replace(nextPath);
     router.refresh();
   }
