@@ -185,6 +185,16 @@ body {
   background-image: var(--pg-page-bg);
 }
 
+/* Évite tout flash du dashboard entre le loading de route et le splash global. */
+.app-shell {
+  transition: opacity 0.32s ease-out;
+}
+
+html[data-digitpro-dashboard-transition="loading"] .app-shell {
+  pointer-events: none;
+  opacity: 0;
+}
+
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

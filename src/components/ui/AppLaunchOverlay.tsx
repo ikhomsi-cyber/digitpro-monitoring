@@ -8,6 +8,7 @@ const MIN_VISIBLE_MS = 560;
 const FADE_MS = 480;
 const DASHBOARD_READY_EVENT = "digitpro:dashboard-ready";
 const DASHBOARD_READY_DATASET = "digitproDashboardReady";
+const DASHBOARD_TRANSITION_DATASET = "digitproDashboardTransition";
 const MAX_DASHBOARD_WAIT_MS = 6_000;
 
 /**
@@ -21,16 +22,20 @@ export function AppLaunchOverlay() {
   const previousPathname = useRef(pathname);
 
   // Après la connexion, Next remplace la page sans remonter le layout racine.
-  // Réactive donc le splash avant le paint de /dashboard, pas après : le contenu
-  // de l'ancien écran ne peut pas apparaître entre deux frames.
+  // Bloque l'app-shell avant le paint : même un loading.tsx qui se démonte vite
+  // ne peut pas laisser entrevoir les filtres mensuels.
   useLayoutEffect(() => {
-    const enteringDashboard =
-      pathname.startsWith("/dashboard") && !previousPathname.current.startsWith("/dashboard");
+    const isDashboard = pathname.startsWith("/dashboard");
+    const enteringDashboard = isDashboard && !previousPathname.current.startsWith("/dashboard");
     previousPathname.current = pathname;
-    if (!enteringDashboard) return;
+    if (!isDashboard) {
+      delete document.documentElement.dataset[DASHBOARD_TRANSITION_DATASET];
+      return;
+    }
 
     delete document.documentElement.dataset[DASHBOARD_READY_DATASET];
-    setPhase("visible");
+    document.documentElement.dataset[DASHBOARD_TRANSITION_DATASET] = "loading";
+    if (enteringDashboard) setPhase("visible");
   }, [pathname]);
 
   useEffect(() => {
@@ -45,6 +50,9 @@ export function AppLaunchOverlay() {
     const startFadeOut = () => {
       if (cancelled || fadeStarted) return;
       fadeStarted = true;
+      if (isDashboard) {
+        document.documentElement.dataset[DASHBOARD_TRANSITION_DATASET] = "revealing";
+      }
       const wait = Math.max(0, minShownUntil - Date.now());
       fadeTimer = window.setTimeout(() => {
         if (cancelled) return;
