@@ -62,6 +62,9 @@ export function AppLaunchOverlay() {
     const startFadeOut = () => {
       if (cancelled || fadeStarted) return;
       fadeStarted = true;
+      if (isDashboard) {
+        document.documentElement.dataset[DASHBOARD_TRANSITION_DATASET] = "revealing";
+      }
       const wait = Math.max(0, minShownUntil - Date.now());
       fadeTimer = window.setTimeout(() => {
         if (cancelled) return;
@@ -101,17 +104,9 @@ export function AppLaunchOverlay() {
 
   useEffect(() => {
     if (phase !== "fading") return;
-    const timer = window.setTimeout(() => {
-      // Le dashboard reste à opacity:0 pendant tout le fondu du loader.
-      // Sans cela, Safari peut révéler une ligne de filtres avant le reste de
-      // la mise en page, surtout dans la web-app iOS.
-      if (pathname.startsWith("/dashboard")) {
-        document.documentElement.dataset[DASHBOARD_TRANSITION_DATASET] = "revealing";
-      }
-      setPhase("hidden");
-    }, FADE_MS);
+    const timer = window.setTimeout(() => setPhase("hidden"), FADE_MS);
     return () => window.clearTimeout(timer);
-  }, [pathname, phase]);
+  }, [phase]);
 
   if (phase === "hidden") return null;
 
