@@ -1,47 +1,91 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AppPageLoader } from "@/components/ui/AppPageLoader";
 
-const MIN_VISIBLE_MS = 380;
+const MIN_VISIBLE_MS = 560;
 const FADE_MS = 480;
+const DASHBOARD_READY_EVENT = "digitpro:dashboard-ready";
+const DASHBOARD_READY_DATASET = "digitproDashboardReady";
+const MAX_DASHBOARD_WAIT_MS = 6_000;
 
 /**
- * Splash unique au premier paint — reste monté dans le layout pour éviter
- * les écrans de chargement empilés (root + route loading.tsx).
+ * Splash unique au premier paint. Sur le dashboard, il reste opaque jusqu'à
+ * ce que le contenu client ait été peint au moins une fois : évite de révéler
+ * brièvement les filtres mensuels pendant le chargement post-connexion.
  */
 export function AppLaunchOverlay() {
+  const pathname = usePathname() ?? "";
   const [phase, setPhase] = useState<"visible" | "fading" | "hidden">("visible");
+  const previousPathname = useRef(pathname);
+
+  // Après la connexion, Next remplace la page sans remonter le layout racine.
+  // Réactive donc le splash avant le paint de /dashboard, pas après : le contenu
+  // de l'ancien écran ne peut pas apparaître entre deux frames.
+  useLayoutEffect(() => {
+    const enteringDashboard =
+      pathname.startsWith("/dashboard") && !previousPathname.current.startsWith("/dashboard");
+    previousPathname.current = pathname;
+    if (!enteringDashboard) return;
+
+    delete document.documentElement.dataset[DASHBOARD_READY_DATASET];
+    setPhase("visible");
+  }, [pathname]);
 
   useEffect(() => {
     if (phase !== "visible") return;
 
     let cancelled = false;
+    let fadeTimer: number | undefined;
+    let safetyTimer: number | undefined;
+    let fadeStarted = false;
     const minShownUntil = Date.now() + MIN_VISIBLE_MS;
 
     const startFadeOut = () => {
+      if (cancelled || fadeStarted) return;
+      fadeStarted = true;
       const wait = Math.max(0, minShownUntil - Date.now());
-      window.setTimeout(() => {
+      fadeTimer = window.setTimeout(() => {
         if (cancelled) return;
         requestAnimationFrame(() => {
           if (cancelled) return;
           setPhase("fading");
-          window.setTimeout(() => {
-            if (!cancelled) setPhase("hidden");
-          }, FADE_MS);
         });
       }, wait);
     };
 
-    if (document.readyState === "complete") {
-      startFadeOut();
+    const isDashboard = pathname.startsWith("/dashboard");
+    const onDashboardReady = () => startFadeOut();
+
+    if (isDashboard) {
+      window.addEventListener(DASHBOARD_READY_EVENT, onDashboardReady, { once: true });
+      if (document.documentElement.dataset[DASHBOARD_READY_DATASET] === "1") {
+        startFadeOut();
+      }
+      // Une erreur d'hydratation ne doit jamais bloquer l'application derrière le splash.
+      safetyTimer = window.setTimeout(startFadeOut, MAX_DASHBOARD_WAIT_MS);
     } else {
-      window.addEventListener("load", startFadeOut, { once: true });
+      if (document.readyState === "complete") {
+        startFadeOut();
+      } else {
+        window.addEventListener("load", startFadeOut, { once: true });
+      }
     }
 
     return () => {
       cancelled = true;
+      if (fadeTimer != null) window.clearTimeout(fadeTimer);
+      if (safetyTimer != null) window.clearTimeout(safetyTimer);
+      window.removeEventListener(DASHBOARD_READY_EVENT, onDashboardReady);
+      window.removeEventListener("load", startFadeOut);
     };
+  }, [pathname, phase]);
+
+  useEffect(() => {
+    if (phase !== "fading") return;
+    const timer = window.setTimeout(() => setPhase("hidden"), FADE_MS);
+    return () => window.clearTimeout(timer);
   }, [phase]);
 
   if (phase === "hidden") return null;

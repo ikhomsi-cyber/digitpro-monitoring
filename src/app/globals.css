@@ -204,9 +204,7 @@ body {
       var(--app-page-light);
     opacity: 1;
     visibility: visible;
-    transition:
-      opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1),
-      visibility 0.48s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: opacity;
   }
 
@@ -214,6 +212,9 @@ body {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
+    transition:
+      opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s linear 0.48s;
   }
 
   .dark .app-launch-screen {

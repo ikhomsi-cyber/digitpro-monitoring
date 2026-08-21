@@ -376,6 +376,22 @@ export function DashboardClient({
 
   const showPullIndicator = pullRefreshEnabled && (isPulling || isRefreshing);
 
+  // Le splash global attend ce signal avant son fondu. Deux frames garantissent
+  // que le dashboard (dont les filtres mensuels) est réellement peint.
+  useEffect(() => {
+    let secondFrame: number | undefined;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        document.documentElement.dataset.digitproDashboardReady = "1";
+        window.dispatchEvent(new Event("digitpro:dashboard-ready"));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame != null) cancelAnimationFrame(secondFrame);
+    };
+  }, []);
+
   useEffect(() => {
     fullHistorySyncedRef.current = false;
     setTransactions(initialTransactions);
