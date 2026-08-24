@@ -11,6 +11,7 @@ describe("app color themes", () => {
     expect(parseAppColorTheme("sapphire")).toBe("sapphire");
     expect(parseAppColorTheme("pearl")).toBe("pearl");
     expect(parseAppColorTheme("mist")).toBe("mist");
+    expect(parseAppColorTheme("cloud")).toBe("cloud");
     expect(parseAppColorTheme("unknown")).toBe(DEFAULT_APP_COLOR_THEME);
     expect(parseAppColorTheme(null)).toBe(DEFAULT_APP_COLOR_THEME);
   });

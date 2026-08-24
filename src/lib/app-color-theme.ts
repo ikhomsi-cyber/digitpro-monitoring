@@ -38,6 +38,12 @@ export const APP_COLOR_THEMES = [
     swatch: "#cbd5e1"
   },
   {
+    id: "cloud",
+    label: "Gris nuage",
+    description: "Très clair, presque blanc",
+    swatch: "#e5e7eb"
+  },
+  {
     id: "sand",
     label: "Sable",
     description: "Beige très clair",
@@ -56,6 +62,7 @@ const APP_THEME_COLOR_VALUES: Record<AppColorTheme, { light: string; darkBackgro
   coral: { light: "#FFF6F5", darkBackground: "#2a1119", darkChrome: "#74293d" },
   pearl: { light: "#F6F7F9", darkBackground: "#121820", darkChrome: "#334155" },
   mist: { light: "#F8FAFC", darkBackground: "#17202b", darkChrome: "#475569" },
+  cloud: { light: "#FCFCFD", darkBackground: "#1b1e23", darkChrome: "#5b6470" },
   sand: { light: "#FBF8F1", darkBackground: "#211B12", darkChrome: "#655136" }
 };
 
