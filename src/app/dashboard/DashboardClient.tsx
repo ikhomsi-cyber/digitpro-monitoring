@@ -34,7 +34,6 @@ import {
   sumOutstandingHiwayInvoiceHt
 } from "@/lib/hiway-invoice-aggregate";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
-import { DashboardPeriodFilterSection } from "@/components/dashboard/DashboardPeriodFilterSection";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { PullToRefreshIndicator } from "@/components/categorisation/PullToRefreshIndicator";
 import { useDashboardRemoteRefresh } from "@/hooks/useDashboardRemoteRefresh";
@@ -42,7 +41,10 @@ import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { BncPaymentHistoryCard } from "@/components/dashboard/BncPaymentHistoryCard";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
-import { RevolutInsightsSection } from "@/components/dashboard/RevolutInsightsSection";
+import {
+  PersonalExpensesInsightCard,
+  RevolutInsightsSection
+} from "@/components/dashboard/RevolutInsightsSection";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
 import { RevenueAllocationChart } from "@/components/dashboard/RevenueAllocationChart";
 import { computeKpiTrend } from "@/lib/kpi-month-trend";
@@ -330,6 +332,8 @@ export function DashboardClient({
   );
   /** Mois contrôlé par le navigateur au sommet du dashboard principal. */
   const [overviewMonthKey, setOverviewMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
+  /** Mois contrôlé par le bloc de dépenses de l’onglet Perso. */
+  const [personalExpensesMonthKey, setPersonalExpensesMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) via clic sur le graphique. */
   const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
@@ -1160,21 +1164,6 @@ export function DashboardClient({
         className={clsx(dashboardSection !== "sasu" && dashboardSection !== "private" && "hidden")}
         aria-hidden={dashboardSection !== "sasu" && dashboardSection !== "private"}
       >
-          {dashboardSection === "private" ? (
-            <DashboardPeriodFilterSection
-              selectedYears={selectedYears}
-              setSelectedYears={setSelectedYears}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              monthOptions={monthOptions}
-              yearOptions={yearOptions}
-              onToggleYear={toggleYearInFilter}
-              sticky
-              showRollingOption
-              showActiveLabel
-            />
-          ) : null}
-
           {dashboardSection === "sasu" ? (
             <section className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
               <div className={clsx(dashboardAnalysisShell, "xl:col-span-2")}>
@@ -1694,7 +1683,13 @@ export function DashboardClient({
             </section>
           ) : null}
           {dashboardSection === "private" ? (
-      <section className="space-y-4">
+      <>
+      <PersonalExpensesInsightCard
+        transactions={transactions}
+        monthKey={personalExpensesMonthKey}
+        onMonthChange={setPersonalExpensesMonthKey}
+      />
+      <section className="hidden" aria-hidden="true">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
           <Card variant="solid" className="flex h-full min-h-0 flex-col">
             <CardHeader className="pb-3">
@@ -2025,7 +2020,7 @@ export function DashboardClient({
             </CardBody>
           </Card>
 
-          <Card id="dashboard-fiscal" variant="solid" className="flex h-full min-h-0 flex-col">
+          <Card id="dashboard-fiscal-legacy" variant="solid" className="flex h-full min-h-0 flex-col">
             <CardHeader className="pb-3">
               <div className="min-w-0">
                 <DashboardBlockTitle icon={TrendingDown} iconTone="expense">
@@ -2305,6 +2300,7 @@ export function DashboardClient({
           </Card>
         </div>
       </section>
+      </>
           ) : null}
 
       </div>

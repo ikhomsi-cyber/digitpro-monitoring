@@ -21,8 +21,12 @@ import {
   BANKIN_UNCATEGORIZED_CATEGORY,
 } from "@/lib/bankin/categorize";
 import {
+  buildBankinPersonalReferenceModel,
   buildBankinReferenceCategoryList,
-  normalizeBankinReferenceCategory
+  normalizeBankinReferenceCategory,
+  resolveBankinPersonalCategory,
+  type BankinPersonalReferenceModel,
+  type BankinReferenceTransaction
 } from "@/lib/bankin/reference-categories";
 import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
 import {
@@ -77,33 +81,60 @@ function mapPowensRowsToImportTx(rows: PowensImportRow[]): ImportTx[] {
 
 type SupabaseServer = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
-async function loadBankinReferenceCategories(client: SupabaseServer): Promise<Set<string>> {
-  const { data, error } = await client
-    .from("transactions")
-    .select("category,import_sessions!inner(format)")
-    .eq("import_sessions.format", "bankin")
-    .order("category", { ascending: true });
+type BankinReferenceData = {
+  categories: Set<string>;
+  personal: BankinPersonalReferenceModel;
+};
 
-  if (error) {
-    const msg = error.message ?? "";
-    if (/import_sessions|relationship|schema cache|PGRST200|PGRST201/i.test(msg)) return new Set();
-    throw new Error(msg);
+async function loadBankinReferenceData(client: SupabaseServer): Promise<BankinReferenceData> {
+  const rows: BankinReferenceTransaction[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await client
+      .from("transactions")
+      .select("id,label,category,import_sessions!inner(format)")
+      .eq("import_sessions.format", "bankin")
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      const msg = error.message ?? "";
+      if (/import_sessions|relationship|schema cache|PGRST200|PGRST201/i.test(msg)) {
+        return {
+          categories: new Set(),
+          personal: buildBankinPersonalReferenceModel([])
+        };
+      }
+      throw new Error(msg);
+    }
+    rows.push(...((data ?? []) as BankinReferenceTransaction[]));
+    if ((data ?? []).length < pageSize) break;
   }
 
-  return new Set(
-    buildBankinReferenceCategoryList(
-      (data ?? []).map((row) => (row as { category?: string | null }).category)
-    )
-  );
+  return {
+    categories: new Set(buildBankinReferenceCategoryList(rows.map((row) => row.category))),
+    personal: buildBankinPersonalReferenceModel(rows)
+  };
 }
 
-function applyBankinReferenceToPowensRows(rows: ImportTx[], referenceCategories: Set<string>): ImportTx[] {
-  if (referenceCategories.size === 0) return rows;
+function applyBankinReferenceToPowensRows(
+  rows: ImportTx[],
+  reference: BankinReferenceData,
+  scope: PowensImportAxis
+): ImportTx[] {
   return rows.map((row) => {
+    if (scope === "personal") {
+      return {
+        ...row,
+        category:
+          resolveBankinPersonalCategory(reference.personal, row.category, row.label) ??
+          BANKIN_UNCATEGORIZED_CATEGORY
+      };
+    }
     const category = normalizeBankinReferenceCategory(row.category);
     return {
       ...row,
-      category: referenceCategories.has(category) ? category : BANKIN_UNCATEGORIZED_CATEGORY
+      category: reference.categories.has(category) ? category : BANKIN_UNCATEGORIZED_CATEGORY
     };
   });
 }
@@ -1072,8 +1103,8 @@ async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promi
     powensUserId,
     filterAccountIds
   });
-  const referenceCategories = await loadBankinReferenceCategories(supabase);
-  const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), referenceCategories);
+  const reference = await loadBankinReferenceData(supabase);
+  const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), reference, axis);
 
   const axisLabel = axis === "personal" ? "perso" : "SASU";
   const result = await importTransactions(txs, {

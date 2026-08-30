@@ -355,6 +355,22 @@ export type PowensImportRow = {
   powensAccountId?: number;
 };
 
+/**
+ * Powens utilise `active: false` pour une transaction masquée des analyses.
+ * Une transaction soft-deleted ne doit pas non plus être importée.
+ */
+export function isPowensTransactionVisible(raw: Record<string, unknown>): boolean {
+  if (raw.active === false || raw.active === 0 || raw.active === "false" || raw.active === "0") return false;
+  return raw.deleted == null || raw.deleted === "" || raw.deleted === false;
+}
+
+/** `display: false` correspond à un compte que les interfaces PFM ne doivent pas présenter. */
+export function isPowensAccountVisible(raw: Record<string, unknown>): boolean {
+  if (raw.display === false || raw.display === 0 || raw.display === "false" || raw.display === "0") return false;
+  if (raw.disabled != null && raw.disabled !== "" && raw.disabled !== false) return false;
+  return raw.deleted == null || raw.deleted === "" || raw.deleted === false;
+}
+
 const POWENS_TYPE_LABEL: Record<string, string> = {
   deferred_card: "Carte différée",
   summary_card: "Récap carte",
@@ -434,6 +450,7 @@ function decoratePowensLabel(raw: Record<string, unknown>, baseLabel: string): s
 }
 
 function mapOneTx(raw: Record<string, unknown>, company: string, scope: "pro" | "personal"): PowensImportRow | null {
+  if (!isPowensTransactionVisible(raw)) return null;
   const id = str(raw.id ?? raw.transaction_id ?? raw.uuid);
   const dateRaw = resolvePowensTxDate(raw);
   if (!dateRaw) return null;
@@ -587,7 +604,7 @@ async function powensFetchAccountsMeta(
   base: string,
   bearer: string,
   effectiveUserId: string | null
-): Promise<{ bankNames: Map<number, string>; accountIds: number[] }> {
+): Promise<{ bankNames: Map<number, string>; accountIds: number[]; hiddenAccountIds: Set<number> }> {
   const paths: string[] = [];
   if (effectiveUserId) {
     paths.push(`/users/${encodeURIComponent(effectiveUserId)}/accounts?limit=1000`);
@@ -618,17 +635,19 @@ async function powensFetchAccountsMeta(
     const accounts = asArray<Record<string, unknown>>(json);
     const bankNames = new Map<number, string>();
     const accountIds: number[] = [];
+    const hiddenAccountIds = new Set<number>();
     for (const account of accounts) {
       const id = num(account.id ?? account.id_account);
       if (id == null) continue;
       accountIds.push(id);
+      if (!isPowensAccountVisible(account)) hiddenAccountIds.add(id);
       const bankName = pickPowensAccountBankName(account);
       if (bankName) bankNames.set(id, bankName);
     }
-    if (accountIds.length) return { bankNames, accountIds };
+    if (accountIds.length) return { bankNames, accountIds, hiddenAccountIds };
   }
 
-  return { bankNames: new Map(), accountIds: [] };
+  return { bankNames: new Map(), accountIds: [], hiddenAccountIds: new Set() };
 }
 
 async function powensFetchTransactionPages(
@@ -691,11 +710,14 @@ function mapPowensRawRowsToImport(
     company: string;
     scope: "pro" | "personal";
     accountBankNames: Map<number, string>;
+    hiddenAccountIds?: ReadonlySet<number>;
     filterAccountIds?: number[] | null;
   }
 ): PowensImportRow[] {
   let out: PowensImportRow[] = [];
   for (const row of rawRows) {
+    const rawAccountId = num(row.id_account);
+    if (rawAccountId != null && opts.hiddenAccountIds?.has(rawAccountId)) continue;
     const mapped = mapOneTx(row, opts.company, opts.scope);
     if (mapped?.powensAccountId != null) {
       mapped.bankName = opts.accountBankNames.get(mapped.powensAccountId) ?? pickPowensAccountBankName(row);
@@ -727,13 +749,16 @@ export async function powensCloudFetchTransactions(
 ): Promise<PowensImportRow[]> {
   const bearer = normalizePowensUserBearerToken(userBearer);
   const base = powensApiBaseUrl();
-  const limitQs = "limit=1000";
+  // `categories` est nécessaire pour conserver la catégorie Powens/Bankin,
+  // notamment « Virements internes ». Les lignes `active: false` sont ensuite
+  // explicitement rejetées par `mapOneTx`.
+  const limitQs = "limit=1000&expand=categories";
 
   let effectiveUserId = opts.powensUserId?.trim() ?? null;
   if (!effectiveUserId) {
     effectiveUserId = await powensResolveUserIdFromMeEndpoint(userBearer);
   }
-  const { bankNames: accountBankNames, accountIds } = await powensFetchAccountsMeta(
+  const { bankNames: accountBankNames, accountIds, hiddenAccountIds } = await powensFetchAccountsMeta(
     base,
     bearer,
     effectiveUserId
@@ -804,6 +829,7 @@ export async function powensCloudFetchTransactions(
       company: opts.company,
       scope: opts.scope,
       accountBankNames,
+      hiddenAccountIds,
       filterAccountIds: opts.filterAccountIds
     });
     if (out.length || mergedRaw.length === 0) return out;

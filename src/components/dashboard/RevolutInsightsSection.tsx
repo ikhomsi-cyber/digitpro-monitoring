@@ -12,6 +12,7 @@ import {
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
+import { bankinParentCategoryLabel } from "@/lib/bankin/categorize";
 import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
@@ -214,16 +215,6 @@ function ExpenseCategoryBars({
   );
 }
 
-function bankinMacroCategoryLabel(storedCategory: string): string {
-  const raw = String(storedCategory ?? "").trim();
-  if (!raw) return "Autres";
-  const m = /\s[›>]\s/u.exec(raw);
-  if (m?.index != null) {
-    return raw.slice(0, m.index).trim().replace(/\.\s*$/, "") || raw;
-  }
-  return raw;
-}
-
 function expenseMacroLabel(tx: DashboardTx): string | null {
   const txScope = tx.scope ?? "pro";
   if (txScope === "pro") {
@@ -231,7 +222,7 @@ function expenseMacroLabel(tx: DashboardTx): string | null {
     return deriveExpenseBucket(tx);
   }
   if (!countsTowardPersonalExpenseKpi(tx)) return null;
-  return bankinMacroCategoryLabel(tx.category);
+  return bankinParentCategoryLabel(tx.category);
 }
 
 function txCountsAsExpense(tx: DashboardTx): boolean {
@@ -411,6 +402,100 @@ function Sparkline({
 
 function InsightCard({ children }: { children: React.ReactNode }) {
   return <div className={dashboardInsightCard}>{children}</div>;
+}
+
+export function PersonalExpensesInsightCard({
+  transactions,
+  monthKey,
+  onMonthChange
+}: {
+  transactions: DashboardTx[];
+  monthKey: string;
+  onMonthChange: (monthKey: string) => void;
+}) {
+  const fmt = useDashboardDisplayFormat();
+  const personalTransactions = useMemo(
+    () => transactions.filter((tx) => tx.scope === "personal"),
+    [transactions]
+  );
+  const currentRows = useMemo(
+    () => computeExpenseMacroBreakdown(personalTransactions, monthKey),
+    [monthKey, personalTransactions]
+  );
+  const previousRows = useMemo(
+    () => computeExpenseMacroBreakdown(personalTransactions, shiftMonthKey(monthKey, -1)),
+    [monthKey, personalTransactions]
+  );
+  const currentTotal = useMemo(
+    () => currentRows.reduce((sum, row) => sum + row.amount, 0),
+    [currentRows]
+  );
+  const previousTotal = useMemo(
+    () => previousRows.reduce((sum, row) => sum + row.amount, 0),
+    [previousRows]
+  );
+  const monthlySeries = useMemo(
+    () => trailingMonthlySeries(personalTransactions, monthKey, "spend"),
+    [monthKey, personalTransactions]
+  );
+  const delta = currentTotal - previousTotal;
+
+  return (
+    <section id="dashboard-personal-expenses" className="space-y-3">
+      <div className="flex justify-center">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onMonthChange(shiftMonthKey(monthKey, -1))}
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
+            aria-label="Mois précédent"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-[6.5rem] text-center text-sm font-medium text-ink-700 dark:text-white/75">
+            {monthNavigatorLabel(monthKey)}
+          </span>
+          <button
+            type="button"
+            onClick={() => onMonthChange(shiftMonthKey(monthKey, 1))}
+            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
+            aria-label="Mois suivant"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <InsightCard>
+        <p className="text-sm text-ink-500 dark:text-white/50">Dépenses perso</p>
+        <div className="mt-1 flex items-baseline gap-2">
+          <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white" data-private>
+            {fmt.euro(currentTotal)}
+          </p>
+          <span
+            className={clsx(
+              "text-sm font-medium tabular-nums",
+              delta > 0
+                ? "text-rose-500 dark:text-rose-400"
+                : delta < 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-ink-400 dark:text-white/45"
+            )}
+            title="Écart par rapport au mois précédent"
+            data-private
+          >
+            {delta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(delta))}
+          </span>
+        </div>
+        <div className="mt-1.5">
+          <ExpenseCategoryBars rows={currentRows} fmt={fmt} />
+        </div>
+        <div className="mt-3">
+          <Sparkline points={monthlySeries} stroke="#fb7185" />
+        </div>
+      </InsightCard>
+    </section>
+  );
 }
 
 export function RevolutInsightsSection({

@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { parseFlexibleDate } from "@/lib/csv-import";
-import { categorizeBankinTransaction } from "./categorize";
+import { formatBankinHierarchy } from "./categorize";
 
 export type BankinParsedRow = {
   date: string;
@@ -94,12 +94,10 @@ export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinPars
 
     if (!dateIso || amount === null) continue;
 
-    const category = categorizeBankinTransaction({
-      parentCategory: parent,
-      subCategory: sub,
-      description: label,
-      amount
-    });
+    // Un export Bankin est la source de vérité pour le privé : on conserve
+    // exactement sa hiérarchie, y compris « A catégoriser », sans appliquer
+    // les inférences ni les raccourcis métier utilisés pour les flux pro.
+    const category = formatBankinHierarchy(parent, sub);
 
     out.push({
       date: dateIso,

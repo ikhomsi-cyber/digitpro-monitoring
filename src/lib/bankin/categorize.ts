@@ -48,6 +48,21 @@ export function bankinSubcategoryLabel(storedCategory: string | null | undefined
   return raw;
 }
 
+/**
+ * Catégorie principale Bankin à partir de la hiérarchie stockée
+ * (`Catégorie › Sous-catégorie`). C'est le niveau affiché par l'écran
+ * Analyse de Bankin (ex. « Logement », « Auto & Transports »).
+ */
+export function bankinParentCategoryLabel(storedCategory: string | null | undefined): string {
+  const raw = String(storedCategory ?? "").trim();
+  if (!raw) return "Autres";
+  const m = /\s[›>]\s/u.exec(raw);
+  if (m?.index != null) {
+    return raw.slice(0, m.index).trim().replace(/\.\s*$/, "") || raw;
+  }
+  return raw.replace(/\.\s*$/, "");
+}
+
 type Rule = { re: RegExp; category: string };
 
 /**
@@ -215,6 +230,12 @@ export function categorizePowensApiTransaction(
   if (isAggregatorGenericCategoryBucket(parent, sub)) {
     parent = "";
     sub = "";
+  }
+
+  // Le code Powens est stable et permet d'exclure les virements internes même
+  // lorsque les libellés français Bankin ne sont pas renvoyés par l'API.
+  if (/^internal[_ -]?transfer$/i.test(sub) || /^internal[_ -]?transfer$/i.test(parent)) {
+    return "Retraits, Chq. et Vir. › Virements internes";
   }
 
   return categorizeBankinTransaction({
