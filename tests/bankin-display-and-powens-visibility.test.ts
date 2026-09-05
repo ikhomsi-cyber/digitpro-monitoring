@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   bankinParentCategoryLabel,
+  categorizeDigitProIncomingTransfer,
+  categorizeKnownPersonalTransfer,
   categorizePowensApiTransaction
 } from "@/lib/bankin/categorize";
 import { isPowensAccountVisible, isPowensTransactionVisible } from "@/lib/powens/cloud-api";
@@ -48,5 +50,27 @@ describe("Bankin personal analytics", () => {
         scope: "personal"
       })
     ).toBe(false);
+  });
+
+  it("maps incoming DigitPro reimbursements from their bank wording", () => {
+    expect(
+      categorizeDigitProIncomingTransfer(
+        "VIREMENT INSTANTANE VIR INST DigitPro Consulting NDF IPR000342061777",
+        509
+      )
+    ).toBe("NDF DigitPro");
+    expect(
+      categorizeDigitProIncomingTransfer(
+        "Virement DigitPro Consulting indemnité kilométrique septembre",
+        525
+      )
+    ).toBe("Indemnités kilométriques");
+    expect(categorizeDigitProIncomingTransfer("Virement DigitPro Consulting IK", -525)).toBeNull();
+  });
+
+  it("maps Mr Lontsi transfers to rent", () => {
+    expect(
+      categorizeKnownPersonalTransfer("VIREMENT INSTANTANE VIR INST Mr LONTSI IPA000342062508", -1450)
+    ).toBe("Logement › Loyer");
   });
 });

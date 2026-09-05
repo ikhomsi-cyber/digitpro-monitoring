@@ -40,4 +40,20 @@ describe("parseBankinTransactionsWorkbook", () => {
       }
     ]);
   });
+
+  it("priorise les remboursements DigitPro NDF et IK identifiés dans le libellé", () => {
+    const rows = parseBankinTransactionsWorkbook(
+      workbookBuffer([
+        ["02/09/2026", "VIREMENT INSTANTANE DigitPro Consulting NDF", "LCL", 509, "Divers.", "A catégoriser", "", ""],
+        ["01/09/2026", "Virement DigitPro Consulting IK", "LCL", 525, "Divers.", "A catégoriser", "", ""],
+        ["01/09/2026", "VIREMENT INSTANTANE Mr LONTSI", "LCL", -1450, "Divers.", "A catégoriser", "", ""]
+      ])
+    );
+
+    expect(rows.map((row) => row.category)).toEqual([
+      "NDF DigitPro",
+      "Indemnités kilométriques",
+      "Logement › Loyer"
+    ]);
+  });
 });

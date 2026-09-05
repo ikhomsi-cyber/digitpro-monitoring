@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { ChevronDown, ReceiptText } from "lucide-react";
+import { Check, ChevronDown, ReceiptText, X } from "lucide-react";
 import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
@@ -52,7 +51,8 @@ export function ActivityMonthSummaryCard({
   ikReferenceEur,
   ikReferenceMonths,
   mealsReferenceEur,
-  mealsReferenceMonths
+  mealsReferenceMonths,
+  onNdfArbitration
 }: {
   countedDays: number;
   ikTotalEur: number;
@@ -70,9 +70,22 @@ export function ActivityMonthSummaryCard({
   mealsReferenceEur?: number;
   /** Nombre de mois réellement comptés dans la moyenne Repas (≤ 12). */
   mealsReferenceMonths?: number;
+  /** Classe une candidate en NDF DigitPro ou dans sa catégorie de rejet suggérée. */
+  onNdfArbitration?: (tx: DashboardTx, decision: "ndf" | "not-ndf") => Promise<void>;
 }) {
   const fmt = useDashboardDisplayFormat();
   const [ndfListOpen, setNdfListOpen] = useState(false);
+  const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
+
+  const decideNdf = async (tx: DashboardTx, decision: "ndf" | "not-ndf") => {
+    if (!onNdfArbitration) return;
+    setPendingDecisionId(tx.id);
+    try {
+      await onNdfArbitration(tx, decision);
+    } finally {
+      setPendingDecisionId(null);
+    }
+  };
 
   const mealsTotal = mealFees?.total ?? 0;
   const ikHasHistory = Boolean(ikReferenceEur && ikReferenceEur > 0 && ikReferenceMonths);
@@ -157,25 +170,20 @@ export function ActivityMonthSummaryCard({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-600 dark:text-white/55">
-                          À valider
+                          À arbitrer · {mealFees.pendingNdfTransactions.length}
                         </p>
-                        <Link
-                          href="/dashboard?section=categorisation"
-                          scroll={false}
-                          className="text-[10px] font-semibold text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
-                        >
-                          Catégorisation
-                        </Link>
                       </div>
-                      <ul className="scrollbar-clean max-h-36 space-y-0 overflow-y-auto overscroll-contain">
+                      <ul className="scrollbar-clean max-h-64 space-y-0 overflow-y-auto overscroll-contain">
                         {mealFees.pendingNdfTransactions.map((tx) => {
                           const dateLabel = formatNdfTxDateLabel(tx.date);
                           const isToday = dateLabel === "Aujourd’hui";
+                          const busy = pendingDecisionId === tx.id;
                           return (
                             <li
                               key={`pending-${tx.id}`}
-                              className="flex items-center justify-between gap-2 border-b border-ink-200/30 py-2 last:border-b-0 dark:border-white/[0.06]"
+                              className="border-b border-ink-200/30 py-2.5 last:border-b-0 dark:border-white/[0.06]"
                             >
+                              <div className="flex items-start justify-between gap-2">
                               <span className="min-w-0">
                                 <span className="flex min-w-0 items-center gap-1.5">
                                   <span className="truncate text-xs font-semibold text-ink-900 dark:text-white">
@@ -192,6 +200,25 @@ export function ActivityMonthSummaryCard({
                               <span className="text-xs font-semibold tabular-nums text-ink-900 dark:text-white">
                                 {fmt.euro(Math.abs(tx.amount))}
                               </span>
+                              </div>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  disabled={busy || !onNdfArbitration}
+                                  onClick={() => void decideNdf(tx, "ndf")}
+                                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+                                >
+                                  <Check className="h-3.5 w-3.5" aria-hidden /> NDF DigitPro
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy || !onNdfArbitration}
+                                  onClick={() => void decideNdf(tx, "not-ndf")}
+                                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 text-[11px] font-bold text-ink-700 transition hover:bg-ink-50 disabled:cursor-wait disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.06] dark:text-white/75 dark:hover:bg-white/[0.12]"
+                                >
+                                  <X className="h-3.5 w-3.5" aria-hidden /> Pas une NDF
+                                </button>
+                              </div>
                             </li>
                           );
                         })}
@@ -239,14 +266,7 @@ export function ActivityMonthSummaryCard({
             </div>
           ) : (
             <p className="mt-2 text-xs text-ink-400 dark:text-white/38">
-              Aucune NDF —{" "}
-              <Link
-                href="/dashboard?section=categorisation"
-                scroll={false}
-                className="font-medium text-brand-600 underline-offset-2 hover:underline dark:text-brand-300"
-              >
-                Catégorisation
-              </Link>
+              Aucune NDF à arbitrer ce mois.
             </p>
           )}
         </div>

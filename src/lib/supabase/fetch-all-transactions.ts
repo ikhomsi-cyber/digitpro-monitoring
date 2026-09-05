@@ -1,5 +1,6 @@
 import "server-only";
 
+import { categorizeKnownPersonalTransfer } from "@/lib/bankin/categorize";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { createSupabaseServerClient } from "./server";
@@ -174,19 +175,26 @@ export function needsDashboardFullHistorySync(
 }
 
 function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {
-  return rawRows.map((row) => ({
-    id: String(row.id),
-    date: String(row.date).slice(0, 10),
-    label: String(row.label ?? ""),
-    category: mapExpenseCategoryLabel(String(row.category ?? "")),
-    amount: Number(row.amount),
-    balance: row.balance == null ? null : Number(row.balance),
-    company: String(row.company ?? "").trim(),
-    bankName: row.bank_name == null ? null : String(row.bank_name).trim(),
-    importFormat: row.import_sessions?.format == null ? null : String(row.import_sessions.format).trim(),
-    scope: row.scope === "personal" ? "personal" : "pro",
-    categoryManual: row.category_manual === true
-  }));
+  return rawRows.map((row) => {
+    const label = String(row.label ?? "");
+    const amount = Number(row.amount);
+    const categoryManual = row.category_manual === true;
+    return {
+      id: String(row.id),
+      date: String(row.date).slice(0, 10),
+      label,
+      category:
+        (categoryManual ? null : categorizeKnownPersonalTransfer(label, amount)) ??
+        mapExpenseCategoryLabel(String(row.category ?? "")),
+      amount,
+      balance: row.balance == null ? null : Number(row.balance),
+      company: String(row.company ?? "").trim(),
+      bankName: row.bank_name == null ? null : String(row.bank_name).trim(),
+      importFormat: row.import_sessions?.format == null ? null : String(row.import_sessions.format).trim(),
+      scope: row.scope === "personal" ? "personal" : "pro",
+      categoryManual
+    };
+  });
 }
 
 /**

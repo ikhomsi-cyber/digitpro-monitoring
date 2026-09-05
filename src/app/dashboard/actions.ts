@@ -1367,6 +1367,48 @@ export async function updateTransaction(id: string, formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+/** Catégorie choisie depuis la liste des mouvements personnels (paiements CB Bankin). */
+export async function updatePersonalTransactionCategory(id: string, category: string) {
+  await assertSupabaseWritesEnabled();
+  if (!id || !category.trim()) throw new Error("Transaction ou catégorie manquante.");
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase not configured (demo mode).");
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const mappedCategory = mapExpenseCategoryLabel(category);
+  let updateError = (
+    await supabase
+      .from("transactions")
+      .update({ category: mappedCategory, category_manual: true })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .eq("scope", "personal")
+  ).error;
+
+  if (
+    updateError &&
+    /category_manual/i.test(updateError.message) &&
+    /(could not find|schema cache|does not exist)/i.test(updateError.message)
+  ) {
+    updateError = (
+      await supabase
+        .from("transactions")
+        .update({ category: mappedCategory })
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .eq("scope", "personal")
+    ).error;
+  }
+
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/dashboard");
+}
+
 /**
  * Nettoyage manuel des doublons en base :
  *  - recalcule un content_hash canonique (date + label + amount) pour chaque ligne,

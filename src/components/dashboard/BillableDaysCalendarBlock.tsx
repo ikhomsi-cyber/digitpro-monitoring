@@ -56,11 +56,13 @@ function monthMatrix(year: number, month0: number): CalendarMonthCell[] {
 
 export function BillableDaysCalendarBlock({
   treasuryTransactions,
-  treasuryScope
+  treasuryScope,
+  onNdfArbitration
 }: {
   /** Mouvements pour le bloc trésorerie (solde, CA, TVA). */
   treasuryTransactions?: DashboardTx[];
   treasuryScope?: "pro" | "personal";
+  onNdfArbitration?: (tx: DashboardTx, decision: "ndf" | "not-ndf") => Promise<void>;
 }) {
   const {
     selected,
@@ -1002,6 +1004,7 @@ export function BillableDaysCalendarBlock({
               ikReferenceMonths={ikReference.months}
               mealsReferenceEur={mealsReference.eur}
               mealsReferenceMonths={mealsReference.months}
+              onNdfArbitration={onNdfArbitration}
             />
           </div>
       </div>

@@ -15,7 +15,6 @@ export function SectionThemeSync() {
     if (section === "valeur") page = "valeur";
     else if (section === "activite") page = "activite";
     else if (section === "sasu" || section === "private") page = "sasu";
-    else if (section === "categorisation") page = "categorisation";
 
     const root = document.querySelector<HTMLElement>(".premium-dashboard-page");
     if (root) root.setAttribute("data-page", page);

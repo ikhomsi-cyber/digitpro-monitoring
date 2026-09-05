@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, ScanSearch, Settings, WalletCards } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, Settings } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
@@ -48,23 +48,11 @@ const TABS: Tab[] = [
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
   },
   {
-    href: "/dashboard?section=private&scope=personal",
-    label: "Perso",
-    icon: WalletCards,
-    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "private"
-  },
-  {
     href: "/dashboard?section=impots",
     label: "Impôts",
     icon: Landmark,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "impots"
   },
-  {
-    href: "/dashboard?section=categorisation",
-    label: "Catég.",
-    icon: ScanSearch,
-    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "categorisation"
-  }
 ];
 
 /** Dock iOS flottant — mobile uniquement. */

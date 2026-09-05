@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Activity, Building2, Briefcase, Gem, Tags, User, type LucideIcon } from "lucide-react";
+import { Activity, Building2, Briefcase, Gem, type LucideIcon } from "lucide-react";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { clsx } from "clsx";
 import { useOptionalDashboardSection } from "@/components/dashboard/DashboardSectionContext";
@@ -32,23 +32,11 @@ const ITEMS: readonly {
     match: ({ panel }) => panel === "valeur-reelle"
   },
   {
-    href: "/dashboard?section=private&scope=personal",
-    label: "Privé",
-    icon: User,
-    match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "private"
-  },
-  {
     href: "/dashboard?panel=lmnp",
     label: "LMNP",
     icon: Building2,
     match: ({ panel }) => panel === "lmnp"
   },
-  {
-    href: "/categorisation",
-    label: "Catégorisation",
-    icon: Tags,
-    match: () => false
-  }
 ];
 
 /**

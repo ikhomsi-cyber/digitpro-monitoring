@@ -11,6 +11,10 @@ import {
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { updatePersonalTransactionCategory } from "./actions";
+import { updatePowensTransactionCategory } from "@/app/categorisation/actions";
+import { resolveNdfRejectionCategory } from "@/lib/categorisation-candidates";
+import { NDF_DIGITPRO_CATEGORY } from "@/lib/ndf-digitpro";
 import { clsx } from "clsx";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -43,6 +47,7 @@ import { BncPaymentHistoryCard } from "@/components/dashboard/BncPaymentHistoryC
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
 import {
   PersonalExpensesInsightCard,
+  PersonalTransactionsPeriodCard,
   RevolutInsightsSection
 } from "@/components/dashboard/RevolutInsightsSection";
 import { TaxLiabilityCard } from "@/components/dashboard/TaxLiabilityCard";
@@ -124,7 +129,6 @@ type LazyDashboardSectionKey =
   | "full"
   | "activite"
   | "valeur"
-  | "categorisation"
   | "impots"
   | "sasu-panel";
 
@@ -137,14 +141,6 @@ const ValeurReelleClient = dynamic(
   () =>
     import("@/components/dashboard/ValeurReelleClient").then((mod) => ({
       default: mod.ValeurReelleClient
-    })),
-  { loading: () => null }
-);
-
-const DashboardCategorisationPanel = dynamic(
-  () =>
-    import("@/app/dashboard/DashboardCategorisationPanel").then((mod) => ({
-      default: mod.DashboardCategorisationPanel
     })),
   { loading: () => null }
 );
@@ -334,6 +330,8 @@ export function DashboardClient({
   const [overviewMonthKey, setOverviewMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
   /** Mois contrôlé par le bloc de dépenses de l’onglet Perso. */
   const [personalExpensesMonthKey, setPersonalExpensesMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
+  /** Catégorie Bankin sélectionnée dans l’histogramme des dépenses perso. */
+  const [personalTransactionCategoryFilter, setPersonalTransactionCategoryFilter] = useState<string | null>(null);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) via clic sur le graphique. */
   const [totalExpensesMonthFilter, setTotalExpensesMonthFilter] = useState<string | null>(null);
   /** Contrepartie CA sélectionnée dans la carte Total revenues (liste des encaissements). */
@@ -362,6 +360,53 @@ export function DashboardClient({
     setHeroStatsReady(true);
     return true;
   }, []);
+
+  const onPersonalTransactionCategoryChange = useCallback(
+    async (transactionId: string, category: string) => {
+      const previous = transactions.find((tx) => tx.id === transactionId);
+      if (!previous) return;
+      setTransactions((current) =>
+        current.map((tx) =>
+          tx.id === transactionId ? { ...tx, category, categoryManual: true } : tx
+        )
+      );
+      try {
+        await updatePersonalTransactionCategory(transactionId, category);
+        toast.success("Catégorie mise à jour");
+      } catch (error) {
+        setTransactions((current) =>
+          current.map((tx) => (tx.id === transactionId ? previous : tx))
+        );
+        toast.error("Impossible de mettre à jour la catégorie", {
+          description: error instanceof Error ? error.message : undefined
+        });
+      }
+    },
+    [transactions]
+  );
+
+  const onNdfArbitration = useCallback(
+    async (tx: DashboardTx, decision: "ndf" | "not-ndf") => {
+      const category =
+        decision === "ndf"
+          ? NDF_DIGITPRO_CATEGORY
+          : resolveNdfRejectionCategory(tx, ["Repas dirigeant", "Repas d'affaire", "Matériel", "Mobile et Internet"]);
+      const formData = new FormData();
+      formData.set("transactionId", tx.id);
+      formData.set("category", category);
+      try {
+        await updatePowensTransactionCategory(formData);
+        await refreshDashboardTransactions();
+        toast.success(decision === "ndf" ? "Transaction validée en NDF DigitPro" : `Classée : ${category}`);
+      } catch (error) {
+        toast.error("Impossible d’enregistrer l’arbitrage", {
+          description: error instanceof Error ? error.message : undefined
+        });
+        throw error;
+      }
+    },
+    [refreshDashboardTransactions]
+  );
 
   const pullRefreshEnabled =
     dashboardSection === "full" || dashboardSection === "sasu";
@@ -1131,6 +1176,7 @@ export function DashboardClient({
         <BillableDaysCalendarBlock
           treasuryTransactions={transactions}
           treasuryScope="pro"
+          onNdfArbitration={onNdfArbitration}
         />
       </div>
       ) : null}
@@ -1141,14 +1187,6 @@ export function DashboardClient({
           demoMode={demoMode}
           loadError={loadError}
         />
-      </div>
-      ) : null}
-      {mountedSections.has("categorisation") ? (
-      <div
-        className={clsx(dashboardSection !== "categorisation" && "hidden")}
-        aria-hidden={dashboardSection !== "categorisation"}
-      >
-        <DashboardCategorisationPanel />
       </div>
       ) : null}
       {mountedSections.has("impots") ? (
@@ -1687,7 +1725,19 @@ export function DashboardClient({
       <PersonalExpensesInsightCard
         transactions={transactions}
         monthKey={personalExpensesMonthKey}
-        onMonthChange={setPersonalExpensesMonthKey}
+        onMonthChange={(monthKey) => {
+          setPersonalExpensesMonthKey(monthKey);
+          setPersonalTransactionCategoryFilter(null);
+        }}
+        selectedCategory={personalTransactionCategoryFilter}
+        onCategoryChange={setPersonalTransactionCategoryFilter}
+      />
+      <PersonalTransactionsPeriodCard
+        transactions={transactions}
+        monthKey={personalExpensesMonthKey}
+        selectedCategory={personalTransactionCategoryFilter}
+        onCategoryChange={setPersonalTransactionCategoryFilter}
+        onTransactionCategoryChange={onPersonalTransactionCategoryChange}
       />
       <section className="hidden" aria-hidden="true">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">

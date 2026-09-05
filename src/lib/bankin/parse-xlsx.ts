@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { parseFlexibleDate } from "@/lib/csv-import";
-import { formatBankinHierarchy } from "./categorize";
+import { categorizeKnownPersonalTransfer, formatBankinHierarchy } from "./categorize";
 
 export type BankinParsedRow = {
   date: string;
@@ -94,10 +94,10 @@ export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinPars
 
     if (!dateIso || amount === null) continue;
 
-    // Un export Bankin est la source de vérité pour le privé : on conserve
-    // exactement sa hiérarchie, y compris « A catégoriser », sans appliquer
-    // les inférences ni les raccourcis métier utilisés pour les flux pro.
-    const category = formatBankinHierarchy(parent, sub);
+    // L'export Bankin reste la source de vérité, sauf les virements connus
+    // explicitement identifiés dans le libellé (DigitPro NDF / IK, loyer Lontsi).
+    const category =
+      categorizeKnownPersonalTransfer(label, amount) ?? formatBankinHierarchy(parent, sub);
 
     out.push({
       date: dateIso,

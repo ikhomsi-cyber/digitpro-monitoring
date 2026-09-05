@@ -12,9 +12,15 @@ import {
   type DashboardTx
 } from "@/lib/dashboard-metrics";
 import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
-import { bankinParentCategoryLabel } from "@/lib/bankin/categorize";
+import {
+  bankinParentCategoryLabel,
+  categorizeKnownPersonalTransfer
+} from "@/lib/bankin/categorize";
 import { resolveSasuSimplifiedExpenseGroup } from "@/lib/valeur-reelle-analyze";
-import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
+import {
+  dashboardSasuExpenseAmountHt,
+  expenseAmountHasRecoverableVat
+} from "@/lib/recoverable-expense-vat";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
@@ -23,6 +29,26 @@ import { monthTitleFr } from "@/lib/billable-calendar-metrics";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 
 type ExpenseKindFilter = "all" | "perso" | "digitpro";
+
+const PERSONAL_CARD_CATEGORY_OPTIONS = [
+  { value: "Alimentation & Restau. › Supermarché / Epicerie", label: "Courses · Carrefour, Auchan…" },
+  { value: "Alimentation & Restau. › Restaurants", label: "Restaurant" },
+  { value: "Alimentation & Restau. › Fast foods", label: "Fast-food" },
+  { value: "Alimentation & Restau. › Café", label: "Café / boulangerie" },
+  { value: "Logement › Loyer", label: "Logement · loyer" },
+  { value: "Logement › Electricité", label: "Logement · électricité" },
+  { value: "Auto & Transports › Carburant", label: "Transport · carburant" },
+  { value: "Auto & Transports › Transports en commun", label: "Transport en commun" },
+  { value: "Auto & Transports › Taxi & VTC", label: "Taxi / VTC" },
+  { value: "Santé › Pharmacie", label: "Santé · pharmacie" },
+  { value: "Achats & Shopping › High Tech", label: "Shopping · high-tech" },
+  { value: "Achats & Shopping › Autres", label: "Shopping" },
+  { value: "Abonnements › Loisirs numériques", label: "Abonnement numérique" }
+] as const;
+
+function isBankinCardPayment(label: string): boolean {
+  return /\bcb\s+bankin\b/i.test(label);
+}
 
 function monthKeyNow(): string {
   const d = new Date();
@@ -145,10 +171,14 @@ function formatBarAmount(amount: number): string {
 
 function ExpenseCategoryBars({
   rows,
-  fmt
+  fmt,
+  selectedLabel,
+  onSelect
 }: {
   rows: ExpenseMacroRow[];
   fmt: ReturnType<typeof useDashboardDisplayFormat>;
+  selectedLabel?: string | null;
+  onSelect?: (label: string) => void;
 }) {
   const top = rows.slice(0, 8);
   const max = Math.max(1, ...top.map((row) => row.amount));
@@ -166,14 +196,9 @@ function ExpenseCategoryBars({
       <div className="flex min-w-min items-end gap-1.5 pt-6 sm:gap-2.5">
         {top.map((row) => {
           const heightPct = Math.max(22, Math.round((row.amount / max) * 100));
-
-          return (
-            <div
-              key={row.label}
-              role="listitem"
-              className="group relative flex min-w-[3rem] flex-1 flex-col items-center gap-1.5"
-              title={`${row.label} · ${fmt.euro(row.amount)}`}
-            >
+          const selected = selectedLabel === row.label;
+          const content = (
+            <>
               <div
                 className="pointer-events-none absolute -top-7 left-1/2 z-10 w-max max-w-[9.5rem] -translate-x-1/2 opacity-0 transition duration-200 group-hover:opacity-100"
                 aria-hidden
@@ -183,14 +208,19 @@ function ExpenseCategoryBars({
                     {row.label}
                   </p>
                   <p className="mt-0.5 text-[11px] font-bold tabular-nums text-ink-800 dark:text-white/90">
-                    {fmt.euro(row.amount)}
+                    {fmt.euro(row.amount)}{row.isHt ? " HT" : ""}
                   </p>
                 </div>
               </div>
 
               <div className="flex h-40 w-12 shrink-0 items-end justify-center sm:h-44 sm:w-[3.25rem]">
                 <div
-                  className="flex w-full min-h-[2.75rem] items-center justify-center rounded-full bg-rose-100/85 transition-all duration-200 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
+                  className={clsx(
+                    "flex w-full min-h-[2.75rem] items-center justify-center rounded-full transition-all duration-200",
+                    selected
+                      ? "bg-rose-300 ring-2 ring-rose-400/80 dark:bg-rose-300/75 dark:ring-rose-300"
+                      : "bg-rose-100/85 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
+                  )}
                   style={{ height: `${heightPct}%` }}
                 >
                   <span
@@ -198,16 +228,48 @@ function ExpenseCategoryBars({
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
                     {formatBarAmount(row.amount)}
+                    {row.isHt ? " HT" : ""}
                   </span>
                 </div>
               </div>
               <div
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink-200/45 bg-ink-50/80 text-lg transition duration-200 group-hover:scale-105 group-hover:border-rose-200/60 dark:border-white/[0.1] dark:bg-white/[0.06] dark:group-hover:border-rose-200/25"
+                className={clsx(
+                  "grid h-9 w-9 shrink-0 place-items-center rounded-full border text-lg transition duration-200 group-hover:scale-105",
+                  selected
+                    ? "border-rose-400 bg-rose-100 dark:border-rose-300 dark:bg-rose-300/20"
+                    : "border-ink-200/45 bg-ink-50/80 group-hover:border-rose-200/60 dark:border-white/[0.1] dark:bg-white/[0.06] dark:group-hover:border-rose-200/25"
+                )}
                 aria-hidden
               >
                 {expenseCategoryPicto(row.label)}
               </div>
-            </div>
+            </>
+          );
+
+          return (
+            onSelect ? (
+              <button
+                key={row.label}
+                type="button"
+                role="listitem"
+                aria-pressed={selected}
+                aria-label={`Filtrer les transactions : ${row.label}`}
+                onClick={() => onSelect(row.label)}
+                className="group relative flex min-w-[3rem] flex-1 flex-col items-center gap-1.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+                title={`${row.label} · ${fmt.euro(row.amount)}${row.isHt ? " HT" : ""}`}
+              >
+                {content}
+              </button>
+            ) : (
+              <div
+                key={row.label}
+                role="listitem"
+                className="group relative flex min-w-[3rem] flex-1 flex-col items-center gap-1.5"
+                title={`${row.label} · ${fmt.euro(row.amount)}${row.isHt ? " HT" : ""}`}
+              >
+                {content}
+              </div>
+            )
           );
         })}
       </div>
@@ -242,7 +304,7 @@ function txCountsAsIncome(tx: DashboardTx): boolean {
   return incomeAnalyticsMonthKey(tx) != null;
 }
 
-type ExpenseMacroRow = { label: string; amount: number };
+type ExpenseMacroRow = { label: string; amount: number; isHt: boolean };
 
 function expenseMatchesKindFilter(tx: DashboardTx, filter: ExpenseKindFilter): boolean {
   if (filter === "all") return true;
@@ -257,18 +319,20 @@ function computeExpenseMacroBreakdown(
   monthKey: string,
   kindFilter: ExpenseKindFilter = "all"
 ): ExpenseMacroRow[] {
-  const byLabel = new Map<string, number>();
+  const byLabel = new Map<string, ExpenseMacroRow>();
   for (const tx of txs) {
     if (tx.date.slice(0, 7) !== monthKey || tx.amount >= 0) continue;
     const label = expenseMacroLabel(tx);
     if (!label) continue;
     if (!expenseMatchesKindFilter(tx, kindFilter)) continue;
-    const amount = kindFilter === "digitpro" ? dashboardSasuExpenseAmountHt(tx) : Math.abs(tx.amount);
-    byLabel.set(label, (byLabel.get(label) ?? 0) + amount);
+    const grossAmount = Math.abs(tx.amount);
+    const amount = kindFilter === "digitpro" ? dashboardSasuExpenseAmountHt(tx) : grossAmount;
+    const current = byLabel.get(label) ?? { label, amount: 0, isHt: false };
+    current.amount += amount;
+    current.isHt ||= kindFilter === "digitpro" && expenseAmountHasRecoverableVat(amount, grossAmount);
+    byLabel.set(label, current);
   }
-  return Array.from(byLabel.entries())
-    .map(([label, amount]) => ({ label, amount }))
-    .sort((a, b) => b.amount - a.amount);
+  return Array.from(byLabel.values()).sort((a, b) => b.amount - a.amount);
 }
 
 type MonthMetrics = {
@@ -303,7 +367,12 @@ function trailingMonthlySeries(
     if (kind === "income" ? !txCountsAsIncome(tx) : !txCountsAsExpense(tx)) continue;
     if (kind === "spend" && !expenseMatchesKindFilter(tx, expenseKindFilter)) continue;
     const mk = kind === "income" ? incomeAnalyticsMonthKey(tx)! : tx.date.slice(0, 7);
-    const amount = kind === "income" ? tx.amount : Math.abs(tx.amount);
+    const amount =
+      kind === "income"
+        ? tx.amount
+        : expenseKindFilter === "digitpro"
+          ? dashboardSasuExpenseAmountHt(tx)
+          : Math.abs(tx.amount);
     buckets.set(mk, (buckets.get(mk) ?? 0) + amount);
   }
   const series: { monthKey: string; value: number }[] = [];
@@ -407,15 +476,25 @@ function InsightCard({ children }: { children: React.ReactNode }) {
 export function PersonalExpensesInsightCard({
   transactions,
   monthKey,
-  onMonthChange
+  onMonthChange,
+  selectedCategory,
+  onCategoryChange
 }: {
   transactions: DashboardTx[];
   monthKey: string;
   onMonthChange: (monthKey: string) => void;
+  selectedCategory: string | null;
+  onCategoryChange: (category: string | null) => void;
 }) {
   const fmt = useDashboardDisplayFormat();
   const personalTransactions = useMemo(
-    () => transactions.filter((tx) => tx.scope === "personal"),
+    () =>
+      transactions
+        .filter((tx) => tx.scope === "personal")
+        .map((tx) => {
+          const category = tx.categoryManual ? null : categorizeKnownPersonalTransfer(tx.label, tx.amount);
+          return category ? { ...tx, category } : tx;
+        }),
     [transactions]
   );
   const currentRows = useMemo(
@@ -488,12 +567,146 @@ export function PersonalExpensesInsightCard({
           </span>
         </div>
         <div className="mt-1.5">
-          <ExpenseCategoryBars rows={currentRows} fmt={fmt} />
+          <ExpenseCategoryBars
+            rows={currentRows}
+            fmt={fmt}
+            selectedLabel={selectedCategory}
+            onSelect={(category) => onCategoryChange(selectedCategory === category ? null : category)}
+          />
         </div>
         <div className="mt-3">
           <Sparkline points={monthlySeries} stroke="#fb7185" />
         </div>
       </InsightCard>
+    </section>
+  );
+}
+
+/** Liste des mouvements privés du mois affiché, avec la catégorie Bankin déjà mappée à l'import. */
+export function PersonalTransactionsPeriodCard({
+  transactions,
+  monthKey,
+  selectedCategory,
+  onCategoryChange,
+  onTransactionCategoryChange
+}: {
+  transactions: DashboardTx[];
+  monthKey: string;
+  selectedCategory: string | null;
+  onCategoryChange: (category: string | null) => void;
+  onTransactionCategoryChange: (transactionId: string, category: string) => Promise<void>;
+}) {
+  const fmt = useDashboardDisplayFormat();
+  const rows = useMemo(
+    () =>
+      transactions
+        .filter(
+          (tx) =>
+            (tx.scope ?? "pro") === "personal" &&
+            tx.date.slice(0, 7) === monthKey
+        )
+        .map((tx) => {
+          const category = tx.categoryManual ? null : categorizeKnownPersonalTransfer(tx.label, tx.amount);
+          return category ? { ...tx, category } : tx;
+        })
+        .filter(
+          (tx) => selectedCategory == null || bankinParentCategoryLabel(tx.category) === selectedCategory
+        )
+        .sort((a, b) => b.date.localeCompare(a.date) || a.label.localeCompare(b.label, "fr")),
+    [monthKey, selectedCategory, transactions]
+  );
+
+  return (
+    <section className={dashboardInsightCard} aria-labelledby="personal-transactions-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <div>
+          <p className="text-sm text-ink-500 dark:text-white/50">Transactions</p>
+          <h2 id="personal-transactions-title" className="mt-0.5 font-display text-lg font-semibold text-ink-900 dark:text-white">
+            {monthNavigatorLabel(monthKey)}
+          </h2>
+          {selectedCategory ? (
+            <button
+              type="button"
+              onClick={() => onCategoryChange(null)}
+              className="mt-2 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-800 transition hover:bg-rose-200 dark:bg-rose-300/15 dark:text-rose-200 dark:hover:bg-rose-300/25"
+            >
+              {selectedCategory} · Réinitialiser
+            </button>
+          ) : null}
+        </div>
+        <span className="text-xs font-semibold tabular-nums text-ink-500 dark:text-white/50">
+          {rows.length} transaction{rows.length > 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {rows.length ? (
+        <div className="mt-4 max-h-[30rem] divide-y divide-ink-200/70 overflow-y-auto pr-1 dark:divide-white/[0.08]">
+          {rows.map((tx) => {
+            const category = tx.category?.trim() || "Non catégorisée";
+            const isCredit = tx.amount >= 0;
+            const showCategoryPicker = isBankinCardPayment(tx.label);
+            const currentOption = PERSONAL_CARD_CATEGORY_OPTIONS.find((option) => option.value === category);
+            const categoryOptions = currentOption
+              ? PERSONAL_CARD_CATEGORY_OPTIONS
+              : [{ value: category, label: `Catégorie actuelle · ${category}` }, ...PERSONAL_CARD_CATEGORY_OPTIONS];
+            return (
+              <div key={tx.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                <time
+                  dateTime={tx.date}
+                  className="w-11 shrink-0 pt-0.5 text-xs font-medium tabular-nums text-ink-400 dark:text-white/40"
+                >
+                  {formatDebitDateLabel(tx.date)}
+                </time>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink-800 dark:text-white/90" title={tx.label}>
+                    {tx.label}
+                  </p>
+                  {showCategoryPicker ? (
+                    <label className="mt-2 block w-full max-w-[18rem]">
+                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-ink-500 dark:text-white/48">
+                        Catégorie du paiement CB
+                      </span>
+                      <select
+                        value={category}
+                        onChange={(event) => void onTransactionCategoryChange(tx.id, event.target.value)}
+                        className="w-full appearance-auto rounded-xl border border-ink-300 bg-white px-3 py-2 text-xs font-semibold text-ink-800 shadow-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-300/50 dark:border-cyan-100/25 dark:bg-[#123f49] dark:text-white dark:focus:border-rose-300"
+                        aria-label={`Catégorie Bankin pour ${tx.label}`}
+                      >
+                        {categoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <p
+                      className="mt-1 w-fit max-w-full truncate rounded-md bg-ink-100/80 px-2 py-0.5 text-[10px] font-semibold text-ink-600 dark:bg-white/[0.08] dark:text-white/62"
+                      title={`Catégorie Bankin mappée : ${category}`}
+                    >
+                      {category}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={clsx(
+                    "shrink-0 pt-0.5 text-sm font-bold tabular-nums",
+                    isCredit ? "text-emerald-700 dark:text-emerald-300" : "text-ink-900 dark:text-white"
+                  )}
+                >
+                  {isCredit ? "+" : "−"}{fmt.euro(Math.abs(tx.amount))}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-ink-500 dark:text-white/45">
+          {selectedCategory
+            ? `Aucune transaction dans la catégorie « ${selectedCategory} » sur cette période.`
+            : "Aucune transaction privée sur cette période."}
+        </p>
+      )}
     </section>
   );
 }
@@ -589,6 +802,8 @@ export function RevolutInsightsSection({
 
   const depensesDelta = filteredDepenses - previousFilteredDepenses;
   const entreesDelta = current.entrees - previous.entrees;
+  const digitProDisplaysHt =
+    expenseKindFilter === "digitpro" && expenseMacroRows.some((row) => row.isHt);
 
   return (
     <section className="space-y-3">
@@ -652,6 +867,7 @@ export function RevolutInsightsSection({
           <div className="mt-1 flex items-baseline gap-2">
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
               {fmt.euro(filteredDepenses)}
+              {digitProDisplaysHt ? <span className="ml-1 text-xs font-bold text-ink-500 dark:text-white/55">HT</span> : null}
             </p>
             <span
               className={clsx(
@@ -666,6 +882,11 @@ export function RevolutInsightsSection({
               {depensesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(depensesDelta))}
             </span>
           </div>
+          {digitProDisplaysHt ? (
+            <p className="mt-1 text-[10px] font-medium text-ink-500 dark:text-white/45">
+              HT lorsque la TVA est récupérable.
+            </p>
+          ) : null}
           <UpcomingQontoDebitsList debits={qontoDebitsThisMonth} fmt={fmt} />
           <div className="mt-1.5">
             <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />

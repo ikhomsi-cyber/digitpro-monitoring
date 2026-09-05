@@ -108,6 +108,37 @@ function mapDigitProBankinSubToAppCategory(sub: string): string | null {
 }
 
 /**
+ * Remboursements reçus de DigitPro : le libellé bancaire est plus fiable que
+ * la catégorie générique souvent renvoyée par Bankin/Powens (« Divers »).
+ */
+export function categorizeDigitProIncomingTransfer(
+  description: string,
+  amount: number
+): "NDF DigitPro" | "Indemnités kilométriques" | null {
+  if (amount <= 0) return null;
+  const text = fold(description);
+  const isDigitPro = /\bdigitpro\b/.test(text);
+  const isTransfer = /\b(virement|vir|transfer)\b/.test(text);
+  if (!isDigitPro || !isTransfer) return null;
+
+  if (/\bndf\b|note?s? de frais/.test(text)) return "NDF DigitPro";
+  if (/\bik\b|indemnite?s? kilometrique?s?/.test(text)) return "Indemnités kilométriques";
+  return null;
+}
+
+/** Règles explicites de catégorisation de virements personnels connus. */
+export function categorizeKnownPersonalTransfer(description: string, amount: number): string | null {
+  const digitPro = categorizeDigitProIncomingTransfer(description, amount);
+  if (digitPro) return digitPro;
+
+  const text = fold(description);
+  if (/\bmr\s+lontsi\b/.test(text) && /\b(virement|vir|transfer)\b/.test(text)) {
+    return "Logement › Loyer";
+  }
+  return null;
+}
+
+/**
  * Catégorie affichée / stockée pour une ligne d’export Bankin.
  * Ne modifie pas le montant ; tient compte du signe uniquement pour d’éventuelles extensions.
  */
@@ -115,6 +146,9 @@ export function categorizeBankinTransaction(input: BankinCategorizeInput): strin
   const parent = input.parentCategory.trim();
   const sub = input.subCategory.trim();
   const desc = input.description.trim();
+
+  const knownTransfer = categorizeKnownPersonalTransfer(desc, input.amount);
+  if (knownTransfer) return knownTransfer;
 
   const digitPro = mapDigitProBankinSubToAppCategory(sub);
   if (digitPro) return digitPro;

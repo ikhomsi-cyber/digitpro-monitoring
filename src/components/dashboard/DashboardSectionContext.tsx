@@ -17,7 +17,6 @@ export type DashboardSection =
   | "valeur"
   | "sasu"
   | "private"
-  | "categorisation"
   | "impots";
 
 export function parseDashboardSection(search: string): DashboardSection {
@@ -27,7 +26,7 @@ export function parseDashboardSection(search: string): DashboardSection {
   if (s === "activite") return "activite";
   if (s === "sasu") return "sasu";
   if (s === "private") return "private";
-  if (s === "categorisation") return "categorisation";
+  if (s === "categorisation") return "activite";
   if (s === "impots") return "impots";
   return "full";
 }
