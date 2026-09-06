@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { GMAIL_OAUTH_STATE_COOKIE, isValidGmailOAuthState } from "@/lib/gmail/oauth-state";
 import { createGmailOAuthClient, exchangeGmailCode } from "@/lib/gmail/oauth";
 import { gmailRedirectUriForOrigin, resolveRequestOrigin } from "@/lib/gmail/config";
 import { fetchGmailAddress } from "@/lib/gmail/fetch-invoices";
@@ -21,6 +23,16 @@ export async function GET(req: NextRequest) {
 
   const error = u.searchParams.get("error");
   const code = u.searchParams.get("code");
+  const receivedState = u.searchParams.get("state");
+  const cookieStore = await cookies();
+  const expectedState = cookieStore.get(GMAIL_OAUTH_STATE_COOKIE)?.value;
+  cookieStore.delete(GMAIL_OAUTH_STATE_COOKIE);
+
+  if (!isValidGmailOAuthState(expectedState, receivedState)) {
+    target.searchParams.set("gmail_connect", "error");
+    target.searchParams.set("gmail_error", "invalid_state");
+    return NextResponse.redirect(target);
+  }
 
   if (error) {
     target.searchParams.set("gmail_connect", "error");

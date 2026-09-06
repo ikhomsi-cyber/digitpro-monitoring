@@ -122,6 +122,13 @@ import {
 } from "@/lib/sasu-analytics";
 import { dashboardSasuExpenseAmountHt } from "@/lib/recoverable-expense-vat";
 import { useDashboardSection, type DashboardSection } from "@/components/dashboard/DashboardSectionContext";
+import {
+  currentDashboardMonthKey,
+  formatCompactEuroAxis,
+  formatDashboardMonthShort,
+  smoothDashboardSvgPath,
+  sumDashboardValues
+} from "@/lib/dashboard-client-utils";
 
 export type { DashboardTx };
 
@@ -200,50 +207,6 @@ function DashboardBlockTitle({
       </CardTitle>
     </div>
   );
-}
-
-/** 12 mois glissants vs années civiles — même logique que la section analytics (`selectedYears` → revenus & dépenses). */
-function sum(values: number[]) {
-  return values.reduce((acc, v) => acc + v, 0);
-}
-
-function monthLabelFr(yyyyMm: string) {
-  const [y, m] = yyyyMm.split("-").map((x) => Number(x));
-  const d = new Date(Date.UTC(y ?? 2000, (m ?? 1) - 1, 1));
-  return new Intl.DateTimeFormat("fr-FR", { month: "short", year: "numeric" }).format(d);
-}
-
-function compactEuroAxis(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000) return `${Math.round(value / 100_000) / 10}M€`;
-  if (abs >= 10_000) return `${Math.round(value / 1000)}k€`;
-  if (abs >= 1000) return `${Math.round(value / 100) / 10}k€`;
-  return `${Math.round(value)}€`;
-}
-
-function smoothSvgPath(points: Array<{ x: number; y: number }>): string {
-  if (!points.length) return "";
-  if (points.length === 1) return `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
-
-  let path = `M ${points[0]!.x.toFixed(1)} ${points[0]!.y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] ?? points[i]!;
-    const p1 = points[i]!;
-    const p2 = points[i + 1]!;
-    const p3 = points[i + 2] ?? p2;
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
-  }
-  return path;
-}
-
-/** Mois civil courant (local), aligné avec les dates des transactions YYYY-MM-DD. */
-function dashboardMonthKeyNowLocal(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function DashboardClient({
@@ -327,9 +290,9 @@ export function DashboardClient({
     () => [defaultDashboardPeriodFilter().selectedMonth]
   );
   /** Mois contrôlé par le navigateur au sommet du dashboard principal. */
-  const [overviewMonthKey, setOverviewMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
+  const [overviewMonthKey, setOverviewMonthKey] = useState<string>(currentDashboardMonthKey);
   /** Mois contrôlé par le bloc de dépenses de l’onglet Perso. */
-  const [personalExpensesMonthKey, setPersonalExpensesMonthKey] = useState<string>(dashboardMonthKeyNowLocal);
+  const [personalExpensesMonthKey, setPersonalExpensesMonthKey] = useState<string>(currentDashboardMonthKey);
   /** Catégorie Bankin sélectionnée dans l’histogramme des dépenses perso. */
   const [personalTransactionCategoryFilter, setPersonalTransactionCategoryFilter] = useState<string | null>(null);
   /** null = total sur toute la fenêtre d’analyse ; sinon un seul mois (YYYY-MM) via clic sur le graphique. */
@@ -662,7 +625,7 @@ export function DashboardClient({
   /** Mois de la fenêtre d’analyse déjà écoulés (≤ mois en cours), pour les moyennes. */
   const monthsElapsedInDashboardPeriod = useMemo(() => {
     if (!metrics.length) return 0;
-    const cap = dashboardMonthKeyNowLocal();
+    const cap = currentDashboardMonthKey();
     return metrics.filter((m) => m.month <= cap).length;
   }, [metrics]);
 
@@ -705,7 +668,7 @@ export function DashboardClient({
       const m = metrics.find((x) => x.month === activeExpenseMonthKey);
       return m ? m.expenses : 0;
     }
-    return sum(metrics.map((x) => x.expenses));
+    return sumDashboardValues(metrics.map((x) => x.expenses));
   }, [activeExpenseMonthKey, metrics]);
 
   const totalExpensesCardTtc = useMemo(() => {
@@ -745,7 +708,7 @@ export function DashboardClient({
   }, [activeExpenseMonthKey, expenseCategoryBreakdownMain]);
 
   const VAT_RATE = 0.2;
-  const totalRevenues = useMemo(() => sum(metrics.map((m) => m.revenue)), [metrics]);
+  const totalRevenues = useMemo(() => sumDashboardValues(metrics.map((m) => m.revenue)), [metrics]);
   const totalRevenuesHt = useMemo(() => totalRevenues / (1 + VAT_RATE), [totalRevenues]);
 
   const revenueYearProjection = useMemo(
@@ -762,7 +725,7 @@ export function DashboardClient({
   const monthlyRevenueChartSeries = useMemo(
     () =>
       metrics.map((m) => ({
-        month: monthLabelFr(m.month),
+        month: formatDashboardMonthShort(m.month),
         monthKey: m.month,
         value:
           Math.round((kpiMode === "personal" ? m.revenue : m.revenue / (1 + VAT_RATE)) * 100) / 100
@@ -845,7 +808,7 @@ export function DashboardClient({
   const monthlyTotalExpensesSeries = useMemo(
     () =>
       metrics.map((m) => ({
-        month: monthLabelFr(m.month),
+        month: formatDashboardMonthShort(m.month),
         monthKey: m.month,
         value: Math.round(m.expenses * 100) / 100
       })),
@@ -887,7 +850,7 @@ export function DashboardClient({
   }, [sasuMonthlyEvolutionBuckets]);
 
   const sasuMonthlyEvolutionColorByName = useMemo(() => {
-    const total = sum(sasuMonthlyEvolutionOptions.map((item) => item.total));
+    const total = sumDashboardValues(sasuMonthlyEvolutionOptions.map((item) => item.total));
     const slices =
       sasuBreakdownMode === "simplified"
         ? sasuMonthlyEvolutionOptions.map((item) => ({
@@ -927,7 +890,7 @@ export function DashboardClient({
         }
       }
       return {
-        month: monthLabelFr(monthKey),
+        month: formatDashboardMonthShort(monthKey),
         monthKey,
         value: Math.round(total * 100) / 100,
         byCategory
@@ -1022,7 +985,7 @@ export function DashboardClient({
     }
     let s: string;
     if (activeExpenseMonthKey) {
-      s = `${base} · ${monthLabelFr(activeExpenseMonthKey)} (mois sélectionné) · ${periodLabel}`;
+      s = `${base} · ${formatDashboardMonthShort(activeExpenseMonthKey)} (mois sélectionné) · ${periodLabel}`;
     } else {
       s = `${base} · ${periodLabel}`;
     }
@@ -1386,7 +1349,7 @@ export function DashboardClient({
                             fill="var(--chart-label)"
                             style={{ fontSize: 7.5, fontWeight: 800 }}
                           >
-                            {compactEuroAxis(value)}
+                            {formatCompactEuroAxis(value)}
                           </text>
                         );
                       })}
@@ -1401,7 +1364,7 @@ export function DashboardClient({
                           const y = 132 - (month.value / maxSasuMonthlyChartValue) * 112;
                           return { x, y, value: month.value, month: month.month };
                         });
-                        const totalPath = smoothSvgPath(totalPoints);
+                        const totalPath = smoothDashboardSvgPath(totalPoints);
                         const areaPath = totalPoints.length
                           ? `${totalPath} L ${totalPoints[totalPoints.length - 1]!.x.toFixed(1)} 136 L ${totalPoints[0]!.x.toFixed(1)} 136 Z`
                           : "";
@@ -1430,7 +1393,7 @@ export function DashboardClient({
                           const y = 132 - (value / maxSasuMonthlyChartValue) * 112;
                           return { x, y, value, month: month.month };
                         });
-                        const path = smoothSvgPath(points);
+                        const path = smoothDashboardSvgPath(points);
                         return (
                           <g key={name}>
                             <path
@@ -2118,8 +2081,8 @@ export function DashboardClient({
                 }
                 ariaLabel={
                   kpiMode === "personal"
-                    ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
-                    : `Évolution des dépenses HT par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${monthLabelFr(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
+                    ? `Évolution des dépenses perso par mois (catégories Bankin, hors virements internes) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${formatDashboardMonthShort(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
+                    : `Évolution des dépenses HT par mois (hors BNC et TVA) — ${periodLabel}${totalExpensesMonthFilter ? ` — filtre ${formatDashboardMonthShort(totalExpensesMonthFilter)}` : ""}. Cliquer un mois sur le graphique active ou désactive le filtre sur ce mois.`
                 }
               />
               <div

@@ -139,23 +139,6 @@ function applyBankinReferenceToPowensRows(
   });
 }
 
-/**
- * True when a Postgrest/PG error means a given column does not exist in the schema cache yet.
- * Lets the action fall back gracefully when the user hasn’t applied recent migrations
- * (e.g. file_hash on import_sessions, balance on transactions).
- */
-function isMissingColumnError(err: unknown, column: string): boolean {
-  if (!err || typeof err !== "object") return false;
-  const e = err as { code?: string; message?: string; details?: string; hint?: string };
-  const blob = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.toLowerCase();
-  if (e.code === "PGRST204" || e.code === "42703") {
-    return blob.includes(column.toLowerCase());
-  }
-  if (blob.includes("could not find") && blob.includes(column.toLowerCase())) return true;
-  if (blob.includes("schema cache") && blob.includes(column.toLowerCase())) return true;
-  return false;
-}
-
 async function assertSupabaseWritesEnabled() {
   const cookieStore = await cookies();
   const envMode = getSupabaseRuntimeMode();
@@ -254,27 +237,19 @@ async function fetchExistingRowsByContentHashes(
 ): Promise<Map<string, ExistingImportRow>> {
   const map = new Map<string, ExistingImportRow>();
   const chunkSize = 120;
-  let categoryManualSupported = true;
 
   for (let i = 0; i < hashes.length; i += chunkSize) {
     const slice = hashes.slice(i, i + chunkSize);
-    const query = categoryManualSupported
-      ? client.from("transactions").select("id,content_hash,category_manual").in("content_hash", slice)
-      : client.from("transactions").select("id,content_hash").in("content_hash", slice);
-    const { data, error } = await query;
-    if (error) {
-      if (categoryManualSupported && isMissingColumnError(error, "category_manual")) {
-        categoryManualSupported = false;
-        i -= chunkSize;
-        continue;
-      }
-      throw new Error(error.message);
-    }
+    const { data, error } = await client
+      .from("transactions")
+      .select("id,content_hash,category_manual")
+      .in("content_hash", slice);
+    if (error) throw new Error(error.message);
     for (const row of data ?? []) {
       if (!row.content_hash || !row.id) continue;
       map.set(row.content_hash, {
         id: row.id,
-        categoryManual: categoryManualSupported && "category_manual" in row && row.category_manual === true
+        categoryManual: row.category_manual === true
       });
     }
   }
@@ -301,37 +276,20 @@ async function fetchStoredTransactionsBetween(
   minDate: string,
   maxDate: string
 ): Promise<StoredTxRow[]> {
-  let categoryManualSupported = true;
-  for (;;) {
-    const query = categoryManualSupported
-      ? client
-          .from("transactions")
-          .select("id,date,label,amount,content_hash,category_manual")
-          .gte("date", minDate)
-          .lte("date", maxDate)
-      : client
-          .from("transactions")
-          .select("id,date,label,amount,content_hash")
-          .gte("date", minDate)
-          .lte("date", maxDate);
-    const { data, error } = await query;
-    if (error) {
-      if (categoryManualSupported && isMissingColumnError(error, "category_manual")) {
-        categoryManualSupported = false;
-        continue;
-      }
-      throw new Error(error.message);
-    }
-    return (data ?? []).map((row) => ({
-      id: String(row.id),
-      date: String(row.date).slice(0, 10),
-      label: String(row.label ?? ""),
-      amount: Number(row.amount),
-      categoryManual:
-        categoryManualSupported && "category_manual" in row && row.category_manual === true,
-      content_hash: row.content_hash ?? null
-    }));
-  }
+  const { data, error } = await client
+    .from("transactions")
+    .select("id,date,label,amount,content_hash,category_manual")
+    .gte("date", minDate)
+    .lte("date", maxDate);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    date: String(row.date).slice(0, 10),
+    label: String(row.label ?? ""),
+    amount: Number(row.amount),
+    categoryManual: row.category_manual === true,
+    content_hash: row.content_hash ?? null
+  }));
 }
 
 async function resolvePowensFuzzyImportRows(
@@ -504,21 +462,15 @@ export async function createTransaction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const insertBase = {
+  const { error } = await supabase.from("transactions").insert({
     date,
     label,
     category: mapExpenseCategoryLabel(category),
     amount,
-    company
-  };
-  const withScope = { ...insertBase, scope };
-  const { error } = await supabase.from("transactions").insert(withScope);
-  if (error && isMissingColumnError(error, "scope")) {
-    const { error: retryErr } = await supabase.from("transactions").insert(insertBase);
-    if (retryErr) throw new Error(retryErr.message);
-  } else if (error) {
-    throw new Error(error.message);
-  }
+    company,
+    scope
+  });
+  if (error) throw new Error(error.message);
 
   await syncMonthlyMetricsFromDb(supabase);
   revalidatePath("/dashboard");
@@ -568,8 +520,6 @@ export async function importTransactions(
 
   const originalCount = importRows.length;
 
-  let fileHashSupported = true;
-
   if (meta.fileHash) {
     const lookup = await client
       .from("import_sessions")
@@ -579,9 +529,7 @@ export async function importTransactions(
       .limit(1)
       .maybeSingle();
 
-    if (lookup.error && isMissingColumnError(lookup.error, "file_hash")) {
-      fileHashSupported = false;
-    } else if (lookup.error) {
+    if (lookup.error) {
       throw new Error(lookup.error.message);
     } else if (lookup.data?.id) {
       await syncMonthlyMetricsFromDb(client);
@@ -597,39 +545,19 @@ export async function importTransactions(
     }
   }
 
-  type SessionInsertBase = {
-    source_filename: string | null;
-    format: "qonto" | "generic" | "bankin" | "powens";
-    row_count: number;
-    inserted_count: number;
-    skipped_duplicate_count: number;
-  };
-  type SessionInsertWithHash = SessionInsertBase & { file_hash: string };
-  const sessionInsertBase: SessionInsertBase = {
+  const sessionInsertPayload = {
     source_filename: meta.sourceFilename,
     format: meta.format,
     row_count: originalCount,
     inserted_count: 0,
-    skipped_duplicate_count: 0
+    skipped_duplicate_count: 0,
+    file_hash: meta.fileHash
   };
-  const sessionInsertPayload: SessionInsertBase | SessionInsertWithHash =
-    fileHashSupported && meta.fileHash
-      ? ({ ...sessionInsertBase, file_hash: meta.fileHash } as SessionInsertWithHash)
-      : sessionInsertBase;
-  let sessionInsert = await client
+  const sessionInsert = await client
     .from("import_sessions")
     .insert(sessionInsertPayload)
     .select("id")
     .single();
-
-  if (sessionInsert.error && isMissingColumnError(sessionInsert.error, "file_hash")) {
-    fileHashSupported = false;
-    sessionInsert = await client
-      .from("import_sessions")
-      .insert(sessionInsertBase)
-      .select("id")
-      .single();
-  }
   if (sessionInsert.error) throw new Error(sessionInsert.error.message);
   const importSessionId = sessionInsert.data!.id;
 
@@ -663,18 +591,15 @@ export async function importTransactions(
     toMerge.push(...fuzzy.fuzzyMerge);
   }
 
-  let balanceSupported = true;
-  let bankNameSupported = true;
-
   type InsertedPayload = {
     date: string;
     label: string;
     category: string;
     amount: number;
-    balance?: number | null;
+    balance: number | null;
     company: string;
-    bank_name?: string | null;
-    scope?: "pro" | "personal";
+    bank_name: string | null;
+    scope: "pro" | "personal";
     content_hash: string;
     import_session_id: string;
   };
@@ -690,15 +615,6 @@ export async function importTransactions(
     content_hash: p.content_hash,
     import_session_id: importSessionId
   }));
-  function stripUnsupportedInsertFields(rows: InsertedPayload[]): InsertedPayload[] {
-    return rows.map((row) => {
-      const copy: InsertedPayload = { ...row };
-      if (!balanceSupported) delete copy.balance;
-      if (!bankNameSupported) delete copy.bank_name;
-      return copy;
-    });
-  }
-
   const insertedRowsAgg: Array<{
     id: string;
     date: string;
@@ -707,44 +623,17 @@ export async function importTransactions(
     amount: number;
     company: string;
     bankName?: string | null;
-    scope?: "pro" | "personal";
+    scope: "pro" | "personal";
   }> = [];
 
   const batchSize = 200;
   for (let i = 0; i < insertedPayload.length; i += batchSize) {
     const slice = insertedPayload.slice(i, i + batchSize);
     if (!slice.length) continue;
-    let attempt = await client
+    const attempt = await client
       .from("transactions")
-      .insert(stripUnsupportedInsertFields(slice))
+      .insert(slice)
       .select("id,date,label,category,amount,company,bank_name,scope");
-    if (attempt.error && bankNameSupported && isMissingColumnError(attempt.error, "bank_name")) {
-      bankNameSupported = false;
-      attempt = await client
-        .from("transactions")
-        .insert(stripUnsupportedInsertFields(slice))
-        .select("id,date,label,category,amount,company,scope");
-    }
-    if (attempt.error && balanceSupported && isMissingColumnError(attempt.error, "balance")) {
-      balanceSupported = false;
-      attempt = await client
-        .from("transactions")
-        .insert(stripUnsupportedInsertFields(slice))
-        .select(bankNameSupported ? "id,date,label,category,amount,company,bank_name,scope" : "id,date,label,category,amount,company,scope");
-    }
-    if (attempt.error && isMissingColumnError(attempt.error, "scope")) {
-      // Backwards-compat when the column does not exist yet.
-      attempt = await client
-        .from("transactions")
-        .insert(
-          stripUnsupportedInsertFields(slice).map((r) => {
-            const copy = { ...r } as InsertedPayload;
-            delete copy.scope;
-            return copy;
-          })
-        )
-        .select("id,date,label,category,amount,company");
-    }
     if (attempt.error) throw new Error(attempt.error.message);
     const batchInserted = attempt.data;
     for (const r of batchInserted ?? []) {
@@ -755,7 +644,7 @@ export async function importTransactions(
         category: r.category,
         amount: Number(r.amount),
         company: String(r.company ?? ""),
-        bankName: "bank_name" in r ? String(r.bank_name ?? "").trim() || null : null,
+        bankName: String(r.bank_name ?? "").trim() || null,
         scope: r.scope === "personal" ? "personal" : "pro"
       });
     }
@@ -764,43 +653,22 @@ export async function importTransactions(
   const mergeBatch = 25;
   for (let i = 0; i < toMerge.length; i += mergeBatch) {
     const slice = toMerge.slice(i, i + mergeBatch);
-    await Promise.all(
+    const results = await Promise.all(
       slice.map(async (row) => {
         const baseUpdate = {
           ...(row.categoryManual ? {} : { category: row.category }),
           ...(row.refreshLabelDate
             ? { label: row.label, date: row.date, content_hash: row.content_hash }
             : {}),
-          ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
-          import_session_id: importSessionId
-        } as const;
-        const fullUpdate = balanceSupported
-          ? { ...baseUpdate, balance: row.balance ?? null }
-          : baseUpdate;
-        let res = await client.from("transactions").update(fullUpdate).eq("id", row.id);
-        if (res.error && bankNameSupported && isMissingColumnError(res.error, "bank_name")) {
-          bankNameSupported = false;
-          const retryBaseUpdate = {
-            ...(row.categoryManual ? {} : { category: row.category }),
-            import_session_id: importSessionId
-          };
-          const retryFullUpdate = balanceSupported
-            ? { ...retryBaseUpdate, balance: row.balance ?? null }
-            : retryBaseUpdate;
-          res = await client.from("transactions").update(retryFullUpdate).eq("id", row.id);
-        }
-        if (res.error && balanceSupported && isMissingColumnError(res.error, "balance")) {
-          balanceSupported = false;
-          const retryBaseUpdate = {
-            ...(row.categoryManual ? {} : { category: row.category }),
-            ...(bankNameSupported ? { bank_name: row.bankName ?? null } : {}),
-            import_session_id: importSessionId
-          };
-          res = await client.from("transactions").update(retryBaseUpdate).eq("id", row.id);
-        }
-        return res;
+          bank_name: row.bankName ?? null,
+          import_session_id: importSessionId,
+          balance: row.balance ?? null
+        };
+        return client.from("transactions").update(baseUpdate).eq("id", row.id);
       })
     );
+    const firstError = results.find((result) => result.error)?.error;
+    if (firstError) throw new Error(firstError.message);
   }
 
   const merged = toMerge.length;
@@ -1341,27 +1209,11 @@ export async function updateTransaction(id: string, formData: FormData) {
   if (!user) throw new Error("Not authenticated");
 
   const mappedCategory = mapExpenseCategoryLabel(category);
-  let updateError = (
-    await supabase
-      .from("transactions")
-      .update({ date, label, category: mappedCategory, amount, company, category_manual: true })
-      .eq("id", id)
-  ).error;
-
-  if (
-    updateError &&
-    /category_manual/i.test(updateError.message) &&
-    /(could not find|schema cache|does not exist)/i.test(updateError.message)
-  ) {
-    updateError = (
-      await supabase
-        .from("transactions")
-        .update({ date, label, category: mappedCategory, amount, company })
-        .eq("id", id)
-    ).error;
-  }
-
-  if (updateError) throw new Error(updateError.message);
+  const { error } = await supabase
+    .from("transactions")
+    .update({ date, label, category: mappedCategory, amount, company, category_manual: true })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 
   await syncMonthlyMetricsFromDb(supabase);
   revalidatePath("/dashboard");
@@ -1380,31 +1232,13 @@ export async function updatePersonalTransactionCategory(id: string, category: st
   if (!user) throw new Error("Not authenticated");
 
   const mappedCategory = mapExpenseCategoryLabel(category);
-  let updateError = (
-    await supabase
-      .from("transactions")
-      .update({ category: mappedCategory, category_manual: true })
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .eq("scope", "personal")
-  ).error;
-
-  if (
-    updateError &&
-    /category_manual/i.test(updateError.message) &&
-    /(could not find|schema cache|does not exist)/i.test(updateError.message)
-  ) {
-    updateError = (
-      await supabase
-        .from("transactions")
-        .update({ category: mappedCategory })
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .eq("scope", "personal")
-    ).error;
-  }
-
-  if (updateError) throw new Error(updateError.message);
+  const { error } = await supabase
+    .from("transactions")
+    .update({ category: mappedCategory, category_manual: true })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .eq("scope", "personal");
+  if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard");
 }
@@ -1544,13 +1378,7 @@ export async function tagExistingTransactionsAsQonto(): Promise<{
       .select("id,company,balance")
       .order("created_at", { ascending: true })
       .range(from, from + pageSize - 1);
-    if (error) {
-      // Si la colonne balance n'existe pas encore, on ne peut rien faire.
-      if (isMissingColumnError(error, "balance")) {
-        return { scanned: 0, updated: 0 };
-      }
-      throw new Error(error.message);
-    }
+    if (error) throw new Error(error.message);
     const rows = (data ?? []) as Row[];
     all.push(...rows);
     if (rows.length < pageSize) break;

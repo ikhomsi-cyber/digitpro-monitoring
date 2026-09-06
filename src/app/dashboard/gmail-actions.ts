@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { gmailRedirectUriForOrigin, isGmailConfigured, resolveRequestOrigin } from "@/lib/gmail/config";
 import { buildGmailConsentUrl } from "@/lib/gmail/oauth";
@@ -28,6 +28,10 @@ import {
 } from "@/lib/gmail/hiway-invoice-store";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 import { loadBillableActivitySettings } from "@/lib/supabase/dashboard-loaders";
+import {
+  GMAIL_OAUTH_STATE_COOKIE,
+  GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
+} from "@/lib/gmail/oauth-state";
 
 export type GmailConnectionStatus = {
   /** Variables d'env OAuth Google présentes côté serveur. */
@@ -72,10 +76,19 @@ export async function getGmailConnectUrl(): Promise<{ url: string }> {
     );
   }
   await requireUser();
+  const state = randomUUID();
+  const cookieStore = await cookies();
+  cookieStore.set(GMAIL_OAUTH_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
+  });
   // Le redirect_uri suit le domaine réel de la requête (prod vs local) au lieu d'un env figé.
   const origin = resolveRequestOrigin(await headers());
   const redirectUri = gmailRedirectUriForOrigin(origin) ?? undefined;
-  return { url: buildGmailConsentUrl(randomUUID(), redirectUri) };
+  return { url: buildGmailConsentUrl(state, redirectUri) };
 }
 
 export async function loadHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }> {

@@ -1,6 +1,9 @@
 /** Message utilisateur pour les erreurs OAuth Google renvoyées sur le callback. */
 export function gmailOAuthErrorMessage(code: string | null): string {
   const key = (code ?? "").toLowerCase();
+  if (key === "invalid_state") {
+    return "La tentative de connexion Gmail a expiré ou n’est pas valide. Relancez la connexion depuis le tableau de bord.";
+  }
   if (key === "access_denied") {
     return (
       "Accès refusé : l’app OAuth est en mode test. Ajoutez votre adresse Gmail dans " +

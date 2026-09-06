@@ -176,8 +176,11 @@ alter table public.transactions add column if not exists import_session_id uuid 
 alter table public.transactions add column if not exists company text not null default '';
 alter table public.transactions add column if not exists balance numeric;
 alter table public.transactions add column if not exists bank_name text;
+alter table public.transactions add column if not exists scope text not null default 'pro'
+  check (scope in ('pro', 'personal'));
 
 create index if not exists transactions_user_company_date_idx on public.transactions (user_id, company, date desc);
+create index if not exists transactions_user_scope_date_idx on public.transactions (user_id, scope, date desc);
 
 create unique index if not exists transactions_user_content_hash_uidx
 on public.transactions (user_id, content_hash)

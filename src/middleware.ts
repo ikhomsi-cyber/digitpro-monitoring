@@ -35,7 +35,11 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isProtected = pathname.startsWith("/dashboard") || pathname.startsWith("/lmnp");
+  const isProtected =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/lmnp") ||
+    pathname.startsWith("/categorisation") ||
+    pathname.startsWith("/parametres");
 
   if (isProtected && !user) {
     const redirectUrl = request.nextUrl.clone();
@@ -55,6 +59,15 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/lmnp", "/lmnp/:path*", "/login", "/signup"]
+  matcher: [
+    "/dashboard/:path*",
+    "/lmnp",
+    "/lmnp/:path*",
+    "/categorisation",
+    "/categorisation/:path*",
+    "/parametres",
+    "/parametres/:path*",
+    "/login",
+    "/signup"
+  ]
 };
-

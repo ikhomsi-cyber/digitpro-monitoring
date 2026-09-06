@@ -13,17 +13,8 @@ const DASHBOARD_TX_FETCH_CONCURRENCY = 4;
 /** Fenêtre chargée au premier paint (mois civils glissants, inclus le mois courant). */
 export const DASHBOARD_TX_INITIAL_MONTHS = 24;
 
-const TX_SELECT_VARIANTS = [
-  "id,date,label,category,category_manual,amount,balance,company,bank_name,scope,import_sessions(format)",
-  "id,date,label,category,amount,balance,company,bank_name,scope,import_sessions(format)",
-  "id,date,label,category,category_manual,amount,balance,company,bank_name,scope",
-  "id,date,label,category,amount,balance,company,bank_name,scope",
-  "id,date,label,category,amount,balance,company,scope",
-  "id,date,label,category,amount,company,bank_name,scope",
-  "id,date,label,category,amount,company,scope",
-  "id,date,label,category,amount,balance,company",
-  "id,date,label,category,amount,company"
-] as const;
+const DASHBOARD_TRANSACTION_SELECT =
+  "id,date,label,category,category_manual,amount,balance,company,bank_name,scope,import_sessions(format)";
 
 export type SupabaseTxRow = {
   id: string;
@@ -38,13 +29,6 @@ export type SupabaseTxRow = {
   scope?: "pro" | "personal" | null;
   category_manual?: boolean | null;
 };
-
-function transactionSelectMissingColumn(errMsg: string, column: string): boolean {
-  if (!errMsg) return false;
-  const blob = errMsg.toLowerCase();
-  if (!/(could not find|schema cache|does not exist)/i.test(blob)) return false;
-  return new RegExp(column, "i").test(blob);
-}
 
 async function fetchDashboardTransactionPage(
   client: SupabaseServerClient,
@@ -129,34 +113,6 @@ async function fetchAllDashboardTransactionRows(
   };
 }
 
-function resolveCompatibleTransactionSelect(
-  loader: (selectStr: string) => Promise<{ rows: SupabaseTxRow[]; errorMessage: string | null }>
-): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
-  return (async () => {
-    for (const selectStr of TX_SELECT_VARIANTS) {
-      const { rows, errorMessage } = await loader(selectStr);
-      if (!errorMessage) {
-        return { transactions: mapRowsToDashboardTx(rows), errorMessage: null };
-      }
-      const err = errorMessage;
-      if (transactionSelectMissingColumn(err, "balance") && selectStr.includes("balance")) {
-        continue;
-      }
-      if (transactionSelectMissingColumn(err, "scope") && selectStr.includes("scope")) {
-        continue;
-      }
-      if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) {
-        continue;
-      }
-      if (transactionSelectMissingColumn(err, "category_manual") && selectStr.includes("category_manual")) {
-        continue;
-      }
-      return { transactions: [], errorMessage: err };
-    }
-    return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };
-  })();
-}
-
 /** Date ISO (YYYY-MM-DD) du 1er jour du mois le plus ancien inclus dans la fenêtre initiale. */
 export function dashboardInitialTransactionsSinceIso(now = new Date()): string {
   const anchor = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -198,14 +154,18 @@ function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {
 }
 
 /**
- * Charge toutes les transactions utilisateur (pagination PostgREST), avec repli si colonnes absentes.
+ * Charge toutes les transactions utilisateur (pagination PostgREST).
+ * Le schéma est versionné par les migrations Supabase : aucun repli vers un
+ * sous-ensemble de colonnes ne masque une migration non appliquée.
  */
 export async function loadAllUserTransactionsFromSupabase(
   client: SupabaseServerClient
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
-  return resolveCompatibleTransactionSelect((selectStr) =>
-    fetchAllDashboardTransactionRows(client, selectStr)
+  const { rows, errorMessage } = await fetchAllDashboardTransactionRows(
+    client,
+    DASHBOARD_TRANSACTION_SELECT
   );
+  return { transactions: mapRowsToDashboardTx(rows), errorMessage };
 }
 
 /**
@@ -216,35 +176,27 @@ export async function loadInitialUserTransactionsFromSupabase(
   now = new Date()
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null; sinceIso: string }> {
   const sinceIso = dashboardInitialTransactionsSinceIso(now);
-  const result = await resolveCompatibleTransactionSelect((selectStr) =>
-    fetchAllDashboardTransactionRows(client, selectStr, sinceIso)
+  const { rows, errorMessage } = await fetchAllDashboardTransactionRows(
+    client,
+    DASHBOARD_TRANSACTION_SELECT,
+    sinceIso
   );
-  return { ...result, sinceIso };
+  return { transactions: mapRowsToDashboardTx(rows), errorMessage, sinceIso };
 }
 
 export async function loadRecentUserTransactionsFromSupabase(
   client: SupabaseServerClient,
   limit = 2000
 ): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
-  for (const selectStr of TX_SELECT_VARIANTS) {
-    const { data, error } = await client
-      .from("transactions")
-      .select(selectStr)
-      .order("date", { ascending: false })
-      .order("id", { ascending: false })
-      .limit(limit);
-    if (!error) {
-      return {
-        transactions: mapRowsToDashboardTx((data ?? []) as unknown as SupabaseTxRow[]),
-        errorMessage: null
-      };
-    }
-    const err = error.message;
-    if (transactionSelectMissingColumn(err, "balance") && selectStr.includes("balance")) continue;
-    if (transactionSelectMissingColumn(err, "scope") && selectStr.includes("scope")) continue;
-    if (transactionSelectMissingColumn(err, "bank_name") && selectStr.includes("bank_name")) continue;
-    if (transactionSelectMissingColumn(err, "category_manual") && selectStr.includes("category_manual")) continue;
-    return { transactions: [], errorMessage: err };
-  }
-  return { transactions: [], errorMessage: "Aucun schéma transactions compatible." };
+  const { data, error } = await client
+    .from("transactions")
+    .select(DASHBOARD_TRANSACTION_SELECT)
+    .order("date", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (error) return { transactions: [], errorMessage: error.message };
+  return {
+    transactions: mapRowsToDashboardTx((data ?? []) as unknown as SupabaseTxRow[]),
+    errorMessage: null
+  };
 }
