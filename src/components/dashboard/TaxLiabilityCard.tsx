@@ -15,6 +15,7 @@ type Props = {
   cashEur: number | null;
   vatEur: number;
   csgEur: number;
+  csgComparaison172Eur: number;
   totalLiabilityEur: number;
   statsReady: boolean;
   formatEuro: (n: number) => string;
@@ -44,6 +45,7 @@ export function TaxLiabilityCard({
   cashEur,
   vatEur,
   csgEur,
+  csgComparaison172Eur,
   totalLiabilityEur,
   statsReady,
   formatEuro,
@@ -82,12 +84,20 @@ export function TaxLiabilityCard({
             </span>
             <span className="inline-flex items-center gap-1.5 text-ink-600 dark:text-white/60">
               <span className="h-2 w-2 rounded-full bg-orange-400" aria-hidden />
-              CSG{" "}
+              CSG (9,7 %){" "}
               <span className="font-medium tabular-nums text-ink-800 dark:text-white/85">
                 {formatEuro(coverage.csgEur)}
               </span>
             </span>
+            <span className="inline-flex items-center gap-1.5 text-ink-600 dark:text-white/60" title="17,2 % du CA HT encaissé depuis le 01/01/2023, après déduction des charges et frais perso, sans réintégration Urssaf ni factures non encaissées. Sans marge, avec déduction de 1 200 €. Non ajoutée au total.">
+              <span className="h-2 w-2 rounded-full bg-violet-400" aria-hidden />
+              CSG (17,2 %){" "}
+              <span className="font-medium tabular-nums text-ink-800 dark:text-white/85">
+                {formatEuro(csgComparaison172Eur)}
+              </span>
+            </span>
           </div>
+          <p className="mt-2 text-xs text-ink-500 dark:text-white/45">17,2 % depuis le 01/01/2023 · comparaison hors total</p>
           <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/[0.08]">
             <div
               className="bg-sky-400 dark:bg-sky-400"

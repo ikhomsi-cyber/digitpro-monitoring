@@ -54,6 +54,8 @@ export type DashboardHeroStats = {
     fraisDigitProEur: number;
   };
   detteCsgDepuisDebutEur: number;
+  /** 17,2 % du résultat encaissé net de charges depuis le 01/01/2023, hors total des dettes. */
+  csgComparaison172Eur: number;
   detteTvaDepuisDebutEur: number;
   detteTotaleDepuisDebutEur: number;
   resteAVerserApresCashEur: number;
@@ -265,6 +267,16 @@ export function computeDashboardHeroStats(
 
   const soldeQontoEur = resolveQontoBalanceEur(transactions, options.qontoLiveBalanceEur, "pro");
   const detteCsgDepuisDebutEur = Math.max(0, allTimeValueAnalysis.cashTree.csgEur - CSG_DEBT_ADJUSTMENT_EUR);
+  const comparaisonCashTree = analyzeValeurReelle(
+    transactions.filter((tx) => tx.date.slice(0, 10) >= "2023-01-01"),
+    { years: allYears.length ? allYears : [currentYear], now }
+  ).cashTree;
+  // La comparaison porte sur le résultat encaissé après charges, sans
+  // réintégration Urssaf, factures impayées ou marge. Correction de 1 200 € déduite.
+  const comparaisonBaseEur = Math.max(0,
+    comparaisonCashTree.caFactureEur - comparaisonCashTree.mandatoryFeesEur - comparaisonCashTree.personalChargesEur
+  );
+  const csgComparaison172Eur = Math.max(0, Math.round(comparaisonBaseEur * 0.172 * 100) / 100 - CSG_DEBT_ADJUSTMENT_EUR);
   const detteTvaDepuisDebutEur =
     Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
     100;
@@ -300,6 +312,7 @@ export function computeDashboardHeroStats(
       fraisDigitProEur: Math.round(tjmRepartitionMois.fraisDigitProEur * 100) / 100
     },
     detteCsgDepuisDebutEur,
+    csgComparaison172Eur,
     detteTvaDepuisDebutEur,
     detteTotaleDepuisDebutEur,
     resteAVerserApresCashEur: Math.max(0, Math.round((detteTotaleDepuisDebutEur - cashDisponibleEur) * 100) / 100),

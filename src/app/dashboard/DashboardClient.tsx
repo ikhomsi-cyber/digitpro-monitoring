@@ -1105,6 +1105,7 @@ export function DashboardClient({
             cashEur={displayHeroStats.soldeQontoEur}
             vatEur={displayHeroStats.detteTvaDepuisDebutEur}
             csgEur={displayHeroStats.detteCsgDepuisDebutEur}
+            csgComparaison172Eur={displayHeroStats.csgComparaison172Eur}
             totalLiabilityEur={displayHeroStats.detteTotaleDepuisDebutEur}
             statsReady={heroStatsReady}
             formatEuro={fmt.euro}

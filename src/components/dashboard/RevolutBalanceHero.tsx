@@ -20,6 +20,9 @@ export function RevolutBalanceHero({
   const cashEur = stats.soldeQontoEur;
   const remunerationEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
   const positive = remunerationEur >= 0;
+  const csgRemainingEur = cashEur == null
+    ? null
+    : Math.max(0, Math.round((stats.csgComparaison172Eur + stats.detteTvaDepuisDebutEur - cashEur) * 100) / 100);
 
   return (
     <section className={dashboardHeroSection} data-private>
@@ -28,9 +31,10 @@ export function RevolutBalanceHero({
         {cashEur != null ? fmt.euro(cashEur) : "—"}
       </p>
       {statsReady ? (
+        <div className="mt-4 grid max-w-2xl grid-cols-1 gap-3 min-[480px]:grid-cols-2">
         <div
           className={clsx(
-            "mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium",
+            "inline-flex flex-col items-center justify-center gap-1 rounded-2xl border px-4 py-2 text-center text-sm font-medium",
             positive
               ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
               : "border-rose-300/50 bg-rose-500/10 text-rose-700 dark:border-rose-400/20 dark:text-rose-300"
@@ -40,6 +44,19 @@ export function RevolutBalanceHero({
             {positive ? "Rémunération à verser" : "Dette nette"}
           </span>
           <span className="tabular-nums">{fmt.euro(Math.abs(remunerationEur))}</span>
+        </div>
+        <div
+          className={clsx(
+            "inline-flex flex-col items-center justify-center gap-1 rounded-2xl border px-4 py-2 text-center text-sm font-medium",
+            csgRemainingEur === 0
+              ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
+              : "border-violet-300/50 bg-violet-500/10 text-violet-700 dark:border-violet-400/20 dark:text-violet-300"
+          )}
+          title="CSG à 17,2 % depuis le 01/01/2023 + dette TVA − cash disponible."
+        >
+          <span className="text-ink-600 dark:text-white/60">Reste à couvrir · CSG 17,2 %</span>
+          <span className="tabular-nums">{csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>
+        </div>
         </div>
       ) : null}
     </section>
