@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { syncQontoTransactionsFromApi } from "@/app/dashboard/actions";
+import { safeSyncQontoTransactionsFromApi } from "@/app/dashboard/actions";
 import { requestCategorisationRefresh } from "@/lib/categorisation-refresh-bus";
 
 export function useDashboardRemoteRefresh({
@@ -18,15 +18,15 @@ export function useDashboardRemoteRefresh({
 
       if (!demoMode) {
         if (source === "pull") {
-          try {
-            const result = await syncQontoTransactionsFromApi();
+          const result = await safeSyncQontoTransactionsFromApi();
+          if (result.ok) {
             insertedFromSync = result.inserted;
             if (insertedFromSync > 0) {
               requestCategorisationRefresh({ source: "qonto", insertedCount: insertedFromSync });
             }
-          } catch (error) {
+          } else {
             toast.warning("Synchro Qonto impossible", {
-              description: error instanceof Error ? error.message : undefined
+              description: result.error
             });
           }
         }

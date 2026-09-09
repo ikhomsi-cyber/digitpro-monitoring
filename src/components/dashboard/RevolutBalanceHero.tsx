@@ -31,32 +31,32 @@ export function RevolutBalanceHero({
         {cashEur != null ? fmt.euro(cashEur) : "—"}
       </p>
       {statsReady ? (
-        <div className="mt-4 grid max-w-2xl grid-cols-1 gap-3 min-[480px]:grid-cols-2">
-        <div
-          className={clsx(
-            "inline-flex flex-col items-center justify-center gap-1 rounded-2xl border px-4 py-2 text-center text-sm font-medium",
-            positive
-              ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
-              : "border-rose-300/50 bg-rose-500/10 text-rose-700 dark:border-rose-400/20 dark:text-rose-300"
-          )}
-        >
-          <span className="text-ink-600 dark:text-white/60">
-            {positive ? "Rémunération à verser" : "Dette nette"}
-          </span>
-          <span className="tabular-nums">{fmt.euro(Math.abs(remunerationEur))}</span>
-        </div>
-        <div
-          className={clsx(
-            "inline-flex flex-col items-center justify-center gap-1 rounded-2xl border px-4 py-2 text-center text-sm font-medium",
-            csgRemainingEur === 0
-              ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
-              : "border-violet-300/50 bg-violet-500/10 text-violet-700 dark:border-violet-400/20 dark:text-violet-300"
-          )}
-          title="CSG à 17,2 % depuis le 01/01/2023 + dette TVA − cash disponible."
-        >
-          <span className="text-ink-600 dark:text-white/60">Reste à couvrir · CSG 17,2 %</span>
-          <span className="tabular-nums">{csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>
-        </div>
+        <div className="mt-4 grid w-full max-w-2xl grid-cols-2 gap-2 sm:gap-3">
+          <div
+            className={clsx(
+              "inline-flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center text-xs font-medium sm:px-4 sm:text-sm",
+              positive
+                ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
+                : "border-rose-300/50 bg-rose-500/10 text-rose-700 dark:border-rose-400/20 dark:text-rose-300"
+            )}
+          >
+            <span className="text-ink-600 dark:text-white/60">
+              {positive ? "Rémunération à verser" : "Dette nette"}
+            </span>
+            <span className="tabular-nums">{fmt.euro(Math.abs(remunerationEur))}</span>
+          </div>
+          <div
+            className={clsx(
+              "inline-flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center text-xs font-medium sm:px-4 sm:text-sm",
+              csgRemainingEur === 0
+                ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
+                : "border-violet-300/50 bg-violet-500/10 text-violet-700 dark:border-violet-400/20 dark:text-violet-300"
+            )}
+            title="CSG à 17,2 % depuis le 01/01/2023 + dette TVA − cash disponible."
+          >
+            <span className="text-ink-600 dark:text-white/60">Reste à couvrir · CSG 17,2 %</span>
+            <span className="tabular-nums">{csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>
+          </div>
         </div>
       ) : null}
     </section>

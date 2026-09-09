@@ -709,13 +709,19 @@ export async function importTransactions(
  * Récupère les transactions via l’API Qonto (clé secrète serveur) et les enregistre
  * comme un import CSV (même dédoublonnage `content_hash`).
  */
-export async function syncQontoTransactionsFromApi(): Promise<{
+type QontoSyncSuccess = {
   inserted: number;
   merged: number;
   skippedInFile: number;
   totalFromApi: number;
   bankAccountSummary: string;
-}> {
+};
+
+export type QontoSyncActionResult =
+  | ({ ok: true } & QontoSyncSuccess)
+  | { ok: false; error: string };
+
+export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> {
   await assertSupabaseWritesEnabled();
   const { rows, bankAccountSummary } = await fetchQontoTransactionsForImport();
   const result = await importTransactions(rows, {
@@ -731,6 +737,27 @@ export async function syncQontoTransactionsFromApi(): Promise<{
     totalFromApi: rows.length,
     bankAccountSummary
   };
+}
+
+/**
+ * Les erreurs lancées par une Server Action sont volontairement masquées par
+ * Next.js en production. Ce wrapper renvoie une valeur sérialisable afin que
+ * le client puisse afficher une cause utile sans déclencher l'erreur RSC.
+ */
+export async function safeSyncQontoTransactionsFromApi(): Promise<QontoSyncActionResult> {
+  try {
+    const result = await syncQontoTransactionsFromApi();
+    return { ok: true, ...result };
+  } catch (error) {
+    console.error("[qonto] transaction sync failed", error);
+    return {
+      ok: false,
+      error:
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Synchronisation Qonto impossible. Consultez les logs serveur pour plus de détails."
+    };
+  }
 }
 
 /**

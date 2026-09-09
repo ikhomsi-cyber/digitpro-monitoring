@@ -10,9 +10,9 @@ import {
   preparePowensConnectSession,
   resetPowensConnectSession,
   safeGetPowensWebviewConnectUrl,
+  safeSyncQontoTransactionsFromApi,
   safeSyncPowensCloudTransactions,
   safeSyncPowensCloudTransactionsPersonal,
-  syncQontoTransactionsFromApi
 } from "@/app/dashboard/actions";
 import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
 import { requestCategorisationRefresh } from "@/lib/categorisation-refresh-bus";
@@ -134,7 +134,14 @@ export function DashboardDataActionsMenu({
     setOpen(false);
     startTransition(async () => {
       try {
-        const result = await syncQontoTransactionsFromApi();
+        const result = await safeSyncQontoTransactionsFromApi();
+        if (!result.ok) {
+          toast.error("Synchronisation Qonto échouée", {
+            id: toastId,
+            description: result.error
+          });
+          return;
+        }
         toast.success("Qonto synchronisé", {
           id: toastId,
           description: `${result.inserted} nouvelle(s) · ${result.merged} fusion(s) · ${result.totalFromApi} ligne(s) API`
