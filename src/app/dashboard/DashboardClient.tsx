@@ -44,6 +44,7 @@ import { useDashboardRemoteRefresh } from "@/hooks/useDashboardRemoteRefresh";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { DashboardPremiumHero } from "@/components/dashboard/DashboardPremiumHero";
 import { BncPaymentHistoryCard } from "@/components/dashboard/BncPaymentHistoryCard";
+import { CsgHistoryCard } from "@/components/dashboard/CsgHistoryCard";
 import { RevolutBalanceHero } from "@/components/dashboard/RevolutBalanceHero";
 import {
   PersonalExpensesInsightCard,
@@ -1118,6 +1119,7 @@ export function DashboardClient({
             trend={selectedMonthRevenueAllocationTrend}
           />
           <BncPaymentHistoryCard transactions={transactions} />
+          <CsgHistoryCard transactions={transactions} />
           <DashboardPremiumHero
             stats={displayHeroStats}
             transactions={transactions}
