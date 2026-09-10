@@ -139,6 +139,26 @@ function applyBankinReferenceToPowensRows(
   });
 }
 
+function isMissingColumnError(error: unknown, column: string): boolean {
+  if (!error || typeof error !== "object") return false;
+  const postgresError = error as {
+    code?: string;
+    message?: string;
+    details?: string;
+    hint?: string;
+  };
+  const description =
+    `${postgresError.message ?? ""} ${postgresError.details ?? ""} ${postgresError.hint ?? ""}`.toLowerCase();
+  const normalizedColumn = column.toLowerCase();
+
+  return (
+    ((postgresError.code === "PGRST204" || postgresError.code === "42703") &&
+      description.includes(normalizedColumn)) ||
+    (description.includes("could not find") && description.includes(normalizedColumn)) ||
+    (description.includes("schema cache") && description.includes(normalizedColumn))
+  );
+}
+
 async function assertSupabaseWritesEnabled() {
   const cookieStore = await cookies();
   const envMode = getSupabaseRuntimeMode();
@@ -526,6 +546,8 @@ async function importTransactionsInternal(
 
   const originalCount = importRows.length;
 
+  let fileHashSupported = true;
+
   if (meta.fileHash) {
     const lookup = await client
       .from("import_sessions")
@@ -535,7 +557,9 @@ async function importTransactionsInternal(
       .limit(1)
       .maybeSingle();
 
-    if (lookup.error) {
+    if (lookup.error && isMissingColumnError(lookup.error, "file_hash")) {
+      fileHashSupported = false;
+    } else if (lookup.error) {
       throw new Error(lookup.error.message);
     } else if (lookup.data?.id) {
       await syncMonthlyMetricsFromDb(client);
@@ -551,19 +575,30 @@ async function importTransactionsInternal(
     }
   }
 
-  const sessionInsertPayload = {
+  const sessionInsertBase = {
     source_filename: meta.sourceFilename,
     format: meta.format,
     row_count: originalCount,
     inserted_count: 0,
-    skipped_duplicate_count: 0,
-    file_hash: meta.fileHash
+    skipped_duplicate_count: 0
   };
-  const sessionInsert = await client
+  const sessionInsertPayload =
+    fileHashSupported && meta.fileHash
+      ? { ...sessionInsertBase, file_hash: meta.fileHash }
+      : sessionInsertBase;
+  let sessionInsert = await client
     .from("import_sessions")
     .insert(sessionInsertPayload)
     .select("id")
     .single();
+
+  if (sessionInsert.error && isMissingColumnError(sessionInsert.error, "file_hash")) {
+    sessionInsert = await client
+      .from("import_sessions")
+      .insert(sessionInsertBase)
+      .select("id")
+      .single();
+  }
   if (sessionInsert.error) throw new Error(sessionInsert.error.message);
   const importSessionId = sessionInsert.data!.id;
 
