@@ -280,19 +280,19 @@ export function formatNdfTxDateLabel(iso: string, now = new Date()): string {
 export function listPendingNdfCandidatesForMonth(
   transactions: readonly DashboardTx[],
   monthKey: string,
-  scope: "pro" | "personal" = "pro"
+  scope?: "pro" | "personal"
 ): DashboardTx[] {
   const validatedNdf = summarizeNdfDigitProForMonth(transactions, monthKey).transactions;
   return transactions
     .filter((tx) => {
       if (tx.date.slice(0, 7) !== monthKey) return false;
-      if ((tx.scope ?? "pro") !== scope) return false;
-      if (isPowensComingStoredLabel(tx.label)) return false;
+      if (scope && (tx.scope ?? "pro") !== scope) return false;
       return isNdfCategorisationCandidate({
         label: tx.label,
         amount: tx.amount,
-        company: "",
-        category: tx.category
+        company: tx.company,
+        category: tx.category,
+        categoryManual: tx.categoryManual
       });
     })
     .filter(

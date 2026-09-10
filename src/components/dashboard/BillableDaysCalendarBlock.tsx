@@ -195,8 +195,7 @@ export function BillableDaysCalendarBlock({
     const ndf = summarizeNdfDigitProForMonth(treasuryTransactions, monthKey);
     const pendingNdfTransactions = listPendingNdfCandidatesForMonth(
       treasuryTransactions,
-      monthKey,
-      treasuryScope
+      monthKey
     );
 
     return {

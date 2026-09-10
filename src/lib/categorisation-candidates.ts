@@ -11,6 +11,7 @@ export type CategorisationCandidateRow = {
   company: string | null;
   bank_name: string | null;
   category?: string | null;
+  category_manual?: boolean | null;
 };
 
 export type CategorisationCandidateTx = {
@@ -21,6 +22,7 @@ export type CategorisationCandidateTx = {
   company: string;
   bankName: string | null;
   category: string;
+  categoryManual: boolean;
 };
 
 export function isTransactionInCategorisationMonth(isoDate: string, monthKey: string): boolean {
@@ -53,6 +55,13 @@ function fold(raw: string): string {
 
 export function isAlreadyTaggedNdfDigitPro(category: string | null | undefined): boolean {
   return mapExpenseCategoryLabel(normalizeCategory(category)) === NDF_DIGITPRO_CATEGORY;
+}
+
+function isImportedNdfSuggestion(category: string | null | undefined): boolean {
+  const raw = normalizeCategory(category);
+  if (!raw) return false;
+  const leaf = raw.split(/\s[›>]\s/u).at(-1) ?? raw;
+  return mapExpenseCategoryLabel(leaf) === NDF_DIGITPRO_CATEGORY;
 }
 
 /** Catégories Powens/Bankin où l’utilisateur doit encore valider une NDF DigitPro. */
@@ -107,8 +116,10 @@ export function isNdfCategorisationCandidate(tx: {
   amount: number;
   company: string;
   category?: string | null;
+  categoryManual?: boolean;
 }): boolean {
   if (tx.amount >= 0) return false;
+  if (isImportedNdfSuggestion(tx.category)) return tx.categoryManual === false;
   if (isAlreadyTaggedNdfDigitPro(tx.category)) return false;
   if (!isPendingNdfCategorization(tx.category)) return false;
 
@@ -153,7 +164,8 @@ export function mapCategorisationCandidateRows(
       amount: Number(row.amount),
       company: String(row.company ?? "").trim(),
       bankName: row.bank_name ? String(row.bank_name).trim() : null,
-      category: normalizeCategory(row.category)
+      category: normalizeCategory(row.category),
+      categoryManual: row.category_manual === true
     }))
     .filter(
       (tx) => isTransactionInCategorisationMonth(tx.date, monthKey) && isNdfCategorisationCandidate(tx)

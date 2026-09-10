@@ -29,7 +29,7 @@ export async function GET() {
       .order("category", { ascending: true }),
     supabase
       .from("transactions")
-      .select("id,date,label,amount,company,bank_name,category,import_sessions!inner(format)")
+      .select("id,date,label,amount,company,bank_name,category,category_manual,import_sessions!inner(format)")
       .eq("import_sessions.format", "powens")
       .lt("amount", 0)
       .gte("date", startIso)
