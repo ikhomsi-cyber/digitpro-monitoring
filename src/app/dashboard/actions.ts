@@ -476,7 +476,13 @@ export async function createTransaction(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function importTransactions(
+/**
+ * Implémentation interne appelée par les autres actions serveur.
+ * Les fonctions exportées d'un module `use server` deviennent des proxys
+ * Server Actions : les appeler entre elles peut produire `undefined.call`
+ * après compilation. Les appels internes doivent donc rester directs.
+ */
+async function importTransactionsInternal(
   transactions: ImportTx[],
   meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin" | "powens"; fileHash: string | null }
 ): Promise<{
@@ -705,6 +711,13 @@ export async function importTransactions(
   };
 }
 
+export async function importTransactions(
+  transactions: ImportTx[],
+  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin" | "powens"; fileHash: string | null }
+) {
+  return importTransactionsInternal(transactions, meta);
+}
+
 /**
  * Récupère les transactions via l’API Qonto (clé secrète serveur) et les enregistre
  * comme un import CSV (même dédoublonnage `content_hash`).
@@ -721,10 +734,10 @@ export type QontoSyncActionResult =
   | ({ ok: true } & QontoSyncSuccess)
   | { ok: false; error: string };
 
-export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> {
+async function syncQontoTransactionsFromApiInternal(): Promise<QontoSyncSuccess> {
   await assertSupabaseWritesEnabled();
   const { rows, bankAccountSummary } = await fetchQontoTransactionsForImport();
-  const result = await importTransactions(rows, {
+  const result = await importTransactionsInternal(rows, {
     sourceFilename: `Qonto API · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
     format: "qonto",
     fileHash: null
@@ -739,6 +752,10 @@ export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> 
   };
 }
 
+export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> {
+  return syncQontoTransactionsFromApiInternal();
+}
+
 /**
  * Les erreurs lancées par une Server Action sont volontairement masquées par
  * Next.js en production. Ce wrapper renvoie une valeur sérialisable afin que
@@ -746,7 +763,7 @@ export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> 
  */
 export async function safeSyncQontoTransactionsFromApi(): Promise<QontoSyncActionResult> {
   try {
-    const result = await syncQontoTransactionsFromApi();
+    const result = await syncQontoTransactionsFromApiInternal();
     return { ok: true, ...result };
   } catch (error) {
     console.error("[qonto] transaction sync failed", error);
@@ -1002,7 +1019,7 @@ async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promi
   const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), reference, axis);
 
   const axisLabel = axis === "personal" ? "perso" : "SASU";
-  const result = await importTransactions(txs, {
+  const result = await importTransactionsInternal(txs, {
     sourceFilename: `Powens API (${axisLabel}) · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
     format: "powens",
     fileHash: null
@@ -1197,7 +1214,7 @@ export async function importBankinPersonalXlsx(formData: FormData) {
     throw new Error("Aucune transaction valide (date + montant) dans ce fichier.");
   }
 
-  return importTransactions(rows, {
+  return importTransactionsInternal(rows, {
     sourceFilename: file.name,
     format: "bankin",
     fileHash
