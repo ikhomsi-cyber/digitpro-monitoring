@@ -1,5 +1,6 @@
 "use client";
 
+import { computeCsgRemainingEur } from "@/lib/csg-remaining";
 import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { dashboardHeroSection } from "@/lib/dashboard-surfaces";
@@ -20,9 +21,7 @@ export function RevolutBalanceHero({
   const cashEur = stats.soldeQontoEur;
   const remunerationEur = (stats.soldeQontoEur ?? 0) - stats.detteTotaleDepuisDebutEur;
   const positive = remunerationEur >= 0;
-  const csgRemainingEur = cashEur == null
-    ? null
-    : Math.max(0, Math.round((stats.csgComparaison172Eur + stats.detteTvaDepuisDebutEur - cashEur) * 100) / 100);
+  const csgRemainingEur = computeCsgRemainingEur(stats);
 
   return (
     <section className={dashboardHeroSection} data-private>
@@ -30,7 +29,6 @@ export function RevolutBalanceHero({
       <p className="mt-2 font-display text-4xl font-bold tabular-nums tracking-apple-tight text-ink-900 dark:text-white sm:text-5xl">
         {cashEur != null ? fmt.euro(cashEur) : "—"}
       </p>
-      {statsReady ? (
         <div className="mt-4 grid w-full max-w-2xl grid-cols-2 gap-2 sm:gap-3">
           <div
             className={clsx(
@@ -41,9 +39,9 @@ export function RevolutBalanceHero({
             )}
           >
             <span className="text-ink-600 dark:text-white/60">
-              {positive ? "Rémunération à verser" : "Dette nette"}
+              {!statsReady || positive ? "Rémunération à verser" : "Dette nette"}
             </span>
-            <span className="tabular-nums">{fmt.euro(Math.abs(remunerationEur))}</span>
+            <span className="tabular-nums" aria-busy={!statsReady}>{statsReady ? fmt.euro(Math.abs(remunerationEur)) : <span className="inline-block h-4 w-20 animate-pulse rounded bg-current opacity-15" aria-label="Calcul en cours" />}</span>
           </div>
           <div
             className={clsx(
@@ -55,10 +53,9 @@ export function RevolutBalanceHero({
             title="CSG à 17,2 % depuis le 01/01/2023 + dette TVA − cash disponible."
           >
             <span className="text-ink-600 dark:text-white/60">Reste à couvrir · CSG 17,2 %</span>
-            <span className="tabular-nums">{csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>
+            <span className="tabular-nums" aria-busy={!statsReady}>{!statsReady ? <span className="inline-block h-4 w-20 animate-pulse rounded bg-current opacity-15" aria-label="Calcul en cours" /> : csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>
           </div>
         </div>
-      ) : null}
     </section>
   );
 }

@@ -29,9 +29,9 @@ const HiwayInvoicesContext = createContext<HiwayInvoicesContextValue | null>(nul
  * pour pouvoir dériver le CSG additionnel tout en partageant la même source au
  * graphique « Jours facturés » et au bloc « Factures émises ».
  */
-export function useHiwayInvoicesState(enabled: boolean): HiwayInvoicesContextValue {
-  const [invoices, setInvoices] = useState<HiwayInvoice[] | null>(null);
-  const [loading, setLoading] = useState(false);
+export function useHiwayInvoicesState(enabled: boolean, initialInvoices?: HiwayInvoice[]): HiwayInvoicesContextValue {
+  const [invoices, setInvoices] = useState<HiwayInvoice[] | null>(initialInvoices ?? null);
+  const [loading, setLoading] = useState(enabled && initialInvoices === undefined);
   const requestIdRef = useRef(0);
 
   const reload = useCallback(() => {
@@ -41,8 +41,8 @@ export function useHiwayInvoicesState(enabled: boolean): HiwayInvoicesContextVal
     void loadHiwayInvoices()
       .then(({ invoices: rows }) => {
         if (requestId !== requestIdRef.current) return;
-        // null = pas (encore) de factures stockées → conserve l'invite « Récupérer ».
-        setInvoices(rows.length > 0 ? rows : null);
+        // [] confirme un chargement réussi, même sans facture.
+        setInvoices(rows);
       })
       .catch(() => {
         // Table non migrée, non connecté ou mode démo : on laisse l'état tel quel.
@@ -53,8 +53,12 @@ export function useHiwayInvoicesState(enabled: boolean): HiwayInvoicesContextVal
   }, [enabled]);
 
   useEffect(() => {
+    if (initialInvoices !== undefined) {
+      setInvoices(initialInvoices);
+      return;
+    }
     reload();
-  }, [reload]);
+  }, [initialInvoices, reload]);
 
   return useMemo<HiwayInvoicesContextValue>(
     () => ({ invoices, setInvoices, reload, loading }),

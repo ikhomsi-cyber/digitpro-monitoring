@@ -10,8 +10,8 @@ import {
   DASHBOARD_TRANSITION_START_EVENT
 } from "@/lib/dashboard-transition";
 
-const MIN_VISIBLE_MS = 560;
-const FADE_MS = 480;
+const MIN_VISIBLE_MS = 0;
+const FADE_MS = 180;
 const MAX_DASHBOARD_WAIT_MS = 6_000;
 
 /**

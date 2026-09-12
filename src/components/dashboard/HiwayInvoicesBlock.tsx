@@ -195,11 +195,11 @@ export function HiwayInvoicesBlock() {
             className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-800 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-400/30 dark:bg-emerald-400/[0.12] dark:text-emerald-100 dark:hover:bg-emerald-400/[0.18]"
           >
             <RefreshCw className={clsx("h-3.5 w-3.5", isPending && "animate-spin")} strokeWidth={2.2} aria-hidden />
-            {invoices == null ? "Récupérer mes factures" : "Actualiser"}
+            {!invoices?.length ? "Récupérer mes factures" : "Actualiser"}
           </button>
         </div>
 
-        {invoices == null ? (
+        {!invoices?.length ? (
           <p className="text-center text-[11px] font-medium text-ink-400 dark:text-cyan-50/45">
             Cliquez sur « Récupérer mes factures » pour interroger Gmail.
           </p>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isNdfCategorisationCandidate } from "@/lib/categorisation-candidates";
-import { listPendingNdfCandidatesForMonth } from "@/lib/ndf-digitpro";
+import { listPendingNdfCandidatesForMonth, summarizeNdfDigitProForMonth } from "@/lib/ndf-digitpro";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 
 function transaction(overrides: Partial<DashboardTx> = {}): DashboardTx {
@@ -19,6 +19,28 @@ function transaction(overrides: Partial<DashboardTx> = {}): DashboardTx {
 }
 
 describe("NDF à arbitrer", () => {
+  it("ne masque pas une suggestion normalisée en la dédoublonnant avec elle-même", () => {
+    const tx = transaction({ category: "NDF DigitPro" });
+    expect(summarizeNdfDigitProForMonth([tx], "2026-09")).toEqual({
+      totalEur: 0,
+      transactions: []
+    });
+    expect(listPendingNdfCandidatesForMonth([tx], "2026-09")).toEqual([tx]);
+
+    const validated = { ...tx, categoryManual: true };
+    expect(listPendingNdfCandidatesForMonth([validated], "2026-09")).toEqual([]);
+    expect(summarizeNdfDigitProForMonth([validated], "2026-09")).toEqual({
+      totalEur: 98,
+      transactions: [validated]
+    });
+  });
+
+  it("masque toujours le doublon importé d'une NDF réellement validée", () => {
+    const pending = transaction({ category: "NDF DigitPro" });
+    const validated = { ...pending, id: "validated", categoryManual: true };
+    expect(listPendingNdfCandidatesForMonth([pending, validated], "2026-09")).toEqual([]);
+  });
+
   it("reconnaît une suggestion NDF importée dans une catégorie hiérarchique", () => {
     expect(isNdfCategorisationCandidate(transaction())).toBe(true);
   });

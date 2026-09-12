@@ -210,9 +210,12 @@ function DashboardBlockTitle({
   );
 }
 
+import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
+
 export function DashboardClient({
   syncKey,
   initialTransactions,
+  initialHiwayInvoices,
   transactionYearBounds,
   initialDashboardScope,
   heroStats,
@@ -224,6 +227,7 @@ export function DashboardClient({
 }: {
   syncKey: string;
   initialTransactions: DashboardTx[];
+  initialHiwayInvoices?: HiwayInvoice[];
   /** Années min/max sur toute la table (Supabase) ; évite de n’afficher que les années du lot chargé (ex. 5000 dernières lignes). */
   transactionYearBounds: { minYear: number; maxYear: number; minDateIso?: string; maxDateIso?: string } | null;
   /** Dérivé de `?scope=` sur `/dashboard` (pro | personal), sinon défaut SASU. */
@@ -251,7 +255,7 @@ export function DashboardClient({
   const [transactions, setTransactions] = useState<DashboardTx[]>(initialTransactions);
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   /** Factures Hiway (partagées avec le graphique « Jours facturés » et le bloc Factures). */
-  const hiwayInvoicesState = useHiwayInvoicesState(!demoMode);
+  const hiwayInvoicesState = useHiwayInvoicesState(!demoMode, initialHiwayInvoices);
   /** CSG à provisionner sur toutes les factures Hiway émises mais pas encore encaissées. */
   const outstandingInvoiceCsgEur = useMemo(
     () =>
@@ -310,19 +314,29 @@ export function DashboardClient({
   /** Filtre global des dépenses (buckets dérivés) : vide = toutes les catégories. */
   const [selectedExpenseCategoryFilters, setSelectedExpenseCategoryFilters] = useState<string[]>([]);
   const shouldComputeSasuPanel = dashboardSection === "sasu" || dashboardSection === "private";
-  const refreshDashboardTransactions = useCallback(async () => {
-    const res = await fetch("/api/dashboard/transactions", { cache: "no-store" });
-    const body = (await res.json().catch(() => null)) as null | {
-      ok?: boolean;
-      transactions?: DashboardTx[];
-      heroStats?: DashboardHeroStats;
+  const refreshInFlightRef = useRef<Promise<boolean> | null>(null);
+  const refreshDashboardTransactions = useCallback((): Promise<boolean> => {
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    const request = (async () => {
+      const res = await fetch("/api/dashboard/transactions", { cache: "no-store" });
+      const body = (await res.json().catch(() => null)) as null | {
+        ok?: boolean;
+        transactions?: DashboardTx[];
+        heroStats?: DashboardHeroStats;
+      };
+      if (!res.ok || !body?.ok || !body.transactions || !body.heroStats) return false;
+      fullHistorySyncedRef.current = true;
+      setTransactions(body.transactions);
+      setCurrentHeroStats(body.heroStats);
+      setHeroStatsReady(true);
+      return true;
+    })();
+    refreshInFlightRef.current = request;
+    const clearRequest = () => {
+      if (refreshInFlightRef.current === request) refreshInFlightRef.current = null;
     };
-    if (!res.ok || !body?.ok || !body.transactions || !body.heroStats) return false;
-    fullHistorySyncedRef.current = true;
-    setTransactions(body.transactions);
-    setCurrentHeroStats(body.heroStats);
-    setHeroStatsReady(true);
-    return true;
+    void request.then(clearRequest, clearRequest);
+    return request;
   }, []);
 
   const onPersonalTransactionCategoryChange = useCallback(
@@ -423,7 +437,7 @@ export function DashboardClient({
       .finally(() => {
         console.timeEnd("dashboard:transactions-full");
         if (!cancelled && !fullHistorySyncedRef.current) {
-          setHeroStatsReady(true);
+          toast.error("Montants indisponibles", { description: "Impossible de charger l’historique complet. Réessayez d’actualiser." });
         }
       });
     return () => {
@@ -1095,7 +1109,7 @@ export function DashboardClient({
         className={clsx(dashboardSection !== "full" && "hidden", dashboardSectionStack)}
         aria-hidden={dashboardSection !== "full"}
       >
-          <RevolutBalanceHero stats={displayHeroStats} statsReady={heroStatsReady} />
+          <RevolutBalanceHero stats={displayHeroStats} statsReady={heroStatsReady && (demoMode || hiwayInvoicesState.invoices !== null)} />
           <RevolutInsightsSection
             transactions={transactions}
             bncYearTotalEur={displayHeroStats.bncYearTotalEur}
@@ -1108,7 +1122,7 @@ export function DashboardClient({
             csgEur={displayHeroStats.detteCsgDepuisDebutEur}
             csgComparaison172Eur={displayHeroStats.csgComparaison172Eur}
             totalLiabilityEur={displayHeroStats.detteTotaleDepuisDebutEur}
-            statsReady={heroStatsReady}
+            statsReady={heroStatsReady && (demoMode || hiwayInvoicesState.invoices !== null)}
             formatEuro={fmt.euro}
             trend={taxLiabilityTrend}
           />
@@ -1119,11 +1133,11 @@ export function DashboardClient({
             trend={selectedMonthRevenueAllocationTrend}
           />
           <BncPaymentHistoryCard transactions={transactions} />
-          <CsgHistoryCard transactions={transactions} />
+          <CsgHistoryCard transactions={transactions} stats={displayHeroStats} />
           <DashboardPremiumHero
             stats={displayHeroStats}
             transactions={transactions}
-            statsReady={heroStatsReady}
+            statsReady={heroStatsReady && (demoMode || hiwayInvoicesState.invoices !== null)}
             contextMessage={heroContextMessage}
             showContextBanner={showContextBanner}
           />

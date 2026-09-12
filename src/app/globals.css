@@ -294,7 +294,7 @@ html[data-digitpro-dashboard-transition="revealing"]::after {
       var(--app-page-light);
     opacity: 1;
     visibility: visible;
-    transition: opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: opacity;
   }
 
@@ -303,8 +303,8 @@ html[data-digitpro-dashboard-transition="revealing"]::after {
     visibility: hidden;
     pointer-events: none;
     transition:
-      opacity 0.48s cubic-bezier(0.4, 0, 0.2, 1),
-      visibility 0s linear 0.48s;
+      opacity 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0s linear 0.18s;
   }
 
   .dark .app-launch-screen {

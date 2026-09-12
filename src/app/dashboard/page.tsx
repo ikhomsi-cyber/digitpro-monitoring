@@ -12,8 +12,7 @@ import {
 } from "@/lib/dashboard-demo-preference";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  loadInitialUserTransactionsFromSupabase,
-  needsDashboardFullHistorySync
+  loadAllUserTransactionsFromSupabase
 } from "@/lib/supabase/fetch-all-transactions";
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
@@ -33,10 +32,11 @@ import { DashboardSettingsSheet } from "@/components/dashboard/DashboardSettings
 import { BillableActivityProvider } from "@/components/dashboard/BillableActivityContext";
 import { BILLABLE_CLIENT_TJM_HT, type BillableRatePeriod } from "@/lib/billable-client-days";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
+import { loadStoredHiwayInvoices } from "@/lib/gmail/hiway-invoice-store";
+import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
 import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
 import {
-  loadBillableActivitySettings,
-  loadTransactionYearBounds
+  loadBillableActivitySettings
 } from "@/lib/supabase/dashboard-loaders";
 import { isDarkModeUiEnabled } from "@/lib/dark-mode-flag";
 import { isPowensCloudConfigured } from "@/lib/powens/cloud-api";
@@ -146,20 +146,20 @@ export default async function DashboardPage({
   let billableRatePeriods: BillableRatePeriod[] = [];
   let qontoLiveBalanceEur: number | null = null;
   let syncFullHistoryOnMount = false;
+  let initialHiwayInvoices: HiwayInvoice[] | undefined;
 
   if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
     const transactionsPromise = (async () => {
       console.time("dashboard:transactions");
       try {
-        return await loadInitialUserTransactionsFromSupabase(supabase);
+        return await loadAllUserTransactionsFromSupabase(supabase);
       } finally {
         console.timeEnd("dashboard:transactions");
       }
     })();
 
-    const [transactionsRes, boundsRes, billableRes, liveBalance] = await Promise.all([
+    const [transactionsRes, billableRes, liveBalance, storedInvoices] = await Promise.all([
       transactionsPromise,
-      loadTransactionYearBounds(supabase),
       user
         ? loadBillableActivitySettings(supabase, user.id)
         : Promise.resolve({
@@ -171,12 +171,23 @@ export default async function DashboardPage({
             initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
           }),
-      loadQontoLiveBalanceEur()
+      loadQontoLiveBalanceEur(),
+      user
+        ? loadStoredHiwayInvoices(supabase, user.id).catch(() => undefined)
+        : Promise.resolve(undefined)
     ]);
     qontoLiveBalanceEur = liveBalance;
     rawRowsMapped = transactionsRes.transactions;
     transactionsLoadError = transactionsRes.errorMessage ?? null;
-    transactionYearBounds = boundsRes;
+    initialHiwayInvoices = storedInvoices;
+    const newest = rawRowsMapped[0]?.date;
+    const oldest = rawRowsMapped.at(-1)?.date;
+    if (newest && oldest) {
+      transactionYearBounds = {
+        minYear: Number(oldest.slice(0, 4)), maxYear: Number(newest.slice(0, 4)),
+        minDateIso: oldest, maxDateIso: newest
+      };
+    }
     initialBillableWorkDays = billableRes.initialBillableWorkDays;
     initialBillableVacationDays = billableRes.initialBillableVacationDays;
     initialBillableCommuteDays = billableRes.initialBillableCommuteDays;
@@ -184,10 +195,8 @@ export default async function DashboardPage({
     initialBillableTjmHt = billableRes.initialBillableTjmHt;
     initialAnnualRevenueTargetHt = billableRes.initialAnnualRevenueTargetHt;
     billableRatePeriods = billableRes.billableRatePeriods;
-    syncFullHistoryOnMount = needsDashboardFullHistorySync(
-      rawRowsMapped,
-      transactionYearBounds?.minDateIso
-    );
+    // En cas d'échec partiel, ne jamais présenter les dettes comme complètes.
+    syncFullHistoryOnMount = Boolean(transactionsRes.errorMessage);
     if (transactionsRes.errorMessage) {
       console.warn("[dashboard] transactions:", transactionsRes.errorMessage);
     }
@@ -254,6 +263,7 @@ export default async function DashboardPage({
             <DashboardClient
               syncKey={syncKey}
               initialTransactions={transactions}
+              initialHiwayInvoices={initialHiwayInvoices}
               transactionYearBounds={transactionYearBounds}
               initialDashboardScope={initialDashboardScope}
               heroStats={heroStats}

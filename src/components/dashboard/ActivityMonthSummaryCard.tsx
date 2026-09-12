@@ -181,10 +181,9 @@ export function ActivityMonthSummaryCard({
                           return (
                             <li
                               key={`pending-${tx.id}`}
-                              className="border-b border-ink-200/30 py-2.5 last:border-b-0 dark:border-white/[0.06]"
+                              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-2 border-b border-ink-200/30 py-2.5 last:border-b-0 dark:border-white/[0.06]"
                             >
-                              <div className="flex items-start justify-between gap-2">
-                              <span className="min-w-0">
+                              <span className="min-w-0 pt-1.5">
                                 <span className="flex min-w-0 items-center gap-1.5">
                                   <span className="truncate text-xs font-semibold text-ink-900 dark:text-white">
                                     {cleanNdfMerchantLabel(tx.label)}
@@ -197,28 +196,29 @@ export function ActivityMonthSummaryCard({
                                 </span>
                                 <span className="text-[10px] text-ink-400 dark:text-white/35">{dateLabel}</span>
                               </span>
-                              <span className="text-xs font-semibold tabular-nums text-ink-900 dark:text-white">
+                              <div className="flex shrink-0 items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  disabled={busy || !onNdfArbitration}
+                                  aria-label={`Valider ${cleanNdfMerchantLabel(tx.label)} en NDF DigitPro`}
+                                  onClick={() => void decideNdf(tx, "ndf")}
+                                  className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-emerald-600/15 bg-emerald-50 px-3 text-[10px] font-medium text-emerald-700 transition-colors hover:border-emerald-600/30 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-40 dark:border-emerald-300/15 dark:bg-emerald-300/[0.08] dark:text-emerald-200 dark:hover:bg-emerald-300/[0.15] dark:focus-visible:ring-offset-[#103038]"
+                                >
+                                  <Check className="h-3 w-3" strokeWidth={1.75} aria-hidden /> <span>NDF</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy || !onNdfArbitration}
+                                  aria-label={`${cleanNdfMerchantLabel(tx.label)} : pas une NDF`}
+                                  onClick={() => void decideNdf(tx, "not-ndf")}
+                                  className="inline-flex min-h-8 items-center justify-center gap-1 rounded-full px-2.5 text-[10px] font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-400 disabled:cursor-wait disabled:opacity-40 dark:text-white/50 dark:hover:bg-white/[0.05] dark:hover:text-white/80"
+                                >
+                                  <X className="h-3 w-3" strokeWidth={1.5} aria-hidden /> <span>Pas NDF</span>
+                                </button>
+                              </div>
+                              <span className="whitespace-nowrap pt-1.5 text-right text-xs font-semibold tabular-nums text-ink-900 dark:text-white">
                                 {fmt.euro(Math.abs(tx.amount))}
                               </span>
-                              </div>
-                              <div className="mt-2 grid grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  disabled={busy || !onNdfArbitration}
-                                  onClick={() => void decideNdf(tx, "ndf")}
-                                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60 dark:bg-emerald-500 dark:hover:bg-emerald-400"
-                                >
-                                  <Check className="h-3.5 w-3.5" aria-hidden /> NDF DigitPro
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy || !onNdfArbitration}
-                                  onClick={() => void decideNdf(tx, "not-ndf")}
-                                  className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 text-[11px] font-bold text-ink-700 transition hover:bg-ink-50 disabled:cursor-wait disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.06] dark:text-white/75 dark:hover:bg-white/[0.12]"
-                                >
-                                  <X className="h-3.5 w-3.5" aria-hidden /> Pas une NDF
-                                </button>
-                              </div>
                             </li>
                           );
                         })}

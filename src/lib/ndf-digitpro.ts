@@ -60,6 +60,9 @@ const MERCHANT_TAIL_TOKENS = new Set(
  */
 export function isNdfDigitProTx(tx: DashboardTx): boolean {
   if (tx.amount >= 0) return false;
+  // Une catégorie suggérée par l'import attend encore l'arbitrage utilisateur.
+  // Les anciennes transactions sans indicateur conservent leur statut historique.
+  if (tx.categoryManual === false) return false;
   return mapExpenseCategoryLabel(tx.category) === NDF_DIGITPRO_CATEGORY;
 }
 

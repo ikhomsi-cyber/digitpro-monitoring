@@ -4,6 +4,7 @@ import { defineConfig } from "vitest/config";
 const src = fileURLToPath(new URL("./src", import.meta.url));
 
 export default defineConfig({
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": src
