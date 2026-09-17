@@ -86,11 +86,9 @@ export function AppLaunchOverlay() {
       // Une erreur d'hydratation ne doit jamais bloquer l'application derrière le splash.
       safetyTimer = window.setTimeout(startFadeOut, MAX_DASHBOARD_WAIT_MS);
     } else {
-      if (document.readyState === "complete") {
-        startFadeOut();
-      } else {
-        window.addEventListener("load", startFadeOut, { once: true });
-      }
+      // L'interface est hydratée : une image ou ressource lente ne doit pas
+      // retenir le formulaire de connexion derrière le splash.
+      startFadeOut();
     }
 
     return () => {
@@ -98,7 +96,6 @@ export function AppLaunchOverlay() {
       if (fadeTimer != null) window.clearTimeout(fadeTimer);
       if (safetyTimer != null) window.clearTimeout(safetyTimer);
       window.removeEventListener(DASHBOARD_READY_EVENT, onDashboardReady);
-      window.removeEventListener("load", startFadeOut);
     };
   }, [pathname, phase]);
 
