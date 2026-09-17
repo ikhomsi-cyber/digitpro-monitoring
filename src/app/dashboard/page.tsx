@@ -17,10 +17,15 @@ import {
 import { getMockTransactions } from "@/lib/mock-data";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
+import nextDynamic from "next/dynamic";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
-import { DashboardLmnpPanel } from "./DashboardLmnpPanel";
+
+const LMNPClient = nextDynamic(
+  () => import("@/app/lmnp/LMNPClient").then((mod) => ({ default: mod.LMNPClient })),
+  { loading: () => null }
+);
 import { Logo } from "@/components/ui/Logo";
 import { DashboardDesktopSidebar, DashboardFloatingDock } from "@/components/dashboard/DashboardFloatingDock";
 import { DashboardSettingsSheet } from "@/components/dashboard/DashboardSettingsSheet";
@@ -249,7 +254,7 @@ export default async function DashboardPage({
         />
     <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(3.75rem,calc(env(safe-area-inset-top)+3.25rem))] sm:px-6 md:pb-10 md:pt-[max(0.75rem,env(safe-area-inset-top))] lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
       {showLmnpPanel ? (
-        <DashboardLmnpPanel
+        <LMNPClient
           analysis={analyzeLmnp(transactions)}
           demoMode={demoMode}
           loadError={transactionsLoadError}

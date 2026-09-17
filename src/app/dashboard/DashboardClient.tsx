@@ -24,9 +24,11 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart";
+import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
+import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import {
   HiwayInvoicesProvider,
   useHiwayInvoicesState
@@ -142,22 +144,6 @@ function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey
   if (section === "sasu" || section === "private") return "sasu-panel";
   return section;
 }
-
-// Ces modules (dont Recharts) ne sont nécessaires qu'à l'ouverture de leur onglet.
-const BillableDaysCalendarBlock = dynamic(
-  () => import("@/components/dashboard/BillableDaysCalendarBlock").then((mod) => mod.BillableDaysCalendarBlock),
-  { loading: () => <DashboardSkeleton className="h-96 w-full rounded-3xl" /> }
-);
-
-const RevenueMiniChart = dynamic(
-  () => import("@/components/charts/RevenueMiniChart").then((mod) => mod.RevenueMiniChart),
-  { loading: () => <DashboardSkeleton className="h-64 w-full rounded-2xl" /> }
-);
-
-const ExpenseTotalMiniChart = dynamic(
-  () => import("@/components/charts/ExpenseTotalMiniChart").then((mod) => mod.ExpenseTotalMiniChart),
-  { loading: () => <DashboardSkeleton className="h-64 w-full rounded-2xl" /> }
-);
 
 const ValeurReelleClient = dynamic(
   () =>
@@ -574,13 +560,9 @@ export function DashboardClient({
   const sasuSingleMonth = sasuMonthsForYears.length === 1 ? sasuMonthsForYears[0]! : null;
   const effectiveMonth = dashboardSection === "sasu" ? sasuSingleMonth : selectedMonth;
 
-  const selectedMonthAnalysis = useMemo(() => {
-    const now = new Date(`${overviewMonthKey}-01`);
-    return analyzeValeurReelle(transactions, { years: null, month: overviewMonthKey, now });
-  }, [overviewMonthKey, transactions]);
-
   const selectedMonthAllocation = useMemo(() => {
-    const analysis = selectedMonthAnalysis;
+    const now = new Date(`${overviewMonthKey}-01`);
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: overviewMonthKey, now });
     return {
       caHtEur: Math.max(0, analysis.cashTree.caFactureEur),
       bncEur: Math.max(0, analysis.cashTree.bncEur),
@@ -589,11 +571,16 @@ export function DashboardClient({
       csgEur: Math.max(0, analysis.cashTree.csgEur),
       fraisDigitProEur: Math.max(0, analysis.cashTree.mandatoryFeesEur)
     };
-  }, [selectedMonthAnalysis]);
+  }, [overviewMonthKey, transactions]);
 
   const selectedMonthRevenueAllocationTrend = useMemo(() => {
     const [year, month] = overviewMonthKey.split("-");
     const prev = new Date(Number(year), Number(month) - 2, 1);
+    const currentAnalysis = analyzeValeurReelle(transactions, {
+      years: null,
+      month: overviewMonthKey,
+      now: new Date(`${overviewMonthKey}-01`)
+    });
     const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
     const previousAnalysis = analyzeValeurReelle(transactions, {
       years: null,
@@ -601,10 +588,10 @@ export function DashboardClient({
       now: prev
     });
     return computeKpiTrend(
-      Math.max(0, selectedMonthAnalysis.cashTree.caFactureEur),
+      Math.max(0, currentAnalysis.cashTree.caFactureEur),
       Math.max(0, previousAnalysis.cashTree.caFactureEur)
     );
-  }, [overviewMonthKey, selectedMonthAnalysis, transactions]);
+  }, [overviewMonthKey, transactions]);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),

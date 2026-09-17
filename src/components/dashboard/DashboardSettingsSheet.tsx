@@ -2,17 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { CalendarClock, ChevronRight, Settings, X } from "lucide-react";
 import { clsx } from "clsx";
-import { DashboardSkeleton } from "@/components/ui/Skeleton";
+import { SettingsControls } from "@/components/dashboard/SettingsControls";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
-
-const SettingsControls = dynamic(
-  () => import("@/components/dashboard/SettingsControls").then((mod) => mod.SettingsControls),
-  { loading: () => <DashboardSkeleton className="h-64 w-full rounded-2xl" /> }
-);
 
 type Props = {
   envMode: SupabaseRuntimeMode;
