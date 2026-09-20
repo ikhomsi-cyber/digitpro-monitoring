@@ -23,7 +23,7 @@ import {
 } from "@/lib/recoverable-expense-vat";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
-import { computeUpcomingInvoice } from "@/lib/upcoming-invoice";
+import { computeCurrentMonthInvoice, computeUpcomingInvoice } from "@/lib/upcoming-invoice";
 import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import { monthTitleFr } from "@/lib/billable-calendar-metrics";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
@@ -790,6 +790,15 @@ export function RevolutInsightsSection({
       }),
     [billable.billableRatePeriods, billable.selected, billable.tjmHt]
   );
+  const currentMonthInvoice = useMemo(
+    () =>
+      computeCurrentMonthInvoice({
+        selectedWorkDayIsos: billable.selected,
+        billableRatePeriods: billable.billableRatePeriods,
+        fallbackTjmHt: billable.tjmHt
+      }),
+    [billable.billableRatePeriods, billable.selected, billable.tjmHt]
+  );
 
   /** Prélèvements Gmail — uniquement mois civil en cours, et seulement si la carte affiche ce mois. */
   const qontoDebitsThisMonth = useMemo(() => {
@@ -897,8 +906,8 @@ export function RevolutInsightsSection({
         </InsightCard>
 
         <InsightCard>
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
+          <div>
+            <div>
               <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
               <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
                 BNC versé depuis le début de l&apos;année ·{" "}
@@ -907,18 +916,29 @@ export function RevolutInsightsSection({
                 </span>
               </p>
             </div>
-            <span
-              className={clsx(
-                "shrink-0 text-right text-[11px] font-bold leading-tight tabular-nums",
-                upcomingInvoice.amountHtEur <= 0
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : upcomingInvoice.dueInDays < 0
-                    ? "text-rose-700 dark:text-rose-300"
-                    : "text-amber-700 dark:text-amber-300"
-              )}
-            >
-              {upcomingInvoice.statusLabel} · {fmt.euro(upcomingInvoice.amountTtcEur)} TTC
-            </span>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-center text-[9px] leading-none tabular-nums min-[430px]:text-[10px]">
+              <div
+                className={clsx(
+                  "whitespace-nowrap rounded-full bg-ink-100/70 px-2 py-1.5 dark:bg-white/[0.05]",
+                  upcomingInvoice.amountHtEur <= 0
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : upcomingInvoice.dueInDays < 0
+                      ? "text-rose-700 dark:text-rose-300"
+                      : "text-amber-700 dark:text-amber-300"
+                )}
+              >
+                <span className="font-bold">{upcomingInvoice.statusLabel}</span>
+                <span className="opacity-50"> · </span>
+                <span className="font-bold">{fmt.euro(upcomingInvoice.amountTtcEur)} TTC</span>
+                <span className="font-medium opacity-65"> · {fmt.euro(upcomingInvoice.amountHtEur)} HT</span>
+              </div>
+              <div className="whitespace-nowrap rounded-full bg-sky-100/60 px-2 py-1.5 text-sky-700 dark:bg-sky-400/[0.07] dark:text-sky-300">
+                <span className="font-bold">À facturer</span>
+                <span className="opacity-50"> · </span>
+                <span className="font-bold">{fmt.euro(currentMonthInvoice.amountTtcEur)} TTC</span>
+                <span className="font-medium opacity-65"> · {fmt.euro(currentMonthInvoice.amountHtEur)} HT</span>
+              </div>
+            </div>
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
