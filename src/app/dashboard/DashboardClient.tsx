@@ -374,7 +374,13 @@ export function DashboardClient({
       formData.set("category", category);
       try {
         await updatePowensTransactionCategory(formData);
-        await refreshDashboardTransactions();
+        setTransactions((current) =>
+          current.map((currentTx) =>
+            currentTx.id === tx.id
+              ? { ...currentTx, category, categoryManual: true }
+              : currentTx
+          )
+        );
         toast.success(decision === "ndf" ? "Transaction validée en NDF DigitPro" : `Classée : ${category}`);
       } catch (error) {
         toast.error("Impossible d’enregistrer l’arbitrage", {
@@ -383,7 +389,7 @@ export function DashboardClient({
         throw error;
       }
     },
-    [refreshDashboardTransactions]
+    []
   );
 
   const pullRefreshEnabled =

@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 
@@ -43,8 +42,6 @@ export async function updatePowensTransactionCategory(formData: FormData) {
 
   if (updateError) throw new Error(updateError.message);
 
-  revalidatePath("/categorisation");
-  revalidatePath("/dashboard");
 }
 
 export async function markPowensTransactionAsNdfDigitPro(formData: FormData) {

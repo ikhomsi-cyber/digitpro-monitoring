@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, ChevronDown, ReceiptText, X } from "lucide-react";
 import { clsx } from "clsx";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
@@ -75,19 +75,52 @@ export function ActivityMonthSummaryCard({
 }) {
   const fmt = useDashboardDisplayFormat();
   const [ndfListOpen, setNdfListOpen] = useState(false);
-  const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
+  const [optimisticDecisions, setOptimisticDecisions] = useState<
+    Record<string, "ndf" | "not-ndf">
+  >({});
 
   const decideNdf = async (tx: DashboardTx, decision: "ndf" | "not-ndf") => {
     if (!onNdfArbitration) return;
-    setPendingDecisionId(tx.id);
+    setOptimisticDecisions((current) => ({ ...current, [tx.id]: decision }));
     try {
       await onNdfArbitration(tx, decision);
     } finally {
-      setPendingDecisionId(null);
+      setOptimisticDecisions((current) => {
+        const next = { ...current };
+        delete next[tx.id];
+        return next;
+      });
     }
   };
 
-  const mealsTotal = mealFees?.total ?? 0;
+  const optimisticNdfTransactions = useMemo(
+    () =>
+      mealFees?.pendingNdfTransactions.filter(
+        (tx) => optimisticDecisions[tx.id] === "ndf"
+      ) ?? [],
+    [mealFees, optimisticDecisions]
+  );
+  const visiblePendingNdfTransactions = useMemo(
+    () =>
+      mealFees?.pendingNdfTransactions.filter(
+        (tx) => optimisticDecisions[tx.id] == null
+      ) ?? [],
+    [mealFees, optimisticDecisions]
+  );
+  const displayedNdfTransactions = useMemo(() => {
+    if (!mealFees) return optimisticNdfTransactions;
+    const optimisticIds = new Set(optimisticNdfTransactions.map((tx) => tx.id));
+    return [
+      ...optimisticNdfTransactions,
+      ...mealFees.ndfTransactions.filter((tx) => !optimisticIds.has(tx.id))
+    ];
+  }, [mealFees, optimisticNdfTransactions]);
+  const optimisticNdfEur = optimisticNdfTransactions.reduce(
+    (sum, tx) => sum + Math.abs(tx.amount),
+    0
+  );
+  const displayedNdfEur = (mealFees?.ndfAffiche ?? 0) + optimisticNdfEur;
+  const mealsTotal = (mealFees?.total ?? 0) + optimisticNdfEur;
   const ikHasHistory = Boolean(ikReferenceEur && ikReferenceEur > 0 && ikReferenceMonths);
   const mealsHasHistory = Boolean(mealsReferenceEur && mealsReferenceEur > 0 && mealsReferenceMonths);
   const ikMax = ikHasHistory ? (ikReferenceEur as number) : IK_REFERENCE_FALLBACK_EUR;
@@ -130,7 +163,7 @@ export function ActivityMonthSummaryCard({
           </div>
           {mealFees ? (
             <p className="text-xs text-ink-400 dark:text-white/38">
-              Dirigeant {fmt.euro(mealFees.dirigeant)} · NDF {fmt.euro(mealFees.ndfAffiche)}
+              Dirigeant {fmt.euro(mealFees.dirigeant)} · NDF {fmt.euro(displayedNdfEur)}
             </p>
           ) : null}
           <FeeProgress value={mealsTotal} max={mealsMax} />
@@ -139,7 +172,7 @@ export function ActivityMonthSummaryCard({
           </p>
 
           {mealFees &&
-          (mealFees.ndfTransactions.length > 0 || mealFees.pendingNdfTransactions.length > 0) ? (
+          (displayedNdfTransactions.length > 0 || visiblePendingNdfTransactions.length > 0) ? (
             <div className="mt-3">
               <button
                 type="button"
@@ -149,10 +182,10 @@ export function ActivityMonthSummaryCard({
               >
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-600 dark:text-white/60">
                   <ReceiptText className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
-                  {mealFees.ndfTransactions.length} NDF validée
-                  {mealFees.ndfTransactions.length > 1 ? "s" : ""}
-                  {mealFees.pendingNdfTransactions.length > 0
-                    ? ` · ${mealFees.pendingNdfTransactions.length} à valider`
+                  {displayedNdfTransactions.length} NDF validée
+                  {displayedNdfTransactions.length > 1 ? "s" : ""}
+                  {visiblePendingNdfTransactions.length > 0
+                    ? ` · ${visiblePendingNdfTransactions.length} à valider`
                     : ""}
                 </span>
                 <ChevronDown
@@ -166,18 +199,17 @@ export function ActivityMonthSummaryCard({
               </button>
               {ndfListOpen ? (
                 <div className="mt-2 space-y-3">
-                  {mealFees.pendingNdfTransactions.length > 0 ? (
+                  {visiblePendingNdfTransactions.length > 0 ? (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-600 dark:text-white/55">
-                          À arbitrer · {mealFees.pendingNdfTransactions.length}
+                          À arbitrer · {visiblePendingNdfTransactions.length}
                         </p>
                       </div>
                       <ul className="scrollbar-clean max-h-64 space-y-0 overflow-y-auto overscroll-contain">
-                        {mealFees.pendingNdfTransactions.map((tx) => {
+                        {visiblePendingNdfTransactions.map((tx) => {
                           const dateLabel = formatNdfTxDateLabel(tx.date);
                           const isToday = dateLabel === "Aujourd’hui";
-                          const busy = pendingDecisionId === tx.id;
                           return (
                             <li
                               key={`pending-${tx.id}`}
@@ -199,7 +231,7 @@ export function ActivityMonthSummaryCard({
                               <div className="flex shrink-0 items-center gap-0.5">
                                 <button
                                   type="button"
-                                  disabled={busy || !onNdfArbitration}
+                                  disabled={!onNdfArbitration}
                                   aria-label={`Valider ${cleanNdfMerchantLabel(tx.label)} en NDF DigitPro`}
                                   onClick={() => void decideNdf(tx, "ndf")}
                                   className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-emerald-600/15 bg-emerald-50 px-3 text-[10px] font-medium text-emerald-700 transition-colors hover:border-emerald-600/30 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-40 dark:border-emerald-300/15 dark:bg-emerald-300/[0.08] dark:text-emerald-200 dark:hover:bg-emerald-300/[0.15] dark:focus-visible:ring-offset-[#103038]"
@@ -208,7 +240,7 @@ export function ActivityMonthSummaryCard({
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={busy || !onNdfArbitration}
+                                  disabled={!onNdfArbitration}
                                   aria-label={`${cleanNdfMerchantLabel(tx.label)} : pas une NDF`}
                                   onClick={() => void decideNdf(tx, "not-ndf")}
                                   className="inline-flex min-h-8 items-center justify-center gap-1 rounded-full px-2.5 text-[10px] font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-400 disabled:cursor-wait disabled:opacity-40 dark:text-white/50 dark:hover:bg-white/[0.05] dark:hover:text-white/80"
@@ -225,9 +257,9 @@ export function ActivityMonthSummaryCard({
                       </ul>
                     </div>
                   ) : null}
-                  {mealFees.ndfTransactions.length > 0 ? (
+                  {displayedNdfTransactions.length > 0 ? (
                     <ul className="scrollbar-clean max-h-44 space-y-0 overflow-y-auto overscroll-contain">
-                      {mealFees.ndfTransactions.map((tx) => {
+                      {displayedNdfTransactions.map((tx) => {
                         const dateLabel = formatNdfTxDateLabel(tx.date);
                         const isToday = dateLabel === "Aujourd’hui";
                         return (
