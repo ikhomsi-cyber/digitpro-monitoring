@@ -21,6 +21,7 @@ import {
   dashboardSasuExpenseAmountHt,
   expenseAmountHasRecoverableVat
 } from "@/lib/recoverable-expense-vat";
+import { useHiwayInvoices } from "@/components/dashboard/HiwayInvoicesContext";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeCurrentMonthInvoice, computeUpcomingInvoice } from "@/lib/upcoming-invoice";
@@ -726,6 +727,7 @@ export function RevolutInsightsSection({
 }) {
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
+  const { invoices: hiwayInvoices } = useHiwayInvoices();
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
   const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>([]);
 
@@ -784,11 +786,12 @@ export function RevolutInsightsSection({
   const upcomingInvoice = useMemo(
     () =>
       computeUpcomingInvoice({
+        hiwayInvoices,
         selectedWorkDayIsos: billable.selected,
         billableRatePeriods: billable.billableRatePeriods,
         fallbackTjmHt: billable.tjmHt
       }),
-    [billable.billableRatePeriods, billable.selected, billable.tjmHt]
+    [billable.billableRatePeriods, billable.selected, billable.tjmHt, hiwayInvoices]
   );
   const currentMonthInvoice = useMemo(
     () =>
@@ -916,10 +919,10 @@ export function RevolutInsightsSection({
                 </span>
               </p>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-center text-[9px] leading-none tabular-nums min-[430px]:text-[10px]">
+            <div className="mt-2 grid grid-cols-2 gap-2 text-left text-[11px] leading-snug tabular-nums">
               <div
                 className={clsx(
-                  "whitespace-nowrap rounded-full bg-ink-100/70 px-2 py-1.5 dark:bg-white/[0.05]",
+                  "flex min-w-0 flex-col items-start gap-0.5 rounded-2xl bg-ink-100/70 px-3 py-2.5 dark:bg-white/[0.05]",
                   upcomingInvoice.amountHtEur <= 0
                     ? "text-emerald-700 dark:text-emerald-300"
                     : upcomingInvoice.dueInDays < 0
@@ -928,15 +931,13 @@ export function RevolutInsightsSection({
                 )}
               >
                 <span className="font-bold">{upcomingInvoice.statusLabel}</span>
-                <span className="opacity-50"> · </span>
-                <span className="font-bold">{fmt.euro(upcomingInvoice.amountTtcEur)} TTC</span>
-                <span className="font-medium opacity-65"> · {fmt.euro(upcomingInvoice.amountHtEur)} HT</span>
+                <span className="text-xs font-bold">{fmt.euro(upcomingInvoice.amountTtcEur)} TTC</span>
+                <span className="font-medium opacity-75">{fmt.euro(upcomingInvoice.amountHtEur)} HT</span>
               </div>
-              <div className="whitespace-nowrap rounded-full bg-sky-100/60 px-2 py-1.5 text-sky-700 dark:bg-sky-400/[0.07] dark:text-sky-300">
+              <div className="flex min-w-0 flex-col items-start gap-0.5 rounded-2xl bg-sky-100/60 px-3 py-2.5 text-sky-700 dark:bg-sky-400/[0.07] dark:text-sky-300">
                 <span className="font-bold">À facturer</span>
-                <span className="opacity-50"> · </span>
-                <span className="font-bold">{fmt.euro(currentMonthInvoice.amountTtcEur)} TTC</span>
-                <span className="font-medium opacity-65"> · {fmt.euro(currentMonthInvoice.amountHtEur)} HT</span>
+                <span className="text-xs font-bold">{fmt.euro(currentMonthInvoice.amountTtcEur)} TTC</span>
+                <span className="font-medium opacity-75">{fmt.euro(currentMonthInvoice.amountHtEur)} HT</span>
               </div>
             </div>
           </div>
