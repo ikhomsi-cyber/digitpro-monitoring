@@ -181,10 +181,12 @@ function ExpenseCategoryBars({
   selectedLabel?: string | null;
   onSelect?: (label: string) => void;
 }) {
-  const top = rows.slice(0, 8);
-  const max = Math.max(1, ...top.map((row) => row.amount));
+  // Afficher chaque catégorie afin que le total soit vérifiable, notamment
+  // les catégories moins élevées comme ANCV.
+  const displayedRows = rows;
+  const max = Math.max(1, ...displayedRows.map((row) => row.amount));
 
-  if (!top.length) {
+  if (!displayedRows.length) {
     return <span className="text-ink-500 dark:text-white/45">Aucune dépense ce mois</span>;
   }
 
@@ -195,7 +197,7 @@ function ExpenseCategoryBars({
       aria-label="Répartition des dépenses par catégorie"
     >
       <div className="flex min-w-min items-end gap-1.5 pt-6 sm:gap-2.5">
-        {top.map((row) => {
+        {displayedRows.map((row) => {
           const heightPct = Math.max(22, Math.round((row.amount / max) * 100));
           const selected = selectedLabel === row.label;
           const content = (
