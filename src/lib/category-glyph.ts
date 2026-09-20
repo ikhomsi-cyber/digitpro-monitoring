@@ -11,6 +11,7 @@ import {
   Home,
   Landmark,
   MoreHorizontal,
+  Palmtree,
   Percent,
   Receipt,
   Rocket,
@@ -33,6 +34,7 @@ export function categoryGlyph(category: string): LucideIcon {
   if (n.startsWith("compta") && n.includes("admin")) return Building2;
   if (n === "ndf") return Receipt;
   if (n === "cesu") return Gift;
+  if (n === "ancv" || n.includes("cheque vacances")) return Palmtree;
   if (n.includes("icloud ia store")) return Cloud;
   if (n === "qonto") return Landmark;
   if (n === "assurance") return Shield;

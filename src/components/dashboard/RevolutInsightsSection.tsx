@@ -219,7 +219,7 @@ function ExpenseCategoryBars({
               <div className="flex h-40 w-12 shrink-0 items-end justify-center sm:h-44 sm:w-[3.25rem]">
                 <div
                   className={clsx(
-                    "flex w-full min-h-[2.75rem] items-center justify-center rounded-full transition-all duration-200",
+                    "relative flex w-full min-h-[2.75rem] items-center justify-center rounded-full transition-all duration-200",
                     selected
                       ? "bg-rose-300 ring-2 ring-rose-400/80 dark:bg-rose-300/75 dark:ring-rose-300"
                       : "bg-rose-100/85 group-hover:bg-rose-200/80 dark:bg-white/[0.14] dark:group-hover:bg-white/[0.2]"
@@ -231,8 +231,12 @@ function ExpenseCategoryBars({
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                   >
                     {formatBarAmount(row.amount)}
-                    {row.isHt ? " HT" : ""}
                   </span>
+                  {row.isHt ? (
+                    <span className="absolute -right-1.5 top-2 rounded-full border border-ink-200/70 bg-white/95 px-1 py-0.5 text-[7px] font-bold leading-none tracking-wide text-ink-600 shadow-sm dark:border-white/15 dark:bg-[#173f48] dark:text-white/70">
+                      HT
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div
@@ -839,11 +843,11 @@ export function RevolutInsightsSection({
   return (
     <section className="space-y-3">
       <div className="flex flex-col items-center gap-2">
-        <div className="inline-flex rounded-full bg-ink-100/70 p-1 dark:bg-white/[0.06]" role="group" aria-label="Période du tableau de bord">
+        <div className="inline-flex rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[0.06]" role="group" aria-label="Période du tableau de bord">
           {([{ value: "month", label: "Mois" }, { value: "year", label: "Année entière" }] as const).map((mode) => (
             <button key={mode.value} type="button" aria-pressed={periodMode === mode.value}
               onClick={() => setPeriodMode(mode.value)}
-              className={clsx("min-h-10 rounded-full px-4 text-xs font-semibold transition", periodMode === mode.value ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/55")}
+              className={clsx("min-h-9 rounded-full px-3.5 text-xs font-semibold transition", periodMode === mode.value ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/55")}
             >{mode.label}</button>
           ))}
         </div>
