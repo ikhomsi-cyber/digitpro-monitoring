@@ -24,7 +24,7 @@ import {
   dashboardPanelTitle,
   dashboardSectionStack
 } from "@/lib/dashboard-surfaces";
-import { analyzeAllNotices } from "@/lib/impots/tax-analysis";
+import { analyzeAllNotices, computeBncNetWithCsg172 } from "@/lib/impots/tax-analysis";
 import { projectCurrentYearTaxFromBnc } from "@/lib/impots/tax-analysis";
 import type { TaxOptimizationKind } from "@/lib/impots/types";
 import { TaxHistoryChart, type TaxHistoryPoint } from "./TaxHistoryChart";
@@ -94,6 +94,7 @@ export function ImpotsSection({ transactions }: { transactions: DashboardTx[] })
     () => [...selectedAnalysis.optimizations].sort((a, b) => b.economie - a.economie),
     [selectedAnalysis]
   );
+  const bncWithCsg = computeBncNetWithCsg172(selectedAnalysis);
   const yearOptimizationsTotal = selectedAnalysis.totalOptimizations;
 
   const historyData = useMemo<TaxHistoryPoint[]>(
@@ -152,9 +153,9 @@ export function ImpotsSection({ transactions }: { transactions: DashboardTx[] })
             Reste à payer selon l&apos;avis : {fmt.euro(selectedAnalysis.soldeRestantAPayer)}
           </p>
         ) : null}
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/50 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-300">
+        <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-emerald-300/50 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-300">
           <Wallet className="h-4 w-4" aria-hidden />
-          <span data-private>{fmt.euro(selectedAnalysis.bncNetApresImpot)}</span> nets de BNC après impôt
+          <span data-private>{fmt.euro(bncWithCsg.netEur)}</span> nets après IR et CSG à 17,2 %
         </div>
       </section>
 
@@ -166,7 +167,7 @@ export function ImpotsSection({ transactions }: { transactions: DashboardTx[] })
             <KpiCell label="Solde à payer" value={fmt.euro(selectedAnalysis.soldeRestantAPayer)} sub="Après PAS et acomptes" />
           ) : null}
           <KpiCell label="BNC brut" value={fmt.euro(selectedAnalysis.bncBrut)} sub={`IR attribué ${fmt.euro(selectedAnalysis.irAttribuableBnc)}`} />
-          <KpiCell label="BNC net après IR" value={fmt.euro(selectedAnalysis.bncNetApresImpot)} sub={`${selectedAnalysis.tauxEffectifBnc.toFixed(1)} % d'imposition`} />
+          <KpiCell label="BNC net après IR et CSG" value={fmt.euro(bncWithCsg.netEur)} sub={`CSG à 17,2 % : ${fmt.euro(bncWithCsg.csgEur)}`} />
           <KpiCell label="Taux moyen / marginal" value={`${selectedAnalysis.tauxMoyen.toFixed(1)} %`} sub={`marginal ${selectedAnalysis.tauxMarginal} %`} privateValue={false} />
         </div>
       </section>
@@ -220,7 +221,7 @@ export function ImpotsSection({ transactions }: { transactions: DashboardTx[] })
             <MiniStat label="RFR" value={fmt.euro(selectedAnalysis.revenuFiscalReference)} />
             <MiniStat label="BNC brut" value={fmt.euro(selectedAnalysis.bncBrut)} />
             <MiniStat label="IR sur BNC" value={fmt.euro(selectedAnalysis.irAttribuableBnc)} />
-            <MiniStat label="BNC net" value={fmt.euro(selectedAnalysis.bncNetApresImpot)} highlight />
+            <MiniStat label="Net après IR et CSG 17,2 %" value={fmt.euro(bncWithCsg.netEur)} highlight />
             <MiniStat label="Taux BNC" value={`${selectedAnalysis.tauxEffectifBnc.toFixed(1)} %`} priv={false} />
             {selectedYear === projectedYear ? (
               <MiniStat label="BNC réel à date" value={fmt.euro(projection.bncYtdEur)} />

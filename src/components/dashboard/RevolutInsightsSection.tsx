@@ -322,7 +322,7 @@ function computeExpenseMacroBreakdown(
 ): ExpenseMacroRow[] {
   const byLabel = new Map<string, ExpenseMacroRow>();
   for (const tx of txs) {
-    if (tx.date.slice(0, 7) !== monthKey || tx.amount >= 0) continue;
+    if (!tx.date.startsWith(`${monthKey}-`) || tx.amount >= 0) continue;
     const label = expenseMacroLabel(tx);
     if (!label) continue;
     if (!expenseMatchesKindFilter(tx, kindFilter)) continue;
@@ -348,7 +348,7 @@ function computeMonthMetrics(txs: readonly DashboardTx[], monthKey: string): Mon
   let entrees = 0;
   for (const tx of txs) {
     const analyticsMonth = incomeAnalyticsMonthKey(tx);
-    if (analyticsMonth !== monthKey) continue;
+    if (!analyticsMonth || (monthKey.length === 4 ? !analyticsMonth.startsWith(`${monthKey}-`) : analyticsMonth !== monthKey)) continue;
     entrees += tx.amount;
   }
   return { depenses, entrees, net: entrees - depenses };
@@ -728,6 +728,7 @@ export function RevolutInsightsSection({
   const fmt = useDashboardDisplayFormat();
   const billable = useBillableActivity();
   const { invoices: hiwayInvoices } = useHiwayInvoices();
+  const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
   const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>([]);
 
@@ -754,18 +755,34 @@ export function RevolutInsightsSection({
     [transactions]
   );
 
-  const current = useMemo(() => computeMonthMetrics(scopedTx, monthKey), [scopedTx, monthKey]);
+  const selectedYear = Number(monthKey.slice(0, 4));
+  const availableYears = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const transactionYears = scopedTx
+      .map((tx) => Number(transactionAnalyticsDayIso(tx).slice(0, 4)))
+      .filter((year) => Number.isInteger(year) && year > 0);
+    const firstYear = transactionYears.reduce((min, year) => Math.min(min, year), Math.min(currentYear, selectedYear));
+    const lastYear = Math.max(currentYear + 1, selectedYear);
+    return Array.from({ length: lastYear - firstYear + 1 }, (_, index) => lastYear - index);
+  }, [scopedTx, selectedYear]);
+
+  const isAnnual = periodMode === "year";
+  const periodKey = isAnnual ? String(selectedYear) : monthKey;
+  const previousPeriodKey = isAnnual ? String(selectedYear - 1) : shiftMonthKey(monthKey, -1);
+  const chartEndMonth = isAnnual ? `${selectedYear}-12` : monthKey;
+
+  const current = useMemo(() => computeMonthMetrics(scopedTx, periodKey), [scopedTx, periodKey, previousPeriodKey, chartEndMonth]);
   const previous = useMemo(
-    () => computeMonthMetrics(scopedTx, shiftMonthKey(monthKey, -1)),
-    [scopedTx, monthKey]
+    () => computeMonthMetrics(scopedTx, previousPeriodKey),
+    [scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
   const expenseMacroRows = useMemo(
-    () => computeExpenseMacroBreakdown(scopedTx, monthKey, expenseKindFilter),
-    [expenseKindFilter, scopedTx, monthKey]
+    () => computeExpenseMacroBreakdown(scopedTx, periodKey, expenseKindFilter),
+    [expenseKindFilter, scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
   const previousExpenseMacroRows = useMemo(
-    () => computeExpenseMacroBreakdown(scopedTx, shiftMonthKey(monthKey, -1), expenseKindFilter),
-    [expenseKindFilter, scopedTx, monthKey]
+    () => computeExpenseMacroBreakdown(scopedTx, previousPeriodKey, expenseKindFilter),
+    [expenseKindFilter, scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
   const filteredDepenses = useMemo(
     () => expenseMacroRows.reduce((sum, row) => sum + row.amount, 0),
@@ -776,12 +793,12 @@ export function RevolutInsightsSection({
     [previousExpenseMacroRows]
   );
   const spendSeries = useMemo(
-    () => trailingMonthlySeries(scopedTx, monthKey, "spend", expenseKindFilter),
-    [expenseKindFilter, scopedTx, monthKey]
+    () => trailingMonthlySeries(scopedTx, chartEndMonth, "spend", expenseKindFilter),
+    [expenseKindFilter, scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
   const incomeSeries = useMemo(
-    () => trailingMonthlySeries(scopedTx, monthKey, "income"),
-    [scopedTx, monthKey]
+    () => trailingMonthlySeries(scopedTx, chartEndMonth, "income"),
+    [scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
   const upcomingInvoice = useMemo(
     () =>
@@ -806,11 +823,11 @@ export function RevolutInsightsSection({
   /** Prélèvements Gmail — uniquement mois civil en cours, et seulement si la carte affiche ce mois. */
   const qontoDebitsThisMonth = useMemo(() => {
     const nowKey = monthKeyNow();
-    if (monthKey !== nowKey) return [];
+    if (isAnnual || monthKey !== nowKey) return [];
     return qontoDebits
       .filter((d) => d.debitDateIso.startsWith(nowKey))
       .sort((a, b) => a.debitDateIso.localeCompare(b.debitDateIso));
-  }, [qontoDebits, monthKey]);
+  }, [qontoDebits, monthKey, isAnnual]);
 
   const depensesDelta = filteredDepenses - previousFilteredDepenses;
   const entreesDelta = current.entrees - previous.entrees;
@@ -819,28 +836,38 @@ export function RevolutInsightsSection({
 
   return (
     <section className="space-y-3">
-      <div className="flex justify-center">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onMonthChange(shiftMonthKey(monthKey, -1))}
-            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
-            aria-label="Mois précédent"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="min-w-[6.5rem] text-center text-sm font-medium text-ink-700 dark:text-white/75">
-            {monthNavigatorLabel(monthKey)}
-          </span>
-          <button
-            type="button"
-            onClick={() => onMonthChange(shiftMonthKey(monthKey, 1))}
-            className="grid h-8 w-8 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100/80 hover:text-ink-900 dark:text-white/45 dark:hover:bg-white/[0.06] dark:hover:text-white"
-            aria-label="Mois suivant"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+      <div className="flex flex-col items-center gap-2">
+        <div className="inline-flex rounded-full bg-ink-100/70 p-1 dark:bg-white/[0.06]" role="group" aria-label="Période du tableau de bord">
+          {([{ value: "month", label: "Mois" }, { value: "year", label: "Année entière" }] as const).map((mode) => (
+            <button key={mode.value} type="button" aria-pressed={periodMode === mode.value}
+              onClick={() => setPeriodMode(mode.value)}
+              className={clsx("min-h-10 rounded-full px-4 text-xs font-semibold transition", periodMode === mode.value ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/55")}
+            >{mode.label}</button>
+          ))}
         </div>
+        {isAnnual ? (
+          <div className="flex flex-wrap justify-center gap-1" role="group" aria-label="Année du tableau de bord">
+            {availableYears.filter((year) => year <= new Date().getFullYear() || year === selectedYear).map((year) => (
+              <button key={year} type="button" aria-pressed={year === selectedYear}
+                onClick={() => onMonthChange(`${year}-${monthKey.slice(5, 7)}`)}
+                className={clsx("min-h-11 rounded-full border px-3 text-xs font-medium tabular-nums", year === selectedYear ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" : "border-ink-200/60 text-ink-500 dark:border-white/10 dark:text-white/55")}
+              >{year}</button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => onMonthChange(shiftMonthKey(monthKey, -1))}
+              className="grid h-11 w-11 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 dark:text-white/45 dark:hover:bg-white/[0.06]" aria-label="Mois précédent">
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-medium text-ink-700 dark:text-white/75">{monthNavigatorLabel(monthKey)}</span>
+            <button type="button" onClick={() => onMonthChange(shiftMonthKey(monthKey, 1))}
+              className="grid h-11 w-11 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 dark:text-white/45 dark:hover:bg-white/[0.06]" aria-label="Mois suivant">
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        {isAnnual ? <p className="text-[10px] text-ink-500 dark:text-white/45">Totaux {selectedYear} · comparaison avec {selectedYear - 1} · courbes de janvier à décembre</p> : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -912,14 +939,14 @@ export function RevolutInsightsSection({
           <div>
             <div>
               <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
-              <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
+              {!isAnnual && selectedYear === new Date().getFullYear() ? <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
                 BNC versé depuis le début de l&apos;année ·{" "}
                 <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">
                   {fmt.euro(bncYearTotalEur)}
                 </span>
-              </p>
+              </p> : null}
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-left text-[11px] leading-snug tabular-nums">
+            {!isAnnual && monthKey === monthKeyNow() ? <div className="mt-2 grid grid-cols-2 gap-2 text-left text-[11px] leading-snug tabular-nums">
               <div
                 className={clsx(
                   "flex min-w-0 flex-col items-start gap-0.5 rounded-2xl bg-ink-100/70 px-3 py-2.5 dark:bg-white/[0.05]",
@@ -939,7 +966,7 @@ export function RevolutInsightsSection({
                 <span className="text-xs font-bold">{fmt.euro(currentMonthInvoice.amountTtcEur)} TTC</span>
                 <span className="font-medium opacity-75">{fmt.euro(currentMonthInvoice.amountHtEur)} HT</span>
               </div>
-            </div>
+            </div> : null}
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">

@@ -326,3 +326,10 @@ export function simulateTax(input: TaxSimulationInput): TaxSimulationResult {
     economiePensionPer
   };
 }
+
+/** Net disponible dans le scénario de suivi à 17,2 %, sans modifier l’avis fiscal. */
+export function computeBncNetWithCsg172(analysis: Pick<TaxYearAnalysis, "bncBrut" | "irAttribuableBnc">) {
+  const csgEur = Math.round(Math.max(0, analysis.bncBrut) * 0.172 * 100) / 100;
+  const netEur = Math.round(Math.max(0, analysis.bncBrut - analysis.irAttribuableBnc - csgEur) * 100) / 100;
+  return { csgEur, netEur };
+}
