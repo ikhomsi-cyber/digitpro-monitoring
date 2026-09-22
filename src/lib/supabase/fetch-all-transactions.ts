@@ -153,6 +153,37 @@ function mapRowsToDashboardTx(rawRows: SupabaseTxRow[]): DashboardTx[] {
   });
 }
 
+/** Mobile category detail: only professional debits in the requested calendar range.
+ * Keep label/manual-category fields: derived categories cannot be filtered by raw category in SQL.
+ */
+export async function loadUserExpensePeriodFromSupabase(
+  client: SupabaseServerClient, userId: string, range: { since: string; until: string }
+): Promise<{ transactions: DashboardTx[]; errorMessage: string | null }> {
+  const page = async (index: number) => client.from("transactions")
+    .select("id,date,label,category,category_manual,amount,company,bank_name,scope", index === 0 ? { count: "exact" } : {})
+    .eq("user_id", userId).or("scope.eq.pro,scope.is.null").lt("amount", 0)
+    .gte("date", range.since).lt("date", range.until)
+    .order("date", { ascending: false }).order("id", { ascending: false })
+    .range(index * DASHBOARD_TX_PAGE_SIZE, (index + 1) * DASHBOARD_TX_PAGE_SIZE - 1);
+  const first = await page(0);
+  if (first.error || first.count == null || first.count > DASHBOARD_TX_MAX_ROWS) {
+    return { transactions: [], errorMessage: "Données de dépenses incomplètes." };
+  }
+  const rows = [...(first.data ?? [])] as unknown as SupabaseTxRow[];
+  const pages = Math.ceil(first.count / DASHBOARD_TX_PAGE_SIZE);
+  for (let index = 1; index < pages; index += DASHBOARD_TX_FETCH_CONCURRENCY) {
+    const batch = await Promise.all(Array.from({ length: Math.min(DASHBOARD_TX_FETCH_CONCURRENCY, pages - index) }, (_, offset) => page(index + offset)));
+    for (const result of batch) {
+      if (result.error) return { transactions: [], errorMessage: result.error.message };
+      rows.push(...(result.data ?? []) as unknown as SupabaseTxRow[]);
+    }
+  }
+  if (rows.length !== first.count || new Set(rows.map(row => row.id)).size !== first.count) {
+    return { transactions: [], errorMessage: "Données de dépenses incomplètes." };
+  }
+  return { transactions: mapRowsToDashboardTx(rows), errorMessage: null };
+}
+
 /**
  * Charge toutes les transactions utilisateur (pagination PostgREST).
  * Le schéma est versionné par les migrations Supabase : aucun repli vers un

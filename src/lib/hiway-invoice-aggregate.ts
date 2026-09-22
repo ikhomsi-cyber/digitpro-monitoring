@@ -38,12 +38,12 @@ export function sumHiwayInvoiceHtForMonth(
  * n'est pas utilisé ici : il décrit le mois de prestation, pas une échéance de
  * règlement, et sinon une facture déjà encaissée peut rester provisionnée.
  */
-export function sumOutstandingHiwayInvoiceHt(
+export function outstandingHiwayInvoices(
   invoices: readonly HiwayInvoice[] | null | undefined,
   transactions: readonly DashboardTx[],
   now = new Date()
-): number {
-  if (!invoices?.length) return 0;
+): Array<{ date: string; amountHt: number }> {
+  if (!invoices?.length) return [];
 
   const todayIso = `${localMonthKey(now)}-${String(now.getDate()).padStart(2, "0")}`;
   const issued = invoices
@@ -51,7 +51,7 @@ export function sumOutstandingHiwayInvoiceHt(
     .filter((invoice) => invoice.date && invoice.date <= todayIso && invoice.amountHt > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (!issued.length) return 0;
+  if (!issued.length) return [];
 
   const receipts = transactions
     .filter(
@@ -66,7 +66,7 @@ export function sumOutstandingHiwayInvoiceHt(
 
   let receiptIndex = 0;
   let availableReceiptHt = 0;
-  let outstandingHt = 0;
+  const outstanding: Array<{ date: string; amountHt: number }> = [];
 
   for (const invoice of issued) {
     let unpaidInvoiceHt = invoice.amountHt;
@@ -86,10 +86,31 @@ export function sumOutstandingHiwayInvoiceHt(
         receiptIndex++;
       }
     }
-    outstandingHt += unpaidInvoiceHt;
+    if (unpaidInvoiceHt > 0.005) outstanding.push({ date: invoice.date, amountHt: unpaidInvoiceHt });
   }
 
-  return round2(Math.max(0, outstandingHt));
+  return outstanding;
+}
+
+export function sumOutstandingHiwayInvoiceHt(
+  invoices: readonly HiwayInvoice[] | null | undefined,
+  transactions: readonly DashboardTx[],
+  now = new Date()
+): number {
+  return round2(outstandingHiwayInvoices(invoices, transactions, now).reduce((total, invoice) => total + invoice.amountHt, 0));
+}
+
+/** 30 calendar days after the recorded issue date; UTC arithmetic avoids DST offsets. */
+export function nextHiwayPaymentDelayDays(
+  invoices: readonly HiwayInvoice[] | null | undefined,
+  transactions: readonly DashboardTx[],
+  now = new Date()
+): number | null {
+  const oldest = outstandingHiwayInvoices(invoices, transactions, now)[0];
+  if (!oldest) return null;
+  const issued = Date.parse(oldest.date + "T00:00:00Z");
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((issued - today) / 86400000) + 30;
 }
 
 /**

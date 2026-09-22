@@ -1,0 +1,6 @@
+# The native app and its local credentials never belong in the web deployment.
+ios/
+# Historical nested checkout is not the active application.
+sasu-control-center/
+tmp/
+.env*

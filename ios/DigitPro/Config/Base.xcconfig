@@ -1,0 +1,5 @@
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+DIGITPRO_API_URL =
+DIGITPRO_APP_GROUP = group.fr.digitpro.ios
+#include? "Local.xcconfig"

@@ -418,6 +418,8 @@ export function computeYearEndProjection(input: {
   soldeQontoEur: number | null;
   detteTotaleEur: number;
   statsReady: boolean;
+  /** Native calendar forecast: no inferred workdays or historical pace. */
+  useCalendarPlan?: boolean;
   now?: Date;
 }): YearEndProjection {
   const now = input.now ?? new Date();
@@ -430,7 +432,7 @@ export function computeYearEndProjection(input: {
   const selectedInYear = new Set(
     input.selectedWorkDayIsos.filter((iso) => iso.startsWith(yearPrefix))
   );
-  const capacitySet = buildYearRevenueCapacityDaySet(year, selectedInYear);
+  const capacitySet = input.useCalendarPlan ? selectedInYear : buildYearRevenueCapacityDaySet(year, selectedInYear);
   const sortedCapacity = [...capacitySet].sort();
 
   const caBase = Math.max(0, input.tjmRepartition.caHtEur);
@@ -487,10 +489,29 @@ export function computeYearEndProjection(input: {
   const paceMonthly = monthsElapsed > 0 ? ytdActualRevenueHtEur / monthsElapsed : 0;
   const paceRemaining = paceMonthly * remainingMonths;
 
-  const remainingRevenueHt =
-    weights.habit * habitRemaining + weights.pace * paceRemaining + weights.plan * planRemaining;
+  const calendarSeries: YearEndProjectionMonth[] = [];
+  if (input.useCalendarPlan) {
+    let cumulative = 0;
+    for (let month1 = 1; month1 <= 12; month1++) {
+      const monthKey = monthKeyFromParts(year, month1);
+      const actual = revenueByMonth.get(monthKey) ?? 0;
+      const days = [...selectedInYear].filter(iso => iso.startsWith(`${monthKey}-`)).length;
+      const planned = days * resolveTjmForMonth(monthKey, input.billableRatePeriods, clientName, input.fallbackTjmHt, tjmCache);
+      // Receipts already recorded in the current month are included once.
+      const revenueHt = round2(month1 < monthsElapsed ? actual : Math.max(actual, planned));
+      cumulative = round2(cumulative + revenueHt);
+      calendarSeries.push({ monthKey, monthLabel: monthShortLabelFr(year, month1), revenueHt,
+        kind: month1 < monthsElapsed || (actual > 0 && actual >= planned) ? "actual" : "forecast",
+        cumulativeHt: cumulative });
+    }
+  }
+  const remainingRevenueHt = input.useCalendarPlan
+    ? Math.max(0, calendarSeries.reduce((sum, row) => sum + row.revenueHt, 0) - ytdActualRevenueHtEur)
+    : weights.habit * habitRemaining + weights.pace * paceRemaining + weights.plan * planRemaining;
 
-  const projectedRevenueHtEur = ytdActualRevenueHtEur + remainingRevenueHt;
+  const projectedRevenueHtEur = input.useCalendarPlan
+    ? calendarSeries.reduce((sum, row) => sum + row.revenueHt, 0)
+    : ytdActualRevenueHtEur + remainingRevenueHt;
   const projectedPersonalIncomeEur = projectedRevenueHtEur * personalRatio;
   const projectedCsgEur = projectedRevenueHtEur * csgRatio;
 
@@ -500,7 +521,7 @@ export function computeYearEndProjection(input: {
   const netCashTodayEur = cashBase - input.detteTotaleEur;
   const projectedCashEur = netCashTodayEur + remainingPersonalIncomeEur - remainingCsgEur;
 
-  const monthlySeries = buildMonthlyProjectionSeries({
+  const monthlySeries = input.useCalendarPlan ? calendarSeries : buildMonthlyProjectionSeries({
     year,
     monthsElapsed,
     revenueByMonth,
@@ -545,7 +566,7 @@ export function computeYearEndProjection(input: {
       explicitPlannedDays: selectedInYear.size,
       ytdActualRevenueHtEur: round2(ytdActualRevenueHtEur),
       habitYearsSampled: habits.yearsSampled,
-      basisLabel: formatBasisLabel(weights, habits.yearsSampled)
+      basisLabel: input.useCalendarPlan ? "Encaissements réels + jours cochés × TJM du mois. Aucun jour ajouté automatiquement." : formatBasisLabel(weights, habits.yearsSampled)
     }
   };
 }

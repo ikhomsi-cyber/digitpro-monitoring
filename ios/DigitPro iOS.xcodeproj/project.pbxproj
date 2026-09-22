@@ -1,0 +1,444 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0185A3106C260FF97914BEC1 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F2F1DDC2C30CD753CD503211 /* Supabase */; };
+		22FE77B0395ED580F0DD7F07 /* DigitProWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 68A94EA9DBA36CBD6841F9A2 /* DigitProWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		51594BAB38A16EDA2CB77A41 /* DigitPro/Features/ActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAC283A1F2F1AB35B0B5DA69 /* DigitPro/Features/ActivityView.swift */; };
+		55FD6B1B62501709E59E8ACA /* DigitPro/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 35A83A313417F36186661152 /* DigitPro/Assets.xcassets */; };
+		5D956DD3702C77DDA487B0A2 /* DigitPro/Core/Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75AF676ACE2914EBD91B609F /* DigitPro/Core/Configuration.swift */; };
+		7D2B8049E24ECBB9FA9A23D8 /* DigitPro/App/DigitProApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC8C92FD1DD5D49504B595E5 /* DigitPro/App/DigitProApp.swift */; };
+		8054317003047632285CE91F /* DigitPro/Features/ExpenseCategoriesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805730DEC2231F179B5E42D4 /* DigitPro/Features/ExpenseCategoriesCard.swift */; };
+		9A32F5F9E7E1A7D3A5B5BFE6 /* DigitPro/Features/FinanceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CBB5384C546BEE48DCD9B3C /* DigitPro/Features/FinanceViews.swift */; };
+		9D698AD969B0103D5E3E46E2 /* DigitPro/Shared/WidgetCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4983898F6C1FAE357B526200 /* DigitPro/Shared/WidgetCache.swift */; };
+		9E7EF19772AC12225993FE9B /* DigitPro/Features/DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921C5E160EA1F5AA7F1931A0 /* DigitPro/Features/DashboardView.swift */; };
+		ADF525BFFCAC33BF44688612 /* DigitPro/Core/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A6237C46997B9F7429D89D /* DigitPro/Core/Models.swift */; };
+		AF22262CFD4ECDE5B73A25E8 /* DigitPro/Widget/DigitProWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41CB7391D9BD1873CA3F6400 /* DigitPro/Widget/DigitProWidget.swift */; };
+		C3B7F80A0DBFA8C053B0C0EC /* DigitPro/Core/MobileAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4181067639D30CDCE8673033 /* DigitPro/Core/MobileAPI.swift */; };
+		CAF312CF3072BFD9B418344C /* DigitPro/Core/AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54DF0FBCBCBB584A76F29D4 /* DigitPro/Core/AppStore.swift */; };
+		D6D98AD647220B90179BC808 /* DigitPro/Features/TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C80A257F25C6600536F4C1F /* DigitPro/Features/TransactionsView.swift */; };
+		DDEF11B52AB56952C1CA9050 /* DigitPro/Shared/DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEF35C12DCF79807587FAC5 /* DigitPro/Shared/DesignSystem.swift */; };
+		E0DB7E3205981768D842582F /* DigitPro/Shared/WidgetCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4983898F6C1FAE357B526200 /* DigitPro/Shared/WidgetCache.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D799BAE6088A90139B415FCC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54BBE413AAEF52C73D2ACFDB;
+			remoteInfo = DigitProWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CFFF27C96089B93150F3553B /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				22FE77B0395ED580F0DD7F07 /* DigitProWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		35A83A313417F36186661152 /* DigitPro/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = DigitPro/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		4181067639D30CDCE8673033 /* DigitPro/Core/MobileAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/MobileAPI.swift; sourceTree = SOURCE_ROOT; };
+		41CB7391D9BD1873CA3F6400 /* DigitPro/Widget/DigitProWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Widget/DigitProWidget.swift; sourceTree = SOURCE_ROOT; };
+		4983898F6C1FAE357B526200 /* DigitPro/Shared/WidgetCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Shared/WidgetCache.swift; sourceTree = SOURCE_ROOT; };
+		4E6C85CB97E677370395B3A2 /* DigitPro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = DigitPro.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		68A94EA9DBA36CBD6841F9A2 /* DigitProWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = DigitProWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		6C80A257F25C6600536F4C1F /* DigitPro/Features/TransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Features/TransactionsView.swift; sourceTree = SOURCE_ROOT; };
+		7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DigitPro/Config/Base.xcconfig; sourceTree = SOURCE_ROOT; };
+		75AF676ACE2914EBD91B609F /* DigitPro/Core/Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/Configuration.swift; sourceTree = SOURCE_ROOT; };
+		805730DEC2231F179B5E42D4 /* DigitPro/Features/ExpenseCategoriesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Features/ExpenseCategoriesCard.swift; sourceTree = SOURCE_ROOT; };
+		921C5E160EA1F5AA7F1931A0 /* DigitPro/Features/DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Features/DashboardView.swift; sourceTree = SOURCE_ROOT; };
+		9BEF35C12DCF79807587FAC5 /* DigitPro/Shared/DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Shared/DesignSystem.swift; sourceTree = SOURCE_ROOT; };
+		9CBB5384C546BEE48DCD9B3C /* DigitPro/Features/FinanceViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Features/FinanceViews.swift; sourceTree = SOURCE_ROOT; };
+		BAC283A1F2F1AB35B0B5DA69 /* DigitPro/Features/ActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Features/ActivityView.swift; sourceTree = SOURCE_ROOT; };
+		D54DF0FBCBCBB584A76F29D4 /* DigitPro/Core/AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/AppStore.swift; sourceTree = SOURCE_ROOT; };
+		F9A6237C46997B9F7429D89D /* DigitPro/Core/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/Models.swift; sourceTree = SOURCE_ROOT; };
+		FC8C92FD1DD5D49504B595E5 /* DigitPro/App/DigitProApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/App/DigitProApp.swift; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		1A730932CB7A1F7E3E6EF1C4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		429254A3096F2C0324F195BB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0185A3106C260FF97914BEC1 /* Supabase in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		B28B7AF69320201D1CF206EB = {
+			isa = PBXGroup;
+			children = (
+				FC8C92FD1DD5D49504B595E5 /* DigitPro/App/DigitProApp.swift */,
+				D54DF0FBCBCBB584A76F29D4 /* DigitPro/Core/AppStore.swift */,
+				75AF676ACE2914EBD91B609F /* DigitPro/Core/Configuration.swift */,
+				4181067639D30CDCE8673033 /* DigitPro/Core/MobileAPI.swift */,
+				F9A6237C46997B9F7429D89D /* DigitPro/Core/Models.swift */,
+				BAC283A1F2F1AB35B0B5DA69 /* DigitPro/Features/ActivityView.swift */,
+				921C5E160EA1F5AA7F1931A0 /* DigitPro/Features/DashboardView.swift */,
+				805730DEC2231F179B5E42D4 /* DigitPro/Features/ExpenseCategoriesCard.swift */,
+				9CBB5384C546BEE48DCD9B3C /* DigitPro/Features/FinanceViews.swift */,
+				6C80A257F25C6600536F4C1F /* DigitPro/Features/TransactionsView.swift */,
+				9BEF35C12DCF79807587FAC5 /* DigitPro/Shared/DesignSystem.swift */,
+				4983898F6C1FAE357B526200 /* DigitPro/Shared/WidgetCache.swift */,
+				41CB7391D9BD1873CA3F6400 /* DigitPro/Widget/DigitProWidget.swift */,
+				35A83A313417F36186661152 /* DigitPro/Assets.xcassets */,
+				7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */,
+				FBDC4F23F93125BBEEAE800C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		FBDC4F23F93125BBEEAE800C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4E6C85CB97E677370395B3A2 /* DigitPro.app */,
+				68A94EA9DBA36CBD6841F9A2 /* DigitProWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		206D523F7415A8FBBF22DD67 /* DigitPro */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5E2A19D1698725489DDAA0D8 /* Build configuration list for PBXNativeTarget "DigitPro" */;
+			buildPhases = (
+				D37CE9A3E7D89CF0C0ED17EB /* Sources */,
+				429254A3096F2C0324F195BB /* Frameworks */,
+				4A7BEB26AA76D7D73119F3E8 /* Resources */,
+				CFFF27C96089B93150F3553B /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DE58E2B17C19600779694943 /* PBXTargetDependency */,
+			);
+			name = DigitPro;
+			packageProductDependencies = (
+				F2F1DDC2C30CD753CD503211 /* Supabase */,
+			);
+			productName = DigitPro;
+			productReference = 4E6C85CB97E677370395B3A2 /* DigitPro.app */;
+			productType = "com.apple.product-type.application";
+		};
+		54BBE413AAEF52C73D2ACFDB /* DigitProWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 009B329950FD360375F4EC67 /* Build configuration list for PBXNativeTarget "DigitProWidget" */;
+			buildPhases = (
+				49E45EB6FEDF6D48D39C84E2 /* Sources */,
+				1A730932CB7A1F7E3E6EF1C4 /* Frameworks */,
+				A199AB8D6497EF3CA9019E0E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DigitProWidget;
+			packageProductDependencies = (
+			);
+			productName = DigitProWidget;
+			productReference = 68A94EA9DBA36CBD6841F9A2 /* DigitProWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = 49EA05A46B1A86EA7E413B43 /* Build configuration list for PBXProject "DigitPro iOS" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = fr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				fr,
+				en,
+				Base,
+			);
+			mainGroup = B28B7AF69320201D1CF206EB;
+			packageReferences = (
+				5B2FB32768E94DF2B310CA2C /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
+			productRefGroup = FBDC4F23F93125BBEEAE800C /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				206D523F7415A8FBBF22DD67 /* DigitPro */,
+				54BBE413AAEF52C73D2ACFDB /* DigitProWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4A7BEB26AA76D7D73119F3E8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				55FD6B1B62501709E59E8ACA /* DigitPro/Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A199AB8D6497EF3CA9019E0E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		49E45EB6FEDF6D48D39C84E2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9D698AD969B0103D5E3E46E2 /* DigitPro/Shared/WidgetCache.swift in Sources */,
+				AF22262CFD4ECDE5B73A25E8 /* DigitPro/Widget/DigitProWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D37CE9A3E7D89CF0C0ED17EB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D2B8049E24ECBB9FA9A23D8 /* DigitPro/App/DigitProApp.swift in Sources */,
+				CAF312CF3072BFD9B418344C /* DigitPro/Core/AppStore.swift in Sources */,
+				5D956DD3702C77DDA487B0A2 /* DigitPro/Core/Configuration.swift in Sources */,
+				C3B7F80A0DBFA8C053B0C0EC /* DigitPro/Core/MobileAPI.swift in Sources */,
+				ADF525BFFCAC33BF44688612 /* DigitPro/Core/Models.swift in Sources */,
+				51594BAB38A16EDA2CB77A41 /* DigitPro/Features/ActivityView.swift in Sources */,
+				9E7EF19772AC12225993FE9B /* DigitPro/Features/DashboardView.swift in Sources */,
+				8054317003047632285CE91F /* DigitPro/Features/ExpenseCategoriesCard.swift in Sources */,
+				9A32F5F9E7E1A7D3A5B5BFE6 /* DigitPro/Features/FinanceViews.swift in Sources */,
+				D6D98AD647220B90179BC808 /* DigitPro/Features/TransactionsView.swift in Sources */,
+				DDEF11B52AB56952C1CA9050 /* DigitPro/Shared/DesignSystem.swift in Sources */,
+				E0DB7E3205981768D842582F /* DigitPro/Shared/WidgetCache.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DE58E2B17C19600779694943 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54BBE413AAEF52C73D2ACFDB /* DigitProWidget */;
+			targetProxy = D799BAE6088A90139B415FCC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		1C0F51C6F574FCBBA5C71EA7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = DigitPro/Config/DigitPro.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F24TC3QB75;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DigitPro/Config/DigitProWidget-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.digitpro.ios.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		89E1FD6268CC0F221A2BE178 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+			};
+			name = Debug;
+		};
+		E31AAABE82F6C5474E65189F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = DigitPro/Config/DigitPro.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F24TC3QB75;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DigitPro/Config/DigitPro-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.digitpro.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		E6DE6C99132752C914FEF632 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+			};
+			name = Release;
+		};
+		FF722E117A20E4744B158C3B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = DigitPro/Config/DigitPro.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F24TC3QB75;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DigitPro/Config/DigitProWidget-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.digitpro.ios.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		FF9915599F110A58D7A084A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7162460438E8AD9BD3214D7E /* DigitPro/Config/Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = DigitPro/Config/DigitPro.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F24TC3QB75;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "DigitPro/Config/DigitPro-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = fr.digitpro.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		009B329950FD360375F4EC67 /* Build configuration list for PBXNativeTarget "DigitProWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FF722E117A20E4744B158C3B /* Debug */,
+				1C0F51C6F574FCBBA5C71EA7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		49EA05A46B1A86EA7E413B43 /* Build configuration list for PBXProject "DigitPro iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				89E1FD6268CC0F221A2BE178 /* Debug */,
+				E6DE6C99132752C914FEF632 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5E2A19D1698725489DDAA0D8 /* Build configuration list for PBXNativeTarget "DigitPro" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E31AAABE82F6C5474E65189F /* Debug */,
+				FF9915599F110A58D7A084A7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5B2FB32768E94DF2B310CA2C /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.48.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F2F1DDC2C30CD753CD503211 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5B2FB32768E94DF2B310CA2C /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}
