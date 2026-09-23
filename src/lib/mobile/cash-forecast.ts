@@ -2,6 +2,7 @@ import type { DashboardTx } from "@/lib/dashboard-metrics";
 import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
 import { outstandingHiwayInvoices, sumHiwayInvoiceHtForMonth } from "@/lib/hiway-invoice-aggregate";
 import { resolveBillableTjmForMonth, type BillableRatePeriod } from "@/lib/billable-client-days";
+import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 
 const round = (n: number) => Math.round(n * 100) / 100;
 const dayMs = 86400000;
@@ -15,10 +16,11 @@ export function mobileCashForecast(input: {
   const today = `${year}-${String(month + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const end = Date.UTC(year, 11, 31);
   const pro = input.transactions.filter(tx => (tx.scope ?? "pro") === "pro");
-  const bncPaidYtdEur = round(pro.filter(tx => tx.date >= `${year}-01-01` && tx.date.slice(0, 10) <= today && tx.amount < 0 && /\bbnc\b/i.test(tx.label))
+  const bncPaidYtdEur = round(pro.filter(tx => tx.date >= `${year}-01-01` && tx.date.slice(0, 10) <= today && tx.amount < 0 && deriveExpenseBucket(tx) === "BNC")
     .reduce((sum, tx) => sum - tx.amount, 0));
   const receiptSchedule: Array<{ date: string; amountTtcEur: number; source: string }> = [];
   for (const invoice of outstandingHiwayInvoices(input.invoices, pro, now)) {
+    // Hiway invoices are payable 30 days after their recorded issue date.
     const due = Date.parse(invoice.date + "T00:00:00Z") + 30 * dayMs;
     if (due > end) continue;
     receiptSchedule.push({ date: new Date(due).toISOString().slice(0, 10),

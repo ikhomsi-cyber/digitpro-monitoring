@@ -9,6 +9,12 @@ it("shows actual BNC paid YTD, excluding future, prior year and personal entries
   const result = mobileCashForecast({ ...base, transactions: [tx("2026-01-15", -1000, "BNC"), tx("2026-09-30", -2000, "BNC"), tx("2026-12-01", -5000, "BNC"), tx("2025-01-01", -6000, "BNC"), { ...tx("2026-01-16", -7000, "BNC"), scope: "personal" }] });
   expect(result.bncPaidYtdEur).toBe(3000);
 });
+it("recognizes manually categorized BNC payments without a BNC label", () => {
+  const result = mobileCashForecast({ ...base, transactions: [
+    { ...tx("2026-08-15", -1250, "Virement dirigeant"), category: "BNC", categoryManual: true }
+  ] });
+  expect(result.bncPaidYtdEur).toBe(1250);
+});
 it("projects bank cash with TTC receipts minus all average outflows including BNC and tax", () => {
   const result = mobileCashForecast({ ...base, transactions: [tx("2026-06-01", -100, "Frais"), tx("2026-07-01", -200, "BNC"), tx("2026-08-01", -300, "TVA")], invoices: [invoice("2026-09-01", 1000)], days: ["2026-10-01", "2026-12-01"] });
   expect(result.expectedReceiptsTtcEur).toBe(2400); // outstanding + October; December paid next year
