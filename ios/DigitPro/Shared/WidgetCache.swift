@@ -13,9 +13,13 @@ struct WidgetSnapshot: Codable {
     let revenueTtcEur: Double?
     let revenueHtEur: Double?
     let workedDays: Int?
+    let totalWorkdays: Int?
     let securedRevenueHtEur: Double?
+    let securedRevenueTargetHtEur: Double?
     let digitProExpensesEur: Double?
     let personalExpensesEur: Double?
+    let ikEur: Double?
+    let ndfEur: Double?
 }
 enum WidgetCache {
     static var defaults: UserDefaults? {
@@ -24,12 +28,13 @@ enum WidgetCache {
         return UserDefaults(suiteName: group)
     }
     static func save(balance: Double?, month: String?, revenueTtcEur: Double?, revenueHtEur: Double?,
-                     workedDays: Int?, securedRevenueHtEur: Double?, digitProExpensesEur: Double?,
-                     personalExpensesEur: Double?, digitProExpensesChangePercent: Double?, personalExpensesChangePercent: Double?, outstandingInvoiceHtEur: Double?, nextPaymentDays: Int?) {
+                     workedDays: Int?, totalWorkdays: Int?, securedRevenueHtEur: Double?, securedRevenueTargetHtEur: Double?, digitProExpensesEur: Double?,
+                     personalExpensesEur: Double?, ikEur: Double?, ndfEur: Double?, digitProExpensesChangePercent: Double?, personalExpensesChangePercent: Double?, outstandingInvoiceHtEur: Double?, nextPaymentDays: Int?) {
         let snapshot = WidgetSnapshot(nextPaymentDays: nextPaymentDays, outstandingInvoiceHtEur: outstandingInvoiceHtEur, digitProExpensesChangePercent: digitProExpensesChangePercent, personalExpensesChangePercent: personalExpensesChangePercent, updatedAt: Date(), balance: balance, month: month,
             revenueTtcEur: revenueTtcEur, revenueHtEur: revenueHtEur, workedDays: workedDays,
-            securedRevenueHtEur: securedRevenueHtEur, digitProExpensesEur: digitProExpensesEur,
-            personalExpensesEur: personalExpensesEur)
+            totalWorkdays: totalWorkdays, securedRevenueHtEur: securedRevenueHtEur,
+            securedRevenueTargetHtEur: securedRevenueTargetHtEur, digitProExpensesEur: digitProExpensesEur,
+            personalExpensesEur: personalExpensesEur, ikEur: ikEur, ndfEur: ndfEur)
         defaults?.set(try? JSONEncoder().encode(snapshot), forKey: "snapshot")
         WidgetCenter.shared.reloadAllTimelines()
     }

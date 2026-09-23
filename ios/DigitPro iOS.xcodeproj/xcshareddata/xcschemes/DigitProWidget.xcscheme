@@ -18,6 +18,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "54BBE413AAEF52C73D2ACFDB"
                BuildableName = "DigitProWidget.appex"
+               BlueprintName = "DigitProWidget"
                ReferencedContainer = "container:DigitPro iOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>

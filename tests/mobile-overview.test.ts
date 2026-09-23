@@ -40,6 +40,8 @@ describe("mobile business contract", () => {
     const result = buildMobileOverview([], { days: ["2026-08-03", "2026-08-04", "2026-08-25"], rates: [], tjm: 820 }, now);
     expect(result.widget.workedDays).toBe(2);
     expect(result.widget.securedRevenueHtEur).toBe(1640);
+    expect(result.widget.totalWorkdays).toBeGreaterThan(result.widget.workedDays);
+    expect(result.widget.securedRevenueTargetHtEur).toBe(result.widget.totalWorkdays * 820);
   });
 });
 

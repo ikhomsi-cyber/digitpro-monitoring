@@ -11,7 +11,7 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 16) {
                 dashboardTopBar
                 if let data = store.overview {
                     if let error = store.overviewError { InlineError(message: error) { Task { await store.refresh() } } }
@@ -42,12 +42,7 @@ struct DashboardView: View {
         HStack(spacing: 12) {
             Button { store.selectedTab = .settings } label: { BrandMark(size: 48).background(mint, in: Circle()) }
                 .accessibilityLabel("Ouvrir mon compte")
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass").font(.system(size: 20, weight: .medium))
-                Text("Rechercher").font(.system(size: 16, weight: .medium)); Spacer()
-            }
-            .foregroundStyle(.secondary).padding(.horizontal, 17).frame(height: 48)
-            .background(DP.surface(scheme), in: Capsule()).overlay(Capsule().stroke(DP.border(scheme)))
+            Spacer(minLength: 0)
             Button { store.selectedTab = .activity } label: {
                 Image(systemName: "chart.bar.fill").font(.system(size: 19, weight: .semibold))
                     .frame(width: 48, height: 48).background(DP.surface(scheme), in: Circle())
@@ -78,7 +73,7 @@ struct DashboardView: View {
                     }.font(.system(size: 14, weight: .medium)).foregroundStyle(comparison.deltaEur >= 0 ? mint : DP.rose)
                     Text("Solde · vs fin du mois dernier").font(.caption2).foregroundStyle(.secondary)
                 }
-            }.padding(.top, 46)
+            }.padding(.top, 0)
             HStack {
                 Text("CA généré HT · depuis janvier").font(.caption).foregroundStyle(.secondary)
                 Spacer()

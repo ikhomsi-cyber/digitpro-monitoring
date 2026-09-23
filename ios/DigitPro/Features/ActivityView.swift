@@ -121,7 +121,7 @@ struct ActivityView: View {
     }
     private func calendarGrid(_ value: ActivityMonthResponse) -> some View {
         let leading = value.days.first.map { ($0.weekday + 6) % 7 } ?? 0
-        let ndfByDay = Dictionary(grouping: value.expenses?.ndf.transactions ?? [], by: { String($0.date.prefix(10)) })
+        let ndfByDay = Dictionary(grouping: value.expenses?.ndf.transactions ?? [], by: { effectiveNdfDate($0) })
             .mapValues { rows in rows.reduce(0.0) { $0 + abs($1.amount) } }
         return VStack(spacing: 7) {
             HStack(spacing: 4) {
@@ -134,6 +134,31 @@ struct ActivityView: View {
                 ForEach(value.days) { day in dayCell(day, today: value.today, ndfAmount: ndfByDay[day.iso]) }
             }
         }
+    }
+    private func effectiveNdfDate(_ transaction: ExpenseItem) -> String {
+        let pattern = #"(?<!\d)(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})(?!\d)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: transaction.label, range: NSRange(transaction.label.startIndex..., in: transaction.label)),
+              let dayRange = Range(match.range(at: 1), in: transaction.label),
+              let monthRange = Range(match.range(at: 2), in: transaction.label),
+              let yearRange = Range(match.range(at: 3), in: transaction.label),
+              let day = Int(transaction.label[dayRange]),
+              let month = Int(transaction.label[monthRange]),
+              let rawYear = Int(transaction.label[yearRange]) else {
+            return String(transaction.date.prefix(10))
+        }
+        let year = rawYear < 100 ? 2000 + rawYear : rawYear
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        var components = DateComponents()
+        components.year = year; components.month = month; components.day = day
+        guard let date = calendar.date(from: components),
+              calendar.component(.year, from: date) == year,
+              calendar.component(.month, from: date) == month,
+              calendar.component(.day, from: date) == day else {
+            return String(transaction.date.prefix(10))
+        }
+        return String(format: "%04d-%02d-%02d", year, month, day)
     }
     private func dayCell(_ day: ActivityDay, today: String, ndfAmount: Double?) -> some View {
         let selected = mode == .worked ? day.worked : mode == .vacation ? day.vacation : day.commute

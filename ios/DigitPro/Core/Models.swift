@@ -46,7 +46,9 @@ struct WidgetOverview: Decodable {
     let revenueTtcEur: Double
     let revenueHtEur: Double
     let workedDays: Int
+    let totalWorkdays: Int?
     let securedRevenueHtEur: Double
+    let securedRevenueTargetHtEur: Double?
     let digitProExpensesEur: Double
     let personalExpensesEur: Double
 }

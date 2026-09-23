@@ -101,6 +101,7 @@ final class AppStore: ObservableObject {
                 let value: ActivityMonthResponse = try await api.get("activity/month", query: [URLQueryItem(name: "month", value: key)])
                 guard self.generation == requestGeneration, self.signedIn, !self.locked else { return }
                 self.activityMonths[key] = (value, Date())
+                if self.widgetEnabled, let overview = self.overview { self.saveWidget(overview) }
             } catch {
                 // The Dashboard remains usable; Activity will retry when opened.
             }
@@ -149,10 +150,13 @@ final class AppStore: ObservableObject {
     }
     private func saveWidget(_ overview: Overview) {
         let value = overview.widget
+        let activityExpenses = activityMonths[overview.month]?.value.expenses
         WidgetCache.save(balance: overview.dashboard.soldeQontoEur, month: overview.month,
             revenueTtcEur: value?.revenueTtcEur, revenueHtEur: value?.revenueHtEur,
-            workedDays: value?.workedDays, securedRevenueHtEur: value?.securedRevenueHtEur,
+            workedDays: value?.workedDays, totalWorkdays: value?.totalWorkdays,
+            securedRevenueHtEur: value?.securedRevenueHtEur, securedRevenueTargetHtEur: value?.securedRevenueTargetHtEur,
             digitProExpensesEur: value?.digitProExpensesEur, personalExpensesEur: value?.personalExpensesEur,
+            ikEur: activityExpenses?.ikEur, ndfEur: activityExpenses?.ndf.totalEur,
             digitProExpensesChangePercent: value?.digitProExpensesChangePercent, personalExpensesChangePercent: value?.personalExpensesChangePercent, outstandingInvoiceHtEur: value?.outstandingInvoiceHtEur, nextPaymentDays: value?.nextPaymentDays)
     }
     func enableReminder() async {
