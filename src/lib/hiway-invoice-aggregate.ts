@@ -42,12 +42,12 @@ export function outstandingHiwayInvoices(
   invoices: readonly HiwayInvoice[] | null | undefined,
   transactions: readonly DashboardTx[],
   now = new Date()
-): Array<{ date: string; amountHt: number }> {
+): Array<{ date: string; amountHt: number; subject?: string; dueDate?: string | null }> {
   if (!invoices?.length) return [];
 
   const todayIso = `${localMonthKey(now)}-${String(now.getDate()).padStart(2, "0")}`;
   const issued = invoices
-    .map((invoice) => ({ date: invoice.date?.slice(0, 10) ?? "", amountHt: hiwayInvoiceHtEur(invoice) }))
+    .map((invoice) => ({ date: invoice.date?.slice(0, 10) ?? "", amountHt: hiwayInvoiceHtEur(invoice), ...(invoice.subject ? { subject: invoice.subject } : {}), ...(invoice.dueDate ? { dueDate: invoice.dueDate } : {}) }))
     .filter((invoice) => invoice.date && invoice.date <= todayIso && invoice.amountHt > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -66,7 +66,7 @@ export function outstandingHiwayInvoices(
 
   let receiptIndex = 0;
   let availableReceiptHt = 0;
-  const outstanding: Array<{ date: string; amountHt: number }> = [];
+  const outstanding: Array<{ date: string; amountHt: number; subject?: string; dueDate?: string | null }> = [];
 
   for (const invoice of issued) {
     let unpaidInvoiceHt = invoice.amountHt;
@@ -86,7 +86,7 @@ export function outstandingHiwayInvoices(
         receiptIndex++;
       }
     }
-    if (unpaidInvoiceHt > 0.005) outstanding.push({ date: invoice.date, amountHt: unpaidInvoiceHt });
+    if (unpaidInvoiceHt > 0.005) outstanding.push({ date: invoice.date, amountHt: unpaidInvoiceHt, ...(invoice.subject ? { subject: invoice.subject } : {}), ...(invoice.dueDate ? { dueDate: invoice.dueDate } : {}) });
   }
 
   return outstanding;
@@ -108,9 +108,9 @@ export function nextHiwayPaymentDelayDays(
 ): number | null {
   const oldest = outstandingHiwayInvoices(invoices, transactions, now)[0];
   if (!oldest) return null;
-  const issued = Date.parse(oldest.date + "T00:00:00Z");
+  const due = oldest.dueDate ? Date.parse(oldest.dueDate + "T00:00:00Z") : Date.parse(oldest.date + "T00:00:00Z") + 30 * 86400000;
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  return Math.round((issued - today) / 86400000) + 30;
+  return Math.round((due - today) / 86400000);
 }
 
 /**

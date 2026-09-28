@@ -18,13 +18,16 @@ export function mobileCashForecast(input: {
   const pro = input.transactions.filter(tx => (tx.scope ?? "pro") === "pro");
   const bncPaidYtdEur = round(pro.filter(tx => tx.date >= `${year}-01-01` && tx.date.slice(0, 10) <= today && tx.amount < 0 && deriveExpenseBucket(tx) === "BNC")
     .reduce((sum, tx) => sum - tx.amount, 0));
-  const receiptSchedule: Array<{ date: string; amountTtcEur: number; source: string }> = [];
+  const receiptSchedule: Array<{ date: string; amountTtcEur: number; source: string; invoiceLabel?: string; sentDate?: string }> = [];
   for (const invoice of outstandingHiwayInvoices(input.invoices, pro, now)) {
-    // Hiway invoices are payable 30 days after their recorded issue date.
-    const due = Date.parse(invoice.date + "T00:00:00Z") + 30 * dayMs;
+    // Respect the explicit invoice deadline; keep the user’s 30-day fallback.
+    const due = invoice.dueDate ? Date.parse(invoice.dueDate + "T00:00:00Z") : Date.parse(invoice.date + "T00:00:00Z") + 30 * dayMs;
     if (due > end) continue;
     receiptSchedule.push({ date: new Date(due).toISOString().slice(0, 10),
-      amountTtcEur: round(invoice.amountHt * 1.2), source: "invoice" });
+      amountTtcEur: round(invoice.amountHt * 1.2), source: "invoice",
+      ...(invoice.subject ? {
+        invoiceLabel: invoice.subject.replace(/^DigitPro Consulting\s*-\s*/i, ""), sentDate: invoice.date
+      } : {}) });
   }
   // Same payment calendar as the web: issue on the first of the next month,
   // then 30 calendar days. Revenue payable next year is excluded from cash.
@@ -51,6 +54,6 @@ export function mobileCashForecast(input: {
     expectedExpensesTtcEur,
     receiptSchedule: input.invoices == null ? [] : receiptSchedule.sort((a, b) => a.date.localeCompare(b.date)),
     projectedBalanceEur: input.balance == null || input.invoices == null ? null : round(input.balance + expectedReceiptsTtcEur - expectedExpensesTtcEur),
-    basis: "Solde actuel + paiements TTC attendus d’ici le 31 décembre − sorties estimées. Factures déjà encaissées exclues ; factures impayées à 30 jours et jours cochés facturés le 1er du mois suivant, payables 30 jours après. Paiements de l’année suivante exclus. Les factures en retard restent attendues, sans date de règlement garantie. Sorties : moyenne des 3 derniers mois complets, BNC et paiements fiscaux inclus, prorata du mois restant."
+    basis: "Solde actuel + paiements TTC attendus d’ici le 31 décembre − sorties estimées. Factures déjà encaissées exclues ; factures impayées à leur échéance (à défaut, 30 jours après l’email) et jours cochés facturés le 1er du mois suivant, payables 30 jours après. Paiements de l’année suivante exclus. Les factures en retard restent attendues, sans date de règlement garantie. Sorties : moyenne des 3 derniers mois complets, BNC et paiements fiscaux inclus, prorata du mois restant."
   };
 }

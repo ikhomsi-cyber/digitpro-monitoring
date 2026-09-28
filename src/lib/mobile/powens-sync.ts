@@ -1,4 +1,5 @@
 import "server-only";
+import { recordBankSync } from "@/lib/mobile/bank-sync-status";
 import { MobileError } from "@/lib/mobile/auth";
 import { isPowensCloudConfigured, powensCloudFetchTransactions } from "@/lib/powens/cloud-api";
 import { powensAccountFilterForAxis, powensDefaultCompanyLabel } from "@/lib/powens/config";
@@ -22,5 +23,6 @@ export async function syncMobilePowens(client: Parameters<typeof importTransacti
   const result = await importTransactionsWithClient(client, transactions, {
     sourceFilename: `Powens API iOS (perso) · ${new Date().toISOString()}`, format: "powens", fileHash: null
   });
+  await recordBankSync(client, userId, "personal");
   return { inserted: result.inserted.length, merged: result.merged };
 }

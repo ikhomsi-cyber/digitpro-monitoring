@@ -74,24 +74,29 @@ struct DashboardView: View {
                     Text("Solde · vs fin du mois dernier").font(.caption2).foregroundStyle(.secondary)
                 }
             }.padding(.top, 0)
-            HStack {
-                Text("CA généré HT · depuis janvier").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Text(data.generatedRevenueHtEur?.euros ?? "—").font(.subheadline.weight(.semibold)).monospacedDigit()
-            }
-
-            if let upcoming = data.upcomingInvoice {
-                VStack(spacing: 3) {
-                    HStack(spacing: 6) {
-                        Text("À encaisser").foregroundStyle(.secondary)
-                        Spacer(minLength: 4)
-                        Text(upcoming.amountTtcEur.euros + " TTC").fontWeight(.semibold).monospacedDigit()
-                        Text("· " + upcoming.statusLabel).foregroundStyle(.secondary)
-                    }.font(.caption).lineLimit(1).minimumScaleFactor(0.75)
-                    Text(upcoming.amountHtEur.euros + " HT").font(.system(size: 10)).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }.padding(.vertical, 2)
-            }
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("CA généré", systemImage: "chart.line.uptrend.xyaxis")
+                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    Text(data.generatedRevenueHtEur?.euros ?? "—")
+                        .font(.system(size: 21, weight: .semibold, design: .rounded)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                    Text("HT · depuis janvier").font(.caption2).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                Rectangle().fill(DP.border(scheme)).frame(width: 1, height: 64)
+                VStack(alignment: .leading, spacing: 5) {
+                    Label("À encaisser", systemImage: "clock.arrow.circlepath")
+                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                    Text(data.upcomingInvoice?.amountTtcEur.euros ?? "—")
+                        .font(.system(size: 21, weight: .semibold, design: .rounded)).foregroundStyle(mint)
+                        .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                    if let upcoming = data.upcomingInvoice {
+                        Text("TTC · " + upcoming.statusLabel).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.65)
+                        Text(upcoming.amountHtEur.euros + " HT").font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }.padding(14).background(DP.surface(scheme), in: RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(DP.border(scheme)))
             Text("CA encaissé par mois · HT").font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             Chart(rows) { month in
                 AreaMark(x: .value("Mois", month.month), y: .value("CA", month.revenueHtEur))
@@ -155,7 +160,7 @@ struct DashboardView: View {
                          amount: abs(remuneration), progress: cash > 0 ? max(0, remuneration) / cash : 0,
                          symbol: "eurosign.circle.fill", color: mint)
             Divider().padding(.leading, 58)
-            AccountGauge(title: "Reste à couvrir · CSG 17,2 %", subtitle: "TVA comprise", amount: csgRemaining,
+            AccountGauge(title: "Reste à couvrir · CSG 17,2 %", subtitle: "Factures non encaissées et TVA incluses", amount: csgRemaining,
                          progress: csgTarget > 0 ? min(1, cash / csgTarget) : 1,
                          symbol: "shield.lefthalf.filled", color: Color(hex: 0x74BBD0))
         }.padding(8).background(DP.surface(scheme), in: RoundedRectangle(cornerRadius: 28, style: .continuous))

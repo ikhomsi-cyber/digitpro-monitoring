@@ -45,6 +45,13 @@ final class MobileAPI {
     func put<T: Decodable, Body: Encodable>(_ path: String, body: Body) async throws -> T {
         try await request(path, method: "PUT", body: try JSONEncoder().encode(body))
     }
+    func syncInvoices() async throws {
+        struct Result: Decodable { let count: Int }
+        let operation = Task.detached { @MainActor [self] in
+            let _: Result = try await request("invoices/sync", method: "POST", body: Optional<Data>.none)
+        }
+        try await operation.value
+    }
     private func request<T: Decodable>(_ path: String, method: String,
                                        query: [URLQueryItem] = [], body: Data?) async throws -> T {
         let session = try await supabase.auth.session
@@ -52,7 +59,7 @@ final class MobileAPI {
         components.queryItems = query.isEmpty ? nil : query
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        if path == "transactions/sync" { request.timeoutInterval = 300 }
+        if path == "transactions/sync" || path == "invoices/sync" { request.timeoutInterval = 300 }
         request.httpBody = body
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

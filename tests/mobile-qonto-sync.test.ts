@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/mobile/bank-sync-status", () => ({ recordBankSync: vi.fn().mockResolvedValue(undefined) }));
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), fetch: vi.fn(), ingest: vi.fn(), mode: vi.fn(), powens: vi.fn() }));
 vi.mock("@/lib/mobile/auth", async original => ({ ...(await original<object>()), mobileAuth: mocks.auth }));
 vi.mock("@/lib/qonto/sync", () => ({ fetchQontoTransactionsForImport: mocks.fetch }));

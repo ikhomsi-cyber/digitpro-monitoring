@@ -55,8 +55,11 @@ struct ForecastView: View {
                                     ForEach(Array(receipts.enumerated()), id: \.offset) { _, receipt in
                                         HStack {
                                             VStack(alignment: .leading, spacing: 3) {
-                                                Text(dayLabel(receipt.date)).font(.caption.weight(.medium))
-                                                Text(receipt.source == "invoice" ? "Facture Hiway restant à régler" : "Prévision selon les jours cochés").font(.caption2).foregroundStyle(.secondary)
+                                                Text("Échéance · \(dayLabel(receipt.date))").font(.caption.weight(.medium))
+                                                Text(receipt.source == "invoice" ? (receipt.invoiceLabel ?? "Facture Hiway restant à régler") : "Prévision selon les jours cochés").font(.caption2).foregroundStyle(.secondary)
+                                                if let sent = receipt.sentDate {
+                                                    Text("Email du \(dayLabel(sent))").font(.caption2).foregroundStyle(.secondary)
+                                                }
                                             }
                                             Spacer()
                                             Text(receipt.amountTtcEur.euros).font(.caption.weight(.semibold))
@@ -83,7 +86,7 @@ struct ForecastView: View {
                 Text("Les projections évoluent avec votre activité. Trésorerie calculée à partir du dernier solde importé.")
                     .font(.caption2).foregroundStyle(.secondary)
             } else { LoadingOverview() }
-        }.toolbar(.hidden, for: .navigationBar).refreshable { await store.refresh() }
+        }.toolbar(.hidden, for: .navigationBar).refreshable { await store.refreshInvoices() }
     }
 }
 struct FinanceView: View {

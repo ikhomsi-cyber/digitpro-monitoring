@@ -18,21 +18,13 @@ import {
 } from "@/lib/billable-client-days";
 import { computeCurrentMonthOverview, countAgendaWorkDaysInMonth } from "@/lib/billable-calendar-metrics";
 import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
-import { additionalCsgFromInvoiceCaHt, sumOutstandingHiwayInvoiceHt } from "@/lib/hiway-invoice-aggregate";
+import { withOutstandingInvoiceCsg } from "@/lib/dashboard-invoice-stats";
 
 export function buildMobileOverview(transactions: DashboardTx[], activity: {
   days: string[]; rates: BillableRatePeriod[]; tjm: number | null; invoices?: HiwayInvoice[];
 }, now = new Date()) {
   const baseDashboard = computeDashboardHeroStats(transactions, now);
-  const outstandingInvoiceCsgEur = additionalCsgFromInvoiceCaHt(
-    sumOutstandingHiwayInvoiceHt(activity.invoices, transactions, now)
-  );
-  const dashboard = outstandingInvoiceCsgEur > 0 ? {
-    ...baseDashboard,
-    detteCsgDepuisDebutEur: Math.round((baseDashboard.detteCsgDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100,
-    detteTotaleDepuisDebutEur: Math.round((baseDashboard.detteTotaleDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100,
-    resteAVerserApresCashEur: Math.max(0, Math.round((baseDashboard.detteTotaleDepuisDebutEur + outstandingInvoiceCsgEur - Math.max(0, baseDashboard.soldeQontoEur ?? 0)) * 100) / 100)
-  } : baseDashboard;
+  const dashboard = withOutstandingInvoiceCsg(baseDashboard, activity.invoices, transactions, now);
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const activityOverview = computeCurrentMonthOverview(
     new Set(activity.days), activity.rates, activity.tjm ?? BILLABLE_CLIENT_TJM_HT, now

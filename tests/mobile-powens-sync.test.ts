@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/mobile/bank-sync-status", () => ({ recordBankSync: vi.fn().mockResolvedValue(undefined) }));
 const mocks = vi.hoisted(() => ({ configured: vi.fn(), fetch: vi.fn(), ingest: vi.fn(), reference: vi.fn(), apply: vi.fn() }));
 vi.mock("@/lib/powens/cloud-api", () => ({ isPowensCloudConfigured: mocks.configured, powensCloudFetchTransactions: mocks.fetch }));
 vi.mock("@/lib/import-transactions", () => ({ importTransactionsWithClient: mocks.ingest }));

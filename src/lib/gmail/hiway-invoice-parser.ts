@@ -10,6 +10,8 @@ export type HiwayInvoice = {
   id: string;
   /** Date d'envoi de l'email (ISO YYYY-MM-DD). */
   date: string;
+  /** Échéance explicite indiquée dans la facture, si présente. */
+  dueDate?: string | null;
   /** Montant détecté (prioritairement HT si libellé, sinon le plus probable). */
   amountEur: number | null;
   /** Nature du montant détecté. */
@@ -251,10 +253,18 @@ export function parseHiwayInvoice(input: {
   const client = extractClient(haystack);
   const times = extractDaysTimesTjm(haystack);
   const tjmHtEur = times.tjmHtEur ?? extractTjmHt(haystack);
+  const due = haystack.match(/(?:date\s+d[’']échéance|échéance)\s*:?\s*(\d{2})[/-](\d{2})[/-](\d{4})/i);
+  let dueDate: string | null = null;
+  if (due) {
+    const candidate = `${due[3]}-${due[2]}-${due[1]}`;
+    const ms = Date.parse(candidate + "T00:00:00Z");
+    if (Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === candidate) dueDate = candidate;
+  }
 
   return {
     id: input.id,
     date: input.dateIso,
+    dueDate,
     amountEur,
     amountKind,
     client,

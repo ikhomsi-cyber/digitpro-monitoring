@@ -1,3 +1,4 @@
+import { recordBankSync } from "@/lib/mobile/bank-sync-status";
 import { mobileAuth, mobileFailure, mobileJSON, MobileError } from "@/lib/mobile/auth";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { importTransactionsWithClient } from "@/lib/import-transactions";
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
       sourceFilename: `Qonto API iOS · ${new Date().toISOString()}`,
       format: "qonto", fileHash: null
     });
+    await recordBankSync(client, userId, "pro");
     const personal = scope === "all" ? await syncMobilePowens(client, userId) : { inserted: 0, merged: 0 };
     return mobileJSON({ inserted: result.inserted.length + personal.inserted, merged: result.merged + personal.merged });
   } catch (error) { return mobileFailure(error); }

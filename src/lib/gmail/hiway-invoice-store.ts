@@ -17,6 +17,7 @@ function rowToInvoice(row: Database["public"]["Tables"]["hiway_invoices"]["Row"]
   return {
     id: row.gmail_message_id,
     date: row.sent_date,
+    dueDate: row.due_date ?? null,
     subject: row.subject,
     client: row.client,
     amountEur: row.amount_ht_eur != null ? Number(row.amount_ht_eur) : null,
@@ -56,6 +57,7 @@ export async function upsertHiwayInvoices(
     user_id: userId,
     gmail_message_id: inv.id,
     sent_date: inv.date || now.slice(0, 10),
+    due_date: inv.dueDate ?? null,
     subject: inv.subject,
     client: inv.client,
     amount_ht_eur: inv.amountEur,

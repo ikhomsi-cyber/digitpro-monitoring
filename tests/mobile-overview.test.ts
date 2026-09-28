@@ -107,4 +107,7 @@ it("uses business meals TTC for forecast notes de frais and reconciles total pay
   expect(result.widget.nextPaymentDays).toBe(web.dueInDays);
   expect(result.widget.outstandingInvoiceHtEur).toBe(web.amountHtEur);
   expect(result.generatedRevenueHtEur).toBe(computeYearToDateInvoicingTotals([], new Set(days), [], 820, now, invoices).factureHtEur);
+  const { withOutstandingInvoiceCsg } = await import("@/lib/dashboard-invoice-stats");
+  expect(result.dashboard).toEqual(withOutstandingInvoiceCsg(computeDashboardHeroStats([], now), invoices, [], now));
+  expect(result.dashboard.csgComparaison172Eur).toBe(1032);
  });

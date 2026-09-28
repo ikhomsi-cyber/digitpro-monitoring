@@ -64,6 +64,18 @@ final class AppStore: ObservableObject {
             await refresh()
         } catch { self.error = error.localizedDescription }
     }
+    func refreshInvoices() async {
+        guard let api, signedIn, !locked, !refreshing else { return }
+        refreshing = true
+        do {
+            try await api.syncInvoices()
+            refreshing = false
+            await refresh()
+        } catch {
+            refreshing = false
+            overviewError = error.localizedDescription
+        }
+    }
     func refresh() async {
         guard let api, signedIn, !locked else { return }
         let requestGeneration = generation

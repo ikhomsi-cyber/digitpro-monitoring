@@ -33,6 +33,8 @@ struct CashForecast: Decodable {
     let basis: String
 }
 struct ForecastReceipt: Decodable {
+    let invoiceLabel: String?
+    let sentDate: String?
     let date: String
     let amountTtcEur: Double
     let source: String
@@ -137,7 +139,12 @@ struct TransactionVAT: Decodable {
     let ttc: Double
     let kind: String
 }
+struct BankSyncStatus: Decodable {
+    let pro: String?
+    let personal: String?
+}
 struct TransactionPage: Decodable {
+    var lastSync: BankSyncStatus? = nil
     let transactions: [BankTransaction]
     let total: Int
     let nextPage: Int?

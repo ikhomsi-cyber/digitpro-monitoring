@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/mobile/bank-sync-status", () => ({ readBankSyncStatus: vi.fn().mockResolvedValue({ pro: "2026-09-28T12:00:00Z", personal: null }) }));
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), query: {} as Record<string, ReturnType<typeof vi.fn>> }));
 vi.mock("@/lib/mobile/auth", async (original) => ({ ...(await original<object>()), mobileAuth: mocks.auth }));
 import { GET } from "@/app/api/mobile/v1/transactions/route";
@@ -17,7 +18,7 @@ it("scopes reads to the verified owner with stable pagination", async () => {
   expect(mocks.query.range).toHaveBeenCalledWith(100,199);
   expect(mocks.query.order).toHaveBeenCalledWith("id", { ascending: false });
   expect(mocks.query.ilike).toHaveBeenCalledWith("label", "%50\\%%");
-  expect(await response.json()).toMatchObject({ total: 201, nextPage: 2 });
+  expect(await response.json()).toMatchObject({ total: 201, nextPage: 2, lastSync: { pro: "2026-09-28T12:00:00Z", personal: null } });
 });
 it("rejects invalid pages and filters before database reads", async () => {
   for (const query of ["page=-1", "page=foo", "scope=someone-else", "page=1.2"]) {

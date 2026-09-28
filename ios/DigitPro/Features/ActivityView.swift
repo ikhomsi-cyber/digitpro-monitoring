@@ -110,7 +110,7 @@ struct ActivityView: View {
                 calendarLegend("Vacances", "beach.umbrella.fill", vacationColor)
                 calendarLegend("Voiture", "car.fill", commuteColor,
                                detail: (value.expenses?.ikEur.euros ?? "—") + " · IK à date")
-                calendarLegend("NDF", "receipt.fill", ndfColor,
+                calendarLegend("NDF", "fork.knife", ndfColor,
                                detail: (value.expenses?.ndf.totalEur.euros ?? "—") + " TTC")
             }
             Text("Jours cochés : déjà facturés jusqu’à aujourd’hui inclus ; à facturer pour les dates à venir.")
@@ -130,7 +130,7 @@ struct ActivityView: View {
                 }
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 7), spacing: 3) {
-                ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 40) }
+                ForEach(0..<leading, id: \.self) { _ in Color.clear.frame(height: 35) }
                 ForEach(value.days) { day in dayCell(day, today: value.today, ndfAmount: ndfByDay[day.iso]) }
             }
         }
@@ -165,13 +165,12 @@ struct ActivityView: View {
         let planned = day.iso > today
         let billingColor = planned ? plannedColor : workColor
         let color = mode == .worked ? billingColor : mode == .commute ? commuteColor : vacationColor
-        let dayColor = day.worked ? billingColor : day.vacation ? vacationColor : day.holiday != nil ? holidayColor : day.commute ? commuteColor : ndfAmount != nil ? ndfColor : Color.primary
         let marked = day.worked || day.vacation || day.commute || day.holiday != nil || ndfAmount != nil
         return Button { Task { await toggle(day, selected: !selected) } } label: {
             ZStack {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(marked ? dayColor.opacity(scheme == .dark ? 0.20 : 0.10) : Color.primary.opacity(scheme == .dark ? 0.07 : 0.035))
-                RoundedRectangle(cornerRadius: 9)
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(day.worked ? calendarAccent.opacity(planned ? 0.07 : 0.16) : Color.primary.opacity(scheme == .dark ? 0.05 : 0.025))
+                RoundedRectangle(cornerRadius: 7)
                     .stroke(day.iso == today ? calendarAccent : selected ? color.opacity(0.85) : Color.primary.opacity(0.14), lineWidth: day.iso == today ? 2 : 1)
                 VStack(spacing: 1) {
                     if savingDate == day.iso { ProgressView().controlSize(.mini).frame(height: 17) }
@@ -180,7 +179,7 @@ struct ActivityView: View {
                             Text("\(day.day)").font(.system(size: 14, weight: marked || day.iso == today ? .bold : .medium))
                                 .foregroundStyle(Color.primary.opacity(day.billable || marked ? 1 : 0.65))
                             if ndfAmount != nil {
-                                Image(systemName: "receipt.fill").font(.system(size: 8, weight: .semibold)).foregroundStyle(ndfColor)
+                                Image(systemName: "fork.knife").font(.system(size: 8, weight: .semibold)).foregroundStyle(ndfColor)
                             }
                         }
                     }
@@ -191,7 +190,7 @@ struct ActivityView: View {
                         dayMarker("car.fill", active: day.commute, color: commuteColor)
                     }.padding(.horizontal, 2)
                 }
-            }.frame(height: 40)
+            }.frame(height: 35)
         }.buttonStyle(.plain).disabled(savingDate != nil)
             .accessibilityLabel(([dayLabel(day.iso), day.worked ? (planned ? "À facturer, jour planifié" : "Déjà facturé, jour réalisé") : nil,
                 day.holiday.map { "Férié : " + $0 }, day.vacation ? "Vacances" : nil,
@@ -200,12 +199,27 @@ struct ActivityView: View {
             .accessibilityHint("Modifier : " + mode.label)
     }
     private var calendarAccent: Color { DP.tint(scheme) }
-    private var workColor: Color { scheme == .dark ? Color(hex: 0x6EE7B7) : Color(hex: 0x047857) }
-    private var plannedColor: Color { scheme == .dark ? Color(hex: 0xFDBA74) : Color(hex: 0x9A3412) }
-    private var holidayColor: Color { scheme == .dark ? Color(hex: 0xFCD34D) : Color(hex: 0x92400E) }
-    private var vacationColor: Color { scheme == .dark ? Color(hex: 0x7DD3FC) : Color(hex: 0x0369A1) }
-    private var commuteColor: Color { scheme == .dark ? Color(hex: 0xD8B4FE) : Color(hex: 0x7E22CE) }
-    private var ndfColor: Color { scheme == .dark ? Color(hex: 0xF9A8D4) : Color(hex: 0x9D174D) }
+    private var workColor: Color { calendarAccent }
+    private var plannedColor: Color { calendarAccent.opacity(0.65) }
+    private var holidayColor: Color { .secondary }
+    private var vacationColor: Color { .secondary }
+    private var commuteColor: Color { .secondary }
+    private var ndfColor: Color { calendarAccent }
+    private func ndfMerchantName(_ label: String) -> String {
+        var name = label
+        let patterns = [
+            #"(?i)\b(?:paiement|achat)\s+(?:par\s+)?(?:carte|cb)\b"#,
+            #"(?i)\b(?:carte|cb)\s*(?:n[°o]\s*)?(?:[xX*•]+\s*)?\d{0,4}\b"#,
+            #"(?<!\d)\d{1,2}[./-]\d{1,2}[./-](?:\d{4}|\d{2})(?!\d)"#,
+            #"(?i)\b(?:du|le)\s*(?=$)"#,
+            #"\s{2,}"#
+        ]
+        for pattern in patterns {
+            name = name.replacingOccurrences(of: pattern, with: " ", options: .regularExpression)
+        }
+        name = name.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "-·:/")))
+        return name.isEmpty ? "Restaurant" : name
+    }
     private func dayMarker(_ symbol: String, active: Bool, color: Color) -> some View {
         Image(systemName: symbol).font(.system(size: 8, weight: .bold))
             .foregroundStyle(color).opacity(active ? 1 : 0)
@@ -222,7 +236,7 @@ struct ActivityView: View {
                 }
             }
         }.font(.caption.weight(.semibold)).frame(maxWidth: .infinity, alignment: .leading)
-            .padding(7).background(color.opacity(scheme == .dark ? 0.14 : 0.08), in: RoundedRectangle(cornerRadius: 10))
+            .padding(6).background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
     }
     private func activityExpenses(_ value: ActivityExpenses) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -235,7 +249,7 @@ struct ActivityView: View {
                     Text("Cumul annuel à cette période : \(value.ikYearToDateEur.euros)")
                         .font(.caption2).foregroundStyle(.secondary)
                     Divider()
-                    MoneyRow(title: "NDF depuis le perso", amount: value.ndf.totalEur, symbol: "receipt", color: DP.amber)
+                    MoneyRow(title: "NDF depuis le perso", amount: value.ndf.totalEur, symbol: "fork.knife", color: ndfColor)
                     Text("Notes de frais validées · TTC · après dédoublonnage")
                         .font(.caption2).foregroundStyle(.secondary)
                     if !value.ndf.transactions.isEmpty {
@@ -243,7 +257,7 @@ struct ActivityView: View {
                             ForEach(value.ndf.transactions) { row in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(row.label).font(.caption).lineLimit(2)
+                                        Text(ndfMerchantName(row.label)).font(.caption).lineLimit(2)
                                         Text(dayLabel(row.date)).font(.caption2).foregroundStyle(.secondary)
                                     }
                                     Spacer()

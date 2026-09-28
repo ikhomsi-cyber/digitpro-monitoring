@@ -136,6 +136,7 @@ export type Database = {
           user_id: string;
           gmail_message_id: string;
           sent_date: string;
+          due_date: string | null;
           subject: string;
           client: string | null;
           amount_ht_eur: number | null;
@@ -151,6 +152,7 @@ export type Database = {
           user_id?: string;
           gmail_message_id: string;
           sent_date: string;
+          due_date?: string | null;
           subject: string;
           client?: string | null;
           amount_ht_eur?: number | null;
@@ -161,6 +163,7 @@ export type Database = {
         };
         Update: Partial<{
           sent_date: string;
+          due_date: string | null;
           subject: string;
           client: string | null;
           amount_ht_eur: number | null;

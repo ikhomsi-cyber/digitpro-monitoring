@@ -13,6 +13,7 @@ struct TransactionsView: View {
     @State private var syncingBanks = false
     @State private var syncingProvider = "Qonto"
     @State private var syncMessage: String?
+    @State private var lastSync: BankSyncStatus?
     @State private var error: String?
     @State private var requestID = UUID()
     private var filterKey: String { scope + "|" + search }
@@ -33,6 +34,11 @@ struct TransactionsView: View {
                 scopeButton("Tout", value: "all", symbol: "square.stack")
                 scopeButton("Pro", value: "pro", symbol: "building.2")
                 scopeButton("Personnel", value: "personal", symbol: "person")
+            }
+            Text("Dernière synchronisation").font(.caption2).foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                syncDate("Pro · Qonto", lastSync?.pro)
+                syncDate("Perso · Powens", lastSync?.personal)
             }
             if syncingBanks {
                 Label("Synchronisation avec \(syncingProvider)…", systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary)
@@ -72,7 +78,7 @@ struct TransactionsView: View {
                 // Invalidate in-flight pagination immediately, even during search debounce.
                 requestID = UUID()
                 if let cached = store.transactionPages[filterKey] {
-                    rows = cached.transactions; total = cached.total; nextPage = cached.nextPage
+                    rows = cached.transactions; total = cached.total; nextPage = cached.nextPage; lastSync = cached.lastSync
                     loading = false; error = nil
                     return
                 }
@@ -116,6 +122,14 @@ struct TransactionsView: View {
             else { self.error = "Synchronisation \(syncingProvider) : " + error.localizedDescription }
         }
     }
+    private func syncDate(_ title: String, _ timestamp: String?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label(title, systemImage: "arrow.triangle.2.circlepath").font(.caption2.weight(.semibold))
+            Text(timestamp.map { displayTimestamp($0) } ?? "Non renseignée")
+                .font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+        }.frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel("Dernière synchronisation " + title + ", " + (timestamp.map { displayTimestamp($0) } ?? "non renseignée"))
+    }
     private func scopeButton(_ title: String, value: String, symbol: String) -> some View {
         Button { scope = value } label: {
             Label(title, systemImage: symbol).font(.system(size: 12, weight: .semibold))
@@ -144,8 +158,8 @@ struct TransactionsView: View {
                 let existing = Set(rows.map(\.id))
                 rows += result.transactions.filter { !existing.contains($0.id) }
             }
-            total = result.total; nextPage = result.nextPage
-            store.transactionPages[requestedFilter] = TransactionPage(transactions: rows, total: total, nextPage: nextPage)
+            total = result.total; nextPage = result.nextPage; lastSync = result.lastSync
+            store.transactionPages[requestedFilter] = TransactionPage(lastSync: lastSync, transactions: rows, total: total, nextPage: nextPage)
         } catch is CancellationError { }
         catch let failure as URLError where failure.code == .cancelled { }
         catch {

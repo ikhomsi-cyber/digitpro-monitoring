@@ -1,5 +1,6 @@
 "use server";
 
+import { syncHiwayInvoices } from "@/lib/gmail/sync-invoices";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
@@ -7,27 +8,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { gmailRedirectUriForOrigin, isGmailConfigured, resolveRequestOrigin } from "@/lib/gmail/config";
 import { buildGmailConsentUrl } from "@/lib/gmail/oauth";
 import {
-  clearGmailTokenIfInvalidGrant,
   deleteGmailToken,
-  getAuthorizedGmailClient,
   loadGmailTokenRow,
   withAuthorizedGmailClient
 } from "@/lib/gmail/tokens";
-import { GMAIL_RECONNECT_REQUIRED_MESSAGE, isInvalidGrantError } from "@/lib/gmail/oauth-grant";
-import { fetchHiwayInvoicesFromGmail } from "@/lib/gmail/fetch-invoices";
 import { fetchQontoUpcomingDebitsFromGmail } from "@/lib/gmail/fetch-qonto-debits";
 import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import {
-  applyHiwayInvoiceBillingRules,
   type HiwayInvoice
 } from "@/lib/gmail/hiway-invoice-parser";
 import {
   deleteStoredHiwayInvoices,
-  loadStoredHiwayInvoices,
-  upsertHiwayInvoices
+  loadStoredHiwayInvoices
 } from "@/lib/gmail/hiway-invoice-store";
-import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
-import { loadBillableActivitySettings } from "@/lib/supabase/dashboard-loaders";
 import {
   GMAIL_OAUTH_STATE_COOKIE,
   GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
@@ -99,31 +92,7 @@ export async function loadHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }>
 
 export async function fetchHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }> {
   const { supabase, user } = await requireUser();
-  const client = await getAuthorizedGmailClient(supabase, user.id);
-  if (!client) {
-    throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
-  }
-
-  const { billableRatePeriods, initialBillableTjmHt } = await loadBillableActivitySettings(
-    supabase,
-    user.id
-  );
-  const fallbackTjmHt = initialBillableTjmHt ?? BILLABLE_CLIENT_TJM_HT;
-
-  let fetched: HiwayInvoice[];
-  try {
-    fetched = await fetchHiwayInvoicesFromGmail(client);
-  } catch (error) {
-    if (await clearGmailTokenIfInvalidGrant(supabase, user.id, error)) {
-      throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
-    }
-    throw error;
-  }
-  const invoices = fetched.map((inv) =>
-    applyHiwayInvoiceBillingRules(inv, { billableRatePeriods, fallbackTjmHt })
-  );
-
-  await upsertHiwayInvoices(supabase, user.id, invoices);
+  await syncHiwayInvoices(supabase, user.id);
   revalidatePath("/dashboard");
 
   const stored = await loadStoredHiwayInvoices(supabase, user.id);

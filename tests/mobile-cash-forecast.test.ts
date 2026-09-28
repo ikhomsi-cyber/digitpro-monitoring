@@ -3,7 +3,7 @@ import { mobileCashForecast } from "@/lib/mobile/cash-forecast";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
 const tx = (date: string, amount: number, label = "Frais"): DashboardTx => ({ id: date + label, date, amount, label, category: label, company: "Qonto", scope: "pro" });
-const invoice = (date: string, amountEur: number): HiwayInvoice => ({ id: date, date, amountEur, amountKind: "HT", client: null, billedDays: null, tjmHtEur: null, subject: "Facture" });
+const invoice = (date: string, amountEur: number): HiwayInvoice => ({ id: date, date, amountEur, amountKind: "HT", client: null, billedDays: null, tjmHtEur: null, subject: "" });
 const base = { transactions: [] as DashboardTx[], invoices: [] as HiwayInvoice[], days: [] as string[], rates: [], tjm: 1000, balance: 10000, now: new Date(2026, 8, 30) };
 it("shows actual BNC paid YTD, excluding future, prior year and personal entries", () => {
   const result = mobileCashForecast({ ...base, transactions: [tx("2026-01-15", -1000, "BNC"), tx("2026-09-30", -2000, "BNC"), tx("2026-12-01", -5000, "BNC"), tx("2025-01-01", -6000, "BNC"), { ...tx("2026-01-16", -7000, "BNC"), scope: "personal" }] });
@@ -44,4 +44,16 @@ it("includes December 31 receipts but excludes January payments from the cash ba
   ]);
   expect(result.expectedReceiptsTtcEur).toBe(1800);
   expect(result.projectedBalanceEur).toBe(11800);
+});
+it("identifies each real invoice separately from its calculated payment date", () => {
+  const result = mobileCashForecast({ ...base, now: new Date(2026, 8, 28), invoices: [
+    { ...invoice("2026-08-26",15300), subject:"DigitPro Consulting - Facture F1046" },
+    { ...invoice("2026-09-28",20680), subject:"DigitPro Consulting - Facture F1047" }
+  ] });
+  expect(result.receiptSchedule).toContainEqual({ date:"2026-09-25", sentDate:"2026-08-26", invoiceLabel:"Facture F1046", amountTtcEur:18360, source:"invoice" });
+  expect(result.receiptSchedule).toContainEqual({ date:"2026-10-28", sentDate:"2026-09-28", invoiceLabel:"Facture F1047", amountTtcEur:24816, source:"invoice" });
+});
+it("prefers the actual Gmail invoice deadline over the 30-day fallback", () => {
+  const result=mobileCashForecast({...base, now:new Date(2026,8,28), invoices:[{...invoice("2026-09-28",20680),dueDate:"2026-10-31"}]});
+  expect(result.receiptSchedule).toEqual([{date:"2026-10-31",amountTtcEur:24816,source:"invoice"}]);
 });

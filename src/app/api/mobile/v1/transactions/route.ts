@@ -1,3 +1,4 @@
+import { readBankSyncStatus } from "@/lib/mobile/bank-sync-status";
 import { mobileAuth, mobileJSON, mobileFailure, MobileError } from "@/lib/mobile/auth";
 import { z } from "zod";
 import { mobileTransactionVat } from "@/lib/mobile/transaction-vat";
@@ -19,7 +20,9 @@ export async function GET(request: Request) {
       .eq("user_id", userId).order("date", { ascending: false }).order("id", { ascending: false });
     if (scope !== "all") query = query.eq("scope", scope);
     if (search.trim()) query = query.ilike("label", `%${search.trim().replace(/[\\%_]/g, "\\$&")}%`);
-    const { data, error, count } = await query.range(page * 100, page * 100 + 99);
+    const [{ data, error, count }, lastSync] = await Promise.all([
+      query.range(page * 100, page * 100 + 99), readBankSyncStatus(client, userId)
+    ]);
     if (error || count == null) throw new MobileError(503, "Transactions indisponibles.");
     const transactions = (data ?? []).map(row => ({ ...row, vat: mobileTransactionVat({
       id: row.id, date: row.date, label: row.label ?? "", company: row.company ?? "",
@@ -28,6 +31,6 @@ export async function GET(request: Request) {
       category: (row.category_manual ? null : categorizeKnownPersonalTransfer(row.label ?? "", Number(row.amount)))
         ?? mapExpenseCategoryLabel(row.category ?? "")
     }) }));
-    return mobileJSON({ transactions, total: count, nextPage: (page + 1) * 100 < count ? page + 1 : null });
+    return mobileJSON({ lastSync, transactions, total: count, nextPage: (page + 1) * 100 < count ? page + 1 : null });
   } catch (error) { return mobileFailure(error); }
 }
