@@ -50,7 +50,7 @@ export function RevolutBalanceHero({
                 ? "border-emerald-300/50 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:text-emerald-300"
                 : "border-violet-300/50 bg-violet-500/10 text-violet-700 dark:border-violet-400/20 dark:text-violet-300"
             )}
-            title="CSG à 17,2 % depuis le 01/01/2023 + dette TVA − cash disponible."
+            title="CSG à 17,2 % depuis le 01/01/2023, factures émises non encaissées incluses + dette TVA − cash disponible."
           >
             <span className="text-ink-600 dark:text-white/60">Reste à couvrir · CSG 17,2 %</span>
             <span className="tabular-nums" aria-busy={!statsReady}>{!statsReady ? <span className="inline-block h-4 w-20 animate-pulse rounded bg-current opacity-15" aria-label="Calcul en cours" /> : csgRemainingEur == null ? "—" : fmt.euro(csgRemainingEur)}</span>

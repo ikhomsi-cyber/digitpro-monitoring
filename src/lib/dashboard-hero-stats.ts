@@ -19,6 +19,8 @@ import {
 const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
 /** Correction manuelle demandée sur la dette CSG calculée. */
 const CSG_DEBT_ADJUSTMENT_EUR = 1_200;
+/** Correction historique et déduction supplémentaire de 1 000 € à 17,2 %. */
+const CSG_172_ADJUSTMENT_EUR = CSG_DEBT_ADJUSTMENT_EUR + 1_000;
 
 export type DashboardHeroStats = {
   /**
@@ -272,11 +274,11 @@ export function computeDashboardHeroStats(
     { years: allYears.length ? allYears : [currentYear], now }
   ).cashTree;
   // La comparaison porte sur le résultat encaissé après charges, sans
-  // réintégration Urssaf, factures impayées ou marge. Correction de 1 200 € déduite.
+  // réintégration Urssaf, factures impayées ou marge. Correction de 2 200 € déduite.
   const comparaisonBaseEur = Math.max(0,
     comparaisonCashTree.caFactureEur - comparaisonCashTree.mandatoryFeesEur - comparaisonCashTree.personalChargesEur
   );
-  const csgComparaison172Eur = Math.max(0, Math.round(comparaisonBaseEur * 0.172 * 100) / 100 - CSG_DEBT_ADJUSTMENT_EUR);
+  const csgComparaison172Eur = Math.max(0, Math.round(comparaisonBaseEur * 0.172 * 100) / 100 - CSG_172_ADJUSTMENT_EUR);
   const detteTvaDepuisDebutEur =
     Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
     100;

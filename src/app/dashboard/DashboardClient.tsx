@@ -33,10 +33,7 @@ import {
   HiwayInvoicesProvider,
   useHiwayInvoicesState
 } from "@/components/dashboard/HiwayInvoicesContext";
-import {
-  additionalCsgFromInvoiceCaHt,
-  sumOutstandingHiwayInvoiceHt
-} from "@/lib/hiway-invoice-aggregate";
+import { withOutstandingInvoiceCsg } from "@/lib/dashboard-invoice-stats";
 import { DashboardInsightPeriodFilter } from "@/components/dashboard/DashboardInsightPeriodFilter";
 import { SectionThemeSync } from "@/components/dashboard/SectionThemeSync";
 import { PullToRefreshIndicator } from "@/components/categorisation/PullToRefreshIndicator";
@@ -256,24 +253,11 @@ export function DashboardClient({
   const [currentHeroStats, setCurrentHeroStats] = useState<DashboardHeroStats>(heroStats);
   /** Factures Hiway (partagées avec le graphique « Jours facturés » et le bloc Factures). */
   const hiwayInvoicesState = useHiwayInvoicesState(!demoMode, initialHiwayInvoices);
-  /** CSG à provisionner sur toutes les factures Hiway émises mais pas encore encaissées. */
-  const outstandingInvoiceCsgEur = useMemo(
-    () =>
-      additionalCsgFromInvoiceCaHt(
-        sumOutstandingHiwayInvoiceHt(hiwayInvoicesState.invoices, transactions)
-      ),
-    [hiwayInvoicesState.invoices, transactions]
+  /** Provisions à 9,7 % et 17,2 % sur les factures émises non encaissées. */
+  const displayHeroStats = useMemo(
+    () => withOutstandingInvoiceCsg(currentHeroStats, hiwayInvoicesState.invoices, transactions),
+    [currentHeroStats, hiwayInvoicesState.invoices, transactions]
   );
-  const displayHeroStats = useMemo<DashboardHeroStats>(() => {
-    if (outstandingInvoiceCsgEur <= 0) return currentHeroStats;
-    return {
-      ...currentHeroStats,
-      detteCsgDepuisDebutEur:
-        Math.round((currentHeroStats.detteCsgDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100,
-      detteTotaleDepuisDebutEur:
-        Math.round((currentHeroStats.detteTotaleDepuisDebutEur + outstandingInvoiceCsgEur) * 100) / 100
-    };
-  }, [currentHeroStats, outstandingInvoiceCsgEur]);
   /** Dette nette / KPIs fiscaux : masqués tant que l’historique complet n’est pas chargé. */
   const [heroStatsReady, setHeroStatsReady] = useState(
     () => !syncFullHistoryOnMount || demoMode

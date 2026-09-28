@@ -108,7 +108,8 @@ export function CsgHistoryCard({ transactions, stats }: { transactions: Dashboar
                 <div className="flex justify-between gap-3"><dt>Cash disponible</dt><dd>{stats.soldeQontoEur == null ? "—" : `− ${fmt.euro(stats.soldeQontoEur)}`}</dd></div>
               </dl>
               <p>Le reste à couvrir est limité à zéro et reste global. Les filtres annuels concernent uniquement la comparaison des provisions.</p>
-              <p>Le tableau rattache le CA au mois de prestation. Pour {now.getFullYear()}, il inclut le réalisé à date et les factures émises. Ses montants précèdent la correction globale de 1 200 €, déjà déduite de la CSG du solde global.</p>
+              <p>Le solde global inclut la CSG à 17,2 % sur le HT des factures émises encore non encaissées. Un règlement réduit cette provision pour éviter de compter deux fois la même facture.</p>
+              <p>Le tableau rattache le CA au mois de prestation. Pour {now.getFullYear()}, il inclut le réalisé à date et les factures émises. Ses montants précèdent les corrections globales : 1 200 € à 9,7 % et 2 200 € à 17,2 % (dont 1 000 € supplémentaires), déjà déduits des montants globaux.</p>
               <p>Hypothèse de suivi : 2022 prescrite, CSG à 17,2 % nulle et provision à 9,7 % en compensation.</p>
               {totals.compensationEur > 0 ? <p data-private>Compensation sur la sélection : {fmt.euro(totals.compensationEur)}.</p> : null}
             </div>

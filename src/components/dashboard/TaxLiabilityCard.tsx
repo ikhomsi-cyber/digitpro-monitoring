@@ -89,7 +89,7 @@ export function TaxLiabilityCard({
                 {formatEuro(coverage.csgEur)}
               </span>
             </span>
-            <span className="inline-flex items-center gap-1.5 text-ink-600 dark:text-white/60" title="17,2 % du CA HT encaissé depuis le 01/01/2023, après déduction des charges et frais perso, sans réintégration Urssaf ni factures non encaissées. Sans marge, avec déduction de 1 200 €. Non ajoutée au total.">
+            <span className="inline-flex items-center gap-1.5 text-ink-600 dark:text-white/60" title="17,2 % du CA HT encaissé depuis le 01/01/2023, après déduction des charges et frais perso, plus les factures émises non encaissées. Sans réintégration Urssaf ni marge, avec déduction de 2 200 € (1 200 € historiques + 1 000 € supplémentaires). Non ajoutée au total.">
               <span className="h-2 w-2 rounded-full bg-violet-400" aria-hidden />
               CSG (17,2 %){" "}
               <span className="font-medium tabular-nums text-ink-800 dark:text-white/85">
