@@ -28,7 +28,7 @@ private enum WidgetTone {
     static func panel(dark: Bool) -> Color { dark ? .white.opacity(0.09) : .white.opacity(0.78) }
     static func progressTrack(dark: Bool) -> Color { dark ? .white.opacity(0.18) : hex(0xA7CDB3).opacity(0.55) }
     static func background(dark: Bool) -> [Color] {
-        dark ? [hex(0x073B25), hex(0x031E14)] : [hex(0xF0FAF3), hex(0xDCEFE2)]
+        dark ? [hex(0x383A3D), hex(0x202124)] : [hex(0xF0FAF3), hex(0xDCEFE2)]
     }
     private static func hex(_ value: UInt32) -> Color {
         Color(.sRGB, red: Double((value >> 16) & 255) / 255,
@@ -58,18 +58,24 @@ struct DigitProWidgetView: View {
         VStack(alignment: .leading, spacing: 4) {
             header(value)
             receivable(value)
-            VStack(alignment: .leading, spacing: 2) {
-                Label("ENTRÉES DU MOIS", systemImage: "arrow.down.left")
-                    .font(.system(size: 8, weight: .bold)).tracking(0.7).foregroundStyle(WidgetTone.emerald(dark: darkMode))
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(widgetEuro(value.revenueTtcEur)).font(.system(size: 19, weight: .semibold, design: .rounded)).minimumScaleFactor(0.65).lineLimit(1)
+            HStack(alignment: .center, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("ENTRÉES DU MOIS", systemImage: "arrow.down.left")
+                        .font(.system(size: 8, weight: .bold)).tracking(0.7).foregroundStyle(WidgetTone.emerald(dark: darkMode))
+                    Text(widgetEuro(value.revenueTtcEur))
+                        .font(.system(size: 19, weight: .semibold, design: .rounded)).minimumScaleFactor(0.65).lineLimit(1)
                     Text("\(widgetEuro(value.revenueHtEur)) HT encaissé")
                         .font(.system(size: 8, weight: .medium)).foregroundStyle(WidgetTone.secondary(dark: darkMode)).lineLimit(1)
                 }
-            }
-            HStack(spacing: 8) {
-                progressMetric("Jours", completed: Double(value.workedDays ?? 0), target: value.totalWorkdays.map(Double.init), unit: "j", color: WidgetTone.blue(dark: darkMode), ringSize: 36)
-                progressMetric("CA sécurisé", completed: value.securedRevenueHtEur, target: value.securedRevenueTargetHtEur, unit: "€ HT", color: WidgetTone.emerald(dark: darkMode), ringSize: 36)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    compactRingMetric("Jours", value: "\(value.workedDays ?? 0)/\(value.totalWorkdays ?? 0) j",
+                                      completed: Double(value.workedDays ?? 0), target: value.totalWorkdays.map(Double.init),
+                                      color: WidgetTone.blue(dark: darkMode))
+                    compactRingMetric("CA sécurisé", value: widgetEuro(value.securedRevenueHtEur) + " HT",
+                                      completed: value.securedRevenueHtEur, target: value.securedRevenueTargetHtEur,
+                                      color: WidgetTone.emerald(dark: darkMode))
+                }
             }
             HStack(spacing: 10) {
                 compactStat("DigitPro", widgetEuro(value.digitProExpensesEur), WidgetTone.blue(dark: darkMode))
@@ -138,6 +144,17 @@ struct DigitProWidgetView: View {
             Spacer(minLength: 0)
         }.accessibilityElement(children: .ignore)
             .accessibilityLabel("\(label), \(Int(done)) sur \(Int(total)) \(unit), reste \(Int(remaining)) \(unit)")
+    }
+    private func compactRingMetric(_ label: String, value: String, completed: Double?, target: Double?, color: Color) -> some View {
+        VStack(spacing: 1) {
+            WidgetProgressRing(completed: completed, target: target, color: color,
+                               trackColor: WidgetTone.progressTrack(dark: darkMode), size: 46)
+            Text(label).font(.system(size: 7, weight: .medium)).foregroundStyle(WidgetTone.secondary(dark: darkMode)).lineLimit(1).minimumScaleFactor(0.7)
+            Text(value).font(.system(size: 7, weight: .semibold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.55)
+        }
+        .frame(width: 58)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(value)")
     }
     private func smallProgress(_ label: String, completed: Double?, target: Double?, unit: String, color: Color, ringSize: CGFloat) -> some View {
         let done = max(0, completed ?? 0)
