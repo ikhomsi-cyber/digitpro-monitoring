@@ -1,11 +1,12 @@
 import { computeTjmWorkdayGauge } from "@/lib/billable-calendar-metrics";
 import {
   BILLABLE_CLIENT_TJM_HT,
-  resolveBillableTjmForClientMonth,
   type BillableRatePeriod
 } from "@/lib/billable-client-days";
-import { dashboardMonthKeyNowLocal } from "@/lib/dashboard-period";
+import { dashboardMonthKeyNowLocal, previousMonthKey } from "@/lib/dashboard-period";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { computeCashedCaWorkedDays } from "@/lib/invoice-worked-days-series";
+import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
 import {
   analyzeValeurReelle,
   type ValeurReelleCashTree
@@ -19,14 +20,18 @@ export type GainPerWorkDayEstimate = {
   gainAverageMonthKey: string;
   /** Jours ouvrés cochés jusqu'à aujourd'hui dans le mois en cours. */
   currentMonthWorkedDays: number;
-  /** Gain total estimé (BNC + frais perso) sur la base historique + mois partiel. */
+  /** Gain total estimé (BNC théorique à verser + frais perso) sur la base historique + mois partiel. */
   estimatedGainEur: number;
   /** Indique si une part de l'estimation provient de l'historique (pas seulement le réalisé). */
   usesHistoricalEstimate: boolean;
 };
 
 function gainEurFromCashTree(tree: ValeurReelleCashTree): number {
-  return Math.max(0, tree.bncEur + tree.personalChargesEur);
+  const bncToPayEur = Math.max(
+    0,
+    tree.caFactureEur - tree.mandatoryFeesEur - tree.personalChargesEur - tree.csgEur
+  );
+  return Math.max(0, bncToPayEur + tree.personalChargesEur);
 }
 
 function capGainToCa(gainEur: number, caHtEur: number): number {
@@ -36,8 +41,7 @@ function capGainToCa(gainEur: number, caHtEur: number): number {
 
 /**
  * Le gain de l'activité ne peut pas dépasser le CA HT généré par jour.
- * Les remboursements de frais ou sorties BNC peuvent être décalés dans le temps :
- * ils restent visibles dans le cash disponible, mais ne gonflent pas le gain/jour.
+ * Le gain théorique est plafonné au CA HT par jour.
  */
 export function computeCappedGainPerWorkDay(
   gainEur: number,
@@ -62,11 +66,7 @@ function workedBillableDaysInMonth(
   return computeTjmWorkdayGauge(selected, y, month0, refDate).countedBillable;
 }
 
-export function previousMonthKey(monthKey: string): string {
-  const [y, m] = monthKey.split("-").map(Number);
-  const cursor = new Date(y, m - 2, 1);
-  return `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
-}
+export { previousMonthKey } from "@/lib/dashboard-period";
 
 /** Mois civils passés (hors mois en cours), les plus récents en premier. */
 function listPastMonthKeys(now: Date, maxMonths = 12): string[] {
@@ -119,7 +119,7 @@ function computeHistoricalGainSignals(
 
 /**
  * Mois en cours : gain / jour estimé à partir du réalisé partiel, du CA HT du mois
- * et du rythme historique (BNC + frais perso par jour ouvré coché).
+ * et du rythme historique (BNC théorique à verser + frais perso par jour ouvré coché).
  */
 export function estimateCurrentMonthGainPerWorkDay(
   transactions: readonly DashboardTx[],
@@ -198,43 +198,6 @@ function shiftMonthKey(monthKey: string, delta: number): string {
   return `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function billableDaysFromCaHt(caHt: number, tjmHt: number): number {
-  if (!Number.isFinite(tjmHt) || tjmHt <= 0 || caHt <= 0) return 0;
-  return Math.round((caHt / tjmHt) * 10) / 10;
-}
-
-/**
- * Les jours cochés sont la source principale, mais un encaissement peut couvrir
- * davantage de jours que ceux déjà renseignés dans l'agenda. On ne doit jamais
- * diviser le gain par moins de jours que le CA le permet au TJM configuré.
- */
-export function resolveWorkedDaysForGain(
-  calendarWorkedDays: number,
-  caHtEur: number,
-  tjmHt: number
-): number {
-  return Math.max(Math.max(0, calendarWorkedDays), billableDaysFromCaHt(caHtEur, tjmHt));
-}
-
-function resolveGainDenominatorDays(
-  transactions: readonly DashboardTx[],
-  monthKey: string,
-  billableWorkDayIsos: ReadonlySet<string>,
-  billableRatePeriods: readonly BillableRatePeriod[],
-  fallbackTjmHt: number,
-  now: Date
-): number {
-  const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now });
-  const tjmHt = resolveBillableTjmForClientMonth(
-    billableRatePeriods,
-    billableRatePeriods[0]?.clientName ?? "",
-    monthKey,
-    fallbackTjmHt
-  );
-  const calendarWorkedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
-  return resolveWorkedDaysForGain(calendarWorkedDays, analysis.cashTree.caFactureEur, tjmHt);
-}
-
 function gainPerDayForMonth(
   transactions: readonly DashboardTx[],
   monthKey: string,
@@ -256,16 +219,19 @@ function gainPerDayForMonth(
       : null;
   if (estimate?.gainPerDayEur) return estimate.gainPerDayEur;
 
-  const gain = gainEurFromCashTree(analysis.cashTree);
-  const workedDays = resolveGainDenominatorDays(
+  // Même base TJM / jours facturés que la carte « Décomposition / jour ».
+  const billedCa = computeCashedCaWorkedDays(
     transactions,
-    monthKey,
-    billableWorkDayIsos,
+    { years: null, month: monthKey },
     billableRatePeriods,
     fallbackTjmHt,
     now
   );
-  return computeCappedGainPerWorkDay(gain, analysis.cashTree.caFactureEur, workedDays);
+  return computeValeurReelleDailyBreakdown({
+    tree: analysis.cashTree,
+    tjmHt: billedCa.effectiveTjmHt,
+    billableDays: billedCa.workedDays
+  }).netPerDay;
 }
 
 /** Point mensuel — gain moyen / jour (sparkline Cash disponible). */

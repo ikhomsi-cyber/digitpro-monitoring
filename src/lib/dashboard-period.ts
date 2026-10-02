@@ -15,6 +15,12 @@ export function formatDashboardMonthLabel(monthKey: string): string {
   return new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(date);
 }
 
+export function previousMonthKey(monthKey: string): string {
+  const [year, month] = monthKey.split("-").map(Number);
+  const previous = new Date(year, month - 2, 1);
+  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function formatDashboardPeriodLabelWithMonth(
   selectedYears: number[] | null,
   selectedMonth: string | null

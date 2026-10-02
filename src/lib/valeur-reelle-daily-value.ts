@@ -6,7 +6,7 @@ import {
   countSelectedDaysInMonth
 } from "@/lib/billable-calendar-metrics";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
-import { dashboardMonthKeyNowLocal } from "@/lib/dashboard-period";
+import { dashboardMonthKeyNowLocal, previousMonthKey } from "@/lib/dashboard-period";
 import { summarizeNdfDigitProForMonth } from "@/lib/ndf-digitpro";
 import { indemniteKmPerWorkDayForAnnualDaysEur } from "@/lib/pluxee-commute-indemnity";
 import {
@@ -15,7 +15,7 @@ import {
   type ValeurReelleCashTree,
   type ValeurReelleWaterfallBreakdownRow
 } from "@/lib/valeur-reelle-analyze";
-import { previousMonthKey, type GainPerWorkDayEstimate } from "@/lib/valeur-reelle-gain-per-day";
+import type { GainPerWorkDayEstimate } from "@/lib/valeur-reelle-gain-per-day";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -41,7 +41,7 @@ export type ValeurReelleDailyBreakdown = {
   personalChargesPerDay: number;
   /** Indemnités kilométriques / jour (barème annuel, mois en cours). */
   ikPerDay: number;
-  /** BNC versé / jour, avant affichage informatif de l'IR. */
+  /** BNC théorique à verser / jour, avant affichage informatif de l'IR. */
   bncPerDay: number;
   /** BNC + frais perso + IK / jour — l'IR reste isolé à titre informatif. */
   netPerDay: number;
@@ -186,12 +186,12 @@ function computeCurrentMonthDailyBreakdown(input: {
  * Décomposition journalière d'une journée travaillée sur la période filtrée.
  *
  * Mois en cours : voir `computeCurrentMonthDailyBreakdown`.
- * Autres périodes : montants période ÷ jours cochés calendrier.
+ * Autres périodes : TJM HT et charges réelles réparties sur les jours facturés.
  */
 export function computeValeurReelleDailyBreakdown(input: {
   tree: ValeurReelleCashTree;
   tjmHt: number;
-  /** Jours cochés dans le calendrier sur la période filtrée. */
+  /** Jours facturés correspondant au CA HT de la période filtrée. */
   billableDays: number;
   gainPerWorkDayEstimate?: GainPerWorkDayEstimate | null;
   currentMonthProjection?: ValeurReelleCurrentMonthProjectionInput | null;
@@ -220,13 +220,15 @@ export function computeValeurReelleDailyBreakdown(input: {
   const workedDays = Math.max(0, billableDays);
 
   if (workedDays > 0) {
-    const caHtPerDay = round2(tree.caFactureEur / workedDays);
+    const caHtPerDay = round2(tjmHt > 0 ? tjmHt : tree.caFactureEur / workedDays);
     const mandatoryFeesPerDay = round2(tree.mandatoryFeesEur / workedDays);
     const personalChargesPerDay = round2(tree.personalChargesEur / workedDays);
     const csgPerDay = round2(tree.csgEur / workedDays);
     const impotPerDay = round2(tree.impotUtiliseEur / workedDays);
     const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay);
-    const bncPerDay = round2(Math.max(0, tree.bncEur) / workedDays);
+    const bncPerDay = round2(
+      Math.max(0, caHtPerDay - mandatoryFeesPerDay - personalChargesPerDay - csgPerDay)
+    );
     const netPerDay = round2(bncPerDay + personalChargesPerDay);
 
     return {
@@ -247,12 +249,11 @@ export function computeValeurReelleDailyBreakdown(input: {
     };
   }
 
-  const caHtPerDay = tjmHt > 0 ? tjmHt : 0;
   const caBase = Math.max(0, tree.caFactureEur);
+  const caHtPerDay = caBase > 0 && tjmHt > 0 ? tjmHt : 0;
   const csgRatio = caBase > 0 ? tree.csgEur / caBase : 0;
   const mandatoryRatio = caBase > 0 ? tree.mandatoryFeesEur / caBase : 0;
   const personalRatio = caBase > 0 ? tree.personalChargesEur / caBase : 0;
-  const bncRatio = caBase > 0 ? tree.bncEur / caBase : 0;
   const impotRatio = caBase > 0 ? tree.impotUtiliseEur / caBase : 0;
 
   const csgPerDay = round2(caHtPerDay * csgRatio);
@@ -260,7 +261,9 @@ export function computeValeurReelleDailyBreakdown(input: {
   const mandatoryFeesPerDay = round2(caHtPerDay * mandatoryRatio);
   const personalChargesPerDay = round2(caHtPerDay * personalRatio);
   const expensesPerDay = round2(mandatoryFeesPerDay + personalChargesPerDay);
-  const bncPerDay = round2(Math.max(0, caHtPerDay * bncRatio));
+  const bncPerDay = round2(
+    Math.max(0, caHtPerDay - mandatoryFeesPerDay - personalChargesPerDay - csgPerDay)
+  );
   const netPerDay = round2(bncPerDay + personalChargesPerDay);
 
   return {

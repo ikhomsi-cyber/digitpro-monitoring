@@ -800,9 +800,7 @@ function DailyValueBlock({
     breakdown.caHtPerDay > 0 ? Math.round((breakdown.netPerDay / breakdown.caHtPerDay) * 1000) / 10 : null;
   const basisLabel =
     breakdown.workedDays > 0
-      ? breakdown.isEstimate
-        ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. facturés`
-        : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. retenus`
+      ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(breakdown.workedDays)} j. facturés`
       : (breakdown.estimateNote ?? "estimation");
 
   const fraisPersoPerDay =
@@ -1123,6 +1121,7 @@ type ValeurReelleViewModel = {
   analysis: ValeurReelleAnalysis;
   vatSavingsKpis: ValeurReelleVatSavingsKpis;
   billableDaysInPeriod: number;
+  caEncashmentWorkedDays: number;
   gainPerWorkDayEstimate: GainPerWorkDayEstimate | null;
   gainPerDayPoints: TrailingGainPerDayPoint[];
   tjmHtForPeriod: number;
@@ -1202,21 +1201,22 @@ function computeValeurReelleViewModel(input: {
   );
 
   // Jours du CA encaissé via le TJM réel du mois d'encaissement (pas un barème par défaut).
-  const caEncashmentTjmHt = computeCashedCaWorkedDays(
+  const caEncashment = computeCashedCaWorkedDays(
     transactions,
     { years: selectedYears, months: selectedMonthsForYears.length ? selectedMonthsForYears : null },
     billableRatePeriods,
     billableTjmHt
-  ).effectiveTjmHt;
+  );
 
   return {
     analysis,
     vatSavingsKpis,
     billableDaysInPeriod,
+    caEncashmentWorkedDays: caEncashment.workedDays,
     gainPerWorkDayEstimate,
     gainPerDayPoints,
     tjmHtForPeriod,
-    caEncashmentTjmHt
+    caEncashmentTjmHt: caEncashment.effectiveTjmHt
   };
 }
 
@@ -1481,6 +1481,7 @@ export function ValeurReelleClient({
     analysis,
     vatSavingsKpis,
     billableDaysInPeriod,
+    caEncashmentWorkedDays,
     gainPerWorkDayEstimate,
     gainPerDayPoints,
     tjmHtForPeriod,
@@ -1508,8 +1509,8 @@ export function ValeurReelleClient({
           <DailyValueBlock
             tree={tree}
             fmt={fmt}
-            tjmHt={tjmHtForPeriod}
-            billableDays={billableDaysInPeriod}
+            tjmHt={caEncashmentTjmHt}
+            billableDays={caEncashmentWorkedDays}
             gainPerWorkDayEstimate={gainPerWorkDayEstimate}
             currentMonthProjection={currentMonthProjectionForSelectedPeriod}
           />
