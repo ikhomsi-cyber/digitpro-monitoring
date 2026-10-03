@@ -114,9 +114,7 @@ function YearEndProjectionCard({
       />
       <p className="mt-2 text-xs text-ink-400 dark:text-white/35">
         {projection.detail.basisLabel}
-        {projection.detail.habitYearsSampled > 0
-          ? ` · ${projection.detail.habitYearsSampled} an${projection.detail.habitYearsSampled > 1 ? "s" : ""} d’historique`
-          : ""}{" "}
+        {" "}
         · {formatInt(projection.detail.remainingCapacityDays)} j. restants sur{" "}
         {formatInt(projection.detail.totalCapacityDays)} j. planifiés
       </p>
@@ -141,6 +139,7 @@ export function DashboardPremiumHero({ stats, transactions, statsReady, contextM
   const yearEndProjection = useMemo(
     () =>
       computeYearEndProjection({
+        useCalendarPlan: true,
         selectedWorkDayIsos: billable.sortedIsos,
         billableRatePeriods: billable.billableRatePeriods,
         fallbackTjmHt: billable.tjmHt,
