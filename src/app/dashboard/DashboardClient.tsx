@@ -28,7 +28,6 @@ import { ExpenseTotalMiniChart } from "@/components/charts/ExpenseTotalMiniChart
 import { RevenueMiniChart } from "@/components/charts/RevenueMiniChart";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { ActivityOverviewPremium } from "@/components/dashboard/ActivityOverviewPremium";
-import { BillableDaysCalendarBlock } from "@/components/dashboard/BillableDaysCalendarBlock";
 import {
   HiwayInvoicesProvider,
   useHiwayInvoicesState
@@ -141,6 +140,12 @@ function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey
   if (section === "sasu" || section === "private") return "sasu-panel";
   return section;
 }
+
+// The calendar and invoice charts are only needed after opening Activity.
+const BillableDaysCalendarBlock = dynamic(
+  () => import("@/components/dashboard/BillableDaysCalendarBlock").then(mod => mod.BillableDaysCalendarBlock),
+  { loading: () => <div className="min-h-64 animate-pulse rounded-2xl bg-ink-900/5 dark:bg-white/5" role="status" aria-label="Chargement du calendrier" /> }
+);
 
 const ValeurReelleClient = dynamic(
   () =>
@@ -566,11 +571,6 @@ export function DashboardClient({
   const selectedMonthRevenueAllocationTrend = useMemo(() => {
     const [year, month] = overviewMonthKey.split("-");
     const prev = new Date(Number(year), Number(month) - 2, 1);
-    const currentAnalysis = analyzeValeurReelle(transactions, {
-      years: null,
-      month: overviewMonthKey,
-      now: new Date(`${overviewMonthKey}-01`)
-    });
     const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
     const previousAnalysis = analyzeValeurReelle(transactions, {
       years: null,
@@ -578,10 +578,10 @@ export function DashboardClient({
       now: prev
     });
     return computeKpiTrend(
-      Math.max(0, currentAnalysis.cashTree.caFactureEur),
+      selectedMonthAllocation.caHtEur,
       Math.max(0, previousAnalysis.cashTree.caFactureEur)
     );
-  }, [overviewMonthKey, transactions]);
+  }, [overviewMonthKey, transactions, selectedMonthAllocation.caHtEur]);
 
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === scope),

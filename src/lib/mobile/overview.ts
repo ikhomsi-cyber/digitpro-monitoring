@@ -6,7 +6,7 @@ import { deriveExpenseBucket } from "@/lib/derived-expense-bucket";
 import { analyzeValeurReelle } from "@/lib/valeur-reelle-analyze";
 import { buildMobileExpenses } from "@/lib/mobile/expenses";
 import { computeDashboardHeroStats } from "@/lib/dashboard-hero-stats";
-import type { DashboardTx } from "@/lib/dashboard-metrics";
+import { transactionAnalyticsDayIso, type DashboardTx } from "@/lib/dashboard-metrics";
 import { computeYearEndProjection } from "@/lib/year-end-projection";
 import { computeTreasuryVerserSnapshot } from "@/lib/treasury-verser";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
@@ -45,7 +45,17 @@ export function buildMobileOverview(transactions: DashboardTx[], activity: {
   });
   const previousDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonth = `${previousDate.getFullYear()}-${String(previousDate.getMonth() + 1).padStart(2, "0")}`;
-  const previousExpenses = analyzeValeurReelle(transactions, { years: null, month: previousMonth, now }).cashTree;
+  // Index analytic periods once instead of scanning the full history for every allocation.
+  const periodTransactions = new Map<string, DashboardTx[]>();
+  for (const tx of transactions) {
+    const date = transactionAnalyticsDayIso(tx);
+    for (const period of [date.slice(0, 7), date.slice(0, 4)]) {
+      const rows = periodTransactions.get(period);
+      if (rows) rows.push(tx);
+      else periodTransactions.set(period, [tx]);
+    }
+  }
+  const previousExpenses = analyzeValeurReelle(periodTransactions.get(previousMonth) ?? [], { years: null, month: previousMonth, now }).cashTree;
   return {
     version: 1,
     generatedAt: now.toISOString(),
@@ -80,7 +90,7 @@ export function buildMobileOverview(transactions: DashboardTx[], activity: {
         const cached = allocations.get(period);
         if (cached) return cached;
         const annual = period.length === 4;
-        const tree = analyzeValeurReelle(transactions, { years: annual ? [Number(period)] : null, month: annual ? null : period, now }).cashTree;
+        const tree = analyzeValeurReelle(periodTransactions.get(period) ?? [], { years: annual ? [Number(period)] : null, month: annual ? null : period, now }).cashTree;
         const allocation = { personal: Math.round(Math.max(0, tree.personalChargesEur) * 100) / 100,
           digitPro: Math.round(Math.max(0, tree.mandatoryFeesEur) * 100) / 100 };
         allocations.set(period, allocation);

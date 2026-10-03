@@ -111,3 +111,23 @@ it("uses business meals TTC for forecast notes de frais and reconciles total pay
   expect(result.dashboard).toEqual(withOutstandingInvoiceCsg(computeDashboardHeroStats([], now), invoices, [], now));
   expect(result.dashboard.csgComparaison172Eur).toBe(1032);
  });
+
+
+it("preserves monthly and annual allocations across analytic date boundaries", async () => {
+  const { analyzeValeurReelle } = await import("@/lib/valeur-reelle-analyze");
+  const rows: DashboardTx[] = [
+    { ...tx, id: "december", date: "2025-12-28", amount: 1200 },
+    { ...tx, id: "january", date: "2026-01-15", amount: 2400 },
+    { ...tx, id: "july", date: "2026-07-28", amount: 3600 },
+    { ...tx, id: "fee", date: "2026-08-15", category: "Qonto", label: "Qonto", amount: -120 },
+    { ...tx, id: "personal", date: "2026-08-15", scope: "personal", category: "Qonto", amount: -500 }
+  ];
+  const result = buildMobileOverview(rows, activity, now);
+  for (const row of [...result.expenses.months, ...result.expenses.years]) {
+    const annual = row.month.length === 4;
+    const tree = analyzeValeurReelle(rows, { years: annual ? [Number(row.month)] : null,
+      month: annual ? null : row.month, now }).cashTree;
+    expect(row.personalExpensesEur).toBe(Math.round(Math.max(0, tree.personalChargesEur) * 100) / 100);
+    expect(row.digitProExpensesEur).toBe(Math.round(Math.max(0, tree.mandatoryFeesEur) * 100) / 100);
+  }
+});

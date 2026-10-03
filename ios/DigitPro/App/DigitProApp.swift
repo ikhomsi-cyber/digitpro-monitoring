@@ -115,17 +115,29 @@ struct LoginView: View {
     }
 }
 struct MainTabs: View {
+    @State private var visitedTabs: Set<AppTab> = [.dashboard]
     @AppStorage("digitpro.colorTheme") private var colorTheme = "emerald"
     @EnvironmentObject private var store: AppStore
     @Environment(\.colorScheme) private var scheme
     var body: some View {
         TabView(selection: $store.selectedTab) {
             NavigationStack { DashboardView() }.tag(AppTab.dashboard).tabItem { Label("Accueil", systemImage: "square.grid.2x2") }
-            NavigationStack { ActivityView() }.tag(AppTab.activity).tabItem { Label("Activité", systemImage: "calendar.badge.clock") }
-            NavigationStack { TransactionsView() }.tag(AppTab.transactions).tabItem { Label("Opérations", systemImage: "arrow.left.arrow.right") }
-            NavigationStack { ForecastView() }.tag(AppTab.forecast).tabItem { Label("Prévisionnel", systemImage: "chart.xyaxis.line") }
-            NavigationStack { FinanceView() }.tag(AppTab.finance).tabItem { Label("Patrimoine", systemImage: "building.2") }
-            NavigationStack { SettingsView() }.tag(AppTab.settings).tabItem { Label("Réglages", systemImage: "slider.horizontal.3") }
+            NavigationStack {
+                if store.selectedTab == .activity || visitedTabs.contains(.activity) { ActivityView() }
+            }.tag(AppTab.activity).tabItem { Label("Activité", systemImage: "calendar.badge.clock") }
+            NavigationStack {
+                if store.selectedTab == .transactions || visitedTabs.contains(.transactions) { TransactionsView() }
+            }.tag(AppTab.transactions).tabItem { Label("Opérations", systemImage: "arrow.left.arrow.right") }
+            NavigationStack {
+                if store.selectedTab == .forecast || visitedTabs.contains(.forecast) { ForecastView() }
+            }.tag(AppTab.forecast).tabItem { Label("Prévisionnel", systemImage: "chart.xyaxis.line") }
+            NavigationStack {
+                if store.selectedTab == .finance || visitedTabs.contains(.finance) { FinanceView() }
+            }.tag(AppTab.finance).tabItem { Label("Patrimoine", systemImage: "building.2") }
+            NavigationStack {
+                if store.selectedTab == .settings || visitedTabs.contains(.settings) { SettingsView() }
+            }.tag(AppTab.settings).tabItem { Label("Réglages", systemImage: "slider.horizontal.3") }
         }.tint(DP.tint(scheme))
+            .onChange(of: store.selectedTab) { _, tab in visitedTabs.insert(tab) }
     }
 }

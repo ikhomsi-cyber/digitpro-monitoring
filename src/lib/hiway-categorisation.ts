@@ -131,31 +131,33 @@ function textLooksLikeRepasDirigeant(raw: string): boolean {
   );
 }
 
+const HIWAY_CATEGORY_ALIASES = ([
+  ["Indemnités kilométriques", ["indemnites kilometriques", "travel expenses", "frais de voyage", "mileage", "note ik"]],
+  ["CESU", ["cesu", "achat cesu", "ticket cesu", "cheque domicile", "chèque domicile", "domiserve", "up cesu", "bimpli cesu"]],
+  ["ANCV", ["ancv", "cheque vacances", "chèque vacances"]],
+  ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
+  ["Cadeau client", ["cadeau client", "igraal"]],
+  ["Abonnement Hiway", ["abonnement hiway"]],
+  ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
+  ["Mutuelle", ["mutuelle", "wemind", "we mind", "prevoyance", "prévoyance", "prevoyance collective", "prévoyance collective"]],
+  ["Hiway compta", ["hiway compta", "depenses administratives", "administrative expenses"]],
+  ["Retraite", ["retraite", "frais de personnel"]],
+  ["Abonnement internet & mobile", ["abonnement internet mobile", "abonnement internet & mobile", "mobile et internet"]],
+  ["Repas du dirigeant", ["repas du dirigeant", "repas dirigeant", "repas ilias", "repas ilia", "restauration pro", "dejeuner", "déjeuner", "frais de nourriture et boissons", "food and drink"]],
+  ["Assurances", ["assurances", "assurance", "axa sogarep", "sogarep"]],
+  ["Frais bancaires", ["frais bancaires", "qonto", "qonto solo", "solo basic", "solo_basic"]],
+  ["Matériels et fournitures", ["materiels et fournitures", "matériels et fournitures", "materiel", "matériel", "fournitures"]],
+  ["Paiement TVA", ["paiement tva", "tva"]],
+  ["Impôt", ["impot", "impôt", "impot-pas", "impot pas", "pasdsn", "pas-dsn", "impot sur le revenu"]],
+  ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
+  ["Abonnement logiciel", ["abonnement logiciel", "icloud ia store", "apple.com bill", "cursor ai powered ide"]]
+] as Array<[HiwayExpenseCategory, string[]]>).map(([category, keys]) => [category, keys.map(foldHiwayText)] as const);
+
+/** Normalize the fixed matching rules once, rather than for every transaction. */
 export function mapHiwayExpenseCategory(raw: string | null | undefined): HiwayExpenseCategory | null {
   const text = foldHiwayText(String(raw ?? ""));
   if (!text) return null;
-  const aliases: Array<[HiwayExpenseCategory, string[]]> = [
-    ["Indemnités kilométriques", ["indemnites kilometriques", "travel expenses", "frais de voyage", "mileage", "note ik"]],
-    ["CESU", ["cesu", "achat cesu", "ticket cesu", "cheque domicile", "chèque domicile", "domiserve", "up cesu", "bimpli cesu"]],
-    ["ANCV", ["ancv", "cheque vacances", "chèque vacances"]],
-    ["Repas d’affaires", ["repas d affaires", "depenses liees au marketing", "marketing expenses"]],
-    ["Cadeau client", ["cadeau client", "igraal"]],
-    ["Abonnement Hiway", ["abonnement hiway"]],
-    ["Urssaf", ["urssaf", "cgss", "cotisation sociale", "cotisations sociales"]],
-    ["Mutuelle", ["mutuelle", "wemind", "we mind", "prevoyance", "prévoyance", "prevoyance collective", "prévoyance collective"]],
-    ["Hiway compta", ["hiway compta", "depenses administratives", "administrative expenses"]],
-    ["Retraite", ["retraite", "frais de personnel"]],
-    ["Abonnement internet & mobile", ["abonnement internet mobile", "abonnement internet & mobile", "mobile et internet"]],
-    ["Repas du dirigeant", ["repas du dirigeant", "repas dirigeant", "repas ilias", "repas ilia", "restauration pro", "dejeuner", "déjeuner", "frais de nourriture et boissons", "food and drink"]],
-    ["Assurances", ["assurances", "assurance", "axa sogarep", "sogarep"]],
-    ["Frais bancaires", ["frais bancaires", "qonto", "qonto solo", "solo basic", "solo_basic"]],
-    ["Matériels et fournitures", ["materiels et fournitures", "matériels et fournitures", "materiel", "matériel", "fournitures"]],
-    ["Paiement TVA", ["paiement tva", "tva"]],
-    ["Impôt", ["impot", "impôt", "impot-pas", "impot pas", "pasdsn", "pas-dsn", "impot sur le revenu"]],
-    ["Non catégorisé", ["non categorise", "non catégorisé", "autres"]],
-    ["Abonnement logiciel", ["abonnement logiciel", "icloud ia store", "apple.com bill", "cursor ai powered ide"]]
-  ];
-  return aliases.find(([, keys]) => keys.some((key) => text === foldHiwayText(key) || text.includes(foldHiwayText(key))))?.[0] ?? null;
+  return HIWAY_CATEGORY_ALIASES.find(([, keys]) => keys.some(key => text.includes(key)))?.[0] ?? null;
 }
 
 function resolveManualHiwayCategory(category: string): HiwayExpenseCategory | null {

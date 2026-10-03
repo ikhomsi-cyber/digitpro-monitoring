@@ -52,6 +52,8 @@ final class AppStore: ObservableObject {
         guard let api else { return }
         signedIn = api.supabase.auth.currentSession != nil
         locked = signedIn && faceID
+        // Reveal the authenticated shell before waiting for network data.
+        restoring = false
         if signedIn && !locked { await refresh() }
     }
     func signIn(email: String, password: String) async {
@@ -77,10 +79,9 @@ final class AppStore: ObservableObject {
         }
     }
     func refresh() async {
-        guard let api, signedIn, !locked else { return }
+        guard let api, signedIn, !locked, !refreshing else { return }
         let requestGeneration = generation
         let identity = UUID(); refreshID = identity
-        prefetchCurrentActivityMonth(using: api, generation: requestGeneration)
         refreshing = true; overviewError = nil
         defer { if refreshID == identity { refreshing = false } }
         do {
@@ -90,6 +91,8 @@ final class AppStore: ObservableObject {
             invalidateExpenses()
             overview = result; overviewError = nil
             if widgetEnabled && !faceID { saveWidget(result) }
+            // Secondary activity data must not compete with the initial overview.
+            prefetchCurrentActivityMonth(using: api, generation: requestGeneration)
         } catch is CancellationError {
             // SwiftUI peut annuler la tâche liée au geste de pull-to-refresh.
             // Une annulation UI ne doit pas devenir une erreur visible dans le Dashboard.
@@ -121,6 +124,7 @@ final class AppStore: ObservableObject {
     }
     func signOut() async {
         generation += 1
+        refreshID = UUID(); refreshing = false
         activityMonths.removeAll(); activitySummary = nil
         transactionPages.removeAll()
         invalidateExpenses()

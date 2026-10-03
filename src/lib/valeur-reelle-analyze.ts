@@ -205,7 +205,7 @@ function addWaterfallBreakdown(
     prev.amountEur += amountEur;
     prev.grossAmountEur = (prev.grossAmountEur ?? 0) + (transaction?.grossAmountEur ?? amountEur);
     prev.count += 1;
-    if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
+    if (transaction) (prev.transactions ??= []).push(transaction);
   } else {
     step.set(label, { amountEur, grossAmountEur: transaction?.grossAmountEur ?? amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
@@ -325,7 +325,7 @@ function addBreakdownRow(
     prev.amountEur += amountEur;
     prev.grossAmountEur = (prev.grossAmountEur ?? 0) + (transaction?.grossAmountEur ?? amountEur);
     prev.count += 1;
-    if (transaction) prev.transactions = [...(prev.transactions ?? []), transaction];
+    if (transaction) (prev.transactions ??= []).push(transaction);
   } else {
     rows.set(label, { amountEur, grossAmountEur: transaction?.grossAmountEur ?? amountEur, count: 1, transactions: transaction ? [transaction] : undefined });
   }
