@@ -16,6 +16,7 @@ struct DashboardView: View {
                 if let data = store.overview {
                     if let error = store.overviewError { InlineError(message: error) { Task { await store.refresh() } } }
                     cashHero(data)
+                    indicators(data)
                     actionRow
                     treasuryAccount(data)
                     activitySummary(data)
@@ -129,6 +130,42 @@ struct DashboardView: View {
                     .background(DP.surface(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
         }
+    }
+
+    private func indicators(_ data: Overview) -> some View {
+        let cash = data.dashboard.soldeQontoEur
+        let debt = data.dashboard.detteTotaleDepuisDebutEur
+        let debt172 = data.dashboard.csgComparaison172Eur + data.dashboard.detteTvaDepuisDebutEur
+        let coverage172 = cash.map { debt172 > 0 ? min(100, max(0, $0 / debt172 * 100)) : 100 }
+        let coverage = cash.map { debt > 0 ? min(100, max(0, $0 / debt * 100)) : 100 }
+        return VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                indicator("Trésorerie", value: cash?.euros ?? "—", symbol: "lock.square", color: Color(hex: 0x418E66), detail: "Solde du compte professionnel")
+                indicator("CA facturé HT", value: data.generatedRevenueHtEur?.euros ?? "—", symbol: "chart.bar.xaxis", color: Color(hex: 0x713ACC), detail: "Chiffre d’affaires facturé HT depuis janvier")
+                indicator("Dette à 9,7 %", value: debt.euros, symbol: "eurosign.arrow.circlepath", color: Color(hex: 0xB7373D), detail: "Dette CSG à 9,7 % et TVA cumulée")
+                indicator("Dette à 17,2 %", value: debt172.euros, symbol: "eurosign.arrow.circlepath", color: Color(hex: 0xB68A56), detail: "Dette CSG à 17,2 % et TVA cumulée")
+
+                indicator("Sécurisation 9,7 %", value: coverage.map { "\(Int($0.rounded()))%" } ?? "—", symbol: "shield", color: Color(hex: 0x60BFC7), detail: "Part de la dette à 9,7 %, TVA incluse, couverte par la trésorerie")
+                indicator("Sécurisation 17,2 %", value: coverage172.map { "\(Int($0.rounded()))%" } ?? "—", symbol: "shield", color: Color(hex: 0x60BFC7), detail: "Part de la dette à 17,2 %, TVA incluse, couverte par la trésorerie")
+            }
+        }
+    }
+
+    private func indicator(_ title: String, value: String, symbol: String, color: Color, detail: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .regular)).foregroundStyle(color)
+                .frame(width: 24, height: 24).background(color.opacity(0.10), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                Text(value).font(.system(size: 16, weight: .medium, design: .rounded))
+                    .monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
+            }
+            Spacer(minLength: 0)
+        }.padding(8).frame(maxWidth: .infinity, alignment: .leading)
+            .background(DP.surface(scheme), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(DP.border(scheme)))
+            .accessibilityElement(children: .combine).accessibilityHint(detail)
     }
 
     private var actionRow: some View {

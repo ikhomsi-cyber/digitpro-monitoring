@@ -43,12 +43,12 @@ export function CsgHistoryCard({ transactions, stats }: { transactions: Dashboar
           <p className="text-sm text-ink-500 dark:text-white/50">CSG · Reste à couvrir</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
             <p className="font-display text-3xl font-semibold tabular-nums text-ink-900 dark:text-white" data-private>
-              {remainingEur == null ? "—" : fmt.euro(remainingEur)}
+              {remainingEur == null ? "—" : fmt.euro(remainingEur === 0 ? 0 : -remainingEur)}
             </p>
             <span className="text-xs font-medium tabular-nums text-ink-500 dark:text-white/45">scénario à 17,2 %</span>
           </div>
         </div>
-        <p className="-mt-2 text-[10px] text-ink-500 dark:text-white/45">Solde global · TVA et cash disponible inclus</p>
+        <p className="-mt-2 text-[10px] text-ink-500 dark:text-white/45">Montant à trouver pour revenir à 0 · TVA et cash disponible inclus</p>
       </div>
       <ul className="mt-4 grid grid-cols-2 gap-2 text-xs">
         {[
@@ -107,7 +107,7 @@ export function CsgHistoryCard({ transactions, stats }: { transactions: Dashboar
                 <div className="flex justify-between gap-3"><dt>Dette TVA</dt><dd>+ {fmt.euro(stats.detteTvaDepuisDebutEur)}</dd></div>
                 <div className="flex justify-between gap-3"><dt>Cash disponible</dt><dd>{stats.soldeQontoEur == null ? "—" : `− ${fmt.euro(stats.soldeQontoEur)}`}</dd></div>
               </dl>
-              <p>Le reste à couvrir est limité à zéro et reste global. Les filtres annuels concernent uniquement la comparaison des provisions.</p>
+              <p>Le montant à trouver est affiché négativement et plafonné à zéro. Les filtres annuels concernent uniquement la comparaison des provisions.</p>
               <p>Le solde global inclut la CSG à 17,2 % sur le HT des factures émises encore non encaissées. Un règlement réduit cette provision pour éviter de compter deux fois la même facture.</p>
               <p>Le tableau rattache le CA au mois de prestation. Pour {now.getFullYear()}, il inclut le réalisé à date et les factures émises. Ses montants précèdent les corrections globales : 1 200 € à 9,7 % et 2 200 € à 17,2 % (dont 1 000 € supplémentaires), déjà déduits des montants globaux.</p>
               <p>Hypothèse de suivi : 2022 prescrite, CSG à 17,2 % nulle et provision à 9,7 % en compensation.</p>
