@@ -99,6 +99,7 @@ export function isCardPowensLabel(raw: string): boolean {
 
 export function isLikelyNdfDigitProCandidate(raw: string): boolean {
   const label = fold(raw);
+  if (/\bthe\s+ranch\b/.test(label)) return true;
   if (
     /\b(quick|domino|dominos|tacos|boucherie|boucheries|auchan|grand frais|carrefour|leclerc|lidl|intermarche|super u|supermarche)\b/.test(
       label

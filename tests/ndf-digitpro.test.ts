@@ -19,6 +19,19 @@ function transaction(overrides: Partial<DashboardTx> = {}): DashboardTx {
 }
 
 describe("NDF à arbitrer", () => {
+  it("propose The Ranch même quand l'import le classe en fast food", () => {
+    const tx = transaction({
+      date: "2026-10-03",
+      label: "[En cours] CB THE RANCH CLAMART 03/10/26",
+      amount: -79.4,
+      category: "Alimentation & Restau › Fast foods"
+    });
+    expect(listPendingNdfCandidatesForMonth([tx], "2026-10")).toEqual([tx]);
+    expect(isNdfCategorisationCandidate({ ...tx, amount: 79.4 })).toBe(false);
+    expect(isNdfCategorisationCandidate({ ...tx, category: "Repas dirigeant", categoryManual: true })).toBe(false);
+    expect(isNdfCategorisationCandidate({ ...tx, label: "CB Aprr Villefranch" })).toBe(false);
+  });
+
   it("ne masque pas une suggestion normalisée en la dédoublonnant avec elle-même", () => {
     const tx = transaction({ category: "NDF DigitPro" });
     expect(summarizeNdfDigitProForMonth([tx], "2026-09")).toEqual({
