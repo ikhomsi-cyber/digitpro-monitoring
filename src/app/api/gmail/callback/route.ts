@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
   const receivedState = u.searchParams.get("state");
   const cookieStore = await cookies();
   const expectedState = cookieStore.get(GMAIL_OAUTH_STATE_COOKIE)?.value;
+  if (cookieStore.get("gmail_oauth_return")?.value === "pilote") target.searchParams.set("section", "pilote");
+  cookieStore.delete("gmail_oauth_return");
   cookieStore.delete(GMAIL_OAUTH_STATE_COOKIE);
 
   if (!isValidGmailOAuthState(expectedState, receivedState)) {

@@ -23,7 +23,7 @@ beforeAll(async () => {
     grant select,insert,update,delete on all tables in schema public to authenticated,service_role;
     insert into public.transactions(id,user_id,date,label,category,amount,company) values('${tx}','${owner}','2026-10-11','A','Divers',1,'Bank');
     insert into public.import_sessions(id,user_id,format) values('${session}','${owner}','generic');`);
-  for (const file of ["20261011081900_private_integration_secrets.sql", "20261011081906_sync_jobs_and_agent_access.sql", "20261011083434_expense_note_upsert_ownership.sql"]) {
+  for (const file of ["20261011081900_private_integration_secrets.sql", "20261011081906_sync_jobs_and_agent_access.sql", "20261011083434_expense_note_upsert_ownership.sql", "20261011092330_bankin_pilote_snapshots.sql"]) {
     await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
   }
 }, 30_000);
@@ -113,4 +113,21 @@ it("allows repeated owner tag upserts and denies reassignment to another user or
     const result = await db.query(`update public.expense_notes set tag='note_de_frais' where id='${noteId!}' returning id`);
     expect(result.rows).toEqual([]);
   } finally { await db.exec("reset role;"); }
+});
+
+it("isolates Bankin snapshots and denies anonymous reads, cross-owner writes and deletion", async () => {
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${owner}';`);
+  try {
+    await db.query(`insert into public.bankin_pilote_snapshots(user_id,snapshot) values ('${owner}','{"version":1}')`);
+    expect((await db.query(`select * from public.bankin_pilote_snapshots`)).rows).toHaveLength(1);
+    await expect(db.query(`insert into public.bankin_pilote_snapshots(user_id,snapshot) values ('${other}','{}')`)).rejects.toThrow();
+    await expect(db.query(`update public.bankin_pilote_snapshots set user_id='${other}' where user_id='${owner}'`)).rejects.toThrow();
+    await expect(db.query(`delete from public.bankin_pilote_snapshots`)).rejects.toThrow();
+    await db.exec(`set request.jwt.claim.sub='${other}';`);
+    expect((await db.query(`select * from public.bankin_pilote_snapshots`)).rows).toHaveLength(0);
+    expect((await db.query(`update public.bankin_pilote_snapshots set snapshot='{}' where user_id='${owner}' returning user_id`)).rows).toHaveLength(0);
+  } finally { await db.exec("reset role;"); }
+  await db.exec("set role anon;");
+  try { await expect(db.query("select * from public.bankin_pilote_snapshots")).rejects.toThrow(); }
+  finally { await db.exec("reset role;"); }
 });

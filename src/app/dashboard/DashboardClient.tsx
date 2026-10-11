@@ -134,6 +134,7 @@ type LazyDashboardSectionKey =
   | "activite"
   | "valeur"
   | "impots"
+  | "pilote"
   | "sasu-panel";
 
 function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey {
@@ -146,6 +147,8 @@ const BillableDaysCalendarBlock = dynamic(
   () => import("@/components/dashboard/BillableDaysCalendarBlock").then(mod => mod.BillableDaysCalendarBlock),
   { loading: () => <div className="min-h-64 animate-pulse rounded-2xl bg-ink-900/5 dark:bg-white/5" role="status" aria-label="Chargement du calendrier" /> }
 );
+
+const PiloteSection = dynamic(() => import("@/components/dashboard/PiloteSection").then(mod => mod.PiloteSection), { loading: () => <div className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5" role="status" aria-label="Chargement de Pilote" /> });
 
 const ValeurReelleClient = dynamic(
   () =>
@@ -1159,6 +1162,7 @@ export function DashboardClient({
         />
       </div>
       ) : null}
+      {mountedSections.has("pilote") ? <div className={clsx(dashboardSection !== "pilote" && "hidden")} aria-hidden={dashboardSection !== "pilote"}><PiloteSection demoMode={demoMode} onImported={refreshDashboardTransactions} /></div> : null}
       {mountedSections.has("impots") ? (
       <div
         className={clsx(dashboardSection !== "impots" && "hidden")}

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const MAX_IMPORT_ROWS = 10_000;
+/** Bankin exports can contain the full personal history, still bounded by the same file/archive limits. */
+export const MAX_BANKIN_IMPORT_ROWS = 20_000;
 export const MAX_IMPORT_BYTES = 3 * 1024 * 1024;
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
   const parsed = new Date(`${value}T00:00:00Z`);
@@ -19,8 +21,10 @@ const metadata = z.object({
 });
 
 export function validateImport(transactions: unknown, meta: unknown) {
-  const rows = z.array(row).max(MAX_IMPORT_ROWS).safeParse(transactions);
   const settings = metadata.safeParse(meta);
-  if (!rows.success || !settings.success) throw new Error("Import invalide ou trop volumineux (10 000 lignes maximum).");
+  if (!settings.success) throw new Error("Métadonnées d’import invalides.");
+  const limit = settings.data.format === "bankin" ? MAX_BANKIN_IMPORT_ROWS : MAX_IMPORT_ROWS;
+  const rows = z.array(row).max(limit).safeParse(transactions);
+  if (!rows.success) throw new Error(`Import invalide ou trop volumineux (${limit.toLocaleString("fr-FR")} lignes maximum).`);
   return { rows: rows.data, meta: settings.data };
 }

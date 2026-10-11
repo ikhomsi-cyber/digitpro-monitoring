@@ -15,7 +15,7 @@ import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
 import { transactionImportHash } from "@/lib/transaction-hash";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
-import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
+import { parseBankinTransactionsWorkbook, parseBankinPiloteWorkbook } from "@/lib/bankin/parse-xlsx";
 import {
   isPowensCloudConfigured,
   powensCloudCreateUser,
@@ -32,6 +32,8 @@ import {
   powensPrimaryImportAxis,
   type PowensImportAxis
 } from "@/lib/powens/config";
+import { buildBankinPiloteSnapshot } from "@/lib/pilote";
+import { saveBankinPiloteSnapshot } from "@/lib/bankin/pilote-store";
 import { MAX_IMPORT_BYTES } from "@/lib/security/import-validation";
 import { withSyncJob } from "@/lib/security/sync-job";
 import { createHash } from "crypto";
@@ -593,11 +595,14 @@ export async function importBankinPersonalXlsx(formData: FormData) {
     throw new Error("Aucune transaction valide (date + montant) dans ce fichier.");
   }
 
-  return importTransactionsInternal(rows, {
+  const result = await importTransactionsInternal(rows, {
     sourceFilename: file.name,
     format: "bankin",
     fileHash
   });
+  const original = parseBankinPiloteWorkbook(arrayBuffer);
+  await saveBankinPiloteSnapshot(client, user.id, buildBankinPiloteSnapshot(original, file.name, fileHash));
+  return result;
 }
 
 export async function deleteTransaction(id: string) {

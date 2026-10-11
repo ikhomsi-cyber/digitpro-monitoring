@@ -1,5 +1,5 @@
 import { checkWorkbookArchive } from "@/lib/security/workbook-limits";
-import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS } from "@/lib/security/import-validation";
+import { MAX_IMPORT_BYTES, MAX_BANKIN_IMPORT_ROWS } from "@/lib/security/import-validation";
 import * as XLSX from "xlsx";
 import { parseFlexibleDate } from "@/lib/csv-import";
 import { categorizeKnownPersonalTransfer, formatBankinHierarchy } from "./categorize";
@@ -61,24 +61,24 @@ function cellToNumber(cell: unknown): number | null {
  * Parse un export Bankin « Liste des transactions » (.xls ou .xlsx).
  * Retourne des lignes prêtes pour `importTransactions` (scope perso).
  */
-export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinParsedRow[] {
+function bankinWorkbookMatrix(buffer: ArrayBuffer) {
   if (buffer.byteLength > MAX_IMPORT_BYTES) throw new Error("Fichier trop volumineux (3 Mo maximum).");
   checkWorkbookArchive(buffer);
-  const wb = XLSX.read(buffer, { type: "array", cellDates: true, sheetRows: MAX_IMPORT_ROWS + 2, sheets: 0 });
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true, sheetRows: MAX_BANKIN_IMPORT_ROWS + 2, sheets: 0 });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("Fichier Excel vide ou illisible.");
 
   const sh = wb.Sheets[sheetName];
   if (sh["!fullref"]) {
     const range = XLSX.utils.decode_range(sh["!fullref"]);
-    if (range.e.r >= MAX_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
+    if (range.e.r >= MAX_BANKIN_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
   }
   const matrix = XLSX.utils.sheet_to_json<(string | number | boolean | Date | null)[]>(sh, {
     header: 1,
     defval: ""
   });
 
-  if (matrix.length > MAX_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
+  if (matrix.length > MAX_BANKIN_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
   if (!matrix.length) throw new Error("Aucune ligne dans la feuille Excel.");
 
   const headerNorm = (matrix[0] ?? []).map(normalizeHeaderCell);
@@ -90,6 +90,11 @@ export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinPars
     }
   }
 
+  return matrix;
+}
+
+export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinParsedRow[] {
+  const matrix = bankinWorkbookMatrix(buffer);
   const out: BankinParsedRow[] = [];
 
   for (let r = 1; r < matrix.length; r++) {
@@ -120,4 +125,17 @@ export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinPars
   }
 
   return out;
+}
+
+/** Exact source fields for Pilote: no category inference, transfer overrides, or app mappings. */
+export function parseBankinPiloteWorkbook(buffer: ArrayBuffer): import("@/lib/pilote").BankinPiloteRow[] {
+  const matrix = bankinWorkbookMatrix(buffer);
+  const headers = matrix[0].map(normalizeHeaderCell);
+  const hiddenIndex = headers.findIndex(name => ["masquee", "masque", "transaction masquee", "hidden"].includes(name));
+  return matrix.slice(1).flatMap((row, index) => {
+    const date = cellToYmd(row[0]); const amount = cellToNumber(row[3]);
+    if (!date || amount === null) return [];
+    const hidden = hiddenIndex >= 0 && ["true", "1", "oui", "yes", "x", "masque", "masquee"].includes(normalizeHeaderCell(row[hiddenIndex]));
+    return [{ sourceRow: index + 2, date, amount, parentCategory: String(row[4] ?? "").trim(), subCategory: String(row[5] ?? "").trim(), hidden }];
+  });
 }

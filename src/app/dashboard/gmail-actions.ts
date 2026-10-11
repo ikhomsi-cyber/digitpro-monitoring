@@ -64,7 +64,7 @@ export async function getGmailConnectionStatus(): Promise<GmailConnectionStatus>
   }
 }
 
-export async function getGmailConnectUrl(): Promise<{ url: string }> {
+export async function getGmailConnectUrl(returnSection?: "pilote"): Promise<{ url: string }> {
   if (!isGmailConfigured()) {
     throw new Error(
       "Gmail non configuré : définissez GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET et GOOGLE_REDIRECT_URI. Voir .env.example."
@@ -79,6 +79,10 @@ export async function getGmailConnectUrl(): Promise<{ url: string }> {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
+  });
+  cookieStore.set("gmail_oauth_return", returnSection === "pilote" ? "pilote" : "activite", {
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
+    path: "/", maxAge: GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
   });
   // Production uses the explicitly configured OAuth origin, never forwarded headers.
   const origin = resolveRequestOrigin(await headers());

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { parseBankinTransactionsWorkbook } from "@/lib/bankin/parse-xlsx";
+import { parseBankinTransactionsWorkbook, parseBankinPiloteWorkbook } from "@/lib/bankin/parse-xlsx";
 
 const HEADERS = [
   "Date",
@@ -16,7 +16,7 @@ const HEADERS = [
 function workbookBuffer(rows: unknown[][]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([HEADERS, ...rows]), "Transactions");
-  const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const bytes = XLSX.write(workbook, { type: "array", bookType: "xlsx", compression: true }) as ArrayBuffer;
   return bytes;
 }
 
@@ -56,4 +56,20 @@ describe("parseBankinTransactionsWorkbook", () => {
       "Logement › Loyer"
     ]);
   });
+});
+
+it("parses a bounded full-history Bankin export above the generic 10,000-row limit", () => {
+  const buffer = workbookBuffer(Array.from({ length: 11_870 }, () => ["01/10/2026", "TEST", "Compte synthétique", -1, "Logement", "Loyer", "", ""]));
+  expect(parseBankinTransactionsWorkbook(buffer)).toHaveLength(11_870);
+});
+
+it("preserves Bankin source categories for Pilote without applying app transfer rules or the Pointée flag", () => {
+  const buffer = workbookBuffer([["23/08/2026", "Virement DigitPro NDF", "Compte", 1000, "Entrées d’argent.", "Virements reçus", "", true]]);
+  expect(parseBankinPiloteWorkbook(buffer)[0]).toMatchObject({ parentCategory: "Entrées d’argent.", subCategory: "Virements reçus", hidden: false });
+});
+it("recognizes an explicit Masquée column separately from Pointée", () => {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([[...HEADERS, "Masquée"], ["01/10/2026", "TEST", "Compte", -1, "Logement.", "Loyer", "", false, true]]), "Transactions");
+  const rows = parseBankinPiloteWorkbook(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+  expect(rows[0].hidden).toBe(true);
 });

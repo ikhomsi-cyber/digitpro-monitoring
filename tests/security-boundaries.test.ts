@@ -69,3 +69,11 @@ it("refuses foreign Powens pagination hosts and never retries a denied request",
   await expect(fetchWithNetworkDiagnostics("https://digitpro.biapi.pro/2.0/users/me", {}, "test")).rejects.toThrow("refusé");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+it("accepts bounded full-history Bankin exports without expanding other import limits", () => {
+  const row = { date: "2026-10-01", label: "Test", category: "Divers", amount: -1, company: "Compte", scope: "personal" };
+  const metadata = { sourceFilename: "fixture.xls", format: "bankin", fileHash: null };
+  expect(validateImport(Array(11_870).fill(row), metadata).rows).toHaveLength(11_870);
+  expect(() => validateImport(Array(20_001).fill(row), metadata)).toThrow();
+  expect(() => validateImport(Array(10_001).fill(row), { ...metadata, format: "generic" })).toThrow();
+});
