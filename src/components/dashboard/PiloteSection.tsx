@@ -38,8 +38,8 @@ function PiloteFamilyBars({ families, direction }: { families: PiloteCompensatio
 function PiloteSourceDetail({ title, rows, income = false }: { title: string; rows: {parent: string; name: string; amount: number}[]; income?: boolean }) {
   const fmt = useDashboardDisplayFormat();
   const parents = [...new Set(rows.map(row => row.parent))];
-  return <div className="min-w-0"><h5 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-white/65">{title}</h5>
-    {parents.length ? <div className="space-y-3">{parents.map(parent => <div key={parent}><p className="mb-1 text-[11px] font-medium text-ink-500 dark:text-white/60">{parent}</p><ul className="divide-y divide-ink-100 dark:divide-white/[.06]">{rows.filter(row => row.parent === parent).map(row => <li key={row.name} className="flex items-baseline justify-between gap-4 py-2 text-xs"><span className="min-w-0 leading-snug text-ink-800 dark:text-white/95">{row.name}</span><span className={`shrink-0 font-semibold tabular-nums ${income ? "text-emerald-600 dark:text-emerald-300" : "text-ink-900 dark:text-white"}`}>{fmt.euro(row.amount)}</span></li>)}</ul></div>)}</div> : <p className="text-xs text-ink-500 dark:text-white/65">Aucun mouvement sur cette période.</p>}
+  return <div className="min-w-0"><h5 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500 dark:text-white/65">{title}</h5>
+    {parents.length ? <div className="space-y-1.5">{parents.map(parent => <div key={parent}><p className="mb-0.5 text-[10px] font-medium text-ink-500 dark:text-white/60">{parent}</p><ul className="divide-y divide-ink-100 dark:divide-white/[.06]">{rows.filter(row => row.parent === parent).map(row => <li key={row.name} className="flex items-baseline justify-between gap-3 py-1 text-xs"><span className="min-w-0 leading-snug text-ink-800 dark:text-white/95">{row.name}</span><span className={`shrink-0 font-semibold tabular-nums ${income ? "text-emerald-600 dark:text-emerald-300" : "text-ink-900 dark:text-white"}`}>{fmt.euro(row.amount)}</span></li>)}</ul></div>)}</div> : <p className="text-xs text-ink-500 dark:text-white/65">Aucun mouvement sur cette période.</p>}
   </div>;
 }
 
@@ -69,7 +69,7 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-rose-100 dark:bg-rose-300/20"><div className="h-full rounded-full bg-emerald-400" style={{width: `${coverage}%`}} /></div>
             {surplus > 0 ? <p className="mt-1 text-[10px] text-emerald-700 dark:text-emerald-200">Excédent : {fmt.euro(surplus)}</p> : null}
           </summary>
-          <div className="mt-3 grid gap-5 border-t border-ink-200 pt-3 pb-2 dark:border-white/15 sm:grid-cols-2">
+          <div className="mt-2 grid gap-2 border-t border-ink-200 pt-2 pb-0.5 dark:border-white/15 sm:grid-cols-2">
             <PiloteSourceDetail title="Dépenses" rows={expenseRows.map(row => ({parent: row.parent, name: row.name, amount: row.expenses}))} />
             <PiloteSourceDetail title="Rentrées" income rows={incomeRows.map(row => ({parent: row.parent, name: row.name, amount: row.income}))} />
           </div>
