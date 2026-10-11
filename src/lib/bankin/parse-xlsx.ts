@@ -1,3 +1,5 @@
+import { checkWorkbookArchive } from "@/lib/security/workbook-limits";
+import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS } from "@/lib/security/import-validation";
 import * as XLSX from "xlsx";
 import { parseFlexibleDate } from "@/lib/csv-import";
 import { categorizeKnownPersonalTransfer, formatBankinHierarchy } from "./categorize";
@@ -60,16 +62,23 @@ function cellToNumber(cell: unknown): number | null {
  * Retourne des lignes prêtes pour `importTransactions` (scope perso).
  */
 export function parseBankinTransactionsWorkbook(buffer: ArrayBuffer): BankinParsedRow[] {
-  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  if (buffer.byteLength > MAX_IMPORT_BYTES) throw new Error("Fichier trop volumineux (3 Mo maximum).");
+  checkWorkbookArchive(buffer);
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true, sheetRows: MAX_IMPORT_ROWS + 2, sheets: 0 });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("Fichier Excel vide ou illisible.");
 
   const sh = wb.Sheets[sheetName];
+  if (sh["!fullref"]) {
+    const range = XLSX.utils.decode_range(sh["!fullref"]);
+    if (range.e.r >= MAX_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
+  }
   const matrix = XLSX.utils.sheet_to_json<(string | number | boolean | Date | null)[]>(sh, {
     header: 1,
     defval: ""
   });
 
+  if (matrix.length > MAX_IMPORT_ROWS + 1) throw new Error("Trop de lignes dans le fichier Excel.");
   if (!matrix.length) throw new Error("Aucune ligne dans la feuille Excel.");
 
   const headerNorm = (matrix[0] ?? []).map(normalizeHeaderCell);

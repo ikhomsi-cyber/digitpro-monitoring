@@ -19,7 +19,7 @@ export async function loadUpcomingQontoDebits(
     const debits = await withAuthorizedGmailClient(supabase, userId, fetchQontoUpcomingDebitsFromGmail);
     return debits ?? [];
   } catch (error) {
-    console.warn("[gmail/qonto-debits] unavailable:", error);
+    console.warn("[gmail/qonto-debits] unavailable");
     return [];
   }
 }

@@ -16,7 +16,9 @@ export async function GET(req: NextRequest) {
   const u = req.nextUrl;
   // Origine réelle (proxy Vercel) : sert au redirect_uri d'échange ET à la redirection finale,
   // pour ne jamais retomber sur localhost en production.
-  const origin = resolveRequestOrigin(req.headers) ?? u.origin;
+  let origin: string | null;
+  try { origin = resolveRequestOrigin(req.headers); } catch { origin = null; }
+  if (!origin) return NextResponse.json({ error: "Origine OAuth non autorisée." }, { status: 400 });
   const redirectUri = gmailRedirectUriForOrigin(origin) ?? undefined;
   const target = new URL("/dashboard", origin);
   target.searchParams.set("section", "activite");
@@ -84,7 +86,7 @@ export async function GET(req: NextRequest) {
     target.searchParams.set("gmail_connect", "error");
     target.searchParams.set(
       "gmail_error",
-      (e instanceof Error ? e.message : "unknown").slice(0, 200)
+      "connection_failed"
     );
   }
 

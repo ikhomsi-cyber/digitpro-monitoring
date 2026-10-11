@@ -3,6 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import type { Database } from "@/lib/supabase/types";
 
+import { SyncBusyError } from "@/lib/security/sync-job";
+import { QontoAccessError } from "@/lib/security/qonto-access";
+
 export class MobileError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -27,6 +30,6 @@ export function mobileJSON(value: unknown, status = 200) {
   } });
 }
 export function mobileFailure(error: unknown) {
-  return mobileJSON({ error: error instanceof MobileError ? error.message : "Chargement impossible. Réessayez." },
-    error instanceof MobileError ? error.status : 503);
+  return mobileJSON({ error: error instanceof MobileError || error instanceof QontoAccessError || error instanceof SyncBusyError ? error.message : "Chargement impossible. Réessayez." },
+    error instanceof MobileError || error instanceof QontoAccessError || error instanceof SyncBusyError ? error.status : 503);
 }

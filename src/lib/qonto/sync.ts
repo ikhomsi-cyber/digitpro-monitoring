@@ -1,3 +1,5 @@
+import "server-only";
+import { assertQontoOwner } from "@/lib/security/qonto-access";
 /**
  * Synchronisation des transactions via l’API Business Qonto (v2).
  * @see https://docs.qonto.com/get-started/business-api/authentication/api-key
@@ -43,6 +45,10 @@ function qontoAuthHeader(): string {
 
 function qontoBaseUrl(): string {
   const raw = (getEnv("QONTO_API_BASE_URL") || "https://thirdparty.qonto.com").replace(/\/$/, "");
+  const url = new URL(raw);
+  if (url.protocol !== "https:" || !["thirdparty.qonto.com", "thirdparty-sandbox.staging.qonto.co"].includes(url.hostname) || url.port || url.username || url.password) {
+    throw new Error("Destination Qonto non autorisée.");
+  }
   return sanitizeLatin1HttpValue(raw, "QONTO_API_BASE_URL");
 }
 
@@ -202,7 +208,8 @@ export type QontoSyncResult = {
 /**
  * Récupère toutes les transactions « completed » (comportement par défaut Qonto) pour le compte configuré.
  */
-export async function fetchQontoTransactionsForImport(): Promise<QontoSyncResult> {
+export async function fetchQontoTransactionsForImport(userId: string): Promise<QontoSyncResult> {
+  assertQontoOwner(userId);
   const orgJson = await qontoFetchJson<OrganizationResponse>("/v2/organization");
   const accounts = orgJson.organization?.bank_accounts ?? [];
   const account = pickBankAccount(accounts);
@@ -241,7 +248,7 @@ export async function fetchQontoTransactionsForImport(): Promise<QontoSyncResult
     if (next == null || next === page) break;
     page = next;
     guard++;
-    if (guard > 500) break;
+    if (guard > 100 || rows.length > 10_000) throw new Error("Synchronisation Qonto trop volumineuse.");
   }
 
   const summary = `${company}${iban ? ` · ${iban.slice(0, 4)}…${iban.slice(-4)}` : bankAccountId ? ` · ${bankAccountId.slice(0, 8)}…` : ""}`;
@@ -252,7 +259,8 @@ export async function fetchQontoTransactionsForImport(): Promise<QontoSyncResult
 /**
  * Solde courant du compte Qonto configuré (GET /v2/organization, repli GET /v2/bank_accounts/:id).
  */
-export async function fetchQontoBankAccountBalanceEur(): Promise<number> {
+export async function fetchQontoBankAccountBalanceEur(userId: string): Promise<number> {
+  assertQontoOwner(userId);
   const orgJson = await qontoFetchJson<OrganizationResponse>("/v2/organization");
   const accounts = orgJson.organization?.bank_accounts ?? [];
   const account = pickBankAccount(accounts);

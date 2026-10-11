@@ -1,5 +1,7 @@
 "use server";
 
+import { withSyncJob } from "@/lib/security/sync-job";
+
 import { syncHiwayInvoices } from "@/lib/gmail/sync-invoices";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -78,7 +80,7 @@ export async function getGmailConnectUrl(): Promise<{ url: string }> {
     path: "/",
     maxAge: GMAIL_OAUTH_STATE_MAX_AGE_SECONDS
   });
-  // Le redirect_uri suit le domaine réel de la requête (prod vs local) au lieu d'un env figé.
+  // Production uses the explicitly configured OAuth origin, never forwarded headers.
   const origin = resolveRequestOrigin(await headers());
   const redirectUri = gmailRedirectUriForOrigin(origin) ?? undefined;
   return { url: buildGmailConsentUrl(state, redirectUri) };
@@ -92,7 +94,7 @@ export async function loadHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }>
 
 export async function fetchHiwayInvoices(): Promise<{ invoices: HiwayInvoice[] }> {
   const { supabase, user } = await requireUser();
-  await syncHiwayInvoices(supabase, user.id);
+  await withSyncJob(supabase, user.id, "gmail", () => syncHiwayInvoices(supabase, user.id));
   revalidatePath("/dashboard");
 
   const stored = await loadStoredHiwayInvoices(supabase, user.id);

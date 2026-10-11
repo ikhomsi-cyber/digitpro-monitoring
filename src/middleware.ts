@@ -3,6 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 import { getSupabaseEnv, reportSupabaseEnvDiagnostics } from "@/lib/supabase/config";
 
 export async function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === "/signup" && process.env.ALLOW_PUBLIC_SIGNUP !== "true") {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
   reportSupabaseEnvDiagnostics("middleware", { dedupeKey: "middleware" });
   const env = getSupabaseEnv();
 

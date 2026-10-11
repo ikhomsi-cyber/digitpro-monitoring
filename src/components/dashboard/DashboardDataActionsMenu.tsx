@@ -14,7 +14,6 @@ import {
   safeSyncPowensCloudTransactions,
   safeSyncPowensCloudTransactionsPersonal,
 } from "@/app/dashboard/actions";
-import { openPowensConnectWidget } from "@/lib/powens/connect-widget";
 import { requestCategorisationRefresh } from "@/lib/categorisation-refresh-bus";
 import type { SupabaseRuntimeMode } from "@/lib/supabase/config";
 
@@ -78,7 +77,7 @@ export function DashboardDataActionsMenu({
     setOpen(false);
     startTransition(async () => {
       try {
-        const session = opts?.reset
+        opts?.reset
           ? await resetPowensConnectSession()
           : await preparePowensConnectSession();
         const webviewResult = await safeGetPowensWebviewConnectUrl();
@@ -103,21 +102,10 @@ export function DashboardDataActionsMenu({
             window.location.assign(webviewResult.url);
           }
         } else {
-          const opened = await openPowensConnectWidget({
-            userId: session.userId,
-            token: session.token
+          toast.error("Connexion Powens indisponible", {
+            id: toastId,
+            description: "La webview sécurisée est requise. Vérifiez la configuration Powens."
           });
-          if (opened.ok) {
-            toast.success("Widget Powens", {
-              id: toastId,
-              description: "Si la fenêtre ne s’affiche pas, vérifiez le bloqueur de pop-ups."
-            });
-          } else {
-            toast.message("Compte Powens prêt", {
-              id: toastId,
-              description: `${webviewResult.error} · ${opened.message}`
-            });
-          }
         }
       } catch (e) {
         toast.error("Powens — préparation échouée", {

@@ -1,4 +1,5 @@
 import "server-only";
+import { validateImport } from "@/lib/security/import-validation";
 import { revalidatePath } from "next/cache";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { computeMetricsFromTransactions, trailingTwelveMonthStartDateIso, type DashboardTx } from "@/lib/dashboard-metrics";
@@ -314,7 +315,10 @@ export async function importTransactionsWithClient(
   importSessionId: string | null;
   fileAlreadyImported?: boolean;
 }> {
-  if (!Array.isArray(transactions) || transactions.length === 0) {
+  const validated = validateImport(transactions, meta);
+  transactions = validated.rows;
+  meta = validated.meta;
+  if (transactions.length === 0) {
     await syncMonthlyMetricsFromDb(client);
     const metrics = await fetchLatestMetrics(client);
     return { inserted: [], metrics, skippedInFile: 0, merged: 0, importSessionId: null };

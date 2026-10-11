@@ -1,3 +1,4 @@
+import { requireSameOrigin } from "@/lib/security/http";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -24,12 +25,14 @@ export async function GET(req: Request) {
   let q = supabase.from("expense_notes").select("id,transaction_id,tag,created_at,updated_at");
   if (transactionId) q = q.eq("transaction_id", transactionId);
   const res = await q.order("created_at", { ascending: false }).limit(5000);
-  if (res.error) return NextResponse.json({ ok: false, error: res.error.message }, { status: 400 });
+  if (res.error) return NextResponse.json({ ok: false, error: "Opération impossible." }, { status: 400 });
 
   return NextResponse.json({ ok: true, rows: res.data ?? [] });
 }
 
 export async function POST(req: Request) {
+  const rejected = requireSameOrigin(req);
+  if (rejected) return rejected;
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "Supabase not configured (demo mode)." }, { status: 400 });
@@ -61,12 +64,14 @@ export async function POST(req: Request) {
     )
     .select("id,transaction_id,tag,created_at,updated_at")
     .maybeSingle();
-  if (ins.error) return NextResponse.json({ ok: false, error: ins.error.message }, { status: 400 });
+  if (ins.error) return NextResponse.json({ ok: false, error: "Opération impossible." }, { status: 400 });
 
   return NextResponse.json({ ok: true, row: ins.data });
 }
 
 export async function DELETE(req: Request) {
+  const rejected = requireSameOrigin(req);
+  if (rejected) return rejected;
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "Supabase not configured (demo mode)." }, { status: 400 });
@@ -95,7 +100,7 @@ export async function DELETE(req: Request) {
     .delete()
     .eq("transaction_id", transactionId)
     .eq("tag", tag);
-  if (del.error) return NextResponse.json({ ok: false, error: del.error.message }, { status: 400 });
+  if (del.error) return NextResponse.json({ ok: false, error: "Opération impossible." }, { status: 400 });
 
   return NextResponse.json({ ok: true });
 }

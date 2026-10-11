@@ -1,5 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/security/sync-job", async original => ({
+  ...(await original<object>()),
+  withSyncJob: async (_client: unknown, _userId: string, _integration: string, run: () => Promise<unknown>) => run()
+}));
+
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), sync: vi.fn() }));
 vi.mock("@/lib/mobile/auth", async original => ({ ...(await original<object>()), mobileAuth: mocks.auth }));
 vi.mock("@/lib/gmail/sync-invoices", () => ({ syncHiwayInvoices: mocks.sync }));

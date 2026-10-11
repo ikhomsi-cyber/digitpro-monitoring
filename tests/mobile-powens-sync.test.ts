@@ -1,10 +1,16 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/security/sync-job", async original => ({
+  ...(await original<object>()),
+  withSyncJob: async (_client: unknown, _userId: string, _integration: string, run: () => Promise<unknown>) => run()
+}));
+
 vi.mock("@/lib/mobile/bank-sync-status", () => ({ recordBankSync: vi.fn().mockResolvedValue(undefined) }));
-const mocks = vi.hoisted(() => ({ configured: vi.fn(), fetch: vi.fn(), ingest: vi.fn(), reference: vi.fn(), apply: vi.fn() }));
+const mocks = vi.hoisted(() => ({ configured: vi.fn(), fetch: vi.fn(), ingest: vi.fn(), reference: vi.fn(), apply: vi.fn(), secret: vi.fn() }));
 vi.mock("@/lib/powens/cloud-api", () => ({ isPowensCloudConfigured: mocks.configured, powensCloudFetchTransactions: mocks.fetch }));
 vi.mock("@/lib/import-transactions", () => ({ importTransactionsWithClient: mocks.ingest }));
 vi.mock("@/lib/powens/import-reference", () => ({ mapPowensRowsToImportTx: (rows: unknown) => rows, loadBankinReferenceData: mocks.reference, applyBankinReferenceToPowensRows: mocks.apply }));
+vi.mock("@/lib/security/integration-secrets", () => ({ readIntegrationSecret: mocks.secret }));
 import { syncMobilePowens } from "@/lib/mobile/powens-sync";
 beforeEach(() => {
   vi.resetAllMocks(); mocks.configured.mockReturnValue(true);
@@ -14,6 +20,7 @@ beforeEach(() => {
   mocks.ingest.mockResolvedValue({ inserted: [1], merged: 2 });
 });
 function database(token: string | null) {
+  mocks.secret.mockResolvedValue({ auth_token: token, powens_user_id: "123" });
   const eq = vi.fn().mockReturnValue({ maybeSingle: async () => ({ data: { auth_token: token, powens_user_id: "123" }, error: null }) });
   const client = { from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq }) }) };
   return { client: client as unknown as Parameters<typeof syncMobilePowens>[0], eq };
@@ -21,7 +28,7 @@ function database(token: string | null) {
 it("uses the verified user's Powens connection and preserves personal classification", async () => {
   const { client, eq } = database("test-token");
   expect(await syncMobilePowens(client, "owner")).toEqual({ inserted: 1, merged: 2 });
-  expect(eq).toHaveBeenCalledWith("user_id", "owner");
+  expect(mocks.secret).toHaveBeenCalledWith(client, "owner", "powens");
   expect(mocks.fetch).toHaveBeenCalledWith("test-token", expect.objectContaining({ scope: "personal", powensUserId: "123" }));
   expect(mocks.apply).toHaveBeenCalledWith(expect.any(Array), { reference: true }, "personal");
   expect(mocks.ingest).toHaveBeenCalledWith(client, expect.any(Array), expect.objectContaining({ format: "powens" }));

@@ -24,7 +24,7 @@ export async function GET() {
         console.timeEnd("dashboard:transactions-full");
       }
     })(),
-    loadQontoLiveBalanceEur()
+    loadQontoLiveBalanceEur(user.id)
   ]);
   if (res.errorMessage) {
     return NextResponse.json({ ok: false, error: res.errorMessage }, { status: 400 });

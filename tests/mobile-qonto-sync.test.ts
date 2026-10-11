@@ -1,5 +1,10 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/security/sync-job", async original => ({
+  ...(await original<object>()),
+  withSyncJob: async (_client: unknown, _userId: string, _integration: string, run: () => Promise<unknown>) => run()
+}));
+
 vi.mock("@/lib/mobile/bank-sync-status", () => ({ recordBankSync: vi.fn().mockResolvedValue(undefined) }));
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), fetch: vi.fn(), ingest: vi.fn(), mode: vi.fn(), powens: vi.fn() }));
 vi.mock("@/lib/mobile/auth", async original => ({ ...(await original<object>()), mobileAuth: mocks.auth }));
@@ -12,6 +17,7 @@ import { MobileError } from "@/lib/mobile/auth";
 const client = { authenticated: true };
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubEnv("QONTO_ALLOWED_USER_ID", "owner");
   mocks.auth.mockResolvedValue({ client, userId: "owner" });
   mocks.mode.mockReturnValue("SUPABASE");
   mocks.powens.mockResolvedValue({ inserted: 3, merged: 4 });
@@ -57,4 +63,11 @@ it("syncs both banks for all operations and rejects invalid scope", async () => 
 it("does not report success if Powens fails", async () => {
   mocks.powens.mockRejectedValue(new MobileError(409, "Reconnectez Powens"));
   expect((await POST(new Request("https://test?scope=personal", { method: "POST" }))).status).toBe(409);
+});
+
+afterEach(() => vi.unstubAllEnvs());
+it("denies another authenticated account before contacting Qonto or importing", async () => {
+  mocks.auth.mockResolvedValue({ client, userId: "other" });
+  expect((await POST(new Request("https://test", { method: "POST" }))).status).toBe(403);
+  expect(mocks.fetch).not.toHaveBeenCalled(); expect(mocks.ingest).not.toHaveBeenCalled();
 });

@@ -1,3 +1,5 @@
+import { assertQontoOwner } from "@/lib/security/qonto-access";
+import { withSyncJob } from "@/lib/security/sync-job";
 import { recordBankSync } from "@/lib/mobile/bank-sync-status";
 import { mobileAuth, mobileFailure, mobileJSON, MobileError } from "@/lib/mobile/auth";
 import { fetchQontoTransactionsForImport } from "@/lib/qonto/sync";
@@ -15,13 +17,17 @@ export async function POST(request: Request) {
     const scope = new URL(request.url).searchParams.get("scope") ?? "pro";
     if (!["pro", "personal", "all"].includes(scope)) throw new MobileError(400, "Périmètre invalide.");
     if (scope === "personal") return mobileJSON(await syncMobilePowens(client, userId));
-    const { rows } = await fetchQontoTransactionsForImport();
-    const result = await importTransactionsWithClient(client, rows, {
-      sourceFilename: `Qonto API iOS · ${new Date().toISOString()}`,
-      format: "qonto", fileHash: null
+    assertQontoOwner(userId);
+    const professional = await withSyncJob(client, userId, "qonto", async () => {
+      const { rows } = await fetchQontoTransactionsForImport(userId);
+      const result = await importTransactionsWithClient(client, rows, {
+        sourceFilename: `Qonto API iOS · ${new Date().toISOString()}`,
+        format: "qonto", fileHash: null
+      });
+      await recordBankSync(client, userId, "pro");
+      return { inserted: result.inserted.length, merged: result.merged };
     });
-    await recordBankSync(client, userId, "pro");
     const personal = scope === "all" ? await syncMobilePowens(client, userId) : { inserted: 0, merged: 0 };
-    return mobileJSON({ inserted: result.inserted.length + personal.inserted, merged: result.merged + personal.merged });
+    return mobileJSON({ inserted: professional.inserted + personal.inserted, merged: professional.merged + personal.merged });
   } catch (error) { return mobileFailure(error); }
 }

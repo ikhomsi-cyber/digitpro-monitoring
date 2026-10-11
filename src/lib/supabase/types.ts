@@ -108,28 +108,6 @@ export type Database = {
         }>;
         Relationships: [];
       };
-      powens_users: {
-        Row: {
-          id: string;
-          user_id: string;
-          powens_user_id: string;
-          auth_token: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string;
-          powens_user_id: string;
-          auth_token: string;
-        };
-        Update: Partial<{
-          powens_user_id: string;
-          auth_token: string;
-          updated_at: string;
-        }>;
-        Relationships: [];
-      };
       hiway_invoices: {
         Row: {
           id: string;
@@ -171,37 +149,6 @@ export type Database = {
           billed_days: number | null;
           tjm_ht_eur: number | null;
           synced_at: string;
-          updated_at: string;
-        }>;
-        Relationships: [];
-      };
-      gmail_oauth_tokens: {
-        Row: {
-          id: string;
-          user_id: string;
-          email: string | null;
-          refresh_token: string;
-          access_token: string | null;
-          token_expiry: string | null;
-          scope: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string;
-          email?: string | null;
-          refresh_token: string;
-          access_token?: string | null;
-          token_expiry?: string | null;
-          scope?: string | null;
-        };
-        Update: Partial<{
-          email: string | null;
-          refresh_token: string;
-          access_token: string | null;
-          token_expiry: string | null;
-          scope: string | null;
           updated_at: string;
         }>;
         Relationships: [];
@@ -349,7 +296,17 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      integration_job_acquire: { Args: { p_user_id: string; p_integration: string; p_lease: string }; Returns: boolean };
+      integration_job_release: { Args: { p_user_id: string; p_integration: string; p_lease: string }; Returns: undefined };
+      agent_authorize: { Args: { p_hash: string; p_request_id: string }; Returns: Json };
+      agent_complete: { Args: { p_grant_id: string; p_request_id: string; p_outcome: string }; Returns: boolean };
+      agent_grant_create: { Args: { p_user_id: string; p_name: string; p_hash: string }; Returns: string };
+      agent_grant_revoke: { Args: { p_grant_id: string }; Returns: undefined };
+      integration_secret_read: { Args: { p_user_id: string; p_integration: string }; Returns: Json };
+      integration_secret_write: { Args: { p_user_id: string; p_integration: string; p_values: Json }; Returns: undefined };
+      integration_secret_delete: { Args: { p_user_id: string; p_integration: string }; Returns: undefined };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

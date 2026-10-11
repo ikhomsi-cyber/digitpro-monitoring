@@ -75,6 +75,7 @@ export default function LoginPage() {
               <AuthForm mode="login" />
             </Suspense>
 
+            {process.env.ALLOW_PUBLIC_SIGNUP === "true" ? (
             <div className="mt-8 text-center text-sm text-ink-600 dark:text-white/55 lg:text-left">
               Pas de compte ?{" "}
               <Link
@@ -84,6 +85,7 @@ export default function LoginPage() {
                 Créer un compte ›
               </Link>
             </div>
+            ) : null}
           </div>
         </div>
 

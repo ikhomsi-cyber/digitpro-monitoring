@@ -171,7 +171,7 @@ export default async function DashboardPage({
             initialAnnualRevenueTargetHt: null,
             billableRatePeriods: []
           }),
-      loadQontoLiveBalanceEur(),
+      loadQontoLiveBalanceEur(user?.id),
       user
         ? loadStoredHiwayInvoices(supabase, user.id).catch(() => undefined)
         : Promise.resolve(undefined)

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CheckCircle2, Sparkles, ShieldCheck, LineChart, type LucideIcon } from "lucide-react";
@@ -12,6 +13,7 @@ const FEATURES: { icon: LucideIcon; label: string; tone: IconBadgeTone }[] = [
 ];
 
 export default function SignupPage() {
+  if (process.env.ALLOW_PUBLIC_SIGNUP !== "true") redirect("/login");
   return (
     <div className="premium-dashboard-page grid min-h-dvh grid-cols-1 lg:grid-cols-2">
       <aside

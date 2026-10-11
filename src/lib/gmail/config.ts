@@ -54,12 +54,19 @@ function getEnv(name: string): string | undefined {
  * au lieu d'un `GOOGLE_REDIRECT_URI` figé sur localhost.
  */
 export function resolveRequestOrigin(headerList: { get(name: string): string | null }): string | null {
-  const forwardedHost = headerList.get("x-forwarded-host");
-  const host = forwardedHost || headerList.get("host");
-  if (!host) return null;
-  const proto =
-    headerList.get("x-forwarded-proto") ?? (host.startsWith("localhost") || host.startsWith("127.") ? "http" : "https");
-  return `${proto}://${host}`;
+  // Production must use an explicitly configured redirect origin, never proxy headers.
+  const configured = getEnv("GOOGLE_REDIRECT_URI");
+  if (configured) {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1"].includes(url.hostname))) {
+      throw new Error("Origine OAuth non autorisée.");
+    }
+    return url.origin;
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("Origine OAuth non configurée.");
+  const host = headerList.get("host");
+  if (host && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return `http://${host}`;
+  return null;
 }
 
 /** `redirect_uri` OAuth pour une origine donnée (doit être déclarée dans la console Google). */

@@ -32,7 +32,10 @@ import {
   powensPrimaryImportAxis,
   type PowensImportAxis
 } from "@/lib/powens/config";
+import { MAX_IMPORT_BYTES } from "@/lib/security/import-validation";
+import { withSyncJob } from "@/lib/security/sync-job";
 import { createHash } from "crypto";
+import { readIntegrationSecret, writeIntegrationSecret, deleteIntegrationSecret } from "@/lib/security/integration-secrets";
 
 type ImportTx = {
   date: string;
@@ -174,20 +177,26 @@ export type QontoSyncActionResult =
 
 async function syncQontoTransactionsFromApiInternal(): Promise<QontoSyncSuccess> {
   await assertSupabaseWritesEnabled();
-  const { rows, bankAccountSummary } = await fetchQontoTransactionsForImport();
-  const result = await importTransactionsInternal(rows, {
-    sourceFilename: `Qonto API · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
-    format: "qonto",
-    fileHash: null
-  });
+  const client = await createSupabaseServerClient();
+  if (!client) throw new Error("Connexion requise.");
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) throw new Error("Connexion requise.");
+  return withSyncJob(client, user.id, "qonto", async () => {
+    const { rows, bankAccountSummary } = await fetchQontoTransactionsForImport(user.id);
+    const result = await importTransactionsInternal(rows, {
+      sourceFilename: `Qonto API · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
+      format: "qonto",
+      fileHash: null
+    });
 
-  return {
-    inserted: result.inserted.length,
-    merged: result.merged,
-    skippedInFile: result.skippedInFile,
-    totalFromApi: rows.length,
-    bankAccountSummary
-  };
+    return {
+      inserted: result.inserted.length,
+      merged: result.merged,
+      skippedInFile: result.skippedInFile,
+      totalFromApi: rows.length,
+      bankAccountSummary
+    };
+  });
 }
 
 export async function syncQontoTransactionsFromApi(): Promise<QontoSyncSuccess> {
@@ -204,13 +213,11 @@ export async function safeSyncQontoTransactionsFromApi(): Promise<QontoSyncActio
     const result = await syncQontoTransactionsFromApiInternal();
     return { ok: true, ...result };
   } catch (error) {
-    console.error("[qonto] transaction sync failed", error);
+    console.error("[qonto] transaction sync failed");
     return {
       ok: false,
       error:
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : "Synchronisation Qonto impossible. Consultez les logs serveur pour plus de détails."
+        "Synchronisation Qonto impossible. Vérifiez la connexion et réessayez."
     };
   }
 }
@@ -219,7 +226,7 @@ export async function safeSyncQontoTransactionsFromApi(): Promise<QontoSyncActio
  * Crée ou réutilise l’utilisateur Powens (Budget Insight : POST /auth/init uniquement si aucune ligne
  * `powens_users` ; sinon réutilise `powens_user_id` + `auth_token`) et met à jour Supabase si création.
  */
-export async function preparePowensConnectSession(): Promise<{ userId: string; token: string }> {
+export async function preparePowensConnectSession(): Promise<{ userId: string }> {
   await assertSupabaseWritesEnabled();
   if (!isPowensCloudConfigured()) {
     throw new Error(
@@ -240,59 +247,29 @@ export async function preparePowensConnectSession(): Promise<{ userId: string; t
     throw new Error("Votre compte Supabase n’a pas d’email : requis pour le flux Powens POST /users (hors Budget Insight /auth/init).");
   }
 
-  const existingRes = await supabase
-    .from("powens_users")
-    .select("powens_user_id, auth_token")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (existingRes.error) {
-    const msg = existingRes.error.message ?? "";
-    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(
-        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
-      );
-    }
-    throw new Error(msg);
-  }
-
-  const existingRow = existingRes.data as { powens_user_id?: unknown; auth_token?: unknown } | null;
+  const existing = await readIntegrationSecret(supabase, user.id, "powens");
+  const existingRow = existing as { powens_user_id?: unknown; auth_token?: unknown } | null;
   const existingUserId = existingRow?.powens_user_id != null ? String(existingRow.powens_user_id).trim() : "";
   const existingToken =
     typeof existingRow?.auth_token === "string" ? existingRow.auth_token.trim() : "";
   if (existingUserId && existingToken) {
-    return { userId: existingUserId, token: existingToken };
+    return { userId: existingUserId };
   }
 
   const { userId, userToken } = await powensCloudCreateUser(email);
 
-  const upsert = await supabase.from("powens_users").upsert(
-    {
-      user_id: user.id,
-      powens_user_id: userId,
-      auth_token: userToken
-    },
-    { onConflict: "user_id" }
-  );
+  await writeIntegrationSecret(supabase, user.id, "powens", {
+    powens_user_id: userId, auth_token: userToken
+  });
 
-  if (upsert.error) {
-    const msg = upsert.error.message ?? "";
-    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(
-        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
-      );
-    }
-    throw new Error(msg);
-  }
-
-  return { userId, token: userToken };
+  return { userId };
 }
 
 /**
  * Repart sur un nouvel utilisateur Powens sans supprimer les transactions déjà importées.
  * Utile quand l'utilisateur stocké répond `noAccount` après une webview incomplète.
  */
-export async function resetPowensConnectSession(): Promise<{ userId: string; token: string }> {
+export async function resetPowensConnectSession(): Promise<{ userId: string }> {
   await assertSupabaseWritesEnabled();
   const supabase = await createSupabaseServerClient();
   if (!supabase) throw new Error("Supabase not configured (demo mode).");
@@ -301,13 +278,7 @@ export async function resetPowensConnectSession(): Promise<{ userId: string; tok
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase.from("powens_users").delete().eq("user_id", user.id);
-  if (error) {
-    const msg = error.message ?? "";
-    if (!/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(msg);
-    }
-  }
+  await deleteIntegrationSecret(supabase, user.id, "powens");
 
   revalidatePath("/dashboard");
   return preparePowensConnectSession();
@@ -339,23 +310,9 @@ export async function getPowensWebviewConnectUrl(): Promise<{ url: string }> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const rowRes = await supabase
-    .from("powens_users")
-    .select("auth_token")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const row = await readIntegrationSecret(supabase, user.id, "powens");
 
-  if (rowRes.error) {
-    const msg = rowRes.error.message ?? "";
-    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(
-        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
-      );
-    }
-    throw new Error(msg);
-  }
-
-  const token = (rowRes.data as { auth_token?: string } | null)?.auth_token?.trim();
+  const token = (row as { auth_token?: string } | null)?.auth_token?.trim();
   if (!token) {
     throw new Error(
       "Aucun token Powens enregistré : utilisez d’abord « Connecter Powens » (création utilisateur)."
@@ -382,13 +339,11 @@ export async function safeGetPowensWebviewConnectUrl(): Promise<
     const { url } = await getPowensWebviewConnectUrl();
     return { ok: true, url };
   } catch (error) {
-    console.error("[powens] webview url failed", error);
+    console.error("[powens] webview url failed");
     return {
       ok: false,
       error:
-        error instanceof Error && error.message.trim()
-          ? error.message
-          : "Impossible de préparer l’URL Powens Connect."
+        "Impossible de préparer la connexion Powens. Vérifiez la configuration."
     };
   }
 }
@@ -416,60 +371,48 @@ async function syncPowensCloudTransactionsForAxis(axis: PowensImportAxis): Promi
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const rowRes = await supabase
-    .from("powens_users")
-    .select("auth_token, powens_user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  return withSyncJob(supabase, user.id, "powens", async () => {
+    const row = await readIntegrationSecret(supabase, user.id, "powens");
 
-  if (rowRes.error) {
-    const msg = rowRes.error.message ?? "";
-    if (/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(
-        "Table « powens_users » introuvable : appliquez la migration Supabase (20260517100000_powens_users_restore.sql)."
-      );
+    const token = (row as { auth_token?: string; powens_user_id?: unknown } | null)?.auth_token?.trim();
+    if (!token) {
+      throw new Error("Aucun token Powens enregistré : utilisez d’abord « Connecter Powens » (création utilisateur + liaison bancaire).");
     }
-    throw new Error(msg);
-  }
 
-  const token = (rowRes.data as { auth_token?: string; powens_user_id?: unknown } | null)?.auth_token?.trim();
-  if (!token) {
-    throw new Error("Aucun token Powens enregistré : utilisez d’abord « Connecter Powens » (création utilisateur + liaison bancaire).");
-  }
+    const powensUserIdRaw = (row as { powens_user_id?: unknown } | null)?.powens_user_id;
+    const powensUserId =
+      powensUserIdRaw != null && String(powensUserIdRaw).trim() !== ""
+        ? String(powensUserIdRaw).trim()
+        : null;
 
-  const powensUserIdRaw = (rowRes.data as { powens_user_id?: unknown } | null)?.powens_user_id;
-  const powensUserId =
-    powensUserIdRaw != null && String(powensUserIdRaw).trim() !== ""
-      ? String(powensUserIdRaw).trim()
-      : null;
+    const scope = axis;
+    const company = powensDefaultCompanyLabel(axis);
+    const filterAccountIds = powensAccountFilterForAxis(axis);
 
-  const scope = axis;
-  const company = powensDefaultCompanyLabel(axis);
-  const filterAccountIds = powensAccountFilterForAxis(axis);
+    const rows = await powensCloudFetchTransactions(token, {
+      company,
+      scope,
+      powensUserId,
+      filterAccountIds
+    });
+    const reference = await loadBankinReferenceData(supabase);
+    const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), reference, axis);
 
-  const rows = await powensCloudFetchTransactions(token, {
-    company,
-    scope,
-    powensUserId,
-    filterAccountIds
+    const axisLabel = axis === "personal" ? "perso" : "SASU";
+    const result = await importTransactionsInternal(txs, {
+      sourceFilename: `Powens API (${axisLabel}) · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
+      format: "powens",
+      fileHash: null
+    });
+
+    return {
+      inserted: result.inserted.length,
+      merged: result.merged,
+      skippedInFile: result.skippedInFile,
+      totalFromApi: txs.length,
+      summary: `${company} · ${axisLabel}`
+    };
   });
-  const reference = await loadBankinReferenceData(supabase);
-  const txs = applyBankinReferenceToPowensRows(mapPowensRowsToImportTx(rows), reference, axis);
-
-  const axisLabel = axis === "personal" ? "perso" : "SASU";
-  const result = await importTransactionsInternal(txs, {
-    sourceFilename: `Powens API (${axisLabel}) · ${new Date().toISOString().slice(0, 19).replace("T", " ")} UTC`,
-    format: "powens",
-    fileHash: null
-  });
-
-  return {
-    inserted: result.inserted.length,
-    merged: result.merged,
-    skippedInFile: result.skippedInFile,
-    totalFromApi: txs.length,
-    summary: `${company} · ${axisLabel}`
-  };
 }
 
 type PowensSyncSuccess = {
@@ -494,7 +437,7 @@ function toPowensSyncActionError(error: unknown): PowensSyncActionResult {
   const message = powensSyncErrorMessage(error);
   return {
     ok: false,
-    error: message,
+    error: "Synchronisation Powens impossible. Vérifiez la connexion et réessayez.",
     noAccount: message.includes("aucun compte bancaire") || message.includes("noAccount")
   };
 }
@@ -511,7 +454,7 @@ export async function safeSyncPowensCloudTransactions(): Promise<PowensSyncActio
     const result = await syncPowensCloudTransactionsForAxis(powensPrimaryImportAxis());
     return { ok: true, ...result };
   } catch (error) {
-    console.error("[powens] sync failed", error);
+    console.error("[powens] sync failed");
     return toPowensSyncActionError(error);
   }
 }
@@ -529,7 +472,7 @@ export async function safeSyncPowensCloudTransactionsPersonal(): Promise<PowensS
     const result = await syncPowensCloudTransactionsForAxis("personal");
     return { ok: true, ...result };
   } catch (error) {
-    console.error("[powens] personal sync failed", error);
+    console.error("[powens] personal sync failed");
     return toPowensSyncActionError(error);
   }
 }
@@ -579,16 +522,9 @@ export async function purgePowensData(): Promise<PurgePowensDataResult> {
     .eq("format", "powens");
   if (delSessionsErr) throw new Error(delSessionsErr.message);
 
-  const { count: deletedPowensUsers, error: delPowensErr } = await supabase
-    .from("powens_users")
-    .delete({ count: "exact" })
-    .eq("user_id", user.id);
-  if (delPowensErr) {
-    const msg = delPowensErr.message ?? "";
-    if (!/powens_users|does not exist|schema cache|42P01/i.test(msg)) {
-      throw new Error(msg);
-    }
-  }
+  const powensConnection = await readIntegrationSecret(supabase, user.id, "powens");
+  await deleteIntegrationSecret(supabase, user.id, "powens");
+  const deletedPowensUsers = powensConnection ? 1 : 0;
 
   const legacyTables = [
     "lcl_transactions",
@@ -628,10 +564,15 @@ export async function purgePowensData(): Promise<PurgePowensDataResult> {
  */
 export async function importBankinPersonalXlsx(formData: FormData) {
   await assertSupabaseWritesEnabled();
+  const client = await createSupabaseServerClient();
+  if (!client) throw new Error("Connexion requise.");
+  const { data: { user } } = await client.auth.getUser();
+  if (!user) throw new Error("Connexion requise.");
   const file = formData.get("file");
   if (!(file instanceof File)) {
     throw new Error("Fichier manquant : sélectionnez un export Bankin (.xls ou .xlsx).");
   }
+  if (!file.size || file.size > MAX_IMPORT_BYTES) throw new Error("Fichier trop volumineux (3 Mo maximum).");
   const nameLower = file.name.toLowerCase();
   if (!nameLower.endsWith(".xls") && !nameLower.endsWith(".xlsx")) {
     throw new Error("Extension non reconnue : attendu .xls ou .xlsx (export Bankin).");

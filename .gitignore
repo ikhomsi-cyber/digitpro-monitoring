@@ -53,3 +53,10 @@ next-env.d.ts
 !.vscode/extensions.json
 .idea
 .env*
+
+# Opaque agent credentials
+.agent-credentials/
+
+/.next-security-check/
+
+.security-backups/

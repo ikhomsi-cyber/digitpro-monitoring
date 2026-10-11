@@ -50,7 +50,19 @@ export async function fetchWithNetworkDiagnostics(
   context: string
 ): Promise<Response> {
   try {
-    return await fetch(urlStr, init);
+    const url = new URL(urlStr);
+    const powensConfig = process.env.POWENS_API_BASE_URL?.trim() || process.env.POWENS_DOMAIN?.trim();
+    const powensHost = powensConfig ? new URL(powensConfig.includes("://") ? powensConfig : `https://${powensConfig}`).hostname : null;
+    const permitted = url.hostname === "thirdparty.qonto.com" || url.hostname === "thirdparty-sandbox.staging.qonto.co" ||
+      (url.hostname === powensHost && (url.hostname.endsWith(".biapi.pro") || url.hostname === "api.powens.com"));
+    if (!permitted || url.protocol !== "https:" || url.username || url.password || url.port) {
+      throw new Error("Destination réseau non autorisée.");
+    }
+    const timeout = AbortSignal.timeout(20_000);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    const result = await fetch(urlStr, { ...init, signal, redirect: "error" });
+    if (result.status === 401 || result.status === 403) throw new Error("Accès fournisseur refusé. Reconnexion requise.");
+    return result;
   } catch (e) {
     throw wrapFetchError(urlStr, context, e);
   }

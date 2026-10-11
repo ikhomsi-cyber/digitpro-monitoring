@@ -12,9 +12,10 @@ export async function loadDashboardHeroStatsFromSupabase(
   client: SupabaseServerClient,
   now = new Date()
 ): Promise<{ stats: DashboardHeroStats | null; errorMessage: string | null }> {
+  const { data: { user } } = await client.auth.getUser();
   const [{ transactions, errorMessage }, qontoLiveBalanceEur] = await Promise.all([
     loadAllUserTransactionsFromSupabase(client),
-    loadQontoLiveBalanceEur()
+    loadQontoLiveBalanceEur(user?.id)
   ]);
   if (errorMessage) return { stats: null, errorMessage };
   return {

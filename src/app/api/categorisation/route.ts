@@ -1,9 +1,12 @@
+import { requireSameOrigin } from "@/lib/security/http";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 
 export async function POST(req: Request) {
+  const rejected = requireSameOrigin(req);
+  if (rejected) return rejected;
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ ok: false, error: "Supabase not configured (demo mode)." }, { status: 400 });
@@ -47,7 +50,7 @@ export async function POST(req: Request) {
     ).error;
   }
 
-  if (updateError) return NextResponse.json({ ok: false, error: updateError.message }, { status: 400 });
+  if (updateError) return NextResponse.json({ ok: false, error: "Opération impossible." }, { status: 400 });
 
   revalidatePath("/categorisation");
   revalidatePath("/dashboard");

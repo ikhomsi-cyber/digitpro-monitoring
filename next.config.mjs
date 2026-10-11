@@ -1,6 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  distDir: process.env.NEXT_BUILD_DIR || ".next",
+  async headers() {
+    return [{ source: "/api/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] }, { source: "/:path*", headers: [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" }
+    ] }];
+  },
   /** Évite erreurs de chunk / `.call` avec certains builds Recharts + App Router. */
   transpilePackages: ["recharts"],
   webpack(config) {
@@ -18,7 +28,7 @@ const nextConfig = {
   experimental: {
     serverActions: {
       // CSV imports can exceed the default 1MB limit.
-      bodySizeLimit: "10mb"
+      bodySizeLimit: "4mb"
     }
   }
 };

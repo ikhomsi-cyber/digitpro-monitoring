@@ -6,31 +6,21 @@ import type { Database } from "@/lib/supabase/types";
 import { createGmailOAuthClient } from "@/lib/gmail/oauth";
 import { isInvalidGrantError } from "@/lib/gmail/oauth-grant";
 
+import { readIntegrationSecret, writeIntegrationSecret, deleteIntegrationSecret } from "@/lib/security/integration-secrets";
+
 type SupabaseDb = SupabaseClient<Database>;
 
-const MIGRATION_HINT =
-  "Table « gmail_oauth_tokens » introuvable : appliquez la migration Supabase (20260609140000_gmail_oauth_tokens.sql).";
-
-function isMissingTableError(message: string | undefined): boolean {
-  return /gmail_oauth_tokens|does not exist|schema cache|42P01/i.test(message ?? "");
-}
-
-export type GmailTokenRow = Database["public"]["Tables"]["gmail_oauth_tokens"]["Row"];
+export type GmailTokenRow = {
+  id: string; user_id: string; email: string | null; refresh_token: string;
+  access_token: string | null; token_expiry: string | null; scope: string | null;
+  created_at: string; updated_at: string;
+};
 
 export async function loadGmailTokenRow(
   supabase: SupabaseDb,
   userId: string
 ): Promise<GmailTokenRow | null> {
-  const res = await supabase
-    .from("gmail_oauth_tokens")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (res.error) {
-    if (isMissingTableError(res.error.message)) throw new Error(MIGRATION_HINT);
-    throw new Error(res.error.message);
-  }
-  return res.data ?? null;
+  return await readIntegrationSecret(supabase, userId, "gmail") as GmailTokenRow | null;
 }
 
 export async function saveGmailToken(
@@ -44,28 +34,17 @@ export async function saveGmailToken(
     scope?: string | null;
   }
 ): Promise<void> {
-  const res = await supabase.from("gmail_oauth_tokens").upsert(
-    {
-      user_id: userId,
-      email: values.email ?? null,
-      refresh_token: values.refreshToken,
-      access_token: values.accessToken ?? null,
-      token_expiry: values.expiryDate ? new Date(values.expiryDate).toISOString() : null,
-      scope: values.scope ?? null
-    },
-    { onConflict: "user_id" }
-  );
-  if (res.error) {
-    if (isMissingTableError(res.error.message)) throw new Error(MIGRATION_HINT);
-    throw new Error(res.error.message);
-  }
+  await writeIntegrationSecret(supabase, userId, "gmail", {
+    email: values.email ?? null,
+    refresh_token: values.refreshToken,
+    access_token: values.accessToken ?? null,
+    token_expiry: values.expiryDate ? new Date(values.expiryDate).toISOString() : null,
+    scope: values.scope ?? null
+  });
 }
 
 export async function deleteGmailToken(supabase: SupabaseDb, userId: string): Promise<void> {
-  const res = await supabase.from("gmail_oauth_tokens").delete().eq("user_id", userId);
-  if (res.error && !isMissingTableError(res.error.message)) {
-    throw new Error(res.error.message);
-  }
+  await deleteIntegrationSecret(supabase, userId, "gmail");
 }
 
 /** Supprime le jeton stocké si Google renvoie invalid_grant. */
