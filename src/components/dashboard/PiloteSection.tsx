@@ -47,9 +47,9 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
   const fmt = useDashboardDisplayFormat();
   return <section aria-label="Compensation par famille" className="min-w-0 rounded-3xl border border-ink-200/70 bg-white px-4 py-3 shadow-card dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none">
     <div className="flex items-center gap-3"><div><h3 className="font-display text-sm font-semibold tracking-tight text-ink-900 dark:text-white">Compensation par famille</h3></div></div>
-    <div className="mt-3 grid grid-cols-3 gap-2 border-b border-ink-200 pb-2 text-[11px] font-medium text-ink-600 dark:border-white/20 dark:text-white/80"><span>Payé</span><span>Compensé</span><span>Reste à couvrir</span></div>
-    <div className="divide-y divide-ink-200 dark:divide-white/20">
-      {families.map(family => {
+    <div className="mt-3 grid grid-cols-3 gap-2 pl-3 border-b border-ink-200 pb-2 text-[11px] font-medium text-ink-600 dark:border-white/20 dark:text-white/80"><span>Payé</span><span>Compensé</span><span>Reste à couvrir</span></div>
+    <div className="space-y-2 divide-y divide-ink-200 dark:divide-white/25">
+      {families.map((family, index) => {
         const expenseRows = month.categories.flatMap(parent => parent.children.filter(sub => piloteCompensationFamily(parent.name, sub.name, false) === family.id).map(sub => ({ parent: parent.name, ...sub })));
         const incomeMonths = month.month.length === 4 ? sourceMonths.filter(row => row.month.startsWith(`${month.month}-`)) : [month];
         const rawIncomeRows = incomeMonths.flatMap(period => period.incomeCategories.flatMap(parent => parent.children.filter(sub => piloteIncomeFamily(period.month, parent.name, sub.name, sub.income) === family.id).map(sub => ({ period: period.month, parent: parent.name, ...sub }))));
@@ -62,7 +62,7 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
         const remaining = Math.max(0, -family.balance);
         const surplus = Math.max(0, family.balance);
         const coverage = fmt.dummy ? 60 : family.expenses ? family.covered / family.expenses * 100 : 0;
-        return <details key={family.id} className="group py-2">
+        return <details key={family.id} className="group border-l-2 pl-3 py-2" style={{borderLeftColor: COLORS[index]}}>
           <summary className="cursor-pointer list-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
             <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold text-ink-900 dark:text-white">{family.name}</h4><p className="mt-0.5 text-[11px] leading-relaxed text-ink-600 group-open:hidden dark:text-white/80">{family.source}</p></div><ChevronRight size={16} className="text-ink-400 transition group-open:rotate-90" /></div>
             <div className="mt-2 grid grid-cols-3 gap-2"><div><p className="font-display text-base font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white">{fmt.euro(family.expenses)}</p></div><div><p className="font-display text-base font-semibold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-300">{fmt.euro(family.covered)}</p></div><div><p className={`font-display text-base font-semibold tabular-nums tracking-tight ${remaining ? "text-rose-600 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-200"}`}>{fmt.euro(remaining)}</p></div></div>
