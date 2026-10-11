@@ -61,13 +61,23 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
         }, new Map<string, {parent: string; name: string; income: number}>()).values()];
         const remaining = Math.max(0, -family.balance);
         const surplus = Math.max(0, family.balance);
-        const coverage = fmt.dummy ? 60 : family.expenses ? family.covered / family.expenses * 100 : 0;
+        const gaugeIncome = fmt.dummy ? 100 : family.income;
+        const gaugeExpenses = fmt.dummy ? 60 : family.expenses;
+        const gaugeMax = Math.max(gaugeIncome, gaugeExpenses, 1);
+        const consumedWidth = Math.min(gaugeIncome, gaugeExpenses) / gaugeMax * 100;
+        const overflowWidth = Math.max(0, gaugeExpenses - gaugeIncome) / gaugeMax * 100;
+        const incomeMarker = gaugeIncome / gaugeMax * 100;
+        const consumptionPercent = family.income > 0 ? Math.round(family.expenses / family.income * 100) : null;
         return <details key={family.id} className="group border-l-2 pl-3 py-2" style={{borderLeftColor: COLORS[index]}}>
           <summary className="cursor-pointer list-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
             <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold text-ink-900 dark:text-white">{family.name}</h4><p className="mt-0.5 text-[11px] leading-relaxed text-ink-600 group-open:hidden dark:text-white/80">{family.source}</p></div><ChevronRight size={16} className="text-ink-400 transition group-open:rotate-90" /></div>
             <div className="mt-2 grid grid-cols-3 gap-2"><div><p className="font-display text-base font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white">{fmt.euro(family.expenses)}</p></div><div><p className="font-display text-base font-semibold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-300">{fmt.euro(family.covered)}</p></div><div><p className={`font-display text-base font-semibold tabular-nums tracking-tight ${remaining ? "text-rose-600 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-200"}`}>{fmt.euro(remaining)}</p></div></div>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-rose-100 dark:bg-rose-300/20"><div className="h-full rounded-full bg-emerald-400" style={{width: `${coverage}%`}} /></div>
-            {surplus > 0 ? <p className="mt-1 text-[10px] text-emerald-700 dark:text-emerald-200">Excédent : {fmt.euro(surplus)}</p> : null}
+            <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-ink-600 dark:text-white/75"><span>Rentrées : {fmt.euro(family.income)}</span><span>{fmt.dummy ? "Consommation masquée" : consumptionPercent === null ? "Aucune rentrée" : `${consumptionPercent} % consommés`}</span></div>
+            <div className="relative mt-1.5" role="img" aria-label={fmt.dummy ? "Jauge masquée" : `${family.source} : ${fmt.euro(family.income)} reçus, ${fmt.euro(family.expenses)} dépensés${remaining ? `, dépassement de ${fmt.euro(remaining)}` : `, ${fmt.euro(surplus)} disponibles`}` }>
+              <div className="flex h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-white/15"><div className="h-full bg-emerald-400" style={{width: `${consumedWidth}%`}} /><div className="h-full bg-rose-400" style={{width: `${overflowWidth}%`}} /></div>
+              {gaugeIncome > 0 && gaugeExpenses > gaugeIncome ? <span className="absolute -top-1 h-3.5 w-0.5 bg-ink-900 dark:bg-white" style={{left: `${incomeMarker}%`}} /> : null}
+            </div>
+            <div className="mt-1 flex justify-between gap-2 text-[10px]"><span className="text-ink-500 dark:text-white/65">{!fmt.dummy && remaining > 0 && family.income > 0 ? "Repère : 100 % des rentrées" : "100 % = rentrées reçues"}</span><span className={remaining ? "font-medium text-rose-600 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-200"}>{remaining ? `Dépassement : ${fmt.euro(remaining)}` : `Disponible : ${fmt.euro(surplus)}`}</span></div>
           </summary>
           <div className="mt-2 grid gap-2 border-t border-ink-200 pt-2 pb-0.5 dark:border-white/15 sm:grid-cols-2">
             <PiloteSourceDetail title="Dépenses" rows={expenseRows.map(row => ({parent: row.parent, name: row.name, amount: row.expenses}))} />
