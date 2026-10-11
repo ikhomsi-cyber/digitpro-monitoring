@@ -23,7 +23,7 @@ beforeAll(async () => {
     grant select,insert,update,delete on all tables in schema public to authenticated,service_role;
     insert into public.transactions(id,user_id,date,label,category,amount,company) values('${tx}','${owner}','2026-10-11','A','Divers',1,'Bank');
     insert into public.import_sessions(id,user_id,format) values('${session}','${owner}','generic');`);
-  for (const file of ["20261011100000_private_integration_secrets.sql", "20261011110000_sync_jobs_and_agent_access.sql"]) {
+  for (const file of ["20261011081900_private_integration_secrets.sql", "20261011081906_sync_jobs_and_agent_access.sql", "20261011083434_expense_note_upsert_ownership.sql"]) {
     await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
   }
 }, 30_000);
@@ -90,5 +90,27 @@ it("enforces agent expiry, quotas, cooldown, audit and immediate revocation", as
     expect(completion.rows[0].active).toBe(false);
     const audit = await db.query<{ outcome: string }>(`select outcome from private.agent_audit where grant_id='${id}'`);
     expect(audit.rows[0].outcome).toBe("revoked");
+  } finally { await db.exec("reset role;"); }
+});
+
+it("allows repeated owner tag upserts and denies reassignment to another user or transaction", async () => {
+  const foreignTx = "66666666-6666-4666-8666-666666666666";
+  await db.exec(`insert into public.transactions(id,user_id,date,label,category,amount,company)
+    values('${foreignTx}','${other}','2026-10-11','B','Divers',1,'Bank');`);
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${owner}';`);
+  let noteId: string;
+  try {
+    const upsert = () => db.query<{id:string}>(`insert into public.expense_notes(transaction_id,tag)
+      values('${tx}','repas_client') on conflict(user_id,transaction_id,tag)
+      do update set tag=excluded.tag returning id;`);
+    noteId = (await upsert()).rows[0].id;
+    expect((await upsert()).rows[0].id).toBe(noteId);
+    await expect(db.query(`update public.expense_notes set user_id='${other}' where id='${noteId}'`)).rejects.toThrow();
+    await expect(db.query(`update public.expense_notes set transaction_id='${foreignTx}' where id='${noteId}'`)).rejects.toThrow();
+  } finally { await db.exec("reset role;"); }
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${other}';`);
+  try {
+    const result = await db.query(`update public.expense_notes set tag='note_de_frais' where id='${noteId!}' returning id`);
+    expect(result.rows).toEqual([]);
   } finally { await db.exec("reset role;"); }
 });
