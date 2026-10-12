@@ -123,3 +123,14 @@ it("only counts cashback among other income without dropping named compensation 
   expect(filterPiloteIncome(filtered)).toEqual(filtered);
   expect(buildPiloteYear([filtered],"2026")?.income).toBe(1460);
 });
+
+
+it("counts September Extra income as Meryeme after the cashback-only filter", async () => {
+  const {filterPiloteIncome} = await import("@/lib/pilote");
+  const months = buildPiloteMonths([row(1,500,"Entrées d’argent","Extra","2026-09-01"),row(2,20,"Entrées d’argent","Extra","2026-09-02"),row(3,30,"Entrées d’argent","Autre","2026-09-03")]);
+  const filtered = months.map(filterPiloteIncome);
+  expect(filtered[0].income).toBe(520);
+  expect(buildPiloteCompensations(filtered[0]).find(f => f.id === "food")?.income).toBe(520);
+  const annual = buildPiloteYear(filtered,"2026")!;
+  expect(buildPiloteCompensations(annual,filtered).find(f => f.id === "food")?.income).toBe(520);
+});

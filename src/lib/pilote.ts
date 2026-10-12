@@ -92,6 +92,8 @@ export function piloteCompensationFamily(parent: string, sub: string, income: bo
 export function piloteIncomeFamily(month: string, parent: string, sub: string, amount: number): PiloteCompensationFamily {
   // Explicit user correction: the €500 in Bankin “Extra” in October 2026 is Meryeme.
   if (month === "2026-10" && sourceName(sub) === "extra" && cents(amount) === 50000) return "food";
+  // Explicit user correction: the two Extra credits in September 2026 are Meryeme.
+  if (month === "2026-09" && sourceName(sub) === "extra") return "food";
   return piloteCompensationFamily(parent, sub, true);
 }
 
