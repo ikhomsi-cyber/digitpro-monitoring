@@ -94,3 +94,18 @@ it("keeps electricity and home insurance in the Bankin housing compensation fami
   expect(buildPiloteCompensations(month).find(f => f.id === "rent")).toMatchObject({expenses: 57, income: 50, covered: 50, balance: -7});
   expect(month.categories[0].name).toBe("Logement");
 });
+
+describe("Pilote expense views", () => {
+  it("partitions every expense once, preserves source names and leaves income unchanged", async () => {
+    const {filterPiloteExpenses, piloteExpenseView} = await import("@/lib/pilote");
+    expect(piloteExpenseView("Charges LMNP", "Charges copro LMNP")).toBe("essential");
+    expect(piloteExpenseView("Charges LMNP", "Taxe foncière")).toBe("secondary");
+    const month = buildPiloteMonths([row(1,-100), row(2,-30,"Logement.","Taxe foncière"), row(3,-20,"Auto & Transports.","Entretien"), row(4,-50,"Voyages.","Transport"), row(5,-10,"Divers.","Autre"), row(6,300,"Entrées d’argent.","Salaire")])[0];
+    const views = (["essential","secondary","travel"] as const).map(view => filterPiloteExpenses(month,view));
+    expect(views.map(view => view.expenses)).toEqual([100,60,50]);
+    expect(views.reduce((sum,view) => sum + view.expenses,0)).toBe(month.expenses);
+    expect(views.every(view => view.incomeCategories === month.incomeCategories && view.income === 300)).toBe(true);
+    expect(views[1].categories.find(category => category.name === "Logement.")?.children[0].name).toBe("Taxe foncière");
+    expect(month.categories.flatMap(category => category.children).length).toBe(5);
+  });
+});

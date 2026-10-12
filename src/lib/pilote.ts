@@ -134,3 +134,21 @@ export function buildPiloteYear(months: PiloteMonth[], year: string): PiloteMont
   const expenses = rows.reduce((s, m) => s + cents(m.expenses), 0) / 100;
   return { month: year, income, expenses, balance: (cents(income) - cents(expenses)) / 100, count: rows.reduce((s, m) => s + m.count, 0), categories: merge("categories"), incomeCategories: merge("incomeCategories") };
 }
+
+export type PiloteExpenseView = "essential" | "secondary" | "travel";
+/** Display-only partitions; original Bankin labels and income remain unchanged. */
+export function piloteExpenseView(parent: string, sub: string): PiloteExpenseView {
+  const name = sourceName(`${parent} ${sub}`);
+  if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
+  if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";
+  if (/\b(logement|loyers?|lmnp|copro|alimentation|transports?|sante|scolarite|enfants)\b/.test(name)) return "essential";
+  return "secondary";
+}
+export function filterPiloteExpenses(month: PiloteMonth, view: PiloteExpenseView): PiloteMonth {
+  const categories = month.categories.map(parent => {
+    const children = parent.children.filter(sub => piloteExpenseView(parent.name, sub.name) === view);
+    return {...parent, children, expenses: children.reduce((sum, sub) => sum + cents(sub.expenses), 0) / 100, count: children.reduce((sum, sub) => sum + sub.count, 0)};
+  }).filter(parent => parent.children.length);
+  const expenses = categories.reduce((sum, parent) => sum + cents(parent.expenses), 0) / 100;
+  return {...month, categories, expenses, balance: (cents(month.income) - cents(expenses)) / 100};
+}
