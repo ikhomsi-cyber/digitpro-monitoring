@@ -73,3 +73,21 @@ it("recognizes an explicit Masquée column separately from Pointée", () => {
   const rows = parseBankinPiloteWorkbook(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
   expect(rows[0].hidden).toBe(true);
 });
+
+
+it("excludes flagged hidden credits and debits from Pilote totals after Excel parsing", async () => {
+  const { buildBankinPiloteSnapshot } = await import("@/lib/pilote");
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    [...HEADERS, "Masquée"],
+    ["01/10/2026", "Synthetic hidden credit", "Compte", 500, "Entrées d’argent", "Salaire", "", false, true],
+    ["01/10/2026", "Synthetic hidden debit", "Compte", -100, "Logement", "Loyer", "", false, "Oui"],
+    ["01/10/2026", "Synthetic visible credit", "Compte", 20, "Entrées d’argent", "Salaire", "", true, false],
+    ["01/10/2026", "Synthetic visible debit", "Compte", -5, "Logement", "Loyer", "", false, "Non"],
+  ]), "Transactions");
+  const rows = parseBankinPiloteWorkbook(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+  expect(rows.map(row => row.hidden)).toEqual([true, true, false, false]);
+  const snapshot = buildBankinPiloteSnapshot(rows, "synthetic.xlsx", "a".repeat(64));
+  expect(snapshot.excludedHidden).toBe(2);
+  expect(snapshot.months[0]).toMatchObject({ income: 20, expenses: 5, balance: 15, count: 2 });
+});

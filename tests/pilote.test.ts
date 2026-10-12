@@ -109,3 +109,17 @@ describe("Pilote expense views", () => {
     expect(month.categories.flatMap(category => category.children).length).toBe(5);
   });
 });
+
+
+it("only counts cashback among other income without dropping named compensation income", async () => {
+  const {filterPiloteIncome} = await import("@/lib/pilote");
+  const source = buildPiloteMonths([row(1,10,"Entrées d’argent","Cashback"), row(2,400,"Entrées d’argent","Salaire"), row(3,950,"Entrées d’argent","Loyers reçus"), row(4,500,"Entrées d’argent","Extra"), row(5,-20)])[0];
+  const filtered = filterPiloteIncome(source);
+  expect(filtered.income).toBe(1460);
+  expect(filtered.balance).toBe(1440);
+  expect(buildPiloteCompensations(filtered).find(family => family.id === "other")?.income).toBe(10);
+  expect(filtered.incomeCategories[0].children.map(sub => sub.name)).not.toContain("Salaire");
+  expect(source.income).toBe(1860);
+  expect(filterPiloteIncome(filtered)).toEqual(filtered);
+  expect(buildPiloteYear([filtered],"2026")?.income).toBe(1460);
+});

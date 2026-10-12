@@ -152,3 +152,13 @@ export function filterPiloteExpenses(month: PiloteMonth, view: PiloteExpenseView
   const expenses = categories.reduce((sum, parent) => sum + cents(parent.expenses), 0) / 100;
   return {...month, categories, expenses, balance: (cents(month.income) - cents(expenses)) / 100};
 }
+
+/** User rule: unassigned income only contributes when Bankin categorizes it as cashback. */
+export function filterPiloteIncome(month: PiloteMonth): PiloteMonth {
+  const incomeCategories = month.incomeCategories.map(parent => {
+    const children = parent.children.filter(sub => piloteIncomeFamily(month.month, parent.name, sub.name, sub.income) !== "other" || /\bcash\s*back\b/.test(sourceName(`${parent.name} ${sub.name}`)));
+    return {...parent, children, income: children.reduce((sum, sub) => sum + cents(sub.income), 0) / 100, count: children.reduce((sum, sub) => sum + sub.count, 0)};
+  }).filter(parent => parent.children.length);
+  const income = incomeCategories.reduce((sum, parent) => sum + cents(parent.income), 0) / 100;
+  return {...month, incomeCategories, income, balance: (cents(income) - cents(month.expenses)) / 100};
+}
