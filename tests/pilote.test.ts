@@ -144,3 +144,15 @@ it("keeps DigitPro NDF expenses and reimbursements together in Essential", async
   expect(filterPiloteExpenses(month,"secondary").expenses).toBe(0);
   expect(essential.categories[0].name).toBe("Loisirs & Sorties");
 });
+
+
+it("combines multiple expense types once and supports an empty selection", async () => {
+  const {filterPiloteExpenses} = await import("@/lib/pilote");
+  const month = buildPiloteMonths([row(1,-100),row(2,-30,"Logement","Taxe foncière"),row(3,-50,"Voyages","Vacances"),row(4,200,"Entrées","Cashback")])[0];
+  expect(filterPiloteExpenses(month,["essential","secondary"]).expenses).toBe(130);
+  expect(filterPiloteExpenses(month,["essential","secondary","travel"]).expenses).toBe(180);
+  expect(filterPiloteExpenses(month,["essential","essential"]).expenses).toBe(100);
+  expect(filterPiloteExpenses(month,[])).toMatchObject({expenses:0,income:200,categories:[]});
+  const annual = buildPiloteYear([month],"2026")!;
+  expect(filterPiloteExpenses(annual,["essential","secondary"]).expenses).toBe(130);
+});

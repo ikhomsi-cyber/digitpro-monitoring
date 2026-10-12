@@ -147,9 +147,10 @@ export function piloteExpenseView(parent: string, sub: string): PiloteExpenseVie
   if (/\b(logement|loyers?|lmnp|copro|alimentation|transports?|sante|scolarite|enfants)\b/.test(name)) return "essential";
   return "secondary";
 }
-export function filterPiloteExpenses(month: PiloteMonth, view: PiloteExpenseView): PiloteMonth {
+export function filterPiloteExpenses(month: PiloteMonth, view: PiloteExpenseView | readonly PiloteExpenseView[]): PiloteMonth {
+  const views = new Set(typeof view === "string" ? [view] : view);
   const categories = month.categories.map(parent => {
-    const children = parent.children.filter(sub => piloteExpenseView(parent.name, sub.name) === view);
+    const children = parent.children.filter(sub => views.has(piloteExpenseView(parent.name, sub.name)));
     return {...parent, children, expenses: children.reduce((sum, sub) => sum + cents(sub.expenses), 0) / 100, count: children.reduce((sum, sub) => sum + sub.count, 0)};
   }).filter(parent => parent.children.length);
   const expenses = categories.reduce((sum, parent) => sum + cents(parent.expenses), 0) / 100;
