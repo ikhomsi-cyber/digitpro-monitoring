@@ -140,6 +140,7 @@ export function buildPiloteYear(months: PiloteMonth[], year: string): PiloteMont
 export type PiloteExpenseView = "essential" | "secondary" | "travel";
 /** Display-only partitions; original Bankin labels and income remain unchanged. */
 export function piloteExpenseView(parent: string, sub: string): PiloteExpenseView {
+  if (piloteCompensationFamily(parent, sub, false) === "ndf") return "essential";
   const name = sourceName(`${parent} ${sub}`);
   if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
   if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";

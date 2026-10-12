@@ -134,3 +134,13 @@ it("counts September Extra income as Meryeme after the cashback-only filter", as
   const annual = buildPiloteYear(filtered,"2026")!;
   expect(buildPiloteCompensations(annual,filtered).find(f => f.id === "food")?.income).toBe(520);
 });
+
+
+it("keeps DigitPro NDF expenses and reimbursements together in Essential", async () => {
+  const {filterPiloteIncome, filterPiloteExpenses} = await import("@/lib/pilote");
+  const month = filterPiloteIncome(buildPiloteMonths([row(1,-79,"Loisirs & Sorties","NDF DigitPro"),row(2,589,"Entrées d’argent","DigitPro Consulting NDF")])[0]);
+  const essential = filterPiloteExpenses(month,"essential");
+  expect(buildPiloteCompensations(essential).find(f => f.id === "ndf")).toMatchObject({income:589,expenses:79,covered:79,balance:510});
+  expect(filterPiloteExpenses(month,"secondary").expenses).toBe(0);
+  expect(essential.categories[0].name).toBe("Loisirs & Sorties");
+});
