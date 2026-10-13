@@ -125,3 +125,14 @@ Déploiement widget validé le 21 septembre 2026 : `dpl_GDJTASisEm4U3LZwr8UB6SZa
 L’app utilise maintenant l’icône du web (fond noir, barres blanches et accent bleu) dans un AppIcon iOS opaque de 1024 px. L’écran Activité ne recharge plus toutes les transactions lors d’un changement de mois : après le chargement initial, `/api/mobile/v1/activity/month` ne lit que les jours facturés, vacances, trajets, kilométrage, TJM et périodes nécessaires au mois demandé. Les blocs Objectif annuel et projection de rythme ont été retirés de l’écran iOS. Le graphique Jours facturés est sélectionnable et affiche le mois, le statut, les jours, le TJM HT, le montant HT et la planification éventuelle.
 
 Déploiement validé le 21 septembre 2026 : `dpl_8W6JiC93E7T3u8Kb7e8z6vF61YSY`, promu sur https://digitpro-monitoring.vercel.app. Health 200, route mensuelle 401 sans session et login 200 après promotion. Compilation Xcode réussie sans avertissement, build Next.js et typecheck réussis, 82 tests réussis.
+
+
+## Pilote natif — 13 octobre 2026
+
+Pilote est accessible depuis le bouton avion d’Accueil et depuis Patrimoine. Les blocs SwiftUI reprennent la couverture des rentrées, la sélection mois/année, les filtres multiples Essentiel/Presque essentiel/Voyages, les histogrammes fins par famille, le solde de la vue, les compensations avec sous-catégories, le détail des catégories replié, les rentrées et la carte des voyages. Le loyer Maroc de 300 €/mois depuis avril 2024 reste distinct avec les calculs avec/sans ; la dépense d’hôtel Minorque confirmée comme remboursée est exclue.
+
+La nouvelle lecture `GET /api/mobile/v1/pilote` utilise le JWT mobile et le snapshot Bankin de l’utilisateur sous RLS. Les calculs restent dans les fonctions TypeScript partagées avec le web. Les imports Gmail/Excel s’ouvrent dans l’espace web de l’environnement configuré ; l’actualisation native recharge ensuite le snapshot. Aucun token Gmail ou lien de téléchargement Bankin n’est transmis au mobile.
+
+La carte utilise les contours Natural Earth embarqués, sans requête cartographique externe. Les îles espagnoles sont représentées par les contours 10m ; Minorque et Tenerife disposent d’un cadrage dédié. Les montants restent discrets à côté des pays, avec le détail des enveloppes et des postes au toucher. Le filtre par défaut est l’année courante à Paris.
+
+Recette : ouvrir Pilote, comparer octobre 2026 au web, sélectionner plusieurs types, passer en cumul annuel et vérifier la limite d’avril 2024 pour le loyer Maroc. Déplier Logement, vérifier les catégories et choisir Minorque puis l’enveloppe Grèce + Turquie sur la carte. Tester un mois sans données, le changement de compte, le thème clair/Obsidienne et VoiceOver. Les tests visuels et la session authentifiée sur simulateur/iPhone restent à effectuer par l’utilisateur selon la préférence ci-dessus. La distribution native et la publication de la nouvelle route mobile ne sont pas automatiques.

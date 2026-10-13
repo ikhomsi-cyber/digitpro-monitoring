@@ -44,6 +44,11 @@ struct DashboardView: View {
             Button { store.selectedTab = .settings } label: { BrandMark(size: 48).background(mint, in: Circle()) }
                 .accessibilityLabel("Ouvrir mon compte")
             Spacer(minLength: 0)
+            NavigationLink { PiloteView() } label: {
+                Image(systemName: "paperplane.fill").font(.system(size: 18, weight: .semibold))
+                    .frame(width: 48, height: 48).background(DP.surface(scheme), in: Circle())
+                    .overlay(Circle().stroke(DP.border(scheme)))
+            }.accessibilityLabel("Ouvrir Pilote")
             Button { store.selectedTab = .activity } label: {
                 Image(systemName: "chart.bar.fill").font(.system(size: 19, weight: .semibold))
                     .frame(width: 48, height: 48).background(DP.surface(scheme), in: Circle())

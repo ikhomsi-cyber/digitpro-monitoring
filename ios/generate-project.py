@@ -3,7 +3,10 @@ from pathlib import Path
 import hashlib
 import json
 import plistlib
+import re
 root = Path(__file__).resolve().parent
+existing_project = root/'DigitPro iOS.xcodeproj/project.pbxproj'
+existing_team = re.search(r'DEVELOPMENT_TEAM\s*=\s*"?([^";]+)"?;', existing_project.read_text()) if existing_project.exists() else None
 objects = {}
 def uid(label): return hashlib.sha1(label.encode()).hexdigest()[:24].upper()
 def obj(label, body):
@@ -16,6 +19,7 @@ app_sources = sorted(str(p.relative_to(root)) for p in (root/'DigitPro').rglob('
 widget_sources = ['DigitPro/Shared/WidgetCache.swift', 'DigitPro/Widget/DigitProWidget.swift']
 files = {p: ref(p) for p in sorted(set(app_sources+widget_sources))}
 assets = ref('DigitPro/Assets.xcassets', 'folder.assetcatalog')
+world_map = ref('DigitPro/Resources/world-shapes.json', 'text.json')
 base = ref('DigitPro/Config/Base.xcconfig', 'text.xcconfig')
 products = []
 configs = {}
@@ -36,6 +40,7 @@ for target, bundle, product in [('DigitPro','fr.digitpro.ios','DigitPro.app'), (
             'GENERATE_INFOPLIST_FILE':'NO', 'ENABLE_USER_SCRIPT_SANDBOXING':'YES',
             'COPY_PHASE_STRIP': 'NO'
         }
+        if existing_team: settings['DEVELOPMENT_TEAM'] = existing_team.group(1).strip()
         if target == 'DigitPro': settings['ASSETCATALOG_COMPILER_APPICON_NAME'] = 'AppIcon'
         if target != 'DigitPro': settings.update(SKIP_INSTALL='YES',APPLICATION_EXTENSION_API_ONLY='YES')
         target_configs.append(obj(target+config, 'isa = XCBuildConfiguration; baseConfigurationReference = '+base+'; name = '+q(config)+'; buildSettings = {'+' '.join(k+' = '+q(v)+';' for k,v in settings.items())+'};'))
@@ -48,6 +53,7 @@ for target, sources in [('DigitPro',app_sources),('DigitProWidget',widget_source
     obj('sources:'+target,f'isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = {ids(builds)}; runOnlyForDeploymentPostprocessing = 0;')
     obj('frameworks:'+target,f'isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = {ids([package_build] if target == "DigitPro" else [])}; runOnlyForDeploymentPostprocessing = 0;')
     resource_builds = [obj(target+':assets', f'isa = PBXBuildFile; fileRef = {assets};')] if target == 'DigitPro' else []
+    if target == 'DigitPro': resource_builds.append(obj(target+':world-map', f'isa = PBXBuildFile; fileRef = {world_map};'))
     obj('resources:'+target,f'isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = {ids(resource_builds)}; runOnlyForDeploymentPostprocessing = 0;')
 proxy = obj('proxy',f'isa = PBXContainerItemProxy; containerPortal = {uid("project")}; proxyType = 1; remoteGlobalIDString = {uid("target:DigitProWidget")}; remoteInfo = DigitProWidget;')
 dependency = obj('dependency',f'isa = PBXTargetDependency; target = {uid("target:DigitProWidget")}; targetProxy = {proxy};')
@@ -57,7 +63,7 @@ for index,target in enumerate(['DigitPro','DigitProWidget']):
     phases = [uid('sources:'+target),uid('frameworks:'+target),uid('resources:'+target)] + ([embed] if index == 0 else [])
     obj('target:'+target, f'isa = PBXNativeTarget; buildConfigurationList = {configs[target]}; buildPhases = {ids(phases)}; buildRules = (); dependencies = {ids([dependency] if index == 0 else [])}; name = {target}; packageProductDependencies = {ids([package_product] if index == 0 else [])}; productName = {target}; productReference = {products[index]}; productType = "com.apple.product-type.{"application" if index == 0 else "app-extension"}";')
 product_group = obj('products',f'isa = PBXGroup; children = {ids(products)}; name = Products; sourceTree = "<group>";')
-main_group = obj('main',f'isa = PBXGroup; children = {ids(list(files.values())+[assets,base,product_group])}; sourceTree = "<group>";')
+main_group = obj('main',f'isa = PBXGroup; children = {ids(list(files.values())+[assets,world_map,base,product_group])}; sourceTree = "<group>";')
 project_configs = []
 for config in ['Debug','Release']:
     project_configs.append(obj('project'+config,f'isa = XCBuildConfiguration; name = {config}; buildSettings = {{CLANG_ENABLE_MODULES = YES; SWIFT_ACTIVE_COMPILATION_CONDITIONS = {q("DEBUG" if config == "Debug" else "")};}};'))

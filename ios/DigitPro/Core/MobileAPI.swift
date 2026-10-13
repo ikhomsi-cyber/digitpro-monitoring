@@ -27,6 +27,11 @@ final class MobileAPI {
         config.timeoutIntervalForRequest = 45
         transport = URLSession(configuration: config)
     }
+    var piloteImportURL: URL {
+        var components = URLComponents(url: baseURL.appendingPathComponent("dashboard"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "section", value: "pilote")]
+        return components.url!
+    }
     func get<T: Decodable>(_ path: String, query: [URLQueryItem] = []) async throws -> T {
         try await request(path, method: "GET", query: query, body: Optional<Data>.none)
     }

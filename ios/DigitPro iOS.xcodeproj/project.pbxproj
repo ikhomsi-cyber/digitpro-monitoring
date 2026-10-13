@@ -24,6 +24,10 @@
 		D6D98AD647220B90179BC808 /* DigitPro/Features/TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C80A257F25C6600536F4C1F /* DigitPro/Features/TransactionsView.swift */; };
 		DDEF11B52AB56952C1CA9050 /* DigitPro/Shared/DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEF35C12DCF79807587FAC5 /* DigitPro/Shared/DesignSystem.swift */; };
 		E0DB7E3205981768D842582F /* DigitPro/Shared/WidgetCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4983898F6C1FAE357B526200 /* DigitPro/Shared/WidgetCache.swift */; };
+		D7F605CA7120308815AFE717 /* DigitPro/Core/PiloteModels.swift */ = {isa = PBXBuildFile; fileRef = 33BC47970DE77DBF7E0D55AD /* DigitPro/Core/PiloteModels.swift */; };
+		23289E9D583968A69EA5049F /* DigitPro/Features/PiloteView.swift */ = {isa = PBXBuildFile; fileRef = 4A6EC2E40E33C16454DCEFF3 /* DigitPro/Features/PiloteView.swift */; };
+		1629E10C3F88F8F63AE60CDB /* DigitPro/Features/PiloteTravelCard.swift */ = {isa = PBXBuildFile; fileRef = D2FC2FAC97012A53AC69FF23 /* DigitPro/Features/PiloteTravelCard.swift */; };
+		9ABA13F5700BD2338448795E /* DigitPro/Resources/world-shapes.json */ = {isa = PBXBuildFile; fileRef = DDB7FB7189EF4CBD06DBD221 /* DigitPro/Resources/world-shapes.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +72,10 @@
 		D54DF0FBCBCBB584A76F29D4 /* DigitPro/Core/AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/AppStore.swift; sourceTree = SOURCE_ROOT; };
 		F9A6237C46997B9F7429D89D /* DigitPro/Core/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/Core/Models.swift; sourceTree = SOURCE_ROOT; };
 		FC8C92FD1DD5D49504B595E5 /* DigitPro/App/DigitProApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DigitPro/App/DigitProApp.swift; sourceTree = SOURCE_ROOT; };
+		33BC47970DE77DBF7E0D55AD /* DigitPro/Core/PiloteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DigitPro/Core/PiloteModels.swift"; sourceTree = SOURCE_ROOT; };
+		4A6EC2E40E33C16454DCEFF3 /* DigitPro/Features/PiloteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DigitPro/Features/PiloteView.swift"; sourceTree = SOURCE_ROOT; };
+		D2FC2FAC97012A53AC69FF23 /* DigitPro/Features/PiloteTravelCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DigitPro/Features/PiloteTravelCard.swift"; sourceTree = SOURCE_ROOT; };
+		DDB7FB7189EF4CBD06DBD221 /* DigitPro/Resources/world-shapes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "DigitPro/Resources/world-shapes.json"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,6 +106,10 @@
 				4181067639D30CDCE8673033 /* DigitPro/Core/MobileAPI.swift */,
 				F9A6237C46997B9F7429D89D /* DigitPro/Core/Models.swift */,
 				BAC283A1F2F1AB35B0B5DA69 /* DigitPro/Features/ActivityView.swift */,
+				33BC47970DE77DBF7E0D55AD /* DigitPro/Core/PiloteModels.swift */,
+				4A6EC2E40E33C16454DCEFF3 /* DigitPro/Features/PiloteView.swift */,
+				D2FC2FAC97012A53AC69FF23 /* DigitPro/Features/PiloteTravelCard.swift */,
+				DDB7FB7189EF4CBD06DBD221 /* DigitPro/Resources/world-shapes.json */,
 				921C5E160EA1F5AA7F1931A0 /* DigitPro/Features/DashboardView.swift */,
 				805730DEC2231F179B5E42D4 /* DigitPro/Features/ExpenseCategoriesCard.swift */,
 				9CBB5384C546BEE48DCD9B3C /* DigitPro/Features/FinanceViews.swift */,
@@ -201,7 +213,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				55FD6B1B62501709E59E8ACA /* DigitPro/Assets.xcassets in Resources */,
-			);
+							9ABA13F5700BD2338448795E /* DigitPro/Resources/world-shapes.json */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A199AB8D6497EF3CA9019E0E /* Resources */ = {
@@ -239,7 +252,10 @@
 				D6D98AD647220B90179BC808 /* DigitPro/Features/TransactionsView.swift in Sources */,
 				DDEF11B52AB56952C1CA9050 /* DigitPro/Shared/DesignSystem.swift in Sources */,
 				E0DB7E3205981768D842582F /* DigitPro/Shared/WidgetCache.swift in Sources */,
-			);
+							D7F605CA7120308815AFE717 /* DigitPro/Core/PiloteModels.swift */,
+				23289E9D583968A69EA5049F /* DigitPro/Features/PiloteView.swift */,
+				1629E10C3F88F8F63AE60CDB /* DigitPro/Features/PiloteTravelCard.swift */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

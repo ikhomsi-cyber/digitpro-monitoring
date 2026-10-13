@@ -96,6 +96,13 @@ struct FinanceView: View {
     @State private var section = 0
     var body: some View {
         PageScroll {
+            NavigationLink { PiloteView() } label: {
+                DPCard { HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) { Text("Pilote").font(.title3.weight(.semibold)); Text("Budget, compensations et voyages").font(.caption).foregroundStyle(.secondary) }
+                    Spacer(); Image(systemName: "arrow.up.right").foregroundStyle(DP.tint(scheme))
+                } }
+            }.buttonStyle(.plain)
+
             VStack(alignment: .leading, spacing: 8) {
                 Eyebrow(text: "Une vision d’ensemble")
                 Text("Patrimoine").font(.system(.largeTitle, design: .rounded, weight: .semibold)).tracking(-1)
