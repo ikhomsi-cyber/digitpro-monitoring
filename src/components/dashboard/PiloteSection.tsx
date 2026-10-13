@@ -5,7 +5,7 @@ import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft } from "lu
 import { dashboardInsightCard, dashboardFlatSectionHeader, dashboardPanelTitle, dashboardPanelSub } from "@/lib/dashboard-surfaces";
 import { PiloteTravelMap } from "./PiloteTravelMap";
 import { toast } from "sonner";
-import { piloteSnapshotMonths, filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
+import { addPiloteMoroccoRent, piloteSnapshotMonths, filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
 import { getGmailConnectionStatus, getGmailConnectUrl } from "@/app/dashboard/gmail-actions";
 import { importBankinPersonalXlsx } from "@/app/dashboard/actions";
 import { useDashboardSection } from "./DashboardSectionContext";
@@ -58,6 +58,9 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
           groups.set(key, {parent: row.parent, name: row.name, income: (Math.round((previous?.income ?? 0) * 100) + Math.round(row.income * 100)) / 100});
           return groups;
         }, new Map<string, {parent: string; name: string; income: number}>()).values()];
+        const moroccoIncome=family.id === "rent" ? incomeRows.filter(row=>row.parent === "Loyer Maroc ajouté").reduce((sum,row)=>sum+row.income,0) : 0;
+        const withoutMoroccoIncome=family.income-moroccoIncome;
+        const withoutMoroccoBalance=withoutMoroccoIncome-family.expenses;
         const remaining = Math.max(0, -family.balance);
         const surplus = Math.max(0, family.balance);
         const gaugeIncome = fmt.dummy ? 100 : family.income;
@@ -71,11 +74,13 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
           <summary className="cursor-pointer list-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
             <div className="flex items-center gap-3"><span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{backgroundColor:COLORS[index]}}/><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold tracking-tight text-ink-900 dark:text-white">{family.name}</h4><p className="mt-0.5 text-[10px] text-ink-500 dark:text-white/55">{family.source}</p></div><ChevronRight size={14} className="shrink-0 text-ink-400 transition group-open:rotate-90" /></div>
             <div className="mt-3 grid grid-cols-3 gap-3"><div><p className="text-[10px] text-ink-500 dark:text-white/55">Dépensé</p><p className="mt-1 text-base font-semibold tabular-nums tracking-tight text-ink-900 dark:text-white">{fmt.euro(family.expenses)}</p></div><div><p className="text-[10px] text-ink-500 dark:text-white/55">Reçu</p><p className="mt-1 text-base font-semibold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-300">{fmt.euro(family.income)}</p></div><div className="text-right"><p className="text-[10px] text-ink-500 dark:text-white/55">{remaining ? "À couvrir" : "Disponible"}</p><p className={`mt-1 text-base font-semibold tabular-nums tracking-tight ${remaining ? "text-rose-600 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-200"}`}>{fmt.euro(remaining || surplus)}</p></div></div>
+            {moroccoIncome>0?<p className="mt-2 text-[10px] text-ink-500 dark:text-white/65">{fmt.euro(withoutMoroccoIncome)} de loyers Bankin + <span className="font-medium text-emerald-600 dark:text-emerald-300">{fmt.euro(moroccoIncome)} de loyer Maroc</span></p>:null}
             <div className="relative mt-3" role="img" aria-label={fmt.dummy ? "Jauge masquée" : `${family.source} : ${fmt.euro(family.income)} reçus, ${fmt.euro(family.expenses)} dépensés${remaining ? `, dépassement de ${fmt.euro(remaining)}` : `, ${fmt.euro(surplus)} disponibles`}` }>
               <div className="flex h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/15"><div className="h-full bg-emerald-400" style={{width: `${consumedWidth}%`}} /><div className="h-full bg-rose-400" style={{width: `${overflowWidth}%`}} /></div>
               {gaugeIncome > 0 && gaugeExpenses > gaugeIncome ? <span className="absolute -top-0.5 h-2 w-px bg-ink-900 dark:bg-white" style={{left: `${incomeMarker}%`}} /> : null}
             </div>
             <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-ink-500 dark:text-white/55"><span>{fmt.dummy ? "Consommation masquée" : consumptionPercent === null ? "Aucune rentrée" : `${consumptionPercent} % des rentrées consommés`}</span>{!fmt.dummy && remaining > 0 && family.income > 0?<span>Repère à 100 %</span>:null}</div>
+            {moroccoIncome>0?<div className="mt-3 grid grid-cols-2 gap-3 border-t border-ink-200/60 pt-2 dark:border-white/10"><div><p className="text-[10px] text-ink-500 dark:text-white/55">Sans loyer Maroc</p><p className={`mt-0.5 text-xs font-semibold tabular-nums ${withoutMoroccoBalance<0?"text-rose-600 dark:text-rose-300":"text-emerald-600 dark:text-emerald-300"}`}>{fmt.euro(Math.abs(withoutMoroccoBalance))} {withoutMoroccoBalance<0?"à couvrir":"disponibles"}</p><p className="mt-0.5 text-[9px] text-ink-500 dark:text-white/50">{fmt.euro(family.expenses)} − {fmt.euro(withoutMoroccoIncome)}</p></div><div className="text-right"><p className="text-[10px] text-ink-500 dark:text-white/55">Avec loyer Maroc</p><p className={`mt-0.5 text-xs font-semibold tabular-nums ${remaining?"text-rose-600 dark:text-rose-300":"text-emerald-600 dark:text-emerald-300"}`}>{fmt.euro(remaining||surplus)} {remaining?"à couvrir":"disponibles"}</p><p className="mt-0.5 text-[9px] text-ink-500 dark:text-white/50">{fmt.euro(family.expenses)} − {fmt.euro(family.income)}</p></div></div>:null}
           </summary>
           <div className="mt-2 grid gap-2 border-t border-ink-200 pt-2 pb-0.5 dark:border-white/15 sm:grid-cols-2">
             <PiloteSourceDetail title="Dépenses" rows={expenseRows.map(row => ({parent: row.parent, name: row.name, amount: row.expenses}))} />
@@ -107,7 +112,7 @@ export function PiloteSection({ demoMode, onImported }: { demoMode: boolean; onI
     }
     return () => { alive = false; };
   }, [demoMode, loadSnapshot]);
-  const months = demoMode ? [] : (snapshot ? piloteSnapshotMonths(snapshot) : []).map(filterPiloteIncome);
+  const months = demoMode ? [] : (snapshot ? piloteSnapshotMonths(snapshot) : []).map(filterPiloteIncome).map(addPiloteMoroccoRent);
   const [selected, setSelected] = useState("");
   const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const selectedMonth = months.find(m => m.month === selected) ?? months.at(-1);

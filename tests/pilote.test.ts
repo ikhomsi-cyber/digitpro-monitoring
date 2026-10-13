@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { piloteSnapshotMonths, type PiloteMonth, type BankinPiloteSnapshot, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, buildPiloteMonths, buildBankinPiloteSnapshot, bankinPiloteExclusion, type BankinPiloteRow } from "@/lib/pilote";
+import { addPiloteMoroccoRent, piloteSnapshotMonths, type PiloteMonth, type BankinPiloteSnapshot, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, buildPiloteMonths, buildBankinPiloteSnapshot, bankinPiloteExclusion, type BankinPiloteRow } from "@/lib/pilote";
 const row = (sourceRow: number, amount: number, parentCategory = "Logement.", subCategory = "Loyer", date = "2026-10-01"): BankinPiloteRow => ({ sourceRow, amount, parentCategory, subCategory, date, hidden: false });
 describe("Pilote — exact Bankin source", () => {
   it("preserves category and subcategory verbatim without changing credit dates or classifying labels", () => {
@@ -174,5 +174,25 @@ describe("confirmed reimbursed travel expense", () => {
     expect(month.expenses).toBe(500);expect(month.balance).toBe(-400);expect(month.categories[0].children[0].expenses).toBe(500);
     expect(month.count).toBe(2);expect(oldMonth.expenses).toBe(1815.2);
     expect(piloteSnapshotMonths(snapshot)[0].expenses).toBe(500);
+  });
+});
+
+
+describe("declared Morocco rent",()=>{
+  const month=(date:string)=>buildPiloteMonths([row(1,-1704,"Logement","Loyer",date),row(2,950,"Entrées d’argent","Loyers reçus",date)])[0];
+  it("starts in April 2024 and adds a distinct income only once",()=>{
+    const before=month("2024-03-10");expect(addPiloteMoroccoRent(before)).toBe(before);
+    const april=addPiloteMoroccoRent(month("2024-04-10"));
+    expect(april.income).toBe(1250);expect(april.balance).toBe(-454);expect(april.count).toBe(2);
+    expect(april.incomeCategories.at(-1)?.name).toBe("Loyer Maroc ajouté");
+    expect(addPiloteMoroccoRent(april)).toBe(april);
+    expect(buildPiloteCompensations(april).find(f=>f.id==='rent')?.balance).toBe(-454);
+  });
+  it("sums only the eligible source months for annual reporting",()=>{
+    const months=[month("2024-03-10"),month("2024-04-10"),month("2024-05-10")].map(addPiloteMoroccoRent);
+    const annual=buildPiloteYear(months,"2024")!;
+    expect(annual.income).toBe(3450);
+    expect(annual.incomeCategories.find(g=>g.name==='Loyer Maroc ajouté')?.income).toBe(600);
+    expect(buildPiloteCompensations(annual,months).find(f=>f.id==='rent')?.income).toBe(3450);
   });
 });

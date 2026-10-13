@@ -192,3 +192,14 @@ export function filterPiloteIncome(month: PiloteMonth): PiloteMonth {
   const income = incomeCategories.reduce((sum, parent) => sum + cents(parent.income), 0) / 100;
   return {...month, incomeCategories, income, balance: (cents(income) - cents(month.expenses)) / 100};
 }
+
+
+/** User-declared income, kept separate from the original Bankin categories. */
+export function addPiloteMoroccoRent(month: PiloteMonth): PiloteMonth {
+  if (!/^\d{4}-\d{2}$/.test(month.month) || month.month < "2024-04"
+    || month.incomeCategories.some(group => group.name === "Loyer Maroc ajouté")) return month;
+  const supplemental: PiloteGroup = {name:"Loyer Maroc ajouté",income:300,expenses:0,count:0,
+    children:[{name:"Loyer Maroc",income:300,expenses:0,count:0,children:[]}]};
+  return {...month,income:(cents(month.income)+30000)/100,balance:(cents(month.balance)+30000)/100,
+    incomeCategories:[...month.incomeCategories,supplemental]};
+}
