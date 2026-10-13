@@ -8,3 +8,9 @@ it("allocates known destinations and keeps ambiguous costs separate without doub
  expect(data.countries.reduce((s,c)=>s+c.amount,0)+data.shared.reduce((s,c)=>s+c.amount,0)).toBe(data.total);
 });
 it("handles empty history",()=>expect(buildPiloteTravel([])).toEqual({total:0,countries:[],shared:[]}));
+
+it("breaks grouped destinations down by original expense names and merges repeated posts",()=>{
+ const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-30),row(2,"Voyage Bodrum Kos 26","Hôtel Bodrum Kos",-100),row(3,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-20)]));
+ expect(data.shared[0]).toEqual({name:"Voyage Bodrum Kos 26",amount:150,posts:[{name:"Hôtel Bodrum Kos",amount:100},{name:"Transport Bodrum Kos",amount:50}]});
+ expect(data.countries.reduce((s,c)=>s+c.amount,0)+data.shared.reduce((s,c)=>s+c.amount,0)).toBe(150);
+});

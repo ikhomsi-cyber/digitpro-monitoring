@@ -16,7 +16,7 @@ const destinations = [
 const fold=(s:string)=>s.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase();
 export function buildPiloteTravel(months: PiloteMonth[]) {
   const countries = new Map<string,{id:string;name:string;amount:number;trips:Set<string>}>();
-  const shared = new Map<string,number>(); let total=0;
+  const shared = new Map<string,{amount:number;posts:Map<string,number>}>(); let total=0;
   for(const month of months) for(const parent of month.categories) for(const sub of parent.children) {
     if(piloteExpenseView(parent.name,sub.name)!=="travel") continue;
     const amount=Math.round(sub.expenses*100); total+=amount;
@@ -24,7 +24,10 @@ export function buildPiloteTravel(months: PiloteMonth[]) {
     const subMatches=destinations.filter(d=>d.terms.test(fold(sub.name)));
     const matches=subMatches.length?subMatches:parentMatches;
     for(const destination of matches){const c=countries.get(destination.id)??{id:destination.id,name:destination.name,amount:0,trips:new Set<string>()};c.trips.add(parent.name);if(matches.length===1)c.amount+=amount;countries.set(c.id,c);}
-    if(matches.length!==1)shared.set(parent.name,(shared.get(parent.name)??0)+amount);
+    if(matches.length!==1){
+      const group=shared.get(parent.name)??{amount:0,posts:new Map<string,number>()};
+      group.amount+=amount;group.posts.set(sub.name,(group.posts.get(sub.name)??0)+amount);shared.set(parent.name,group);
+    }
   }
-  return {total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips]})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,amount])=>({name,amount:amount/100}))};
+  return {total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips]})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,group])=>({name,amount:group.amount/100,posts:[...group.posts].map(([name,amount])=>({name,amount:amount/100})).sort((a,b)=>b.amount-a.amount)}))};
 }
