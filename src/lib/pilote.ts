@@ -14,11 +14,37 @@ export function piloteReportingMonth(row: BankinPiloteRow): string {
   return date.getUTCDate() >= lastDay - 6 ? new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)).toISOString().slice(0, 7) : original;
 }
 
+/** Explicitly confirmed by the user: the cancelled Minorque hotel debit. */
+function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
+  return row.date === "2026-07-09" && row.parentCategory === "Voyage Minorque 26"
+    && row.subCategory === "Hôtel - 14j" && cents(row.amount) === -131520;
+}
+
+/** Upgrade the previously saved aggregate without requiring another import.
+ * New snapshots exclude the exact source row and carry version 2, so this
+ * adjustment is never applied to them a second time.
+ */
+export function piloteSnapshotMonths(snapshot: BankinPiloteSnapshot): PiloteMonth[] {
+  if (snapshot.version === 2) return snapshot.months;
+  return snapshot.months.map(month => {
+    if (month.month !== "2026-07") return month;
+    const parent = month.categories.find(group => group.name === "Voyage Minorque 26");
+    const child = parent?.children.find(group => group.name === "Hôtel - 14j");
+    if (!parent || !child || cents(child.expenses) < 131520) return month;
+    const categories = month.categories.map(group => group !== parent ? group : {
+      ...group, expenses: (cents(group.expenses) - 131520) / 100, count: Math.max(0, group.count - 1),
+      children: group.children.map(sub => sub !== child ? sub : {...sub, expenses: (cents(sub.expenses) - 131520) / 100, count: Math.max(0, sub.count - 1)}),
+    });
+    return {...month, categories, expenses: (cents(month.expenses) - 131520) / 100,
+      balance: (cents(month.balance) + 131520) / 100, count: Math.max(0, month.count - 1)};
+  });
+}
+
 /** No inferred labels, category mappings or app transactions. */
 export function buildPiloteMonths(transactions: BankinPiloteRow[]): PiloteMonth[] {
   const months = new Map<string, { rows: BankinPiloteRow[]; ids: Set<number> }>();
   for (const tx of transactions) {
-    if (bankinPiloteExclusion(tx) || !Number.isFinite(tx.amount) || !/^\d{4}-\d{2}-\d{2}$/.test(tx.date)) continue;
+    if (isConfirmedReimbursedExpense(tx) || bankinPiloteExclusion(tx) || !Number.isFinite(tx.amount) || !/^\d{4}-\d{2}-\d{2}$/.test(tx.date)) continue;
     const date = new Date(`${tx.date}T00:00:00Z`);
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== tx.date) continue;
     const month = piloteReportingMonth(tx);
@@ -58,9 +84,9 @@ export function bankinPiloteExclusion(row: BankinPiloteRow): "hidden" | "interna
   if (names.some(name => ["virement interne", "virements internes"].includes(name))) return "internal";
   return null;
 }
-export type BankinPiloteSnapshot = { version: 1; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string };
+export type BankinPiloteSnapshot = { version: 1 | 2; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string };
 export function buildBankinPiloteSnapshot(rows: BankinPiloteRow[], sourceFilename: string, fileHash: string): BankinPiloteSnapshot {
-  return { version: 1, months: buildPiloteMonths(rows), shiftedRentCount: rows.filter(row => !bankinPiloteExclusion(row) && piloteReportingMonth(row) !== row.date.slice(0, 7)).length, sourceFilename, fileHash, sourceRows: rows.length, excludedInternal: rows.filter(row => bankinPiloteExclusion(row) === "internal").length, excludedHidden: rows.filter(row => bankinPiloteExclusion(row) === "hidden").length, importedAt: new Date().toISOString() };
+  return { version: 2, months: buildPiloteMonths(rows), shiftedRentCount: rows.filter(row => !bankinPiloteExclusion(row) && piloteReportingMonth(row) !== row.date.slice(0, 7)).length, sourceFilename, fileHash, sourceRows: rows.length, excludedInternal: rows.filter(row => bankinPiloteExclusion(row) === "internal").length, excludedHidden: rows.filter(row => bankinPiloteExclusion(row) === "hidden").length, importedAt: new Date().toISOString() };
 }
 
 export type PiloteCompensationFamily = "rent" | "transport" | "ndf" | "food" | "other";

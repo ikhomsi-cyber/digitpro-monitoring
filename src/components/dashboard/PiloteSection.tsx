@@ -5,7 +5,7 @@ import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft } from "lu
 import { dashboardInsightCard, dashboardFlatSectionHeader, dashboardPanelTitle, dashboardPanelSub } from "@/lib/dashboard-surfaces";
 import { PiloteTravelMap } from "./PiloteTravelMap";
 import { toast } from "sonner";
-import { filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
+import { piloteSnapshotMonths, filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
 import { getGmailConnectionStatus, getGmailConnectUrl } from "@/app/dashboard/gmail-actions";
 import { importBankinPersonalXlsx } from "@/app/dashboard/actions";
 import { useDashboardSection } from "./DashboardSectionContext";
@@ -107,7 +107,7 @@ export function PiloteSection({ demoMode, onImported }: { demoMode: boolean; onI
     }
     return () => { alive = false; };
   }, [demoMode, loadSnapshot]);
-  const months = demoMode ? [] : (snapshot?.months ?? []).map(filterPiloteIncome);
+  const months = demoMode ? [] : (snapshot ? piloteSnapshotMonths(snapshot) : []).map(filterPiloteIncome);
   const [selected, setSelected] = useState("");
   const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const selectedMonth = months.find(m => m.month === selected) ?? months.at(-1);

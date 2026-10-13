@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, buildPiloteMonths, buildBankinPiloteSnapshot, bankinPiloteExclusion, type BankinPiloteRow } from "@/lib/pilote";
+import { piloteSnapshotMonths, type PiloteMonth, type BankinPiloteSnapshot, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, buildPiloteMonths, buildBankinPiloteSnapshot, bankinPiloteExclusion, type BankinPiloteRow } from "@/lib/pilote";
 const row = (sourceRow: number, amount: number, parentCategory = "Logement.", subCategory = "Loyer", date = "2026-10-01"): BankinPiloteRow => ({ sourceRow, amount, parentCategory, subCategory, date, hidden: false });
 describe("Pilote — exact Bankin source", () => {
   it("preserves category and subcategory verbatim without changing credit dates or classifying labels", () => {
@@ -155,4 +155,24 @@ it("combines multiple expense types once and supports an empty selection", async
   expect(filterPiloteExpenses(month,[])).toMatchObject({expenses:0,income:200,categories:[]});
   const annual = buildPiloteYear([month],"2026")!;
   expect(filterPiloteExpenses(annual,["essential","secondary"]).expenses).toBe(130);
+});
+
+
+describe("confirmed reimbursed travel expense", () => {
+  const debit: BankinPiloteRow = {sourceRow:1,date:"2026-07-09",amount:-1315.2,parentCategory:"Voyage Minorque 26",subCategory:"Hôtel - 14j",hidden:false};
+  const other: BankinPiloteRow = {...debit,sourceRow:2,date:"2026-07-10",amount:-500};
+  it("excludes only the confirmed debit during import", () => {
+    const snapshot=buildBankinPiloteSnapshot([debit,other,{...debit,sourceRow:3,date:"2026-07-11"}],"bankin.xls","hash");
+    expect(snapshot.version).toBe(2);
+    expect(snapshot.months[0].expenses).toBe(1815.2);
+    expect(piloteSnapshotMonths(snapshot)[0].expenses).toBe(1815.2);
+  });
+  it("adjusts an existing snapshot and all its totals without mutating it", () => {
+    const oldMonth: PiloteMonth={month:"2026-07",expenses:1815.2,income:100,balance:-1715.2,count:3,categories:[{name:debit.parentCategory,expenses:1815.2,income:0,count:2,children:[{name:debit.subCategory,expenses:1815.2,income:0,count:2,children:[]}]}],incomeCategories:[]};
+    const snapshot:BankinPiloteSnapshot={version:1,months:[oldMonth],sourceFilename:"bankin.xls",fileHash:"hash",sourceRows:3,excludedInternal:0,excludedHidden:0,importedAt:""};
+    const month=piloteSnapshotMonths(snapshot)[0];
+    expect(month.expenses).toBe(500);expect(month.balance).toBe(-400);expect(month.categories[0].children[0].expenses).toBe(500);
+    expect(month.count).toBe(2);expect(oldMonth.expenses).toBe(1815.2);
+    expect(piloteSnapshotMonths(snapshot)[0].expenses).toBe(500);
+  });
 });
