@@ -29,10 +29,11 @@ function travelViewBox(ids:string[],focus?:number[]) {
 }
 export function PiloteTravelMap({months,period}:{months:PiloteMonth[];period:string}) {
   const mapId=useId();
-  const fmt=useDashboardDisplayFormat();const [scope,setScope]=useState<"history"|"period"|"year">("history");const [selected,setSelected]=useState<string|null>(null);
-  const years=[...new Set(months.map(m=>m.month.slice(0,4)))].sort().reverse();
-  const [selectedYear,setSelectedYear]=useState("");
-  const year=years.includes(selectedYear)?selectedYear:years[0]??period.slice(0,4);
+  const fmt=useDashboardDisplayFormat();const [scope,setScope]=useState<"history"|"period"|"year">("year");const [selected,setSelected]=useState<string|null>(null);
+  const currentYear=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Europe/Paris"}).format(new Date());
+  const years=[...new Set([currentYear,...months.map(m=>m.month.slice(0,4))])].sort().reverse();
+  const [selectedYear,setSelectedYear]=useState(currentYear);
+  const year=years.includes(selectedYear)?selectedYear:currentYear;
   const data=buildPiloteTravel(scope==="history"?months:scope==="year"?months.filter(m=>m.month.startsWith(`${year}-`)):months.filter(m=>period.length===4?m.month.startsWith(`${period}-`):m.month===period));
   const visited=new Map(data.countries.map(c=>[c.id,c]));const active=data.countries.find(c=>c.id===selected);
   const activeEnvelope=data.envelopes.find(e=>e.id===selected);
