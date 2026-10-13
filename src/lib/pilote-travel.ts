@@ -33,9 +33,12 @@ function locate(label: string) {
     .map(d => ({id:d.id, name:d.name}));
   return [...cities, ...countryOnly];
 }
+// Land-border pairs among the destinations currently recognized by the app.
+const neighbors=new Set(["ES:FR","ES:MA","FR:CH","BE:FR","BE:NL","GR:TR"].map(pair=>pair.split(":").sort().join(":")));
 export function buildPiloteTravel(months: PiloteMonth[]) {
   type Place = {name:string;amount:number;estimated:number;posts:Map<string,{name:string;amount:number;estimated:number}>};
   const countries = new Map<string,{id:string;name:string;amount:number;trips:Set<string>;places:Map<string,Place>}>();
+  const envelopes=new Map<string,{id:string;name:string;countryIds:string[];amount:number;posts:Map<string,number>;allocations:Map<string,number>}>();
   const shared = new Map<string,{amount:number;posts:Map<string,number>}>(); let total=0;
   for(const month of months) for(const parent of month.categories) for(const sub of parent.children) {
     if(piloteExpenseView(parent.name,sub.name)!=="travel") continue;
@@ -44,10 +47,18 @@ export function buildPiloteTravel(months: PiloteMonth[]) {
     total+=amount;
     const subMatches=locate(sub.name);
     const matches=subMatches.length?subMatches:locate(parent.name);
+    const parentIds=[...new Set(locate(parent.name).map(m=>m.id))].sort();
+    const ids=parentIds.length===2 && neighbors.has(parentIds.join(":"))?parentIds:[...new Set(matches.map(m=>m.id))].sort();
+    const joint=ids.length===2 && neighbors.has(ids.join(":"));
+    const envelopeId=JSON.stringify([parent.name,ids]);
+    const envelope=joint?(envelopes.get(envelopeId)??{id:envelopeId,name:parent.name,countryIds:ids,amount:0,posts:new Map<string,number>(),allocations:new Map<string,number>()}):null;
+    if(envelope)for(const id of ids)if(!countries.has(id))countries.set(id,{id,name:destinations.find(d=>d.id===id)!.name,amount:0,trips:new Set([parent.name]),places:new Map()});
+    if(envelope){envelope.amount+=amount;envelope.posts.set(sub.name,(envelope.posts.get(sub.name)??0)+amount);envelopes.set(envelopeId,envelope);}
     // Integer cents preserve the total, including amounts not divisible by the
     // destination count. The first destinations receive the remaining cents.
     matches.forEach((destination,index)=>{
       const share=Math.floor(amount/matches.length)+(index<amount%matches.length?1:0);
+      if(envelope)envelope.allocations.set(destination.id,(envelope.allocations.get(destination.id)??0)+share);
       const c=countries.get(destination.id)??{id:destination.id,name:destinations.find(d=>d.id===destination.id)!.name,amount:0,trips:new Set<string>(),places:new Map<string,Place>()};
       c.trips.add(parent.name);c.amount+=share;
       const place=c.places.get(destination.name)??{name:destination.name,amount:0,estimated:0,posts:new Map()};
@@ -61,5 +72,5 @@ export function buildPiloteTravel(months: PiloteMonth[]) {
       group.amount+=amount;group.posts.set(sub.name,(group.posts.get(sub.name)??0)+amount);shared.set(parent.name,group);
     }
   }
-  return {total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips],places:[...c.places.values()].map(p=>({...p,amount:p.amount/100,estimated:p.estimated/100,posts:[...p.posts.values()].map(post=>({...post,amount:post.amount/100,estimated:post.estimated/100})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,group])=>({name,amount:group.amount/100,posts:[...group.posts].map(([name,amount])=>({name,amount:amount/100})).sort((a,b)=>b.amount-a.amount)}))};
+  return {envelopes:[...envelopes.values()].map(e=>({...e,amount:e.amount/100,posts:[...e.posts].map(([name,amount])=>({name,amount:amount/100})),allocations:[...e.allocations].map(([id,amount])=>({id,amount:amount/100}))})),total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips],places:[...c.places.values()].map(p=>({...p,amount:p.amount/100,estimated:p.estimated/100,posts:[...p.posts.values()].map(post=>({...post,amount:post.amount/100,estimated:post.estimated/100})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,group])=>({name,amount:group.amount/100,posts:[...group.posts].map(([name,amount])=>({name,amount:amount/100})).sort((a,b)=>b.amount-a.amount)}))};
 }

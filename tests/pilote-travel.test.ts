@@ -7,7 +7,7 @@ it("allocates known destinations and splits shared destination costs without dou
  expect(data.total).toBe(620);expect(data.countries.find(c=>c.id==='ES')?.amount).toBe(100);expect(data.countries.find(c=>c.id==='MA')?.amount).toBe(200);expect(data.countries.find(c=>c.id==='TR')?.amount).toBe(150);expect(data.countries.find(c=>c.id==='GR')?.amount).toBe(150);
  expect(data.countries.reduce((s,c)=>s+c.amount,0)+data.shared.reduce((s,c)=>s+c.amount,0)).toBe(data.total);
 });
-it("handles empty history",()=>expect(buildPiloteTravel([])).toEqual({total:0,countries:[],shared:[]}));
+it("handles empty history",()=>expect(buildPiloteTravel([])).toEqual({total:0,countries:[],shared:[],envelopes:[]}));
 
 it("breaks grouped destinations down by original expense names and merges repeated posts",()=>{
  const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-30),row(2,"Voyage Bodrum Kos 26","Hôtel Bodrum Kos",-100),row(3,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-20)]));
@@ -33,4 +33,18 @@ it("exposes the allocated subcategories for each city",()=>{
  const kos=data.countries.find(c=>c.id==='GR')!.places[0];
  expect(kos.posts).toEqual([{name:'Hôtel',amount:60,estimated:60},{name:'Transport',amount:15,estimated:15}]);
  expect(kos.posts.reduce((sum,post)=>sum+post.amount,0)).toBe(kos.amount);
+});
+
+it("groups only neighboring countries within the same source envelope",()=>{
+ const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos 26","Hôtel",-100),row(2,"Voyage Bodrum Kos 26","Transport",-30),row(3,"Voyage Bodrum Kos 25","Hôtel",-50),row(4,"Voyage Bodrum","Hôtel",-60),row(5,"Voyage Bali Kos","Hôtel",-80)]));
+ expect(data.envelopes.map(e=>[e.name,e.amount])).toEqual([["Voyage Bodrum Kos 26",130],["Voyage Bodrum Kos 25",50]]);
+ expect(data.envelopes[0].posts).toEqual([{name:'Hôtel',amount:100},{name:'Transport',amount:30}]);
+ for(const envelope of data.envelopes) expect(envelope.allocations.reduce((s,a)=>s+a.amount,0)).toBe(envelope.amount);
+});
+
+it("includes city-specific subcategories in the shared parent envelope",()=>{
+ const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos","Hôtel Bodrum",-100),row(2,"Voyage Bodrum Kos","Restaurant Kos",-30)]));
+ expect(data.envelopes).toHaveLength(1);
+ expect(data.envelopes[0].amount).toBe(130);
+ expect(data.envelopes[0].countryIds).toEqual(['GR','TR']);
 });
