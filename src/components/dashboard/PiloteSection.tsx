@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft, House, CarFront, ReceiptText, ShoppingBasket, Layers } from "lucide-react";
+import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft } from "lucide-react";
 import { dashboardInsightCard, dashboardFlatSectionHeader, dashboardPanelTitle, dashboardPanelSub } from "@/lib/dashboard-surfaces";
 import { toast } from "sonner";
 import { filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
@@ -11,7 +11,7 @@ import { useDashboardSection } from "./DashboardSectionContext";
 import { useDashboardDisplayFormat } from "./DashboardDisplayFormatContext";
 
 const monthName = (month: string, short = false) => new Intl.DateTimeFormat("fr-FR", { month: short ? "short" : "long", ...(short ? {} : { year: "numeric" }), timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`));
-const FAMILY_ICONS = { rent: House, transport: CarFront, ndf: ReceiptText, food: ShoppingBasket, other: Layers };
+const FAMILY_PICTOS = { rent: "🏠", transport: "🚗", ndf: "🧾", food: "🍽️", other: "💳" };
 const COLORS = ["#34d399", "#22d3ee", "#a78bfa", "#fbbf24", "#fb7185", "#60a5fa"];
 
 function PiloteFamilyBars({ families, direction }: { families: PiloteCompensation[]; direction: "income" | "expenses" }) {
@@ -19,7 +19,6 @@ function PiloteFamilyBars({ families, direction }: { families: PiloteCompensatio
   const max = Math.max(1, ...families.map(family => family[direction]));
   return <div className="mt-4 flex gap-2" role="list" aria-label={direction === "income" ? "Rentrées par famille" : "Sorties par famille"}>
     {families.map((family, index) => {
-      const Icon = FAMILY_ICONS[family.id];
       const amount = family[direction];
       const height = fmt.dummy ? 45 + index * 10 : amount / max * 110;
       const label = direction === "income" ? family.source : family.name;
@@ -28,7 +27,7 @@ function PiloteFamilyBars({ families, direction }: { families: PiloteCompensatio
           <span className="whitespace-nowrap text-[10px] font-semibold tabular-nums text-ink-600 dark:text-white/70">{fmt.euro(amount)}</span>
           <span className="w-full max-w-10 rounded-t-full bg-gradient-to-t from-emerald-500/35 to-emerald-300/80 shadow-[inset_1px_0_0_rgba(255,255,255,0.15)] transition-[height] duration-300" style={{ height: `${height}px`, minHeight: fmt.dummy || amount ? 3 : 0, backgroundImage: `linear-gradient(to top, ${COLORS[index]}35, ${COLORS[index]}cc)` }} />
         </div>
-        <span className="mx-auto mt-2 flex h-8 w-8 items-center justify-center rounded-full border border-ink-200/60 bg-ink-50 shadow-sm dark:border-white/10 dark:bg-white/5" style={{color: COLORS[index]}}><Icon size={16} strokeWidth={1.7} aria-hidden="true" /></span>
+        <span aria-hidden="true" className="mx-auto mt-2 grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink-200/45 bg-ink-50/80 text-lg dark:border-white/[0.1] dark:bg-white/[0.06]">{FAMILY_PICTOS[family.id]}</span>
         <span className="mt-1.5 block text-[10px] leading-tight text-ink-500 dark:text-white/55">{label}</span>
       </div>;
     })}
