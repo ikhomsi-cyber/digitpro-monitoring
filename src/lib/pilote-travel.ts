@@ -34,7 +34,7 @@ function locate(label: string) {
   return [...cities, ...countryOnly];
 }
 export function buildPiloteTravel(months: PiloteMonth[]) {
-  type Place = {name:string;amount:number;estimated:number};
+  type Place = {name:string;amount:number;estimated:number;posts:Map<string,{name:string;amount:number;estimated:number}>};
   const countries = new Map<string,{id:string;name:string;amount:number;trips:Set<string>;places:Map<string,Place>}>();
   const shared = new Map<string,{amount:number;posts:Map<string,number>}>(); let total=0;
   for(const month of months) for(const parent of month.categories) for(const sub of parent.children) {
@@ -50,8 +50,10 @@ export function buildPiloteTravel(months: PiloteMonth[]) {
       const share=Math.floor(amount/matches.length)+(index<amount%matches.length?1:0);
       const c=countries.get(destination.id)??{id:destination.id,name:destinations.find(d=>d.id===destination.id)!.name,amount:0,trips:new Set<string>(),places:new Map<string,Place>()};
       c.trips.add(parent.name);c.amount+=share;
-      const place=c.places.get(destination.name)??{name:destination.name,amount:0,estimated:0};
+      const place=c.places.get(destination.name)??{name:destination.name,amount:0,estimated:0,posts:new Map()};
       place.amount+=share;if(matches.length>1)place.estimated+=share;
+      const post=place.posts.get(sub.name)??{name:sub.name,amount:0,estimated:0};
+      post.amount+=share;if(matches.length>1)post.estimated+=share;place.posts.set(sub.name,post);
       c.places.set(place.name,place);countries.set(c.id,c);
     });
     if(!matches.length){
@@ -59,5 +61,5 @@ export function buildPiloteTravel(months: PiloteMonth[]) {
       group.amount+=amount;group.posts.set(sub.name,(group.posts.get(sub.name)??0)+amount);shared.set(parent.name,group);
     }
   }
-  return {total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips],places:[...c.places.values()].map(p=>({...p,amount:p.amount/100,estimated:p.estimated/100})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,group])=>({name,amount:group.amount/100,posts:[...group.posts].map(([name,amount])=>({name,amount:amount/100})).sort((a,b)=>b.amount-a.amount)}))};
+  return {total:total/100,countries:[...countries.values()].map(c=>({...c,amount:c.amount/100,trips:[...c.trips],places:[...c.places.values()].map(p=>({...p,amount:p.amount/100,estimated:p.estimated/100,posts:[...p.posts.values()].map(post=>({...post,amount:post.amount/100,estimated:post.estimated/100})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount)})).sort((a,b)=>b.amount-a.amount),shared:[...shared].map(([name,group])=>({name,amount:group.amount/100,posts:[...group.posts].map(([name,amount])=>({name,amount:amount/100})).sort((a,b)=>b.amount-a.amount)}))};
 }

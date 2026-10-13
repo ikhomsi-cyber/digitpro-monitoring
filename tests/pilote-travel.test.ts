@@ -12,18 +12,25 @@ it("handles empty history",()=>expect(buildPiloteTravel([])).toEqual({total:0,co
 it("breaks grouped destinations down by original expense names and merges repeated posts",()=>{
  const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-30),row(2,"Voyage Bodrum Kos 26","Hôtel Bodrum Kos",-100),row(3,"Voyage Bodrum Kos 26","Transport Bodrum Kos",-20)]));
  expect(data.shared).toEqual([]);
- expect(data.countries.find(c=>c.id==='GR')?.places).toEqual([{name:'Kos',amount:75,estimated:75}]);
+ expect(data.countries.find(c=>c.id==='GR')?.places.map(({posts,...place})=>place)).toEqual([{name:'Kos',amount:75,estimated:75}]);
  expect(data.countries.reduce((s,c)=>s+c.amount,0)+data.shared.reduce((s,c)=>s+c.amount,0)).toBe(150);
 });
 
 it("splits multiple cities in one country and preserves odd cents",()=>{
  const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Antalya Kos","Hôtel",-100)]));
- expect(data.countries.find(c=>c.id==='TR')?.places).toEqual([{name:'Bodrum',amount:33.34,estimated:33.34},{name:'Antalya',amount:33.33,estimated:33.33}]);
+ expect(data.countries.find(c=>c.id==='TR')?.places.map(({posts,...place})=>place)).toEqual([{name:'Bodrum',amount:33.34,estimated:33.34},{name:'Antalya',amount:33.33,estimated:33.33}]);
  expect(data.countries.find(c=>c.id==='GR')?.amount).toBe(33.33);
  expect(Math.round(data.countries.reduce((s,c)=>s+c.amount,0)*100)).toBe(10000);
 });
 it("prioritizes a named city over the multi-country trip and deduplicates aliases",()=>{
  const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Maroc Espagne","Hôtel Benalmadena Espagne",-100),row(2,"Voyage Londres London","Hôtel",-50)]));
- expect(data.countries.find(c=>c.id==='ES')?.places).toEqual([{name:'Benalmádena',amount:100,estimated:0}]);
- expect(data.countries.find(c=>c.id==='GB')?.places).toEqual([{name:'Londres',amount:50,estimated:0}]);
+ expect(data.countries.find(c=>c.id==='ES')?.places.map(({posts,...place})=>place)).toEqual([{name:'Benalmádena',amount:100,estimated:0}]);
+ expect(data.countries.find(c=>c.id==='GB')?.places.map(({posts,...place})=>place)).toEqual([{name:'Londres',amount:50,estimated:0}]);
+});
+
+it("exposes the allocated subcategories for each city",()=>{
+ const data=buildPiloteTravel(buildPiloteMonths([row(1,"Voyage Bodrum Kos","Hôtel",-100),row(2,"Voyage Bodrum Kos","Transport",-30),row(3,"Voyage Bodrum Kos","Hôtel",-20)]));
+ const kos=data.countries.find(c=>c.id==='GR')!.places[0];
+ expect(kos.posts).toEqual([{name:'Hôtel',amount:60,estimated:60},{name:'Transport',amount:15,estimated:15}]);
+ expect(kos.posts.reduce((sum,post)=>sum+post.amount,0)).toBe(kos.amount);
 });
