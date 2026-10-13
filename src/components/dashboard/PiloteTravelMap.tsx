@@ -17,12 +17,13 @@ const countryBounds = new Map(shapes.map(shape => {
   return [shape.id,[Math.min(...nearby.map(p=>p[0])),Math.min(...nearby.map(p=>p[1])),Math.max(...nearby.map(p=>p[2])),Math.max(...nearby.map(p=>p[3]))]] as const;
 }));
 countryBounds.set("MV",[503,169,509,175]);
-function travelViewBox(ids:string[]) {
-  const bounds=ids.flatMap(id=>{const b=countryBounds.get(id);return b?[b]:[];});
+const islandBounds:Record<string,number[]>={Minorque:[367.606304,99.841174,368.674174,100.367052],Tenerife:[326.167884,122.833118,327.764506,124.005808]};
+function travelViewBox(ids:string[],focus?:number[]) {
+  const bounds=focus?[focus]:ids.flatMap(id=>{const b=countryBounds.get(id);return b?[b]:[];});
   if(!bounds.length)return "330 55 130 75";
   const left=Math.min(...bounds.map(b=>b[0])),top=Math.min(...bounds.map(b=>b[1]));
   const right=Math.max(...bounds.map(b=>b[2])),bottom=Math.max(...bounds.map(b=>b[3]));
-  const height=Math.max(24,(bottom-top)*1.25,(right-left)*1.25/2);
+  const height=Math.max(focus?1.5:24,(bottom-top)*1.25,(right-left)*1.25/2);
   const width=height*2;
   return `${(left+right-width)/2} ${(top+bottom-height)/2} ${width} ${height}`;
 }
@@ -36,13 +37,15 @@ export function PiloteTravelMap({months,period}:{months:PiloteMonth[];period:str
   const activeEnvelope=data.envelopes.find(e=>e.id===selected);
   const mapEntries=[...data.envelopes.map(e=>({id:e.id,name:e.countryIds.map(id=>visited.get(id)?.name).join(" + "),amount:e.amount,countryIds:e.countryIds,subtitle:e.name})),...data.countries.map(c=>({...c,amount:Math.round((c.amount-data.envelopes.reduce((sum,e)=>sum+(e.allocations.find(a=>a.id===c.id)?.amount??0),0))*100)/100,countryIds:[c.id],subtitle:c.places.map(p=>p.name).join(" · ")})).filter(c=>c.amount>0)];
   const selectCountry=(id:string)=>setSelected(mapEntries.find(e=>e.id===id)?.id??mapEntries.find(e=>e.countryIds.includes(id))?.id??id);
-  const viewBox=travelViewBox(activeEnvelope?activeEnvelope.countryIds:active?[active.id]:data.countries.map(c=>c.id));
+  const placeBounds=(id:string)=>{const country=visited.get(id);return country?.places.length===1?islandBounds[country.places[0].name]:undefined;};
+  const focus=active?placeBounds(active.id):undefined;
+  const viewBox=travelViewBox(activeEnvelope?activeEnvelope.countryIds:active?[active.id]:data.countries.map(c=>c.id),focus);
   const mapWidth=Number(viewBox.split(" ")[2]);
   const amountLabel=(amount:number)=>amount>0?fmt.euro(amount):"Par destination";
   const labels: {id:string;name:string;x:number;y:number;anchorY:number;width:number;label:string}[]=[];
   const labelFontSize=mapWidth/48;
   for(const country of mapEntries.filter(country=>!selected||country.id===selected)){
-    const bounds=country.countryIds.flatMap(id=>{const b=countryBounds.get(id);return b?[b]:[];});if(!bounds.length)continue;
+    const bounds=country.countryIds.flatMap(id=>{const b=placeBounds(id)??countryBounds.get(id);return b?[b]:[];});if(!bounds.length)continue;
     const x=bounds.reduce((sum,b)=>sum+(b[0]+b[2])/2,0)/bounds.length,anchorY=bounds.reduce((sum,b)=>sum+(b[1]+b[3])/2,0)/bounds.length;
     const label=fmt.euro(country.amount),width=Math.max(5,label.length)*labelFontSize*0.66+labelFontSize;
     let y=anchorY;
