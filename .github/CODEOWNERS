@@ -1,0 +1,19 @@
+# Human security owner. Enforce through a branch ruleset with no agent bypass.
+# An agent authenticated as this same account is NOT an independent reviewer.
+/AGENTS.md @ikhomsi-cyber
+/.github/ @ikhomsi-cyber
+/supabase/ @ikhomsi-cyber
+/src/lib/security/ @ikhomsi-cyber
+/src/lib/supabase/ @ikhomsi-cyber
+/src/lib/agents/ @ikhomsi-cyber
+/src/app/api/agents/ @ikhomsi-cyber
+/src/middleware.ts @ikhomsi-cyber
+/src/lib/gmail/tokens.ts @ikhomsi-cyber
+/src/lib/gmail/oauth.ts @ikhomsi-cyber
+/scripts/ @ikhomsi-cyber
+/vercel.json @ikhomsi-cyber
+/next.config.* @ikhomsi-cyber
+/package.json @ikhomsi-cyber
+/package-lock.json @ikhomsi-cyber
+/docs/activation-securite-agents.md @ikhomsi-cyber
+/docs/independent-security-controls.md @ikhomsi-cyber
