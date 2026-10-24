@@ -6,3 +6,11 @@ tmp/
 .env*
 
 .security-backups/
+
+# Local build outputs and agent credentials must never be uploaded.
+.next/
+.next-*/
+node_modules/
+.agent-credentials/
+supabase/.temp/
+*.tsbuildinfo

@@ -18,7 +18,8 @@ export type DashboardSection =
   | "sasu"
   | "private"
   | "impots"
-  | "pilote";
+  | "pilote"
+  | "courses";
 
 export function parseDashboardSection(search: string): DashboardSection {
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -28,6 +29,7 @@ export function parseDashboardSection(search: string): DashboardSection {
   if (s === "sasu") return "sasu";
   if (s === "private") return "private";
   if (s === "categorisation") return "activite";
+  if (s === "courses" || s === "cours") return "courses";
   if (s === "pilote") return "pilote";
   if (s === "impots") return "impots";
   return "full";

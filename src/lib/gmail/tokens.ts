@@ -1,3 +1,4 @@
+import { gmailAccount, type GmailAccount } from "./accounts";
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -18,9 +19,9 @@ export type GmailTokenRow = {
 
 export async function loadGmailTokenRow(
   supabase: SupabaseDb,
-  userId: string
+  userId: string, account: GmailAccount = "primary"
 ): Promise<GmailTokenRow | null> {
-  return await readIntegrationSecret(supabase, userId, "gmail") as GmailTokenRow | null;
+  return await readIntegrationSecret(supabase, userId, gmailAccount(account) === "primary" ? "gmail" : "gmail-secondary") as GmailTokenRow | null;
 }
 
 export async function saveGmailToken(
@@ -32,9 +33,9 @@ export async function saveGmailToken(
     accessToken?: string | null;
     expiryDate?: number | null;
     scope?: string | null;
-  }
+  }, account: GmailAccount = "primary"
 ): Promise<void> {
-  await writeIntegrationSecret(supabase, userId, "gmail", {
+  await writeIntegrationSecret(supabase, userId, gmailAccount(account) === "primary" ? "gmail" : "gmail-secondary", {
     email: values.email ?? null,
     refresh_token: values.refreshToken,
     access_token: values.accessToken ?? null,
@@ -43,18 +44,18 @@ export async function saveGmailToken(
   });
 }
 
-export async function deleteGmailToken(supabase: SupabaseDb, userId: string): Promise<void> {
-  await deleteIntegrationSecret(supabase, userId, "gmail");
+export async function deleteGmailToken(supabase: SupabaseDb, userId: string, account: GmailAccount = "primary"): Promise<void> {
+  await deleteIntegrationSecret(supabase, userId, gmailAccount(account) === "primary" ? "gmail" : "gmail-secondary");
 }
 
 /** Supprime le jeton stocké si Google renvoie invalid_grant. */
 export async function clearGmailTokenIfInvalidGrant(
   supabase: SupabaseDb,
   userId: string,
-  error: unknown
+  error: unknown, account: GmailAccount = "primary"
 ): Promise<boolean> {
   if (!isInvalidGrantError(error)) return false;
-  await deleteGmailToken(supabase, userId);
+  await deleteGmailToken(supabase, userId, account);
   return true;
 }
 
@@ -65,9 +66,9 @@ export async function clearGmailTokenIfInvalidGrant(
  */
 export async function getAuthorizedGmailClient(
   supabase: SupabaseDb,
-  userId: string
+  userId: string, account: GmailAccount = "primary"
 ): Promise<Auth.OAuth2Client | null> {
-  const row = await loadGmailTokenRow(supabase, userId);
+  const row = await loadGmailTokenRow(supabase, userId, account);
   if (!row?.refresh_token) return null;
 
   const client = createGmailOAuthClient();
@@ -84,7 +85,7 @@ export async function getAuthorizedGmailClient(
       accessToken: tokens.access_token ?? row.access_token,
       expiryDate: tokens.expiry_date ?? null,
       scope: tokens.scope ?? row.scope
-    }).catch(() => {
+    }, account).catch(() => {
       // Persistance best-effort : un échec ne doit pas interrompre la récupération.
     });
   });
@@ -93,7 +94,7 @@ export async function getAuthorizedGmailClient(
     await client.getAccessToken();
   } catch (error) {
     if (isInvalidGrantError(error)) {
-      await deleteGmailToken(supabase, userId);
+      await deleteGmailToken(supabase, userId, account);
       return null;
     }
     throw error;
@@ -108,14 +109,14 @@ export async function getAuthorizedGmailClient(
 export async function withAuthorizedGmailClient<T>(
   supabase: SupabaseDb,
   userId: string,
-  fn: (client: Auth.OAuth2Client) => Promise<T>
+  fn: (client: Auth.OAuth2Client) => Promise<T>, account: GmailAccount = "primary"
 ): Promise<T | null> {
-  const client = await getAuthorizedGmailClient(supabase, userId);
+  const client = await getAuthorizedGmailClient(supabase, userId, account);
   if (!client) return null;
   try {
     return await fn(client);
   } catch (error) {
-    if (await clearGmailTokenIfInvalidGrant(supabase, userId, error)) return null;
+    if (await clearGmailTokenIfInvalidGrant(supabase, userId, error, account)) return null;
     throw error;
   }
 }

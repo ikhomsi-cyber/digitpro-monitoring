@@ -1,3 +1,4 @@
+import type { GmailAccount } from "./accounts";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -9,8 +10,8 @@ import { upsertHiwayInvoices } from "@/lib/gmail/hiway-invoice-store";
 import { loadBillableActivitySettings } from "@/lib/supabase/dashboard-loaders";
 import { BILLABLE_CLIENT_TJM_HT } from "@/lib/billable-client-days";
 
-export async function syncHiwayInvoices(supabase: SupabaseClient<Database>, userId: string) {
-  const client = await getAuthorizedGmailClient(supabase, userId);
+export async function syncHiwayInvoices(supabase: SupabaseClient<Database>, userId: string, account: GmailAccount = "primary") {
+  const client = await getAuthorizedGmailClient(supabase, userId, account);
   if (!client) {
     throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
   }
@@ -25,7 +26,7 @@ export async function syncHiwayInvoices(supabase: SupabaseClient<Database>, user
   try {
     fetched = await fetchHiwayInvoicesFromGmail(client);
   } catch (error) {
-    if (await clearGmailTokenIfInvalidGrant(supabase, userId, error)) {
+    if (await clearGmailTokenIfInvalidGrant(supabase, userId, error, account)) {
       throw new Error(GMAIL_RECONNECT_REQUIRED_MESSAGE);
     }
     throw error;

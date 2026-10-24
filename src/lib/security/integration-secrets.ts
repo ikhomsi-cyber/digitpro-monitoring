@@ -4,7 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/types";
 
-type Integration = "gmail" | "powens";
+type Integration = "gmail" | "gmail-secondary" | "powens";
 const PREFIX = "enc:v1:";
 
 function encryptionKey(): Buffer {
@@ -42,7 +42,7 @@ async function verifiedStore(client: SupabaseClient<Database>, userId: string) {
 
 function transformTokens(row: Record<string, Json>, integration: Integration, userId: string, encrypt: boolean) {
   const result = { ...row };
-  const fields = integration === "gmail" ? ["refresh_token", "access_token"] : ["auth_token"];
+  const fields = integration !== "powens" ? ["refresh_token", "access_token"] : ["auth_token"];
   for (const field of fields) {
     const token = result[field];
     if (typeof token === "string" && token) {

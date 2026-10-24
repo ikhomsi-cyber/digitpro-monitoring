@@ -20,3 +20,16 @@ it("never falls back to the public token tables when the private store is unavai
   await expect(readIntegrationSecret(client, "owner", "gmail")).rejects.toThrow("migration");
   expect(mocks.rpc).toHaveBeenCalledWith("integration_secret_read", { p_user_id: "owner", p_integration: "gmail" });
 });
+
+it("binds secondary Gmail ciphertext to its own account slot", async () => {
+  vi.stubEnv("INTEGRATION_TOKEN_ENCRYPTION_KEY", "a".repeat(64));
+  try {
+    await writeIntegrationSecret(client, "owner", "gmail-secondary", { refresh_token: "synthetic-refresh", access_token: "synthetic-access" });
+    const args = mocks.rpc.mock.calls[0][1];
+    expect(args.p_integration).toBe("gmail-secondary");
+    expect(args.p_values.refresh_token).toMatch(/^enc:v1:/);
+    mocks.rpc.mockResolvedValue({ data: args.p_values, error: null });
+    expect(await readIntegrationSecret(client, "owner", "gmail-secondary")).toMatchObject({refresh_token:"synthetic-refresh"});
+    await expect(readIntegrationSecret(client, "owner", "gmail")).rejects.toThrow();
+  } finally { vi.unstubAllEnvs(); }
+});

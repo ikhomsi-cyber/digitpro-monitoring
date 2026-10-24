@@ -135,6 +135,7 @@ type LazyDashboardSectionKey =
   | "valeur"
   | "impots"
   | "pilote"
+  | "courses"
   | "sasu-panel";
 
 function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey {
@@ -148,6 +149,7 @@ const BillableDaysCalendarBlock = dynamic(
   { loading: () => <div className="min-h-64 animate-pulse rounded-2xl bg-ink-900/5 dark:bg-white/5" role="status" aria-label="Chargement du calendrier" /> }
 );
 
+const GroceriesSection = dynamic(() => import("@/components/dashboard/GroceriesSection").then(mod => mod.GroceriesSection), { loading: () => <div role="status" className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des courses…</div> });
 const PiloteSection = dynamic(() => import("@/components/dashboard/PiloteSection").then(mod => mod.PiloteSection), { loading: () => <div className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5" role="status" aria-label="Chargement de Pilote" /> });
 
 const ValeurReelleClient = dynamic(
@@ -1162,6 +1164,7 @@ export function DashboardClient({
         />
       </div>
       ) : null}
+      {mountedSections.has("courses") ? <div className={clsx(dashboardSection !== "courses" && "hidden")} aria-hidden={dashboardSection !== "courses"}><GroceriesSection demoMode={demoMode} /></div> : null}
       {mountedSections.has("pilote") ? <div className={clsx(dashboardSection !== "pilote" && "hidden")} aria-hidden={dashboardSection !== "pilote"}><PiloteSection demoMode={demoMode} onImported={refreshDashboardTransactions} /></div> : null}
       {mountedSections.has("impots") ? (
       <div

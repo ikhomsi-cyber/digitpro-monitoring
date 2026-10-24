@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { GmailAccountPicker } from "./GmailAccountPicker";
+import type { GmailAccount } from "@/lib/gmail/accounts";
 import { ChevronDown, FileText, Mail, Plug, RefreshCw, Unplug } from "lucide-react";
 import { clsx } from "clsx";
 import { toast } from "sonner";
@@ -30,6 +32,9 @@ export function HiwayInvoicesBlock() {
   const fmt = useDashboardDisplayFormat();
   const { invoices, setInvoices } = useHiwayInvoices();
   const [status, setStatus] = useState<GmailConnectionStatus | null>(null);
+  const [account, setAccount] = useState<GmailAccount>("primary");
+  const connected = status?.accounts?.find(value => value.id === account)?.connected ?? (account === "primary" && Boolean(status?.connected));
+  const email = status?.accounts?.find(value => value.id === account)?.email ?? (account === "primary" ? status?.email : null);
   const [invoicesExpanded, setInvoicesExpanded] = useState(false);
   const [reconnectSuggested, setReconnectSuggested] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -53,6 +58,7 @@ export function HiwayInvoicesBlock() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const result = params.get("gmail_connect");
+    if (params.get("gmail_account") === "secondary") setAccount("secondary");
     if (!result) return;
     if (result === "ok") {
       toast.success("Gmail connecté", { description: "Vous pouvez récupérer vos factures Hiway." });
@@ -68,10 +74,10 @@ export function HiwayInvoicesBlock() {
     window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
   }, []);
 
-  function onConnect() {
+  function connectAccount(selected: GmailAccount) {
     startTransition(async () => {
       try {
-        const { url } = await getGmailConnectUrl();
+        const { url } = await getGmailConnectUrl(undefined, selected);
         window.location.assign(url);
       } catch (e) {
         toast.error("Connexion Gmail impossible", {
@@ -81,11 +87,13 @@ export function HiwayInvoicesBlock() {
     });
   }
 
+  function onConnect() { connectAccount(account); }
+
   function onFetch() {
     startTransition(async () => {
       const toastId = toast.loading("Récupération des factures Hiway…");
       try {
-        const { invoices: rows } = await fetchHiwayInvoices();
+        const { invoices: rows } = await fetchHiwayInvoices(account);
         setInvoices(rows);
         setInvoicesExpanded(false);
         toast.success(`${rows.length} facture${rows.length > 1 ? "s" : ""} trouvée${rows.length > 1 ? "s" : ""}`, {
@@ -111,8 +119,8 @@ export function HiwayInvoicesBlock() {
   function onDisconnect() {
     startTransition(async () => {
       try {
-        await disconnectGmail();
-        setInvoices(null);
+        await disconnectGmail(account);
+        refreshStatus();
         setReconnectSuggested(false);
         setStatus((prev) => (prev ? { ...prev, connected: false, email: null } : prev));
         toast.success("Gmail déconnecté");
@@ -130,7 +138,7 @@ export function HiwayInvoicesBlock() {
         <Mail className="h-3.5 w-3.5" strokeWidth={2.2} aria-hidden />
         Factures émises (Hiway)
       </span>
-      {status?.connected ? (
+      {connected ? (
         <button
           type="button"
           onClick={onDisconnect}
@@ -156,7 +164,7 @@ export function HiwayInvoicesBlock() {
         <code className="font-mono">https://VOTRE-DOMAINE/api/gmail/callback</code> dans la console Google.
       </p>
     );
-  } else if (status && !status.connected) {
+  } else if (status && !connected) {
     content = (
       <div className="space-y-3 text-center">
         <p className="text-[11px] font-medium text-ink-600 dark:text-cyan-50/70">
@@ -181,12 +189,12 @@ export function HiwayInvoicesBlock() {
         </button>
       </div>
     );
-  } else if (status?.connected) {
+  } else if (connected) {
     content = (
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <span className="truncate text-[10px] font-medium text-ink-500 dark:text-cyan-50/55">
-            {status.email ? `Connecté : ${status.email}` : "Compte Gmail connecté"}
+            {email ? `Connecté : ${email}` : "Compte Gmail connecté"}
           </span>
           <button
             type="button"
@@ -286,6 +294,7 @@ export function HiwayInvoicesBlock() {
   return (
     <div className="mt-8 space-y-3">
       {eyebrow}
+      <GmailAccountPicker status={status} value={account} onChange={setAccount} onConnect={connectAccount} disabled={isPending} />
       {content}
     </div>
   );

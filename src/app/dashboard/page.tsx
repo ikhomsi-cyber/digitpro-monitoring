@@ -21,6 +21,7 @@ import nextDynamic from "next/dynamic";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
+import { CoursesEntry } from "@/components/dashboard/CoursesEntry";
 
 const LMNPClient = nextDynamic(
   () => import("@/app/lmnp/LMNPClient").then((mod) => ({ default: mod.LMNPClient })),
@@ -85,6 +86,8 @@ export default async function DashboardPage({
   const initialDashboardScope = parseDashboardScopeParam(sp);
   const initialDashboardPanel = parseDashboardPanelParam(sp);
   const showLmnpPanel = initialDashboardPanel === "lmnp";
+  const section = Array.isArray(sp.section) ? sp.section[0] : sp.section;
+  const coursesOnly = !showLmnpPanel && (section === "courses" || section === "cours") && sp.panel !== "valeur-reelle";
   reportSupabaseEnvDiagnostics("app/dashboard/page");
 
   const envMode = getSupabaseRuntimeMode();
@@ -148,7 +151,7 @@ export default async function DashboardPage({
   let syncFullHistoryOnMount = false;
   let initialHiwayInvoices: HiwayInvoice[] | undefined;
 
-  if (envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
+  if (!coursesOnly && envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
     const transactionsPromise = (async () => {
       console.time("dashboard:transactions");
       try {
@@ -227,6 +230,7 @@ export default async function DashboardPage({
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
     <BillableActivityProvider
+      key={coursesOnly ? "courses" : "dashboard"}
       tjmHt={billableTjmHt}
       billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
@@ -259,6 +263,8 @@ export default async function DashboardPage({
           demoMode={demoMode}
           loadError={transactionsLoadError}
         />
+      ) : coursesOnly ? (
+        <CoursesEntry demoMode={demoMode} />
       ) : (
             <DashboardClient
               syncKey={syncKey}

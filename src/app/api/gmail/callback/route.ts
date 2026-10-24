@@ -5,7 +5,8 @@ import { GMAIL_OAUTH_STATE_COOKIE, isValidGmailOAuthState } from "@/lib/gmail/oa
 import { createGmailOAuthClient, exchangeGmailCode } from "@/lib/gmail/oauth";
 import { gmailRedirectUriForOrigin, resolveRequestOrigin } from "@/lib/gmail/config";
 import { fetchGmailAddress } from "@/lib/gmail/fetch-invoices";
-import { saveGmailToken } from "@/lib/gmail/tokens";
+import { gmailAccount } from "@/lib/gmail/accounts";
+import { saveGmailToken, loadGmailTokenRow } from "@/lib/gmail/tokens";
 
 /**
  * Redirection OAuth Google après consentement Gmail (lecture seule).
@@ -27,8 +28,11 @@ export async function GET(req: NextRequest) {
   const code = u.searchParams.get("code");
   const receivedState = u.searchParams.get("state");
   const cookieStore = await cookies();
+  const accountCookie = cookieStore.get("gmail_oauth_account")?.value;
+  cookieStore.delete("gmail_oauth_account");
   const expectedState = cookieStore.get(GMAIL_OAUTH_STATE_COOKIE)?.value;
-  if (cookieStore.get("gmail_oauth_return")?.value === "pilote") target.searchParams.set("section", "pilote");
+  const returnSection = cookieStore.get("gmail_oauth_return")?.value;
+  if (returnSection === "pilote" || returnSection === "courses") target.searchParams.set("section", returnSection);
   cookieStore.delete("gmail_oauth_return");
   cookieStore.delete(GMAIL_OAUTH_STATE_COOKIE);
 
@@ -49,6 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(target);
   }
 
+  let stage = "session";
   try {
     const supabase = await createSupabaseServerClient();
     if (!supabase) throw new Error("supabase_unavailable");
@@ -57,6 +62,8 @@ export async function GET(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("not_authenticated");
 
+    let account = gmailAccount(accountCookie);
+    stage = "token-exchange";
     const tokens = await exchangeGmailCode(code, redirectUri);
     if (!tokens.refreshToken) {
       // Google ne renvoie le refresh_token qu'au 1er consentement : on force prompt=consent
@@ -72,23 +79,38 @@ export async function GET(req: NextRequest) {
         refresh_token: tokens.refreshToken,
         expiry_date: tokens.expiryDate ?? undefined
       });
+      stage = "profile";
       email = await fetchGmailAddress(client);
     }
 
+    if (!email) throw new Error("gmail_address_unavailable");
+    stage = "store-check";
+    const primary = await loadGmailTokenRow(supabase, user.id, "primary");
+    const secondary = await loadGmailTokenRow(supabase, user.id, "secondary");
+    // An OAuth flow started before the multi-account rollout must not replace an existing account.
+    if (!accountCookie && primary?.refresh_token && primary.email?.toLowerCase() !== email.toLowerCase()) account = "secondary";
+    const selected = account === "primary" ? primary : secondary;
+    const other = account === "primary" ? secondary : primary;
+    if (other?.email?.toLowerCase() === email.toLowerCase()) throw new Error("account_already_connected");
+    if (selected?.refresh_token && selected.email?.toLowerCase() !== email.toLowerCase()) throw new Error("account_slot_occupied");
+    stage = "token-save";
     await saveGmailToken(supabase, user.id, {
       email,
       refreshToken: tokens.refreshToken,
       accessToken: tokens.accessToken,
       expiryDate: tokens.expiryDate,
       scope: tokens.scope
-    });
+    }, account);
 
+    console.info("[gmail] account saved", { account });
     target.searchParams.set("gmail_connect", "ok");
+    target.searchParams.set("gmail_account", account);
   } catch (e) {
+    console.warn("[gmail] OAuth connection failed", { stage });
     target.searchParams.set("gmail_connect", "error");
     target.searchParams.set(
       "gmail_error",
-      "connection_failed"
+      e instanceof Error && ["account_already_connected", "account_slot_occupied", "gmail_address_unavailable", "no_refresh_token", "not_authenticated"].includes(e.message) ? e.message : "connection_failed"
     );
   }
 

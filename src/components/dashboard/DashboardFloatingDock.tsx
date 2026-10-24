@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, Settings, Navigation } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, Settings, Navigation, ShoppingBasket } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
@@ -47,6 +47,7 @@ const TABS: Tab[] = [
     icon: Navigation,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "pilote"
   },
+  { href: "/dashboard?section=courses", label: "Cours", icon: ShoppingBasket, isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && (section === "courses" || section === "cours") },
   {
     href: "/dashboard?section=sasu&scope=pro",
     label: "SASU",

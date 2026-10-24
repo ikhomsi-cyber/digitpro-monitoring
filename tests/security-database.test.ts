@@ -23,7 +23,7 @@ beforeAll(async () => {
     grant select,insert,update,delete on all tables in schema public to authenticated,service_role;
     insert into public.transactions(id,user_id,date,label,category,amount,company) values('${tx}','${owner}','2026-10-11','A','Divers',1,'Bank');
     insert into public.import_sessions(id,user_id,format) values('${session}','${owner}','generic');`);
-  for (const file of ["20261011081900_private_integration_secrets.sql", "20261011081906_sync_jobs_and_agent_access.sql", "20261011083434_expense_note_upsert_ownership.sql", "20261011092330_bankin_pilote_snapshots.sql"]) {
+  for (const file of ["20261011081900_private_integration_secrets.sql", "20261011081906_sync_jobs_and_agent_access.sql", "20261011083434_expense_note_upsert_ownership.sql", "20261011092330_bankin_pilote_snapshots.sql", "20261016191000_second_gmail_account.sql", "20261016192000_grocery_orders.sql"]) {
     await db.exec(await readFile(`supabase/migrations/${file}`, "utf8"));
   }
 }, 30_000);
@@ -34,6 +34,7 @@ it("denies secrets and all privileged RPCs to browser roles", async () => {
     await db.exec(`set role ${role};`);
     try {
       await expect(db.query("select * from private.gmail_oauth_tokens")).rejects.toThrow();
+      await expect(db.query("select * from private.gmail_secondary_tokens")).rejects.toThrow();
       await expect(db.query("select * from private.powens_users")).rejects.toThrow();
       await expect(db.query(`select public.integration_secret_read('${owner}','gmail')`)).rejects.toThrow();
       await expect(db.query(`select public.agent_authorize('${"a".repeat(64)}','${lease}')`)).rejects.toThrow();
@@ -130,4 +131,32 @@ it("isolates Bankin snapshots and denies anonymous reads, cross-owner writes and
   await db.exec("set role anon;");
   try { await expect(db.query("select * from public.bankin_pilote_snapshots")).rejects.toThrow(); }
   finally { await db.exec("reset role;"); }
+});
+
+it("stores two encrypted Gmail accounts independently and rejects duplicate or plaintext secondary accounts", async () => {
+  await db.exec("set role service_role");
+  try {
+    const write = (integration: string, email: string, token: string) => db.query("select public.integration_secret_write($1,$2,$3::jsonb)", [other, integration, JSON.stringify({ email, refresh_token: token })]);
+    await write("gmail", "primary@synthetic.test", "enc:v1:first");
+    await write("gmail-secondary", "second@synthetic.test", "enc:v1:second");
+    await expect(write("gmail-secondary", "second@synthetic.test", "plaintext")).rejects.toThrow();
+    await expect(write("gmail-secondary", "PRIMARY@synthetic.test", "enc:v1:bad")).rejects.toThrow("already connected");
+    const read = (slot: string) => db.query<{value:{email:string}}>("select public.integration_secret_read($1,$2) as value", [other, slot]);
+    expect((await read("gmail")).rows[0].value.email).toBe("primary@synthetic.test");
+    expect((await read("gmail-secondary")).rows[0].value.email).toBe("second@synthetic.test");
+    await db.query("select public.integration_secret_delete($1,'gmail-secondary')", [other]);
+    expect((await read("gmail-secondary")).rows[0].value).toBeNull();
+    expect((await read("gmail")).rows[0].value.email).toBe("primary@synthetic.test");
+  } finally { await db.exec("reset role"); }
+});
+
+it("isolates grocery order history and rejects cross-user writes and duplicate order imports",async()=>{
+ await db.exec(`set role authenticated;set request.jwt.claim.sub='${owner}'`);
+ try{
+  const insert=(user:string)=>db.query("insert into public.grocery_orders(user_id,merchant,order_ref,ordered_at,items,gmail_account,gmail_message_id) values($1,'Carrefour','SYNTH1234','2026-10-16','[]','secondary','synthetic-message')",[user]);
+  await insert(owner);await expect(insert(owner)).rejects.toThrow();await expect(insert(other)).rejects.toThrow();
+  await db.exec(`set request.jwt.claim.sub='${other}'`);
+  expect((await db.query("select id from public.grocery_orders")).rows).toHaveLength(0);
+  expect((await db.query("update public.grocery_orders set total_cents=1 returning id")).rows).toHaveLength(0);
+ }finally{await db.exec("reset role");}
 });
