@@ -94,7 +94,7 @@ async function fetchExistingRowsByContentHashes(
       .from("transactions")
       .select("id,content_hash,category_manual")
       .in("content_hash", slice);
-    if (error) throw new Error(error.message);
+    if (error) throw Object.assign(new Error(error.message), { code: error.code });
     for (const row of data ?? []) {
       if (!row.content_hash || !row.id) continue;
       map.set(row.content_hash, {
@@ -131,7 +131,7 @@ async function fetchStoredTransactionsBetween(
     .select("id,date,label,amount,content_hash,category_manual")
     .gte("date", minDate)
     .lte("date", maxDate);
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   return (data ?? []).map((row) => ({
     id: String(row.id),
     date: String(row.date).slice(0, 10),
@@ -239,7 +239,7 @@ async function dedupeStoredPowensComingTransactions(client: SupabaseServer): Pro
 
   if (!toDelete.length) return 0;
   const { error } = await client.from("transactions").delete().in("id", toDelete);
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   return toDelete.length;
 }
 
@@ -254,7 +254,7 @@ export async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
     .from("transactions")
     .select("date,amount,label,category,company")
     .gte("date", start);
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
 
   const txs: DashboardTx[] = (rows ?? []).map((r, i) => ({
     id: `_sync_${i}`,
@@ -278,7 +278,7 @@ export async function syncMonthlyMetricsFromDb(client: SupabaseServer) {
   const { error: upErr } = await client
     .from("monthly_metrics")
     .upsert(payload, { onConflict: "user_id,month" });
-  if (upErr) throw new Error(upErr.message);
+  if (upErr) throw Object.assign(new Error(upErr.message), { code: upErr.code });
 }
 
 async function fetchLatestMetrics(client: SupabaseServer) {
@@ -287,7 +287,7 @@ async function fetchLatestMetrics(client: SupabaseServer) {
     .select("month,revenue,expenses")
     .order("month", { ascending: true })
     .limit(12);
-  if (error) throw new Error(error.message);
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
   return (metricsRows ?? []).map((m) => ({
     month: m.month,
     revenue: Number(m.revenue),
@@ -346,7 +346,7 @@ export async function importTransactionsWithClient(
     if (lookup.error && isMissingColumnError(lookup.error, "file_hash")) {
       fileHashSupported = false;
     } else if (lookup.error) {
-      throw new Error(lookup.error.message);
+      throw Object.assign(new Error(lookup.error.message), { code: lookup.error.code });
     } else if (lookup.data?.id) {
       await syncMonthlyMetricsFromDb(client);
       const metrics = await fetchLatestMetrics(client);
@@ -385,7 +385,7 @@ export async function importTransactionsWithClient(
       .select("id")
       .single();
   }
-  if (sessionInsert.error) throw new Error(sessionInsert.error.message);
+  if (sessionInsert.error) throw Object.assign(new Error(sessionInsert.error.message), { code: sessionInsert.error.code });
   const importSessionId = sessionInsert.data!.id;
 
   const { unique: prepared, skippedInFile } = dedupeImportRows(importRows);
@@ -461,7 +461,7 @@ export async function importTransactionsWithClient(
       .from("transactions")
       .insert(slice)
       .select("id,date,label,category,amount,company,bank_name,scope");
-    if (attempt.error) throw new Error(attempt.error.message);
+    if (attempt.error) throw Object.assign(new Error(attempt.error.message), { code: attempt.error.code });
     const batchInserted = attempt.data;
     for (const r of batchInserted ?? []) {
       insertedRowsAgg.push({
@@ -495,7 +495,7 @@ export async function importTransactionsWithClient(
       })
     );
     const firstError = results.find((result) => result.error)?.error;
-    if (firstError) throw new Error(firstError.message);
+    if (firstError) throw Object.assign(new Error(firstError.message), { code: firstError.code });
   }
 
   const merged = toMerge.length;
@@ -509,7 +509,7 @@ export async function importTransactionsWithClient(
     })
     .eq("id", importSessionId);
 
-  if (sessionUpdateErr) throw new Error(sessionUpdateErr.message);
+  if (sessionUpdateErr) throw Object.assign(new Error(sessionUpdateErr.message), { code: sessionUpdateErr.code });
 
   await syncMonthlyMetricsFromDb(client);
   if (meta.format === "powens") {

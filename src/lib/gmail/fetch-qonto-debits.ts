@@ -11,7 +11,8 @@ import {
   type QontoUpcomingDebit
 } from "@/lib/gmail/qonto-debit-parser";
 
-const MAX_MESSAGES = 30;
+const MAX_MESSAGES = 50;
+const REQUEST_OPTIONS = () => ({ timeout: 20000, retry: false, signal: AbortSignal.timeout(90000) });
 
 function decodeBase64Url(data: string | null | undefined): string {
   if (!data) return "";
@@ -60,7 +61,7 @@ function messageDateIso(message: gmail_v1.Schema$Message): string {
   return "";
 }
 
-async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[]): Promise<string[]> {
+async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[], options: ReturnType<typeof REQUEST_OPTIONS>): Promise<string[]> {
   const seen = new Set<string>();
   const ids: string[] = [];
 
@@ -69,7 +70,7 @@ async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[]): Promise
       userId: "me",
       q,
       maxResults: MAX_MESSAGES
-    });
+    }, options);
     for (const message of listRes.data.messages ?? []) {
       if (message.id && !seen.has(message.id)) {
         seen.add(message.id);
@@ -83,14 +84,15 @@ async function listMessageIds(gmail: gmail_v1.Gmail, queries: string[]): Promise
 }
 
 /**
- * Recherche les emails Qonto « … débitera votre compte … » (10 derniers jours)
+ * Recherche les emails Qonto « … débitera votre compte … » (90 derniers jours)
  * et extrait les prélèvements futurs.
  */
 export async function fetchQontoUpcomingDebitsFromGmail(
   auth: Auth.OAuth2Client
 ): Promise<QontoUpcomingDebit[]> {
   const gmail = google.gmail({ version: "v1", auth });
-  const ids = await listMessageIds(gmail, qontoDebitGmailQueries());
+  const options = REQUEST_OPTIONS();
+  const ids = await listMessageIds(gmail, qontoDebitGmailQueries(), options);
 
   const debits: QontoUpcomingDebit[] = [];
   const seenDebitKeys = new Set<string>();
@@ -100,7 +102,7 @@ export async function fetchQontoUpcomingDebitsFromGmail(
       userId: "me",
       id,
       format: "full"
-    });
+    }, options);
     const message = msgRes.data;
     const subject = headerValue(message.payload?.headers, "Subject");
     if (!isQontoDebitNotificationSubject(subject)) continue;

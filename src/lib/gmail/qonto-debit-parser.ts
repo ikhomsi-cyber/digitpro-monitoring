@@ -40,7 +40,8 @@ function foldAccents(input: string): string {
 }
 
 export function isQontoDebitNotificationSubject(subject: string): boolean {
-  return foldAccents(subject).includes("debitera votre compte");
+  const value = foldAccents(subject);
+  return value.includes("debitera votre compte") || /prelevement.*(?:a venir|prevu|programme|annonce)|(?:prochain|nouveau).*prelevement/.test(value);
 }
 
 function cleanOrganization(raw: string): string {
@@ -173,10 +174,7 @@ export function parseQontoUpcomingDebit(input: {
 }
 
 export function localTodayIso(now = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(now);
 }
 
 /** Ne conserve que les débits strictement postérieurs à aujourd'hui. */

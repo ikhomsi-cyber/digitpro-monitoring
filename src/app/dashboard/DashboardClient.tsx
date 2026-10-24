@@ -9,6 +9,7 @@ import {
   type ReactNode
 } from "react";
 import dynamic from "next/dynamic";
+import { createPiloteLoader } from "@/lib/bankin/pilote-loader";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { updatePersonalTransactionCategory } from "./actions";
@@ -250,6 +251,16 @@ export function DashboardClient({
   const router = useRouter();
   const pathname = usePathname();
   const { section: dashboardSection, searchParams } = useDashboardSection();
+  const [loadPiloteData] = useState(() => createPiloteLoader());
+  useEffect(() => {
+    if (demoMode || dashboardSection === "courses") return;
+    // Warm the private report after the first paint, before the first tab selection.
+    const timer = window.setTimeout(() => {
+      void loadPiloteData().catch(() => {});
+      void import("@/components/dashboard/PiloteSection").catch(() => {});
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [demoMode, dashboardSection, loadPiloteData]);
   const [mountedSections, setMountedSections] = useState<Set<LazyDashboardSectionKey>>(() =>
     new Set([lazySectionMountKey(dashboardSection)])
   );
@@ -1165,7 +1176,7 @@ export function DashboardClient({
       </div>
       ) : null}
       {mountedSections.has("courses") ? <div className={clsx(dashboardSection !== "courses" && "hidden")} aria-hidden={dashboardSection !== "courses"}><GroceriesSection demoMode={demoMode} /></div> : null}
-      {mountedSections.has("pilote") ? <div className={clsx(dashboardSection !== "pilote" && "hidden")} aria-hidden={dashboardSection !== "pilote"}><PiloteSection demoMode={demoMode} onImported={refreshDashboardTransactions} /></div> : null}
+      {mountedSections.has("pilote") ? <div className={clsx(dashboardSection !== "pilote" && "hidden")} aria-hidden={dashboardSection !== "pilote"}><PiloteSection loadData={loadPiloteData} demoMode={demoMode} onImported={refreshDashboardTransactions} /></div> : null}
       {mountedSections.has("impots") ? (
       <div
         className={clsx(dashboardSection !== "impots" && "hidden")}

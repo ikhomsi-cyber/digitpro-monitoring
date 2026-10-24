@@ -50,22 +50,24 @@ import {
 /** Taux d’impôt métier appliqué au BNC restant après charges DigitPro. */
 export const DEFAULT_IR_ON_BNC_RATE = 0.17;
 export const CSG_ON_BNC_RATE = 0.097;
+export type ValeurReelleCsgRate = 0.097 | 0.172;
 
 /** Recalcule la CSG pour un CA HT donné en conservant les réintégrations sociales du mois de référence. */
 export function computeCsgEurForCaFacture(
   caFactureEur: number,
   mandatoryFeesEur: number,
   personalChargesEur: number,
-  reference: Pick<ValeurReelleCashTree, "caFactureEur" | "csgEur">
+  reference: Pick<ValeurReelleCashTree, "caFactureEur" | "csgEur" | "csgRate">
 ): number {
+  const csgRate = reference.csgRate ?? CSG_ON_BNC_RATE;
   const refOperating = reference.caFactureEur - mandatoryFeesEur - personalChargesEur;
   const refCsgCore = reference.csgEur > 0 ? reference.csgEur : 0;
-  const refBase = refCsgCore > 0 ? refCsgCore / CSG_ON_BNC_RATE : 0;
+  const refBase = refCsgCore > 0 ? refCsgCore / csgRate : 0;
   const reintegrations = Math.max(0, refBase - Math.max(0, refOperating));
 
   const operating = caFactureEur - mandatoryFeesEur - personalChargesEur;
   const base = Math.max(0, operating + reintegrations);
-  return Math.round(base * CSG_ON_BNC_RATE * 100) / 100;
+  return Math.round(base * csgRate * 100) / 100;
 }
 
 function fold(raw: string): string {
@@ -223,6 +225,7 @@ function materializeWaterfallBreakdown(
 }
 
 export type ValeurReelleCashTree = {
+  csgRate?: ValeurReelleCsgRate;
   caTtcEur: number;
   caFactureEur: number;
   mandatoryFeesEur: number;
@@ -617,9 +620,10 @@ export function classifyValeurReelleTransaction(tx: DashboardTx): ValeurReelleCl
 
 export function analyzeValeurReelle(
   transactions: readonly DashboardTx[],
-  options?: DashboardAnalyticsFilter & { now?: Date }
+  options?: DashboardAnalyticsFilter & { now?: Date; csgRate?: ValeurReelleCsgRate }
 ): ValeurReelleAnalysis {
   const now = options?.now ?? new Date();
+  const csgRate = options?.csgRate ?? CSG_ON_BNC_RATE;
   const years = options?.years ?? null;
   const month = options?.month ?? null;
   const months = options?.months ?? null;
@@ -838,7 +842,7 @@ export function analyzeValeurReelle(
   const csgOperatingExpensesEur = mandatoryFeesEur + personalChargesEur;
   const csgOperatingResultEur = caFactureEur - csgOperatingExpensesEur;
   const csgBaseEur = Math.max(0, csgOperatingResultEur + csgSocialReintegrationsEur);
-  const csgEur = Math.round(csgBaseEur * CSG_ON_BNC_RATE * 100) / 100;
+  const csgEur = Math.round(csgBaseEur * csgRate * 100) / 100;
   const bncRestantApresChargesEur = bncBrutEur;
   const periodIncomeTax = allocateIncomeTaxToPeriod({ years, month, months, now }, bncBrutEur);
   const impotEstimeEur = periodIncomeTax.amountEur;
@@ -849,6 +853,7 @@ export function analyzeValeurReelle(
   const netReelEur = netCashEur + revenusIndirectsEur;
 
   const cashTree: ValeurReelleCashTree = {
+    csgRate,
     caTtcEur,
     caFactureEur,
     mandatoryFeesEur,

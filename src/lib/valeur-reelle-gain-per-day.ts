@@ -9,6 +9,8 @@ import { computeCashedCaWorkedDays } from "@/lib/invoice-worked-days-series";
 import { computeValeurReelleDailyBreakdown } from "@/lib/valeur-reelle-daily-value";
 import {
   analyzeValeurReelle,
+  CSG_ON_BNC_RATE,
+  type ValeurReelleCsgRate,
   type ValeurReelleCashTree
 } from "@/lib/valeur-reelle-analyze";
 
@@ -88,7 +90,8 @@ type HistoricalGainSignals = {
 function computeHistoricalGainSignals(
   transactions: readonly DashboardTx[],
   billableWorkDayIsos: ReadonlySet<string>,
-  now: Date
+  now: Date,
+  csgRate: ValeurReelleCsgRate
 ): HistoricalGainSignals {
   let marginWeighted = 0;
   let marginWeight = 0;
@@ -96,7 +99,7 @@ function computeHistoricalGainSignals(
   let workedDaysSum = 0;
 
   for (const monthKey of listPastMonthKeys(now)) {
-    const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now });
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now, csgRate });
     const caHt = analysis.cashTree.caFactureEur;
     const gain = capGainToCa(gainEurFromCashTree(analysis.cashTree), caHt);
     const workedDays = workedBillableDaysInMonth(billableWorkDayIsos, monthKey, now);
@@ -142,7 +145,7 @@ export function estimateCurrentMonthGainPerWorkDay(
 
   const actualGain = gainEurFromCashTree(cashTree);
   const caHt = cashTree.caFactureEur;
-  const history = computeHistoricalGainSignals(transactions, billableWorkDayIsos, now);
+  const history = computeHistoricalGainSignals(transactions, billableWorkDayIsos, now, cashTree.csgRate ?? CSG_ON_BNC_RATE);
 
   let estimatedGain = actualGain;
   let usesHistoricalEstimate = false;
@@ -204,9 +207,10 @@ function gainPerDayForMonth(
   billableWorkDayIsos: ReadonlySet<string>,
   billableRatePeriods: readonly BillableRatePeriod[],
   fallbackTjmHt: number,
-  now: Date
+  now: Date,
+  csgRate: ValeurReelleCsgRate
 ): number {
-  const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now });
+  const analysis = analyzeValeurReelle(transactions, { years: null, month: monthKey, now, csgRate });
   const estimate =
     monthKey === dashboardMonthKeyNowLocal(now)
       ? estimateCurrentMonthGainPerWorkDay(
@@ -268,7 +272,8 @@ export function buildTrailingGainPerWorkDayPoints(
   months = TRAILING_GAIN_PER_DAY_MONTHS,
   now = new Date(),
   billableRatePeriods: readonly BillableRatePeriod[] = [],
-  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT
+  fallbackTjmHt = BILLABLE_CLIENT_TJM_HT,
+  csgRate: ValeurReelleCsgRate = CSG_ON_BNC_RATE
 ): TrailingGainPerDayPoint[] {
   const monthKeys = Array.from({ length: months }, (_, index) =>
     shiftMonthKey(endMonthKey, -(months - 1 - index))
@@ -284,7 +289,8 @@ export function buildTrailingGainPerWorkDayPoints(
       billableWorkDayIsos,
       billableRatePeriods,
       fallbackTjmHt,
-      now
+      now,
+      csgRate
     )
   }));
 }

@@ -1,4 +1,4 @@
-export type BankinPiloteRow = { sourceRow: number; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
+export type BankinPiloteRow = { sourceRow: number; identity?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
 
 export type PiloteGroup = { name: string; expenses: number; income: number; count: number; children: PiloteGroup[] };
 export type PiloteMonth = { month: string; expenses: number; income: number; balance: number; count: number; categories: PiloteGroup[]; incomeCategories: PiloteGroup[] };
@@ -40,13 +40,18 @@ export function piloteSnapshotMonths(snapshot: BankinPiloteSnapshot): PiloteMont
   });
 }
 
+/** Shared report eligibility; daily charts must use precisely the same exclusions. */
+export function isPiloteReportRow(row: BankinPiloteRow): boolean {
+  if(isConfirmedReimbursedExpense(row)||bankinPiloteExclusion(row)||!Number.isFinite(row.amount)||!/^\d{4}-\d{2}-\d{2}$/.test(row.date))return false;
+  const date=new Date(`${row.date}T00:00:00Z`);
+  return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===row.date;
+}
+
 /** No inferred labels, category mappings or app transactions. */
 export function buildPiloteMonths(transactions: BankinPiloteRow[]): PiloteMonth[] {
   const months = new Map<string, { rows: BankinPiloteRow[]; ids: Set<number> }>();
   for (const tx of transactions) {
-    if (isConfirmedReimbursedExpense(tx) || bankinPiloteExclusion(tx) || !Number.isFinite(tx.amount) || !/^\d{4}-\d{2}-\d{2}$/.test(tx.date)) continue;
-    const date = new Date(`${tx.date}T00:00:00Z`);
-    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== tx.date) continue;
+    if (!isPiloteReportRow(tx)) continue;
     const month = piloteReportingMonth(tx);
     const entry = months.get(month) ?? { rows: [], ids: new Set<number>() };
     if (entry.ids.has(tx.sourceRow)) continue;
@@ -84,9 +89,9 @@ export function bankinPiloteExclusion(row: BankinPiloteRow): "hidden" | "interna
   if (names.some(name => ["virement interne", "virements internes"].includes(name))) return "internal";
   return null;
 }
-export type BankinPiloteSnapshot = { version: 1 | 2; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string };
+export type BankinPiloteSnapshot = { version: 1 | 2; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string; rows?: BankinPiloteRow[]; rowsCompressed?: string; legacyBackup?: BankinPiloteSnapshot };
 export function buildBankinPiloteSnapshot(rows: BankinPiloteRow[], sourceFilename: string, fileHash: string): BankinPiloteSnapshot {
-  return { version: 2, months: buildPiloteMonths(rows), shiftedRentCount: rows.filter(row => !bankinPiloteExclusion(row) && piloteReportingMonth(row) !== row.date.slice(0, 7)).length, sourceFilename, fileHash, sourceRows: rows.length, excludedInternal: rows.filter(row => bankinPiloteExclusion(row) === "internal").length, excludedHidden: rows.filter(row => bankinPiloteExclusion(row) === "hidden").length, importedAt: new Date().toISOString() };
+  return { version: 2, rows, months: buildPiloteMonths(rows), shiftedRentCount: rows.filter(row => !bankinPiloteExclusion(row) && piloteReportingMonth(row) !== row.date.slice(0, 7)).length, sourceFilename, fileHash, sourceRows: rows.length, excludedInternal: rows.filter(row => bankinPiloteExclusion(row) === "internal").length, excludedHidden: rows.filter(row => bankinPiloteExclusion(row) === "hidden").length, importedAt: new Date().toISOString() };
 }
 
 export type PiloteCompensationFamily = "rent" | "transport" | "ndf" | "food" | "other";

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { checkWorkbookArchive } from "@/lib/security/workbook-limits";
 import { MAX_IMPORT_BYTES, MAX_BANKIN_IMPORT_ROWS } from "@/lib/security/import-validation";
 import * as XLSX from "xlsx";
@@ -136,6 +137,8 @@ export function parseBankinPiloteWorkbook(buffer: ArrayBuffer): import("@/lib/pi
     const date = cellToYmd(row[0]); const amount = cellToNumber(row[3]);
     if (!date || amount === null) return [];
     const hidden = hiddenIndex >= 0 && ["true", "1", "oui", "yes", "x", "masque", "masquee"].includes(normalizeHeaderCell(row[hiddenIndex]));
-    return [{ sourceRow: index + 2, date, amount, parentCategory: String(row[4] ?? "").trim(), subCategory: String(row[5] ?? "").trim(), hidden }];
+    // Categories and spreadsheet row numbers can change between exports.
+    const identity = createHash("sha256").update(JSON.stringify([date, Math.round(amount * 100), String(row[1] ?? "").normalize("NFC").trim(), String(row[2] ?? "").normalize("NFC").trim()])).digest("hex");
+    return [{ sourceRow: index + 2, identity, date, amount, parentCategory: String(row[4] ?? "").trim(), subCategory: String(row[5] ?? "").trim(), hidden }];
   });
 }

@@ -75,10 +75,11 @@ function prevMonthRepasNotesDeFraisEur(
 function computeCsgPerDayOnTjm(
   tjmHt: number,
   digitProPerDay: number,
-  personalPerDay: number
+  personalPerDay: number,
+  csgRate: number
 ): number {
   const operatingPerDay = Math.max(0, tjmHt - digitProPerDay - personalPerDay);
-  return round2(operatingPerDay * CSG_ON_BNC_RATE);
+  return round2(operatingPerDay * csgRate);
 }
 
 /**
@@ -147,7 +148,7 @@ function computeCurrentMonthDailyBreakdown(input: {
   const annualBilledDays = countAnnualAgendaBillableDays(billableSelected, year);
   const ikPerDay = indemniteKmPerWorkDayForAnnualDaysEur(annualBilledDays);
 
-  const csgPerDay = computeCsgPerDayOnTjm(tjmHt, mandatoryFeesPerDay, personalChargesPerDay);
+  const csgPerDay = computeCsgPerDayOnTjm(tjmHt, mandatoryFeesPerDay, personalChargesPerDay, tree.csgRate ?? CSG_ON_BNC_RATE);
 
   const bncBeforeIrPerDay = round2(
     Math.max(

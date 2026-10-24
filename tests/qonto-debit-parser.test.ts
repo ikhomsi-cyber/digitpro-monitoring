@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterFutureQontoDebits,
+  localTodayIso,
+  isQontoDebitNotificationSubject,
   parseFrenchDebitDate,
   parseQontoUpcomingDebit
 } from "@/lib/gmail/qonto-debit-parser";
@@ -38,4 +40,11 @@ describe("notifications de prélèvement Qonto", () => {
     expect(parseFrenchDebitDate("5/9/2026")).toBe("2026-09-05");
     expect(parseFrenchDebitDate("5 septembre 2026")).toBe("2026-09-05");
   });
+});
+
+it("recognizes upcoming-debit subject variants and uses the Paris banking date",()=>{
+ expect(isQontoDebitNotificationSubject("Qonto — Un prélèvement à venir")).toBe(true);
+ expect(isQontoDebitNotificationSubject("Votre prélèvement est programmé")).toBe(true);
+ expect(isQontoDebitNotificationSubject("Prélèvement rejeté")).toBe(false);
+ expect(localTodayIso(new Date("2026-10-15T22:30:00Z"))).toBe("2026-10-16");
 });

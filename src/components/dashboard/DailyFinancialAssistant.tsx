@@ -1,0 +1,60 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, BriefcaseBusiness, Gift, GraduationCap, House, Lightbulb, Loader2, ReceiptText, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
+import { useDashboardDummyData } from "./DashboardDisplayFormatContext";
+import { Logo } from "@/components/ui/Logo";
+import { ActivityBriefVisual, HouseholdBriefVisual, TreasuryBriefVisual } from "./DailyBriefVisuals";
+import type { DailyBrief } from "@/lib/daily-financial-brief";
+type Brief=DailyBrief & {qontoBalance:number|null};
+const money=(n:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(n);
+const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMode:boolean}){
+ const masked=useDashboardDummyData();const dialog=useRef<HTMLDialogElement>(null);
+ const [open,setOpen]=useState(false),[brief,setBrief]=useState<Brief|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
+ const pending=useRef<AbortController|null>(null);const lastDate=useRef("");
+ const load=useCallback(async()=>{
+  pending.current?.abort();const controller=new AbortController();pending.current=controller;
+  setLoading(true);setError("");
+  try{const response=await fetch("/api/dashboard/daily-brief",{cache:"no-store",signal:controller.signal});const body=await response.json();if(!response.ok)throw new Error(body.error||"Point quotidien indisponible.");if(!controller.signal.aborted){setBrief(body);lastDate.current=body.date;}}
+  catch(err){if(!controller.signal.aborted)setError(err instanceof Error?err.message:"Point quotidien indisponible.");}
+  finally{if(!controller.signal.aborted)setLoading(false);}
+ },[]);
+ const show=useCallback(()=>{setOpen(true);if(lastDate.current!==today())void load();},[load]);
+ useEffect(()=>{
+  if(demoMode||masked)return;
+  const check=()=>{if(document.visibilityState!=="visible")return;try{if(localStorage.getItem(`digitpro:daily-brief:v2:${userId}`)!==today())show();}catch{show();}};
+  const timer=window.setTimeout(check,900);document.addEventListener("visibilitychange",check);
+  return()=>{clearTimeout(timer);document.removeEventListener("visibilitychange",check);};
+ },[demoMode,masked,userId,show]);
+ useEffect(()=>{if(open&&!masked){dialog.current?.showModal();}else dialog.current?.close();},[open,masked]);
+ useEffect(()=>()=>pending.current?.abort(),[]);
+ const close=()=>{setOpen(false);try{localStorage.setItem(`digitpro:daily-brief:v2:${userId}`,today());}catch{ /* Dismissal is optional; financial data is never persisted. */ }};
+ if(demoMode)return null;
+ const actions=brief?.items.filter(item=>item.priority!=="info")??[];
+ const activity=brief?.activity;
+ const familyGaps=brief?.compensations.filter(f=>f.id!=="other"&&f.balance<0)??[];
+ const familyGap=familyGaps.reduce((sum,f)=>sum-f.balance,0);
+ const selectedActions=[actions.find(item=>item.scope==="pro"),actions.find(item=>item.scope==="foyer"),...actions].filter((item,index,all)=>item&&all.findIndex(other=>other?.id===item.id)===index).slice(0,3);
+ return <>
+  <button type="button" onClick={show} disabled={masked} aria-label="Ouvrir mon point quotidien" title="Mon point quotidien" className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.6rem)] z-50 inline-flex h-11 w-11 items-center justify-center rounded-full border border-ink-200/80 bg-white/85 text-ink-700 shadow-sm backdrop-blur-xl transition hover:bg-white active:scale-95 disabled:opacity-40 dark:border-white/15 dark:bg-[#06242b]/85 dark:text-white md:right-5"><Sparkles size={19} strokeWidth={1.7}/></button>
+  <dialog ref={dialog} onCancel={event=>{event.preventDefault();close();}} aria-labelledby="daily-brief-title" className="m-auto max-h-[90dvh] w-[calc(100%_-_1.5rem)] max-w-2xl overflow-y-auto rounded-2xl border border-ink-200 bg-white p-0 text-ink-900 shadow-2xl backdrop:bg-ink-950/55 backdrop:backdrop-blur-sm dark:border-white/10 dark:bg-[#101d20] dark:text-white">
+   {!masked?<div className="p-5 sm:p-7">
+    <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2.5"><Logo size={24} withWordmark={false}/><p className="text-[10px] font-medium uppercase tracking-[.18em] text-emerald-600 dark:text-emerald-300">Votre point quotidien</p></div><h2 id="daily-brief-title" className="mt-2 text-xl font-semibold tracking-tight">Voici l’essentiel.</h2><p className="mt-1 text-xs text-ink-400 dark:text-white/40">{new Intl.DateTimeFormat("fr-FR",{dateStyle:"full",timeZone:"Europe/Paris"}).format(new Date())}</p></div><button autoFocus type="button" onClick={close} aria-label="Fermer le point quotidien" className="rounded-full p-2 hover:bg-ink-100 dark:hover:bg-white/10"><X size={18}/></button></header>
+    {loading?<div role="status" className="flex items-center gap-3 py-12 text-sm text-ink-500"><Loader2 size={17} className="animate-spin"/>Je fais le point sur votre activité…</div>:null}
+    {error?<div role="alert" className="py-6 text-sm text-amber-700 dark:text-amber-300">{error}</div>:null}
+    {brief&&!loading&&!error?<>
+     <div className="mt-5 divide-y divide-ink-200/50 dark:divide-white/10">
+      <section className="flex items-start gap-3 py-3"><BriefcaseBusiness size={17} className="mt-0.5 shrink-0 text-emerald-500" aria-hidden="true"/><div className="min-w-0"><h3 className="text-xs font-semibold">Activité</h3><p className="mt-1 text-sm">{activity?.workedMonth==null?"Jours à compléter":`${activity.workedMonth} j réalisés${activity.plannedMonth?` · ${activity.plannedMonth} j planifiés`:""}`}</p><p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">{activity?`${money(activity.yearRevenueHt)} HT encaissés cette année${activity.yearChangePercent==null?"":` · ${activity.yearChangePercent>0?"+":""}${activity.yearChangePercent.toLocaleString("fr-FR",{maximumFractionDigits:1})} % vs N−1 à date`}`:"CA indisponible"}</p></div></section>
+      <section className="flex items-start gap-3 py-3"><ShieldCheck size={17} className="mt-0.5 shrink-0 text-sky-500" aria-hidden="true"/><div className="min-w-0"><h3 className="text-xs font-semibold">Trésorerie · CSG 17,2 % + TVA</h3><p className="mt-1 text-sm">{activity?.treasury?activity.treasury.shortfall>0?`${money(activity.treasury.shortfall)} restent à sécuriser`:"Réserve couverte aujourd’hui":"Couverture à vérifier : données incomplètes"}</p>{activity?.nextInvoice?<p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">Facture {activity.nextInvoice.kind==="estimate"?"estimée":"en attente"} : {money(activity.nextInvoice.amountHt)} HT{activity.treasury?.projectedShortfall===0?" · couvrirait la réserve après encaissement":activity.treasury?.projectedShortfall!=null?` · resterait ${money(activity.treasury.projectedShortfall)} à couvrir`:""}</p>:null}</div></section>
+      <section className="flex items-start gap-3 py-3"><House size={17} className="mt-0.5 shrink-0 text-violet-500" aria-hidden="true"/><div className="min-w-0"><h3 className="text-xs font-semibold">Foyer</h3><p className="mt-1 text-sm">{!brief.household?"Import Bankin à actualiser":familyGaps.length?`${money(familyGap)} à financer sur ${familyGaps.length} poste(s)`:brief.compensations.some(f=>f.id!=="other"&&f.expenses>0)?"Les postes suivis sont compensés":"Compensations à compléter"}</p>{familyGaps.length?<p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">{familyGaps.map(f=>f.name).join(" · ")}</p>:null}</div></section>
+     </div>
+     {selectedActions.length?<section className="mt-4 border-t border-ink-200/50 pt-4 dark:border-white/10"><h3 className="text-[10px] font-medium uppercase tracking-wider text-ink-400 dark:text-white/40">À faire en priorité</h3><div className="mt-2 space-y-1">{selectedActions.map((item,index)=>item?<details key={item.id} className="py-1.5"><summary className="cursor-pointer text-xs font-medium"><span className="mr-1.5 text-ink-400">{index+1}.</span>{item.title}</summary><p className="mt-2 text-xs leading-relaxed text-ink-500 dark:text-white/55">{item.detail}</p><a href={item.href} onClick={close} className="mt-2 inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-300">{item.when} · Ouvrir<ArrowUpRight size={11}/></a></details>:null)}</div></section>:null}
+     <details className="mt-4 border-t border-ink-200/50 pt-4 dark:border-white/10"><summary className="cursor-pointer text-xs text-ink-500 dark:text-white/50">Chiffres et graphiques</summary><div className="mt-4 space-y-5">{activity?<><ActivityBriefVisual activity={activity} date={brief.date}/><TreasuryBriefVisual activity={activity}/></>:null}<HouseholdBriefVisual families={brief.compensations}/><div className="space-y-3 text-xs leading-relaxed text-ink-500 dark:text-white/50"><p>{brief.summary.activity}</p><p>{brief.summary.treasury}</p><p>{brief.summary.household}</p></div><p className="text-[10px] text-ink-400 dark:text-white/40">Compensations selon les règles Pilote, loyer Maroc déclaré inclus s’il s’applique. Les excédents ne se compensent pas automatiquement entre familles.</p></div></details>
+     {brief.opportunities.length?<details className="mt-4 border-t border-ink-200/60 pt-4 dark:border-white/10"><summary className="cursor-pointer text-xs font-medium"><Lightbulb size={14} className="mr-2 inline-block text-amber-500" aria-hidden="true"/>Idées pour mieux gérer DigitPro</summary><div className="mt-4 space-y-4">{brief.opportunities.map(idea=><article key={idea.id}><a href={idea.href} onClick={close} className="inline-flex items-center gap-2 text-sm font-medium">{idea.id==="client-gifts"?<Gift size={14} className="text-ink-400" aria-hidden="true"/>:idea.id==="tools-training"?<GraduationCap size={14} className="text-ink-400" aria-hidden="true"/>:<ReceiptText size={14} className="text-ink-400" aria-hidden="true"/>}{idea.title}</a><p className="mt-1 text-xs leading-relaxed text-ink-500 dark:text-white/55">{idea.detail}</p></article>)}<p className="text-[11px] leading-relaxed text-ink-400 dark:text-white/40">Priorité aux frais réels déjà engagés et aux besoins utiles. Une dépense consomme de la trésorerie ; son traitement fiscal et la TVA sont à vérifier avec Hiway.</p><a href="https://www.impots.gouv.fr/professionnel/questions/que-puis-je-deduire-de-mes-resultats-professionnels" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-ink-400 underline">Conditions de déduction · impots.gouv.fr<ArrowUpRight size={10}/></a></div></details>:null}
+     <details className="mt-4 border-t border-ink-200/60 pt-4 text-xs dark:border-white/10"><summary className="cursor-pointer text-ink-400 dark:text-white/40">Sources et points à vérifier{brief.warnings.length?` (${brief.warnings.length})`:""}</summary><p className="mt-3 text-[11px] leading-relaxed text-ink-400 dark:text-white/45">CA encaissé HT comparé à date bancaire équivalente. Jours issus du calendrier saisi, futurs séparés des jours réalisés. Simulation CSG à 17,2 % et TVA à 20 % selon les calculs de l’application ; factures attendues non garanties, autres flux futurs exclus. Une facture inconnue n’est pas estimée depuis son email. Aucun montant n’est conservé dans le navigateur.</p>{brief.warnings.length?<ul className="mt-3 list-disc space-y-2 pl-4 text-amber-700 dark:text-amber-300">{brief.warnings.map(w=><li key={w}>{w}</li>)}</ul>:null}</details>
+    </>:null}
+    <footer className="mt-5 flex items-center justify-between border-t border-ink-200/50 pt-4 dark:border-white/10"><button type="button" disabled={loading} onClick={()=>void load()} className="inline-flex items-center gap-1.5 text-xs text-ink-500 disabled:opacity-40 dark:text-white/50"><RefreshCw size={12}/>Actualiser</button><button type="button" onClick={close} className="rounded-lg bg-ink-900 px-4 py-2 text-xs font-medium text-white dark:bg-white dark:text-ink-900">C’est noté</button></footer>
+   </div>:null}
+  </dialog>
+ </>;
+}

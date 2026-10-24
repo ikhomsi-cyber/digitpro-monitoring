@@ -54,3 +54,44 @@ it("bounds downloads even without Content-Length and catches declared oversized 
   fetcher.mockResolvedValue(new Response(null, { headers: { "content-length": String(MAX_IMPORT_BYTES + 1) } }));
   await expect(downloadBankinFile(link, fetcher)).rejects.toThrow("volumineux");
 });
+
+it("retries a temporary Bankin failure once at the same URL", async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(new Response(null, { status: 503 }))
+    .mockResolvedValueOnce(new Response(Uint8Array.from(workbook())));
+  const file = await downloadBankinFile(link.replace("export.zip", "export.xlsx"), fetcher);
+  expect(file.filename).toBe("export.xlsx");
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls[0][0]).toBe(fetcher.mock.calls[1][0]);
+});
+it("reports the HTTP status without leaking a signed link or provider response", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => new Response("private provider response", { status: 503 }));
+  await expect(downloadBankinFile(link, fetcher)).rejects.toThrow("HTTP 503");
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  fetcher.mockReset().mockResolvedValue(new Response("private provider response", { status: 400 }));
+  try { await downloadBankinFile(link, fetcher); throw new Error("expected failure"); }
+  catch (error) {
+    expect((error as Error).message).toContain("HTTP 400");
+    expect((error as Error).message).not.toContain("Signature");
+    expect((error as Error).message).not.toContain("private provider response");
+  }
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+
+it("identifies expired Bankin authorization without exposing the error body or retrying it", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response("<Error><Code>ExpiredToken</Code><Message>private-token-value</Message></Error>", { status: 400 }));
+  await expect(downloadBankinFile(link, fetcher)).rejects.toThrow("ExpiredToken");
+  expect(fetcher).toHaveBeenCalledOnce();
+});
+it("ignores unrecognized provider codes and bounds error-body reading", async () => {
+  const cancel = vi.fn();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) { controller.enqueue(new TextEncoder().encode("x".repeat(4096))); }, cancel
+  });
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(stream, { status: 400 }));
+  await expect(downloadBankinFile(link, fetcher)).rejects.toThrow("motif non reconnu");
+  expect(cancel).toHaveBeenCalledOnce();
+  fetcher.mockResolvedValue(new Response("<Code>privateProviderSecret</Code>", { status: 400 }));
+  try { await downloadBankinFile(link, fetcher); throw new Error("expected failure"); }
+  catch (error) { expect((error as Error).message).not.toContain("privateProviderSecret"); }
+});

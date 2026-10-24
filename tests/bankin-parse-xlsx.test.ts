@@ -91,3 +91,16 @@ it("excludes flagged hidden credits and debits from Pilote totals after Excel pa
   expect(snapshot.excludedHidden).toBe(2);
   expect(snapshot.months[0]).toMatchObject({ income: 20, expenses: 5, balance: 15, count: 2 });
 });
+
+it("identifies Pilote payments across row moves and category edits, distinguishing accounts and descriptions", () => {
+  const original = parseBankinPiloteWorkbook(workbookBuffer([["01/10/2026", "TEST", "Compte A", -10, "Logement", "Loyer", "", ""]]))[0];
+  const changed = parseBankinPiloteWorkbook(workbookBuffer([
+    ["01/10/2026", "OTHER", "Compte A", -10, "Logement", "Loyer", "", ""],
+    ["01/10/2026", "TEST", "Compte A", -10, "Divers", "Autre", "", ""],
+    ["01/10/2026", "TEST", "Compte B", -10, "Logement", "Loyer", "", ""],
+  ]));
+  expect(original.identity).toMatch(/^[a-f0-9]{64}$/);
+  expect(changed[1].identity).toBe(original.identity);
+  expect(changed[0].identity).not.toBe(original.identity);
+  expect(changed[2].identity).not.toBe(original.identity);
+});

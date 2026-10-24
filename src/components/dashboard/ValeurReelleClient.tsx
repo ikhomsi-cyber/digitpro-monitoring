@@ -28,6 +28,7 @@ import { BILLABLE_CLIENT_TJM_HT, resolveBillableTjmForClientMonth, type Billable
 import { mapExpenseCategoryLabel } from "@/lib/expense-category-map";
 import {
   analyzeValeurReelle,
+  type ValeurReelleCsgRate,
   computeVatSavingsKpis,
   VALEUR_REELLE_EXPENSE_CATEGORIES,
   type ValeurReelleAnalysis,
@@ -1137,6 +1138,7 @@ function computeValeurReelleViewModel(input: {
   billableSelected: ReadonlySet<string>;
   billableRatePeriods: readonly BillableRatePeriod[];
   billableTjmHt: number;
+  csgRate: ValeurReelleCsgRate;
 }): ValeurReelleViewModel {
   const {
     transactions,
@@ -1145,10 +1147,12 @@ function computeValeurReelleViewModel(input: {
     singleMonth,
     billableSelected,
     billableRatePeriods,
-    billableTjmHt
+    billableTjmHt,
+    csgRate
   } = input;
 
   const analysis = analyzeValeurReelle(transactions, {
+    csgRate,
     years: selectedYears,
     months: selectedMonthsForYears.length ? selectedMonthsForYears : null
   });
@@ -1197,7 +1201,8 @@ function computeValeurReelleViewModel(input: {
     12,
     new Date(),
     billableRatePeriods,
-    billableTjmHt
+    billableTjmHt,
+    csgRate
   );
 
   // Jours du CA encaissé via le TJM réel du mois d'encaissement (pas un barème par défaut).
@@ -1230,6 +1235,7 @@ export function ValeurReelleClient({
   loadError: string | null;
 }) {
   const fmt = useDashboardDisplayFormat();
+  const [csgRate, setCsgRate] = useState<ValeurReelleCsgRate>(0.097);
   const [selectedYears, setSelectedYears] = useState<number[]>(
     () => defaultDashboardPeriodFilter().selectedYears
   );
@@ -1314,6 +1320,7 @@ export function ValeurReelleClient({
   const filterKey = useMemo(
     () =>
       [
+        csgRate,
         selectedYears.join(","),
         selectedMonthsForYears.join(","),
         singleMonth ?? "",
@@ -1322,6 +1329,7 @@ export function ValeurReelleClient({
         billableTjmHt
       ].join(":"),
     [
+      csgRate,
       billableRatePeriodsKey,
       billableSelectedKey,
       billableTjmHt,
@@ -1357,7 +1365,8 @@ export function ValeurReelleClient({
             singleMonth,
             billableSelected,
             billableRatePeriods,
-            billableTjmHt
+            billableTjmHt,
+            csgRate
           });
           if (cancelled) return;
           setViewModel(next);
@@ -1373,6 +1382,7 @@ export function ValeurReelleClient({
       if (timer != null) window.clearTimeout(timer);
     };
   }, [
+    csgRate,
     billableRatePeriods,
     billableSelected,
     billableTjmHt,
@@ -1410,7 +1420,7 @@ export function ValeurReelleClient({
   );
 
   const currentMonthDailyBreakdown = useMemo(() => {
-    const analysis = analyzeValeurReelle(transactions, { years: null, month: currentMonthKey });
+    const analysis = analyzeValeurReelle(transactions, { years: null, month: currentMonthKey, csgRate });
     const tjmHt = resolveBillableTjmForClientMonth(
       billableRatePeriods,
       billableRatePeriods[0]?.clientName ?? "",
@@ -1429,6 +1439,7 @@ export function ValeurReelleClient({
       currentMonthProjection
     });
   }, [
+    csgRate,
     billableRatePeriods,
     billableSelected,
     billableTjmHt,
@@ -1441,6 +1452,7 @@ export function ValeurReelleClient({
     singleMonth === currentMonthKey ? currentMonthProjection : null;
 
   const periodFilter = (
+    <>
     <DashboardInsightPeriodFilter
       eyebrow="Valeur réelle"
       title="Ce qu'il vous reste vraiment"
@@ -1452,6 +1464,13 @@ export function ValeurReelleClient({
       onToggleMonth={onToggleMonth}
       onClearMonths={onClearMonths}
     />
+    <div className="-mt-2 flex items-center justify-center gap-2" role="group" aria-label="Taux de CSG">
+      <span className="text-[10px] font-medium uppercase tracking-wider text-ink-400 dark:text-white/40">CSG</span>
+      <div className="inline-flex rounded-full border border-ink-200/50 bg-ink-100/40 p-0.5 dark:border-white/10 dark:bg-white/[0.04]">
+        {([0.097, 0.172] as const).map(rate => <button key={rate} type="button" aria-pressed={csgRate === rate} onClick={() => setCsgRate(rate)} className={clsx("min-h-7 rounded-full px-2.5 text-[11px] font-medium tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400", csgRate === rate ? "bg-ink-200/70 text-ink-900 dark:bg-white/15 dark:text-white" : "text-ink-400 hover:text-ink-700 dark:text-white/45 dark:hover:text-white/80")}>{rate === 0.097 ? "9,7 %" : "17,2 %"}</button>)}
+      </div>
+    </div>
+    </>
   );
 
   const statusBanners = (

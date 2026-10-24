@@ -29,3 +29,13 @@ it("returns an honest empty response when no export or requested period exists",
  expect(result.summary).toBeNull();expect(result.months).toEqual([]);expect(result.travel.total).toBe(0);
  expect(buildMobilePilote(snapshot,{...options,views:[],period:'2024-01'}).summary).toBeNull();
 });
+it("exposes matching daily coverage for selected views and stops at today in Paris",()=>{
+ const result=buildMobilePilote(snapshot,{...options,views:['essential'],period:'2026-10'},new Date('2026-10-13T12:00:00Z'));
+ expect(result.dailyCoverage).toMatchObject({month:'2026-10',daysInMonth:31,firstDeficit:{day:1,balance:-454}});
+ expect(result.dailyCoverage?.points).toHaveLength(13);
+ expect(result.dailyCoverage?.points.at(-1)).toMatchObject({income:1250,expenses:1704,balance:-454});
+ const combined=buildMobilePilote(snapshot,{...options,views:['essential','travel'],period:'2026-10'},new Date('2026-10-13T12:00:00Z'));
+ expect(combined.dailyCoverage?.points.at(-1)?.expenses).toBe(1854);
+ expect(buildMobilePilote(snapshot,{...options,views:['essential'],period:'2026'},new Date('2026-10-13')).dailyCoverage).toBeNull();
+ expect(buildMobilePilote({...snapshot,rows:undefined},{...options,views:['essential']},new Date('2026-10-13')).dailyCoverage).toBeNull();
+});

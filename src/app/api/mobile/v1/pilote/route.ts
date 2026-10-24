@@ -1,3 +1,4 @@
+import { decodePiloteStorage } from "@/lib/bankin/pilote-storage";
 import { z } from "zod";
 import { mobileAuth, mobileJSON, mobileFailure, MobileError } from "@/lib/mobile/auth";
 import { buildMobilePilote } from "@/lib/mobile/pilote";
@@ -13,6 +14,6 @@ export async function GET(request:Request){
     if(views.some(v=>!["essential","secondary","travel"].includes(v)))throw new MobileError(400,"Type de dépenses invalide.");
     const {data,error}=await client.from("bankin_pilote_snapshots").select("snapshot").eq("user_id",userId).maybeSingle();
     if(error)throw new MobileError(503,"Le bilan Bankin est indisponible.");
-    return mobileJSON(buildMobilePilote(data?.snapshot as unknown as BankinPiloteSnapshot|null,{...parsed.data,views:[...new Set(views)] as ("essential"|"secondary"|"travel")[]}));
+    return mobileJSON(buildMobilePilote(data?.snapshot ? decodePiloteStorage(data.snapshot as unknown as BankinPiloteSnapshot) : null,{...parsed.data,views:[...new Set(views)] as ("essential"|"secondary"|"travel")[]}));
   }catch(error){return mobileFailure(error);}
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { fetchUpcomingQontoDebits } from "@/app/dashboard/gmail-actions";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -25,7 +24,6 @@ import { useHiwayInvoices } from "@/components/dashboard/HiwayInvoicesContext";
 import { useBillableActivity } from "@/components/dashboard/BillableActivityContext";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { computeCurrentMonthInvoice, computeUpcomingInvoice } from "@/lib/upcoming-invoice";
-import type { QontoUpcomingDebit } from "@/lib/gmail/qonto-debit-parser";
 import { monthTitleFr } from "@/lib/billable-calendar-metrics";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 
@@ -74,65 +72,6 @@ function formatDebitDateLabel(iso: string): string {
     day: "numeric",
     month: "short"
   }).format(new Date(y, m - 1, d));
-}
-
-function shortenDebitOrganization(name: string): string {
-  const folded = name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-  if (folded.includes("direction generale des finances") || folded.includes("dgfip")) {
-    return "DGFiP";
-  }
-  if (folded.includes("urssaf")) return "Urssaf";
-  if (folded.includes("hiway")) return "Hiway";
-  if (name.length > 14) return `${name.slice(0, 12).trim()}…`;
-  return name;
-}
-
-function UpcomingQontoDebitsList({
-  debits,
-  fmt
-}: {
-  debits: QontoUpcomingDebit[];
-  fmt: ReturnType<typeof useDashboardDisplayFormat>;
-}) {
-  if (!debits.length) return null;
-
-  return (
-    <div
-      className="mt-1.5 flex flex-wrap items-center gap-1.5"
-      aria-label="Prochains prélèvements"
-    >
-      <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-ink-400 dark:text-white/50">
-        Prél.
-      </span>
-      {debits.map((debit) => (
-        <span
-          key={debit.id}
-          title={`${debit.organization} · ${formatDebitDateLabel(debit.debitDateIso)}`}
-          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-ink-200/55 bg-ink-50/70 px-2 py-0.5 text-[10px] leading-none dark:border-white/10 dark:bg-transparent"
-        >
-          <span className="truncate font-semibold text-ink-700 dark:text-white/90">
-            {shortenDebitOrganization(debit.organization)}
-          </span>
-          <span className="shrink-0 text-ink-300 dark:text-white/30" aria-hidden>
-            ·
-          </span>
-          {debit.amountEur != null ? (
-            <span className="shrink-0 font-bold tabular-nums text-ink-900 dark:text-white">
-              {fmt.euro(debit.amountEur)}
-            </span>
-          ) : (
-            <span className="shrink-0 text-ink-400 dark:text-white/45">—</span>
-          )}
-          <span className="shrink-0 text-ink-300 dark:text-white/30" aria-hidden>
-            ·
-          </span>
-          <span className="shrink-0 tabular-nums text-ink-400 dark:text-white/55">
-            {formatDebitDateLabel(debit.debitDateIso)}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
 }
 
 /** Pictogramme par catégorie de dépense (macro bucket ou Bankin). */
@@ -736,26 +675,6 @@ export function RevolutInsightsSection({
   const { invoices: hiwayInvoices } = useHiwayInvoices();
   const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const [expenseKindFilter, setExpenseKindFilter] = useState<ExpenseKindFilter>("all");
-  const [qontoDebits, setQontoDebits] = useState<QontoUpcomingDebit[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    console.time("dashboard:gmail");
-    void fetchUpcomingQontoDebits()
-      .then(({ debits }) => {
-        if (!cancelled) setQontoDebits(debits);
-      })
-      .catch(() => {
-        // Gmail non connecté ou indisponible : on garde les données SSR le cas échéant.
-      })
-      .finally(() => {
-        console.timeEnd("dashboard:gmail");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const scopedTx = useMemo(
     () => transactions.filter((t) => (t.scope ?? "pro") === "pro"),
     [transactions]
@@ -826,14 +745,6 @@ export function RevolutInsightsSection({
     [billable.billableRatePeriods, billable.selected, billable.tjmHt]
   );
 
-  /** Prélèvements Gmail — uniquement mois civil en cours, et seulement si la carte affiche ce mois. */
-  const qontoDebitsThisMonth = useMemo(() => {
-    const nowKey = monthKeyNow();
-    if (isAnnual || monthKey !== nowKey) return [];
-    return qontoDebits
-      .filter((d) => d.debitDateIso.startsWith(nowKey))
-      .sort((a, b) => a.debitDateIso.localeCompare(b.debitDateIso));
-  }, [qontoDebits, monthKey, isAnnual]);
 
   const depensesDelta = filteredDepenses - previousFilteredDepenses;
   const entreesDelta = current.entrees - previous.entrees;
@@ -932,7 +843,6 @@ export function RevolutInsightsSection({
               HT lorsque la TVA est récupérable.
             </p>
           ) : null}
-          <UpcomingQontoDebitsList debits={qontoDebitsThisMonth} fmt={fmt} />
           <div className="mt-1.5">
             <ExpenseCategoryBars rows={expenseMacroRows} fmt={fmt} />
           </div>

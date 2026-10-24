@@ -65,7 +65,7 @@ export function buildValeurReelleWaterfall(tree: ValeurReelleCashTree): ValeurRe
     cumulativeEur: cumulative,
     kind: "decrease",
     pctOfCaHt: pctOfCa(csg, caHt),
-    detail: "9,7 % de (CA HT − frais obligatoires − charges perso)"
+    detail: `${((tree.csgRate ?? 0.097) * 100).toLocaleString("fr-FR")} % de (CA HT − frais obligatoires − charges perso)`
   });
 
   cumulative = round2(cumulative - digitPro);

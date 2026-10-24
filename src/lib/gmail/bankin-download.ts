@@ -37,23 +37,65 @@ export function bankinExportReadySubject(value: string): boolean {
   return /^votre export(?: de donnees)? est pret[.!]?$/i.test(folded);
 }
 
+/** Read only a bounded error prefix and expose fixed messages, never S3's raw response. */
+async function bankinBadRequestMessage(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  if (reader) {
+    try {
+      while (length < 4096) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const prefix = chunk.value.subarray(0, 4096 - length);
+        chunks.push(prefix); length += prefix.length;
+      }
+    } catch { /* Preserve the original HTTP error when its body cannot be read. */ }
+    finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+  }
+  const code = Buffer.concat(chunks).toString("utf8").match(/<Code>\s*([A-Za-z]+)\s*<\/Code>/)?.[1];
+  const reasons: Record<string, string> = {
+    ExpiredToken: "Le lien Bankin contient une autorisation expirée (ExpiredToken).",
+    RequestExpired: "Le lien Bankin a expiré (RequestExpired).",
+    InvalidToken: "L’autorisation du lien Bankin est invalide (InvalidToken).",
+    AuthorizationQueryParametersError: "Les paramètres de signature du lien Bankin sont invalides (AuthorizationQueryParametersError).",
+    InvalidArgument: "Le lien Bankin contient un paramètre invalide (InvalidArgument).",
+    InvalidRequest: "Le serveur Bankin refuse cette requête de téléchargement (InvalidRequest).",
+    RequestTimeTooSkewed: "Le serveur Bankin signale un décalage d’horloge (RequestTimeTooSkewed)."
+  };
+  const reason = code && Object.hasOwn(reasons, code) ? reasons[code] : "Bankin refuse le lien de cet export (HTTP 400, motif non reconnu).";
+  return `${reason} Demandez un nouvel export dans Bankin et attendez le nouvel email avant de relancer l’import Gmail. Votre bilan Pilote est conservé. Vous pouvez aussi utiliser le bouton Excel avec un fichier déjà téléchargé.`;
+}
+
 /** Download only from the known export host; never forward Gmail credentials or follow unchecked redirects. */
 export async function downloadBankinFile(link: string, fetcher: typeof fetch = fetch): Promise<{ buffer: Buffer; filename: string }> {
   let url = validateBankinDownloadUrl(link);
   const signal = AbortSignal.timeout(30_000);
-  for (let redirects = 0; redirects <= 3; redirects++) {
+  let redirects = 0;
+  let transientRetries = 0;
+  while (redirects <= 3) {
     const response = await fetcher(url.href, { redirect: "manual", signal, credentials: "omit", cache: "no-store" });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       const location = response.headers.get("location");
       if (!location || redirects === 3) throw new BankinExportError("Redirection d’export invalide.");
-      url = validateBankinDownloadUrl(new URL(location, url).href); continue;
+      url = validateBankinDownloadUrl(new URL(location, url).href); redirects++; continue;
     }
     if (response.status === 401 || response.status === 403 || response.status === 404 || response.status === 410) {
       await response.body?.cancel();
       throw new BankinExportError("Le lien du dernier export a expiré ou son accès est refusé. Demandez un nouvel export dans Bankin.");
     }
-    if (!response.ok) { await response.body?.cancel(); throw new BankinExportError("Le téléchargement Bankin est momentanément indisponible."); }
+    if (!response.ok) {
+      if (response.status === 400) throw new BankinExportError(await bankinBadRequestMessage(response));
+      await response.body?.cancel();
+      // Retry only a temporary failure, against the same validated URL and without credentials.
+      if ([429, 500, 502, 503, 504].includes(response.status) && transientRetries < 1) {
+        transientRetries++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue;
+      }
+      throw new BankinExportError(`Le téléchargement Bankin est indisponible (HTTP ${response.status}). Réessayez dans quelques instants ou importez votre fichier avec le bouton Excel. Votre bilan Pilote est conservé.`);
+    }
     if (Number(response.headers.get("content-length") ?? 0) > MAX_IMPORT_BYTES) {
       await response.body?.cancel(); throw new BankinExportError("Export trop volumineux (3 Mo maximum). Réduisez la période dans Bankin.");
     }

@@ -20,7 +20,7 @@ export function isHiwayInvoiceSubject(subject: string): boolean {
 }
 
 /** Fenêtre de recherche Gmail pour les prélèvements Qonto (aujourd'hui inclus + 10 jours précédents). */
-export const QONTO_DEBIT_GMAIL_LOOKBACK_DAYS = 10;
+export const QONTO_DEBIT_GMAIL_LOOKBACK_DAYS = 90;
 
 function qontoDebitGmailDateWindow(): string {
   return `newer_than:${QONTO_DEBIT_GMAIL_LOOKBACK_DAYS}d`;
@@ -30,6 +30,7 @@ function qontoDebitGmailDateWindow(): string {
 export function qontoDebitGmailQueries(): string[] {
   const window = qontoDebitGmailDateWindow();
   return [
+    `from:qonto.com {subject:debitera subject:prélèvement subject:prelevement} ${window}`,
     `from:qonto debitera compte ${window}`,
     `debitera votre compte ${window}`,
     `débitera votre compte ${window}`,

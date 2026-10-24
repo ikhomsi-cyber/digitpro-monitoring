@@ -1,3 +1,4 @@
+import { DailyFinancialAssistant } from "@/components/dashboard/DailyFinancialAssistant";
 import Link from "next/link";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
@@ -257,6 +258,7 @@ export default async function DashboardPage({
           powensPrimaryImportAxis={powensPrimaryAxis}
         />
     <div data-page="dashboard" className="premium-dashboard-page mx-auto max-w-6xl px-4 pb-28 pt-[max(3.75rem,calc(env(safe-area-inset-top)+3.25rem))] sm:px-6 md:pb-10 md:pt-[max(0.75rem,env(safe-area-inset-top))] lg:ml-32 lg:mr-8 lg:max-w-none lg:px-8 2xl:mx-auto 2xl:mr-auto 2xl:max-w-[1720px]">
+      {user ? <DailyFinancialAssistant key={user.id} userId={user.id} demoMode={demoMode} /> : null}
       {showLmnpPanel ? (
         <LMNPClient
           analysis={analyzeLmnp(transactions)}
