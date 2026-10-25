@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft } from "lucide-react";
-import { dashboardInsightCard, dashboardPanelTitle, dashboardPanelSub } from "@/lib/dashboard-surfaces";
+import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
 import { GmailAccountPicker } from "./GmailAccountPicker";
 import type { GmailAccount } from "@/lib/gmail/accounts";
+import { PilotePocketSummary } from "./PilotePocketSummary";
 import { PiloteDailyChart } from "./PiloteDailyChart";
 import type { PiloteDaily } from "@/lib/bankin/pilote-daily";
 import dynamic from "next/dynamic";
@@ -108,7 +109,7 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
 export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: boolean; onImported: () => Promise<boolean>; loadData: (refresh?:boolean) => Promise<PiloteDashboardData> }) {
   const fmt = useDashboardDisplayFormat();
   const money = fmt.euro;
-  const { searchParams } = useDashboardSection();
+  const { searchParams, piloteExpenseViews:expenseViews, setPiloteExpenseViews:setExpenseViews } = useDashboardSection();
   const [snapshot, setSnapshot] = useState<BankinPiloteSnapshot | null>(null);
   const [daily, setDaily] = useState<PiloteDaily | null>(null);
   const [loading, setLoading] = useState(!demoMode);
@@ -134,7 +135,6 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   const selectedMonth = months.find(m => m.month === selected) ?? months.at(-1);
   const selectedYear = selectedMonth?.month.slice(0, 4) ?? "";
   const isAnnual = periodMode === "year";
-  const [expenseViews, setExpenseViews] = useState<PiloteExpenseView[]>(["essential"]);
   const period = isAnnual ? buildPiloteYear(months, selectedYear) : selectedMonth;
   const current = period ? filterPiloteExpenses(period, expenseViews) : undefined;
   const monthIndex = months.findIndex(m => m.month === selectedMonth?.month);
@@ -197,21 +197,16 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   };
   const compensations = current ? buildPiloteCompensations(current, months) : [];
   const years = [...new Set(months.map(m => m.month.slice(0, 4)))].reverse();
-  const total = current?.expenses ?? 0;
-  const gradient = current && total ? current.categories.slice(0, 5).concat(current.categories.length > 5 ? [{ name: "Autres", expenses: current.categories.slice(5).reduce((sum, c) => sum + c.expenses, 0), income: 0, count: 0, children: [] }] : []).map((c, index, list) => {
-    const start = list.slice(0, index).reduce((sum, c) => sum + c.expenses, 0) / total * 100;
-    return `${COLORS[index]} ${start}% ${start + c.expenses / total * 100}%`;
-  }).join(",") : "#1e3d3a 0% 100%";
 
   return <section className="space-y-4 pb-28 md:pb-8" aria-label="Pilote financier">
-    <div className="border-b border-ink-200/50 pb-3 dark:border-white/10"><h2 className={dashboardPanelTitle}>Pilote</h2><p className={`mt-0.5 ${dashboardPanelSub}`}>Votre bilan Bankin</p></div>
+    {current&&!loading?<PilotePocketSummary hero families={compensations} periodLabel={`${isAnnual?selectedYear:selectedMonth?monthName(selectedMonth.month):""} · ${expenseViews.map(view=>({essential:"Essentiel",secondary:"Presque essentiel",travel:"Voyages"}[view])).join(" + ")||"Aucune vue"}`}/>:null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[0.06]" role="group" aria-label="Période de Pilote">{([{value: "month", label: "Mois"}, {value: "year", label: "Année entière"}] as const).map(mode => <button key={mode.value} type="button" aria-pressed={periodMode === mode.value} onClick={() => setPeriodMode(mode.value)} className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${periodMode === mode.value ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/55"}`}>{mode.label}</button>)}</div>
         {isAnnual ? <div className="flex flex-wrap justify-center gap-1" role="group" aria-label="Année analysée">{years.map(year => <button type="button" key={year} aria-pressed={year === selectedYear} onClick={() => setSelected(months.filter(m => m.month.startsWith(`${year}-`)).at(-1)!.month)} className={`min-h-11 rounded-full border px-3 text-xs font-medium tabular-nums ${year === selectedYear ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" : "border-ink-200/60 text-ink-500 dark:border-white/10 dark:text-white/55"}`}>{year}</button>)}</div> : <div className="flex items-center gap-1"><button type="button" aria-label="Mois précédent" disabled={monthIndex <= 0} onClick={() => setSelected(months[monthIndex - 1].month)} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 disabled:opacity-25 dark:text-white/45 dark:hover:bg-white/[0.06]"><ChevronLeft className="h-4 w-4" /></button><span className="text-sm font-medium capitalize text-ink-700 dark:text-white/75">{selectedMonth ? monthName(selectedMonth.month) : "Aucune donnée"}</span><button type="button" aria-label="Mois suivant" disabled={monthIndex < 0 || monthIndex >= months.length - 1} onClick={() => setSelected(months[monthIndex + 1].month)} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 disabled:opacity-25 dark:text-white/45 dark:hover:bg-white/[0.06]"><ChevronRight className="h-4 w-4" /></button></div>}
         {isAnnual ? <p className="text-[10px] text-ink-500 dark:text-white/45">Totaux {selectedYear} · mois présents dans l’export Bankin</p> : null}
       </div>
     <div className="space-y-2"><div role="group" aria-label="Vue des dépenses" className="flex rounded-full bg-ink-100/70 p-1 dark:bg-white/[0.06]">{([{value: "essential", label: "Essentiel"}, {value: "secondary", label: "Presque essentiel"}, {value: "travel", label: "Voyages"}] as const).map(view => <button key={view.value} type="button" aria-pressed={expenseViews.includes(view.value)} onClick={() => setExpenseViews(selected => selected.includes(view.value) ? selected.filter(value => value !== view.value) : [...selected, view.value])} className={`min-h-10 min-w-0 flex-1 rounded-full px-2 text-xs font-semibold transition ${expenseViews.includes(view.value) ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/60"}`}>{view.label}</button>)}</div></div>
-    {current ? (!isAnnual && selectedMonth ? <PiloteDailyChart key={selectedMonth.month} days={daily?.[selectedMonth.month]} month={selectedMonth.month} views={expenseViews} summary={<div className="flex items-center gap-4 py-2 sm:gap-6"><div className="relative flex h-28 w-28 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(${gradient})` }} role="img" aria-label={`Répartition des sorties : ${current.categories.map(c => `${c.name} ${money(c.expenses)}`).join(", ")}`}><div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white dark:bg-[#10322f]"><strong className="text-xl text-ink-900 dark:text-white">{current.expenses ? `${fmt.dummy ? "••" : Math.round(current.income / current.expenses * 100)} %` : "—"}</strong><span className="mt-1 text-[10px] text-ink-500 dark:text-white/50">couverture</span></div></div><div><p className={`text-lg font-semibold ${current.balance >= 0 ? "text-emerald-500" : "text-rose-400"}`}>{current.balance >= 0 ? "Solde positif" : "Solde négatif"}</p><p className="mt-2 text-xs leading-relaxed text-ink-500 dark:text-white/60">{current.expenses ? `${money(current.income)} de rentrées face à ${money(current.expenses)} de sorties.` : "Aucune sortie enregistrée sur cette période."}</p></div></div>} /> : <div className="rounded-2xl border border-ink-200/60 p-4 dark:border-white/10"><div className="flex items-center gap-4 py-2 sm:gap-6"><div className="relative flex h-28 w-28 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(${gradient})` }} role="img" aria-label={`Répartition des sorties : ${current.categories.map(c => `${c.name} ${money(c.expenses)}`).join(", ")}`}><div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white dark:bg-[#10322f]"><strong className="text-xl text-ink-900 dark:text-white">{current.expenses ? `${fmt.dummy ? "••" : Math.round(current.income / current.expenses * 100)} %` : "—"}</strong><span className="mt-1 text-[10px] text-ink-500 dark:text-white/50">couverture</span></div></div><div><p className={`text-lg font-semibold ${current.balance >= 0 ? "text-emerald-500" : "text-rose-400"}`}>{current.balance >= 0 ? "Solde positif" : "Solde négatif"}</p><p className="mt-2 text-xs leading-relaxed text-ink-500 dark:text-white/60">{current.expenses ? `${money(current.income)} de rentrées face à ${money(current.expenses)} de sorties.` : "Aucune sortie enregistrée sur cette période."}</p></div></div><p className="mt-4 text-xs text-ink-500">Sélectionnez une vue mensuelle pour comparer les entrées et sorties au fil des jours.</p></div>) : null}
+    {current&&!isAnnual&&selectedMonth?<PiloteDailyChart key={selectedMonth.month} days={daily?.[selectedMonth.month]} month={selectedMonth.month} views={expenseViews}/>:null}
     {fmt.dummy ? <p className="text-xs text-amber-600 dark:text-amber-200">Affichage masqué : les montants et les pourcentages affichés sont fictifs.</p> : null}
     {loadError ? <p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Les données peuvent être incomplètes : {loadError}</p> : null}
     {loading ? <p role="status" className="text-sm text-ink-500 dark:text-white/60">Chargement du bilan Bankin…</p> : null}

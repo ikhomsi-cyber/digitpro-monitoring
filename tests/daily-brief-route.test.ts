@@ -17,21 +17,25 @@ beforeEach(()=>{
  });
 });
 it("scopes both data sources to the authenticated user and never caches the response",async()=>{
- const response=await GET();expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toContain("no-store");
+ const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toContain("no-store");
  expect(mocks.owner).toHaveBeenCalledWith("transactions","synthetic-owner");expect(mocks.owner).toHaveBeenCalledWith("bankin_pilote_snapshots","synthetic-owner");
  expect(mocks.balance).toHaveBeenCalledWith("synthetic-owner");
  const body=await response.json();expect(body.household).toBeNull();expect(body.qontoBalance).toBeNull();
 });
 it("does not query financial data for anonymous callers or demo mode",async()=>{
- mocks.user.mockResolvedValue({data:{user:null},error:null});expect((await GET()).status).toBe(401);
- mocks.user.mockResolvedValue({data:{user:{id:"synthetic-owner"}},error:null});mocks.mode.mockReturnValue("DEMO");expect((await GET()).status).toBe(409);
+ mocks.user.mockResolvedValue({data:{user:null},error:null});expect((await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"))).status).toBe(401);
+ mocks.user.mockResolvedValue({data:{user:{id:"synthetic-owner"}},error:null});mocks.mode.mockReturnValue("DEMO");expect((await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"))).status).toBe(409);
  expect(mocks.from).not.toHaveBeenCalled();expect(mocks.balance).not.toHaveBeenCalled();
 });
 it("reports partial data and keeps provider diagnostics private",async()=>{
  mocks.tx.mockResolvedValue({data:null,error:{message:"private-diagnostic"}});
- const response=await GET();expect(response.status).toBe(200);const body=await response.json();expect(body.pro).toBeNull();expect(body.warnings.length).toBeGreaterThan(0);expect(JSON.stringify(body)).not.toContain("private-diagnostic");
+ const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(200);const body=await response.json();expect(body.pro).toBeNull();expect(body.warnings.length).toBeGreaterThan(0);expect(JSON.stringify(body)).not.toContain("private-diagnostic");
 });
 it("returns an actionable error when both sources are unavailable",async()=>{
  mocks.tx.mockRejectedValue(new Error("private-tx"));mocks.snapshot.mockRejectedValue(new Error("private-snapshot"));
- const response=await GET();expect(response.status).toBe(503);expect(await response.text()).not.toContain("private-");
+ const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(503);expect(await response.text()).not.toContain("private-");
+});
+it("returns household comparison aggregates without exposing imported rows",async()=>{
+ mocks.snapshot.mockResolvedValue({data:{snapshot:{version:2,months:[],rows:[{sourceRow:1,date:"2026-01-02",amount:-50,parentCategory:"Alimentation",subCategory:"synthetic-private-label",hidden:false}],sourceFilename:"synthetic.xlsx",fileHash:"fixture",sourceRows:1,excludedHidden:0,excludedInternal:0,importedAt:"2026-01-03T00:00:00Z"}},error:null});
+ const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(200);const body=await response.json();expect(body.householdHistory).toHaveLength(4);expect(body.householdHistory[0].outOfPocket).toBe(50);expect(JSON.stringify(body)).not.toContain("synthetic-private-label");expect(JSON.stringify(body)).not.toContain('"rows"');
 });

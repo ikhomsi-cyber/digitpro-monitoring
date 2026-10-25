@@ -6,11 +6,19 @@ import type { GroceryOrder } from "./parser";
 import type { GmailAccount } from "@/lib/gmail/accounts";
 const itemSchema=z.object({name:z.string().min(1).max(300),productKey:z.string().min(1).max(600),quantity:z.number().positive().max(1000),unitPriceCents:z.number().int().nonnegative().max(10000000),totalCents:z.number().int().nonnegative().max(10000000)});
 export type StoredGroceryOrder=GroceryOrder & {id:string; account:GmailAccount | "bankin"; source?:"gmail"|"bankin"; bankLabel?:string};
-export async function loadGroceryOrders(client:SupabaseClient<Database>,userId:string){
- const {data,error}=await client.from("grocery_orders").select("*").eq("user_id",userId).order("ordered_at",{ascending:false}).limit(501);
+export async function loadGroceryOrders(client:SupabaseClient<Database>,userId:string,options:{summaryOnly?:boolean;period?:string}={}){
+ const columns=options.summaryOnly?"id,merchant,order_ref,ordered_at,total_cents,gmail_account":"id,merchant,order_ref,ordered_at,total_cents,gmail_account,items";
+ let query=client.from("grocery_orders").select(columns).eq("user_id",userId);
+ if(options.period&&options.period!=="all"){
+  const year=Number(options.period.slice(0,4)),month=options.period.length===7?Number(options.period.slice(5,7)):1;
+  const from=`${year}-${String(month).padStart(2,"0")}-01`;
+  const end=options.period.length===7?new Date(Date.UTC(year,month,1)):new Date(Date.UTC(year+1,0,1));
+  query=query.gte("ordered_at",from).lt("ordered_at",end.toISOString().slice(0,10));
+ }
+ const {data,error}=await query.order("ordered_at",{ascending:false}).limit(501);
  if(error)throw new Error("Le suivi des courses est indisponible. Vérifiez sa migration.");
- const orders:StoredGroceryOrder[]=(data??[]).slice(0,500).map(row=>{
-  const parsed=z.array(itemSchema).max(500).safeParse(row.items);
+ const orders:StoredGroceryOrder[]=((data??[]) as unknown as Database["public"]["Tables"]["grocery_orders"]["Row"][]).slice(0,500).map(row=>{
+  const parsed=options.summaryOnly?{success:true as const,data:[]}:z.array(itemSchema).max(500).safeParse(row.items);
   if(!parsed.success)throw new Error("Une commande sauvegardée est illisible.");
   return {id:row.id,merchant:row.merchant,orderRef:row.order_ref,date:row.ordered_at,totalCents:row.total_cents,items:parsed.data,account:row.gmail_account as GmailAccount};
  });

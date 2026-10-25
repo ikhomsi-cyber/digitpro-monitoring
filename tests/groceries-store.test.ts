@@ -23,3 +23,13 @@ it('keeps a known total when enriching missing products, and skips identical rei
  expect(await saveGroceryOrder(b.db,'user-test','secondary','message-test',order)).toBe(false);
  expect(b.query.update).not.toHaveBeenCalled();
 });
+it('omits product payloads from the initial summary query and scopes detail reads by owner and period',async()=>{
+ const query:any={};for(const method of ['select','eq','order','gte','lt'])query[method]=vi.fn(()=>query);
+ query.limit=vi.fn(async()=>({data:[{id:'fixture',merchant:'Carrefour',order_ref:'TEST1234',ordered_at:'2026-10-16',total_cents:300,gmail_account:'primary',items:[item]}],error:null}));
+ const db={from:()=>query} as any;
+ const {loadGroceryOrders}=await import('@/lib/groceries/store');
+ const summary=await loadGroceryOrders(db,'synthetic-owner',{summaryOnly:true});
+ expect(query.select.mock.calls[0][0].split(',')).not.toContain('items');expect(summary.orders[0].items).toEqual([]);expect(query.eq).toHaveBeenCalledWith('user_id','synthetic-owner');
+ const detailed=await loadGroceryOrders(db,'synthetic-owner',{period:'2026-10'});
+ expect(query.gte).toHaveBeenCalledWith('ordered_at','2026-10-01');expect(query.lt).toHaveBeenCalledWith('ordered_at','2026-11-01');expect(detailed.orders[0].items).toHaveLength(1);
+});

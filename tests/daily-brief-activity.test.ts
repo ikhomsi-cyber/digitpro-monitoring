@@ -10,7 +10,8 @@ it("separates realized days from future planning and compares cash revenue at th
  const report=buildBriefActivity({date:"2026-10-24",transactions:[tx("1","2026-10-02",2400),tx("2","2025-10-02",1200),tx("3","2025-11-01",12000)],settings,invoices:[],cash:null});
  expect(report.workedMonth).toBe(1);expect(report.plannedMonth).toBe(1);expect(report.workedYear).toBe(2);
  expect(report.yearRevenueHt).toBe(2000);expect(report.previousYearRevenueHt).toBe(1000);expect(report.yearChangePercent).toBe(100);
- expect(report.nextInvoice).toMatchObject({kind:"estimate",days:2,amountHt:2000,dueDate:null});
+ expect(report.nextInvoice).toBeNull();
+ expect(report.generatedRevenueHt).toBe(2000);
 });
 it("does not double reserve CSG on an issued invoice and includes incremental VAT in cash projection",()=>{
  const report=buildBriefActivity({date:"2026-10-24",transactions:[],settings:null,invoices:[invoice],cash:500});
@@ -26,4 +27,47 @@ it("never claims that missing data secures cash and does not invent unknown invo
  expect(buildBriefActivity({date:"2026-10-24",transactions:[],settings,invoices:[{...invoice,amountKind:"inconnu"}],cash:500}).nextInvoice).toBeNull();
  expect(buildBriefActivity({date:"2026-10-24",transactions:[],settings,invoices:[{...invoice,amountKind:"inconnu"}],cash:500}).treasury).toBeNull();
  expect(previousYearCutoff("2024-02-29")).toBe("2023-02-28");
+});
+it("compares generated and cashed CA separately while excluding future work",()=>{
+ const work={days:["2026-01-02","2026-10-20","2026-10-26","2025-01-02","2025-10-20","2025-11-01"],tjm:940,rates:[{clientName:"Synthetic",startDate:"2025-01-01",endDate:"2025-12-31",tjmHt:820},{clientName:"Synthetic",startDate:"2026-01-01",endDate:null,tjmHt:940}]};
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[tx("cash","2026-10-01",1200)],settings:work,invoices:[],cash:500});
+ expect(report.generatedRevenueHt).toBe(1880);expect(report.yearRevenueHt).toBe(1000);expect(report.history[1]).toMatchObject({year:2025,generatedHt:1640,workedDays:2});expect(report.generatedChangePercent).toBeCloseTo(14.63);expect(report.nextInvoice).toBeNull();expect(report.treasury?.projectedMargin).toBeNull();
+});
+it("keeps generated historical CA unknown when no applicable historical rate exists",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:{days:["2025-10-01"],tjm:940,rates:[]},invoices:[],cash:null});expect(report.history[1].generatedHt).toBeNull();expect(report.generatedChangePercent).toBeNull();
+});
+it("uses the remaining amount on the Gmail invoice after a partial receipt",()=>{
+ expect(buildBriefActivity({date:"2026-10-25",transactions:[tx("partial","2026-10-03",600)],settings,invoices:[invoice],cash:500}).nextInvoice).toMatchObject({kind:"issued",amountHt:500,dueDate:"2026-10-30"});
+});
+it("selects the next Gmail due date ahead of an old unmatched balance",()=>{
+ const old={...invoice,id:"old",date:"2026-08-01",dueDate:"2026-08-31",amountEur:19000,subject:"Facture F8001"};
+ const upcoming={...invoice,id:"next",date:"2026-09-28",dueDate:"2026-10-31",amountEur:22000,subject:"Facture F8002"};
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[old,upcoming],cash:500});
+ expect(report.nextInvoice).toMatchObject({reference:"F8002",amountHt:22000,invoiceAmountHt:22000,dueDate:"2026-10-31"});
+});
+it("retains the original Gmail invoice amount while projecting only its unpaid balance",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[tx("partial","2026-10-03",600)],settings:null,invoices:[invoice],cash:500});
+ expect(report.nextInvoice).toMatchObject({amountHt:500,invoiceAmountHt:1000});
+});
+it("projects the entire Gmail invoice rather than a matching residual",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[tx("partial","2026-10-03",600)],settings:null,invoices:[invoice],cash:500});
+ // Debt: 1000 + 200 + 86 on the unmatched half. Receipt: 1200, extra VAT 200 and CSG 86 on the other half.
+ expect(report.treasury?.projectedMargin).toBe(128);
+});
+it("calculates personal-transfer capacity after reserves and never advances an unpaid invoice",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[invoice],cash:500});
+ expect(report.treasury?.availableTransferNow).toBe(0);expect(report.treasury?.availableTransferAfterInvoice).toBe(128);
+ const covered=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[],cash:2000});
+ expect(covered.treasury?.availableTransferNow).toBe(800);expect(covered.treasury?.availableTransferAfterInvoice).toBeNull();
+ expect(buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[],cash:null}).treasury).toBeNull();
+});
+it("compares professional expenses over identical year-to-date periods, excluding future and personal rows",()=>{
+ const expense=(id:string,date:string,amount:number):DashboardTx=>({...tx(id,date,amount),category:"Logiciels"});
+ const transactions=[expense("a","2026-01-03",-100),expense("b","2026-10-20",-50),expense("c","2025-10-20",-100),expense("future","2025-11-01",-1000),expense("later","2026-10-26",-1000),{...expense("private","2026-10-10",-900),scope:"personal" as const},{...expense("bnc","2026-10-11",-2000),category:"BNC",label:"BNC"},{...expense("vat","2026-10-11",-2000),category:"TVA",label:"DGFIP TVA"}];
+ const report=buildBriefActivity({date:"2026-10-25",transactions,settings:null,invoices:[],cash:null});
+ expect(report.yearExpensesHt).toBe(125);expect(report.previousYearExpensesHt).toBe(83.33);expect(report.expenseChangePercent).toBe(50.01);expect(report.history[1].expensesHt).toBe(83.33);
+});
+it("distinguishes missing previous-year expense history from zero expenses",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[{...tx("expense","2026-10-10",-100),category:"Logiciels"}],settings:null,invoices:[],cash:null});
+ expect(report.previousYearExpensesHt).toBeNull();expect(report.expenseChangePercent).toBeNull();
 });

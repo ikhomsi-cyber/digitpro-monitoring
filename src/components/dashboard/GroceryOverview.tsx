@@ -13,7 +13,7 @@ const muted="text-ink-500 dark:text-white/45";
 const currency=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",minimumFractionDigits:2,maximumFractionDigits:2});
 const monthLabel=(month:string,long=false)=>new Intl.DateTimeFormat("fr-FR",{month:long?"long":"short",...(long?{year:"numeric"}:{}),timeZone:"UTC"}).format(new Date(`${month}-01T12:00:00Z`));
 
-export function GroceryOverview({orders,insights,month,mode,onSelectMonth}:{orders:GroceryOrder[];insights:ReturnType<typeof groceryInsights>;month:string;mode:"month"|"year"|"all";onSelectMonth:(month:string)=>void}){
+export function GroceryOverview({orders,insights,month,mode,onSelectMonth,productsLoading=false}:{productsLoading?:boolean;orders:GroceryOrder[];insights:ReturnType<typeof groceryInsights>;month:string;mode:"month"|"year"|"all";onSelectMonth:(month:string)=>void}){
  const fmt=useDashboardDisplayFormat();
  const carrefourOrders=useMemo(()=>orders.filter(order=>order.merchant.toLowerCase()==="carrefour"),[orders]);
  const carrefourInsights=useMemo(()=>groceryCategoryTotals(carrefourOrders),[carrefourOrders]);
@@ -29,9 +29,10 @@ export function GroceryOverview({orders,insights,month,mode,onSelectMonth}:{orde
 
   <div className="space-y-4">
    <section className={panel}>
-    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><GroceryMerchantLogo merchant="Carrefour"/><div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Analyse des commandes Carrefour</h3><p className={`mt-1 text-[11px] ${muted}`}>Répartition par rayon · produits des commandes Gmail</p></div></div><div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full" style={{background:gradient?`conic-gradient(${gradient})`:"#64748b20"}} role="img" aria-label="Répartition par rayon, détaillée ci-dessous"><span className="grid h-12 w-12 place-items-center rounded-full bg-white text-xs font-semibold text-ink-700 dark:bg-[#0e3031] dark:text-white">{fmt.dummy?"••":carrefourInsights.categories.length}</span></div></div>
+    <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><GroceryMerchantLogo merchant="Carrefour"/><div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Analyse des commandes Carrefour</h3><p className={`mt-1 text-[11px] ${muted}`}>Répartition par rayon · produits des commandes Gmail</p></div></div><div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full" style={{background:gradient?`conic-gradient(${gradient})`:"#64748b20"}} role="img" aria-label="Répartition par rayon, détaillée ci-dessous"><span className="grid h-12 w-12 place-items-center rounded-full bg-white text-xs font-semibold text-ink-700 dark:bg-[#0e3031] dark:text-white">{fmt.dummy?"••":productsLoading?"…":carrefourInsights.categories.length}</span></div></div>
     <div className="mt-5 divide-y divide-ink-200/40 dark:divide-white/5">{carrefourInsights.categories.map(category=><GroceryCategoryRow key={category.name} category={category} orders={carrefourOrders} totalCents={carrefourInsights.itemTotalCents}/>)}</div>
-    {!carrefourInsights.categories.length?<p className={`mt-5 text-xs ${muted}`}>Aucune commande Carrefour avec détail produit pour cette période.</p>:null}
+    {productsLoading?<p role="status" className={`mt-5 text-xs ${muted}`}>Chargement des produits de cette période…</p>:null}
+    {!productsLoading&&!carrefourInsights.categories.length?<p className={`mt-5 text-xs ${muted}`}>Aucune commande Carrefour avec détail produit pour cette période.</p>:null}
     <p className={`mt-5 border-t border-ink-200/50 pt-3 text-[10px] leading-relaxed dark:border-white/10 ${muted}`}>Rayons estimés à partir des libellés. Prix des lignes avant frais et remises globales ; le total payé peut différer.</p>
    </section>
 

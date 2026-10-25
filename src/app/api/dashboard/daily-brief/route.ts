@@ -1,3 +1,6 @@
+import { decodePiloteStorage, type StoredPiloteSnapshot } from "@/lib/bankin/pilote-storage";
+import { householdOutOfPocketHistory } from "@/lib/daily-brief-household";
+import type { BankinPiloteSnapshot, PiloteExpenseView } from "@/lib/pilote";
 import { loadDailyBriefWork } from "@/lib/supabase/daily-brief-work";
 import { loadStoredHiwayInvoices } from "@/lib/gmail/hiway-invoice-store";
 import { getSupabaseRuntimeMode } from "@/lib/supabase/config";
@@ -9,12 +12,15 @@ import { decodePiloteReport } from "@/lib/bankin/pilote-report";
 import { buildDailyBrief, parisDay } from "@/lib/daily-financial-brief";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
 import { loadQontoLiveBalanceEur } from "@/lib/qonto/live-balance";
-export async function GET() {
+export async function GET(request:Request) {
  const client=await createSupabaseServerClient();
  if(!client)return Response.json({error:"Connexion requise."},{status:401,headers:privateResponseHeaders});
  const {data:{user},error}=await client.auth.getUser();
  if(error||!user)return Response.json({error:"Connexion requise."},{status:401,headers:privateResponseHeaders});
  if(getDashboardEffectiveDataMode(getSupabaseRuntimeMode(), await cookies())==="DEMO")return Response.json({error:"Le point quotidien est disponible avec vos données réelles."},{status:409,headers:privateResponseHeaders});
+ const rawViews=new URL(request.url).searchParams.get("views");
+ const views=(rawViews===null?["essential"]:rawViews===""?[]:rawViews.split(",")) as PiloteExpenseView[];
+ if(views.length>3||views.some(view=>!["essential","secondary","travel"].includes(view)))return Response.json({error:"Vue des dépenses invalide."},{status:400,headers:privateResponseHeaders});
  const date=parisDay();const warnings:string[]=[];
  const [txResult,snapshotResult,balanceResult,workResult,invoicesResult]=await Promise.allSettled([
   (async()=>{
@@ -30,7 +36,7 @@ export async function GET() {
   })(),
   (async()=>{
    const {data,error}=await client.from("bankin_pilote_snapshots").select("snapshot").eq("user_id",user.id).maybeSingle();
-   if(error)throw new Error("snapshot unavailable");return data?.snapshot?decodePiloteReport(data.snapshot):null;
+   if(error)throw new Error("snapshot unavailable");return data?.snapshot?decodePiloteStorage(data.snapshot as unknown as BankinPiloteSnapshot|StoredPiloteSnapshot):null;
   })(),
   loadQontoLiveBalanceEur(user.id),
   loadDailyBriefWork(client,user.id,date),
@@ -41,6 +47,6 @@ export async function GET() {
  if(txResult.status==="rejected"&&snapshotResult.status==="rejected")return Response.json({error:"Le point quotidien est temporairement indisponible. Réessayez."},{status:503,headers:privateResponseHeaders});
  if(workResult.status==="rejected")warnings.push("Calendrier de travail indisponible.");
  if(invoicesResult.status==="rejected")warnings.push("Factures Hiway indisponibles : couverture de trésorerie non calculée.");
- const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value:null,snapshot:snapshotResult.status==="fulfilled"?snapshotResult.value:null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
- return Response.json({...brief,qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
+ const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value:null,snapshot:snapshotResult.status==="fulfilled"&&snapshotResult.value?decodePiloteReport(snapshotResult.value):null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,views,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
+ return Response.json({...brief,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
 }

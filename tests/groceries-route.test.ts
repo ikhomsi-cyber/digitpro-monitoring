@@ -15,7 +15,7 @@ const request=(body:unknown={account:"secondary"},origin="https://digitpro.test"
 beforeEach(()=>{vi.resetAllMocks();mocks.bankin.mockResolvedValue({transactions:[],truncated:false});mocks.mode.mockReturnValue("SUPABASE");mocks.getUser.mockResolvedValue({data:{user:{id:"owner"}},error:null});mocks.gmail.mockImplementation((_c,_u,run)=>run({}));mocks.fetch.mockResolvedValue({orders:[],scanned:2,ignored:2,nextPageToken:null});mocks.load.mockResolvedValue({orders:[],truncated:false});});
 it("uses only the explicitly selected mailbox and authenticated owner",async()=>{
  const response=await POST(request());expect(response.status).toBe(200);expect(mocks.gmail).toHaveBeenCalledWith(expect.anything(),"owner",expect.any(Function),"secondary");
- expect((await GET()).headers.get("cache-control")).toContain("no-store");
+ expect((await GET(new Request("https://digitpro.test/api/gmail/groceries"))).headers.get("cache-control")).toContain("no-store");
 });
 it("rejects cross-site, demo and forged input without touching Gmail",async()=>{
  expect((await POST(request({},"https://attacker.test"))).status).toBe(403);
@@ -28,16 +28,27 @@ it("stops on a refused mailbox and never tries the primary account",async()=>{
 });
 it("includes the owner's Bankin food debits and reports partial data explicitly",async()=>{
  mocks.bankin.mockResolvedValue({transactions:[{id:"synthetic-1",date:"2026-10-02",label:"CB LIDL",category:"Alimentation",amount:-25}],truncated:false});
- const body=await (await GET()).json();
+ const body=await (await GET(new Request("https://digitpro.test/api/gmail/groceries"))).json();
  expect(mocks.bankin).toHaveBeenCalledWith(expect.anything(),"owner");
  expect(body.orders).toEqual([expect.objectContaining({source:"bankin",merchant:"Lidl",totalCents:2500,items:[]})]);
  expect(body.bankinPurchases).toEqual([]);
  mocks.bankin.mockRejectedValue(new Error("private database diagnostic"));
- const partial=await (await GET()).json();expect(partial.warning).toContain("seuls les achats Gmail");expect(JSON.stringify(partial)).not.toContain("private database");
+ const partial=await (await GET(new Request("https://digitpro.test/api/gmail/groceries"))).json();expect(partial.warning).toContain("seuls les achats Gmail");expect(JSON.stringify(partial)).not.toContain("private database");
 });
 it("does not read Bankin or mail orders without authentication or in demo mode",async()=>{
  mocks.getUser.mockResolvedValue({data:{user:null},error:null});
- expect((await GET()).status).toBe(401);expect(mocks.bankin).not.toHaveBeenCalled();expect(mocks.load).not.toHaveBeenCalled();
+ expect((await GET(new Request("https://digitpro.test/api/gmail/groceries"))).status).toBe(401);expect(mocks.bankin).not.toHaveBeenCalled();expect(mocks.load).not.toHaveBeenCalled();
  mocks.getUser.mockResolvedValue({data:{user:{id:"owner"}},error:null});mocks.mode.mockReturnValue("DEMO");
- expect((await GET()).status).toBe(200);expect(mocks.bankin).not.toHaveBeenCalled();
+ expect((await GET(new Request("https://digitpro.test/api/gmail/groceries"))).status).toBe(200);expect(mocks.bankin).not.toHaveBeenCalled();
+});
+it("loads a lightweight overview without requesting product lines",async()=>{
+ const response=await GET(new Request("https://digitpro.test/api/gmail/groceries?view=summary"));
+ expect(response.status).toBe(200);expect(mocks.load).toHaveBeenCalledWith(expect.anything(),"owner",{summaryOnly:true});expect(mocks.bankin).toHaveBeenCalledOnce();
+});
+it("fetches product details only for a validated period without reloading Bankin",async()=>{
+ const response=await GET(new Request("https://digitpro.test/api/gmail/groceries?view=products&period=2026-10"));
+ expect(response.status).toBe(200);expect(mocks.load).toHaveBeenCalledWith(expect.anything(),"owner",{period:"2026-10"});expect(mocks.bankin).not.toHaveBeenCalled();
+});
+it("rejects invalid product periods without querying financial records",async()=>{
+ expect((await GET(new Request("https://digitpro.test/api/gmail/groceries?view=products&period=2026-99"))).status).toBe(400);expect(mocks.load).not.toHaveBeenCalled();expect(mocks.bankin).not.toHaveBeenCalled();
 });

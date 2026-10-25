@@ -1,5 +1,5 @@
 "use client";
-import { useCallback,useEffect,useMemo,useState } from "react";
+import { useCallback,useEffect,useMemo,useRef,useState } from "react";
 import { ShoppingBasket,Mail,Loader2,ChevronLeft,ChevronRight,X } from "lucide-react";
 import { toast } from "sonner";
 import { GroceryMerchantLogo } from "./GroceryMerchantLogo";
@@ -18,6 +18,10 @@ import { dashboardPanelTitle,dashboardPanelSub } from "@/lib/dashboard-surfaces"
 const groceryEuro = new Intl.NumberFormat("fr-FR", {style:"currency",currency:"EUR",minimumFractionDigits:2,maximumFractionDigits:2});
 export function GroceriesSection({demoMode}:{demoMode:boolean}){
  const fmt=useDashboardDisplayFormat();const {searchParams}=useDashboardSection();
+ const loadedProducts=useRef(new Set<string>());
+ const [summaryVersion,setSummaryVersion]=useState(0);
+ const [productLoad,setProductLoad]=useState({period:"",error:""});
+ const sourcePanel=useRef<HTMLElement>(null);
  const [orders,setOrders]=useState<StoredGroceryOrder[]>([]),[connection,setConnection]=useState<GmailConnectionStatus|null>(null);
  const [account,setAccount]=useState<GmailAccount>(searchParams.get("gmail_account")==="primary"?"primary":"secondary");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(!demoMode),[error,setError]=useState(""),[status,setStatus]=useState("");
@@ -27,13 +31,22 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
  const [cursor,setCursor]=useState<{account:GmailAccount;token:string}|null>(null),[truncated,setTruncated]=useState(false);
  const [bankinWarning,setBankinWarning]=useState("");
  useEffect(()=>{if(searchParams.get("gmail_connect")==="error")setError(gmailOAuthErrorMessage(searchParams.get("gmail_error")));if(searchParams.get("gmail_connect")==="ok")setStatus("Compte Gmail connecté. Vous pouvez importer vos commandes alimentaires.");},[searchParams]);
- const refresh=useCallback(async()=>{
-  const response=await fetch("/api/gmail/groceries",{cache:"no-store"});const body=await response.json();
+ const refresh=useCallback(async(signal?:AbortSignal)=>{
+  const response=await fetch("/api/gmail/groceries?view=summary",{cache:"no-store",signal});const body=await response.json();
   if(!response.ok)throw new Error(body.error??"Suivi des courses indisponible.");
-  setOrders(body.orders??[]);setTruncated(Boolean(body.truncated));setError("");
+  if(signal?.aborted)return;
+  loadedProducts.current.clear();setSummaryVersion(version=>version+1);setOrders(body.orders??[]);setTruncated(Boolean(body.truncated));setError("");
   setBankinWarning(body.warning??(body.bankinTruncated?"Historique Bankin limité aux 25 000 paiements alimentaires les plus récents.":""));
  },[]);
- useEffect(()=>{let alive=true;if(!demoMode){setLoading(true);void refresh().catch(error=>{if(alive)setError(error.message);}).finally(()=>{if(alive)setLoading(false);});void getGmailConnectionStatus().then(value=>{if(alive)setConnection(value);}).catch(()=>{ /* Connection status must not hide already imported orders. */ });}return()=>{alive=false;};},[demoMode,refresh]);
+ useEffect(()=>{let alive=true;const controller=new AbortController();if(!demoMode){setLoading(true);void refresh(controller.signal).catch(error=>{if(alive)setError(error.message);}).finally(()=>{if(alive)setLoading(false);});}return()=>{alive=false;controller.abort();};},[demoMode,refresh]);
+ useEffect(()=>{
+  if(demoMode||loading||!sourcePanel.current)return;
+  let alive=true;let started=false;
+  const load=()=>{if(started)return;started=true;void getGmailConnectionStatus().then(value=>{if(alive)setConnection(value);}).catch(()=>{});};
+  if(!window.IntersectionObserver){load();return()=>{alive=false;};}
+  const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){load();observer.disconnect();}},{rootMargin:"100px"});observer.observe(sourcePanel.current);
+  return()=>{alive=false;observer.disconnect();};
+ },[demoMode,loading]);
  const connect=async(selected:GmailAccount)=>{if(busy||demoMode)return;setBusy(true);try{const {url}=await getGmailConnectUrl("courses",selected);window.location.assign(url);}catch(error){toast.error(error instanceof Error?error.message:"Connexion impossible.");setBusy(false);}};
  const sync=async(older=false)=>{
   if(busy||demoMode)return;setBusy(true);setError("");setStatus("Recherche des commandes confirmées et de leurs produits…");
@@ -51,6 +64,19 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
  const months=useMemo(()=>[...new Set(orders.map(order=>order.date.slice(0,7)))].sort().reverse(),[orders]);const merchants=useMemo(()=>[...new Set(orders.map(order=>order.merchant))].sort(),[orders]);
  const selectedMonth=months.includes(period)?period:months[0]??"";
  const selectedYear=selectedMonth.slice(0,4);
+ const productPeriod=periodMode==="all"?"all":periodMode==="year"?selectedYear:selectedMonth;
+ const productError=productLoad.period===productPeriod?productLoad.error:"";
+ const productsLoading=!loadedProducts.current.has(productPeriod)&&!productError;
+ useEffect(()=>{
+  if(demoMode||loading||!productPeriod||loadedProducts.current.has(productPeriod))return;
+  const controller=new AbortController();setProductLoad({period:productPeriod,error:""});
+  void fetch(`/api/gmail/groceries?view=products&period=${encodeURIComponent(productPeriod)}`,{cache:"no-store",signal:controller.signal}).then(async response=>{
+   const body=await response.json();if(!response.ok)throw new Error(body.error??"Détail des produits indisponible.");if(controller.signal.aborted)return;
+   const details=new Map<string,StoredGroceryOrder>((body.orders??[]).map((order:StoredGroceryOrder)=>[order.id,order]));loadedProducts.current.add(productPeriod);
+   setOrders(previous=>previous.map(order=>details.has(order.id)?{...order,items:details.get(order.id)!.items}:order));setProductLoad({period:productPeriod,error:""});
+  }).catch(error=>{if(!controller.signal.aborted)setProductLoad({period:productPeriod,error:error instanceof Error?error.message:"Détail indisponible."});});
+  return()=>controller.abort();
+ },[demoMode,loading,productPeriod,summaryVersion]);
  const years=[...new Set(months.map(month=>month.slice(0,4)))];
  const periods=periodMode==="year"?years:months;
  const periodIndex=periods.indexOf(periodMode==="year"?selectedYear:selectedMonth);
@@ -89,11 +115,12 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
   {loading?<p role="status" className="text-sm text-ink-500">Chargement des commandes…</p>:null}
 
 
-  {orders.length&&!loading?<GroceryOverview orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:null}
+  {orders.length&&!loading?<GroceryOverview productsLoading={productsLoading} orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:null}
+  {productError?<p role="alert" className="text-xs text-amber-600">{productError} <button type="button" onClick={()=>{setProductLoad({period:productPeriod,error:""});setSummaryVersion(version=>version+1);}} className="underline">Réessayer</button></p>:null}
   {stats.pricedOrderCount<stats.orderCount?<p className="text-xs text-ink-500">{stats.orderCount-stats.pricedOrderCount} commande(s) sans total reconnu, exclues du montant et du panier moyen.</p>:null}
   {truncated?<p className="text-xs text-amber-600">Affichage limité aux 500 commandes les plus récentes.</p>:null}
   {!orders.length&&!loading?<div className="rounded-3xl border border-dashed border-emerald-400/30 p-8 text-center"><ShoppingBasket size={32} className="mx-auto mb-4 text-emerald-400"/><h3 className="font-semibold">Votre premier panier commence ici</h3><p className="mx-auto mt-2 max-w-lg text-sm text-ink-500 dark:text-white/55">Connectez le Gmail de vos courses et importez vos confirmations Carrefour, Auchan et autres enseignes compatibles. Les produits reconnus alimenteront votre historique de prix.</p></div>:null}
-  <section aria-label="Sources et imports Cours" className="space-y-3 border-t border-ink-200/50 pt-5 dark:border-white/[.07]">
+  <section ref={sourcePanel} aria-label="Sources et imports Cours" className="space-y-3 border-t border-ink-200/50 pt-5 dark:border-white/[.07]">
    <div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Sources et imports</h3><p className="mt-1 text-[11px] text-ink-500 dark:text-white/45">Le compte Gmail qui reçoit vos confirmations de courses.</p></div>
    <GmailAccountPicker compact status={connection} value={account} onChange={value=>{setAccount(value);setCursor(null);}} onConnect={value=>void connect(value)} disabled={busy||demoMode}/>
    <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={()=>void sync()} disabled={busy||demoMode||loading} aria-label="Importer les commandes Gmail" className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50">{busy?<Loader2 size={15} className="animate-spin"/>:<Mail size={15}/>}{busy?"Import…":"Importer Gmail"}</button>

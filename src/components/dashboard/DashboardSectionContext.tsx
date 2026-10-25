@@ -7,8 +7,9 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ReactNode
+  type Dispatch, type SetStateAction, type ReactNode
 } from "react";
+import type { PiloteExpenseView } from "@/lib/pilote";
 import { useSearchParams } from "next/navigation";
 
 export type DashboardSection =
@@ -36,6 +37,8 @@ export function parseDashboardSection(search: string): DashboardSection {
 }
 
 type DashboardSectionContextValue = {
+  piloteExpenseViews: PiloteExpenseView[];
+  setPiloteExpenseViews: Dispatch<SetStateAction<PiloteExpenseView[]>>;
   section: DashboardSection;
   searchParams: URLSearchParams;
   navigateWithinDashboard: (href: string) => void;
@@ -44,6 +47,7 @@ type DashboardSectionContextValue = {
 const DashboardSectionContext = createContext<DashboardSectionContextValue | null>(null);
 
 export function DashboardSectionProvider({ children }: { children: ReactNode }) {
+  const [piloteExpenseViews,setPiloteExpenseViews]=useState<PiloteExpenseView[]>(["essential"]);
   const nextSearchParams = useSearchParams();
   const nextSearch = nextSearchParams.toString();
   const [urlSearch, setUrlSearch] = useState(() => (nextSearch ? `?${nextSearch}` : ""));
@@ -79,8 +83,8 @@ export function DashboardSectionProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const value = useMemo(
-    () => ({ section, searchParams, navigateWithinDashboard }),
-    [section, searchParams, navigateWithinDashboard]
+    () => ({ section, searchParams, navigateWithinDashboard, piloteExpenseViews, setPiloteExpenseViews }),
+    [section, searchParams, navigateWithinDashboard, piloteExpenseViews]
   );
 
   return <DashboardSectionContext.Provider value={value}>{children}</DashboardSectionContext.Provider>;

@@ -10,13 +10,19 @@ import { mergeBankinGroceries } from "@/lib/groceries/bankin";
 export const maxDuration=300;
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:privateResponseHeaders});
 async function owner(){const client=await createSupabaseServerClient();if(!client)return null;const {data,error}=await client.auth.getUser();return !error&&data.user?{client,userId:data.user.id}:null;}
-export async function GET(){
+export async function GET(request:Request){
  const started=performance.now();
  const user=await owner();if(!user)return json({error:"Connexion requise."},401);
  const authenticated=performance.now();
  if(getDashboardEffectiveDataMode(getSupabaseRuntimeMode(),await cookies())==="DEMO")return json({orders:[],truncated:false});
+ const params=new URL(request.url).searchParams;
+ const view=params.get("view");
+ if(view&&!['summary','products'].includes(view))return json({error:"Vue de courses invalide."},400);
+ const period=params.get("period")??"";
+ if(view==="products"&&!/^(?:all|\d{4}|\d{4}-(?:0[1-9]|1[0-2]))$/.test(period))return json({error:"Période invalide."},400);
  try{
-  const [stored,bankin]=await Promise.all([loadGroceryOrders(user.client,user.userId),loadBankinGroceryTransactions(user.client,user.userId).catch(()=>null)]);
+  if(view==="products")return json({...await loadGroceryOrders(user.client,user.userId,{period}),period});
+  const [stored,bankin]=await Promise.all([(view==="summary"?loadGroceryOrders(user.client,user.userId,{summaryOnly:true}):loadGroceryOrders(user.client,user.userId)),loadBankinGroceryTransactions(user.client,user.userId).catch(()=>null)]);
   const loaded=performance.now();
   const response=json({...stored,...mergeBankinGroceries(stored.orders,bankin?.transactions??[]),bankinTruncated:bankin?.truncated??false,warning:bankin?null:"Les dépenses Alimentation Bankin ne sont pas disponibles : seuls les achats Gmail sont affichés."});
   response.headers.set("Server-Timing",`auth;dur=${Math.round(authenticated-started)}, database;dur=${Math.round(loaded-authenticated)}, merge;dur=${Math.round(performance.now()-loaded)}`);

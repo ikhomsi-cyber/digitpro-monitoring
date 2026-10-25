@@ -37,6 +37,12 @@ export function mergeBankinGroceries(orders:StoredGroceryOrder[],transactions:Gr
  const seen=new Set<string>(),matched=new Set<string>();
  const combined:StoredGroceryOrder[]=orders.map(order=>({...order,source:"gmail" as const}));
  const bankinPurchases:StoredGroceryOrder[]=[];
+ const byMerchantAndAmount=new Map<string,{order:StoredGroceryOrder;day:number}[]>();
+ for(const order of orders){
+  if(order.totalCents===null)continue;
+  const key=`${merchantKey(order.merchant)}|${order.totalCents}`;
+  const entries=byMerchantAndAmount.get(key)??[];entries.push({order,day:Date.parse(order.date)});byMerchantAndAmount.set(key,entries);
+ }
  for(const tx of transactions){
   const amount=Number(tx.amount);
   if(seen.has(tx.id)||!Number.isFinite(amount)||amount>=0||!fold(tx.category).includes("alimentation"))continue;
@@ -45,9 +51,14 @@ export function mergeBankinGroceries(orders:StoredGroceryOrder[],transactions:Gr
   const purchase:StoredGroceryOrder={id:`bankin:${tx.id}`,account:"bankin",source:"bankin",date:tx.date,merchant:voucher?"Achat Bankin":groceryMerchant(tx.label,tx.category),orderRef:voucher?"Bon d’achat · hors total courses":"Paiement Bankin · sans détail produit",totalCents:Math.round(-amount*100),items:[]};
   if(voucher){bankinPurchases.push(purchase);continue;}
   if(purchase.merchant==="Autre enseigne · Bankin")purchase.bankLabel=tx.label;
-  const candidates=orders.filter(order=>!matched.has(order.id)&&purchase.merchant!=="Autre enseigne · Bankin"&&merchantKey(order.merchant)===merchantKey(purchase.merchant)&&order.totalCents===purchase.totalCents&&Math.abs(Date.parse(tx.date)-Date.parse(order.date))<=5*86400000);
-  candidates.sort((a,b)=>Math.abs(Date.parse(tx.date)-Date.parse(a.date))-Math.abs(Date.parse(tx.date)-Date.parse(b.date)));
-  if(candidates[0]){matched.add(candidates[0].id);continue;}
+  const bucket=purchase.merchant==="Autre enseigne · Bankin"?[]:byMerchantAndAmount.get(`${merchantKey(purchase.merchant)}|${purchase.totalCents}`)??[];
+  const day=Date.parse(tx.date);let nearest:StoredGroceryOrder|undefined;let nearestDistance=Infinity;
+  for(const candidate of bucket){
+   if(matched.has(candidate.order.id))continue;
+   const distance=Math.abs(day-candidate.day);
+   if(distance<=5*86400000&&distance<nearestDistance){nearest=candidate.order;nearestDistance=distance;}
+  }
+  if(nearest){matched.add(nearest.id);continue;}
   combined.push(purchase);
  }
  const newestFirst=(a:StoredGroceryOrder,b:StoredGroceryOrder)=>b.date.localeCompare(a.date)||a.id.localeCompare(b.id);
