@@ -37,5 +37,13 @@ it("returns an actionable error when both sources are unavailable",async()=>{
 });
 it("returns household comparison aggregates without exposing imported rows",async()=>{
  mocks.snapshot.mockResolvedValue({data:{snapshot:{version:2,months:[],rows:[{sourceRow:1,date:"2026-01-02",amount:-50,parentCategory:"Alimentation",subCategory:"synthetic-private-label",hidden:false}],sourceFilename:"synthetic.xlsx",fileHash:"fixture",sourceRows:1,excludedHidden:0,excludedInternal:0,importedAt:"2026-01-03T00:00:00Z"}},error:null});
- const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(200);const body=await response.json();expect(body.householdHistory).toHaveLength(4);expect(body.householdHistory[0].outOfPocket).toBe(50);expect(JSON.stringify(body)).not.toContain("synthetic-private-label");expect(JSON.stringify(body)).not.toContain('"rows"');
+ const response=await GET(new Request("https://digitpro.test/api/dashboard/daily-brief"));expect(response.status).toBe(200);const body=await response.json();expect(body.householdHistory).toHaveLength(4);expect(body.householdHistory[0].outOfPocket).toBe(0);expect(JSON.stringify(body)).not.toContain("synthetic-private-label");expect(JSON.stringify(body)).not.toContain('"rows"');
+});
+it("includes categorized transaction details only for the assistant context",async()=>{
+ mocks.tx.mockResolvedValue({data:[{id:"private-id",date:"2026-10-01",label:"private-label",amount:-12,category:"Transport",category_manual:true,scope:"pro"}],error:null});
+ mocks.snapshot.mockResolvedValue({data:{snapshot:{version:2,months:[],rows:[{sourceRow:1,date:"2026-10-02",amount:-30,parentCategory:"Alimentation",subCategory:"Courses",hidden:false}],sourceFilename:"private-file",fileHash:"private-hash",sourceRows:1,excludedHidden:0,excludedInternal:0,importedAt:"2026-10-03T00:00:00Z"}},error:null});
+ const body=await (await GET(new Request("https://digitpro.test/api/dashboard/daily-brief?assistantContext=1"))).json();
+ expect(body.assistantTransactions.digitpro.transactions[0]).toMatchObject({category:"Transport",categoryManual:true});
+ expect(body.assistantTransactions.bankin.transactions[0]).toMatchObject({category:"Alimentation",subcategory:"Courses"});
+ expect(JSON.stringify(body.assistantTransactions)).not.toContain("private-");
 });

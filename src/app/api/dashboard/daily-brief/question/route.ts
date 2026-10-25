@@ -15,7 +15,7 @@ export async function POST(request:Request){
  let payload:unknown;try{payload=JSON.parse(new TextDecoder().decode(buffer));}catch{return json({error:"Question invalide."},400);}
  const parsed=schema.safeParse(payload);if(!parsed.success)return json({error:"Écrivez une question de 2 à 2 000 caractères."},400);
  // Reuses the authenticated, owner-scoped, read-only first-party summary. The model gets no database access.
- const summaryUrl=new URL(request.url);summaryUrl.pathname=summaryUrl.pathname.replace(/\/question\/?$/,"");summaryUrl.search="";if(parsed.data.views)summaryUrl.searchParams.set("views",parsed.data.views.join(","));
+ const summaryUrl=new URL(request.url);summaryUrl.pathname=summaryUrl.pathname.replace(/\/question\/?$/,"");summaryUrl.search="";summaryUrl.searchParams.set("assistantContext","1");if(parsed.data.views)summaryUrl.searchParams.set("views",parsed.data.views.join(","));
  const summary=await getDailyBrief(new Request(summaryUrl));
  if(!summary.ok)return summary;
  const brief=await summary.json() as QuestionBrief;

@@ -27,3 +27,17 @@ it("does not present truncated model output as a complete analysis",async()=>{
  vi.stubEnv("OPENAI_API_KEY","synthetic-key");const fetcher=vi.fn().mockResolvedValue(Response.json({status:"incomplete",output:[{type:"message",content:[{type:"output_text",text:"incomplete"}]}]}));
  await expect(answerBriefQuestion("Mon CA ?",brief,[],{fetcher})).rejects.toMatchObject({status:502});
 });
+it("passes categorized transactions and their coverage limits to the model",()=>{
+ const source={available:true,totalCount:501,includedCount:1,truncated:true,transactions:[{date:"2026-10-01",amount:-20,category:"Alimentation",subcategory:"Courses",categoryManual:null,hidden:false}]};
+ const context=briefQuestionContext({...brief,assistantTransactions:{digitpro:source,bankin:source}});
+ expect(context.transactions?.bankin).toEqual(source);
+});
+
+it("identifies a rejected API key without reading or leaking the provider response or retrying",async()=>{
+ vi.stubEnv("OPENAI_API_KEY","synthetic-key");
+ const response=Response.json({error:{code:"invalid_api_key",message:"private-provider-credential-details"}},{status:401});
+ const read=vi.spyOn(response,"json");
+ const fetcher=vi.fn().mockResolvedValue(response);
+ await expect(answerBriefQuestion("Test synthétique",brief,[],{fetcher})).rejects.toMatchObject({status:503,message:expect.stringContaining("clé OpenAI")});
+ expect(fetcher).toHaveBeenCalledOnce();expect(read).not.toHaveBeenCalled();
+});

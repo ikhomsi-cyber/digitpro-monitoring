@@ -34,12 +34,15 @@ export function usePullToRefresh(
   useEffect(() => {
     if (disabled) return;
 
+    const modalOpen = () => document.querySelector("dialog[open], [aria-modal=\"true\"]") !== null;
     const onTouchStart = (event: TouchEvent) => {
+      if (modalOpen() || (event.target instanceof Element && event.target.closest("[data-pull-refresh-ignore]"))) { reset(); return; }
       if (pullStateRef.current === "refreshing" || window.scrollY > 2) return;
       startYRef.current = event.touches[0]?.clientY ?? null;
     };
 
     const onTouchMove = (event: TouchEvent) => {
+      if (modalOpen()) { if (startYRef.current !== null) reset(); return; }
       if (startYRef.current == null || pullStateRef.current === "refreshing") return;
       const y = event.touches[0]?.clientY ?? 0;
       const delta = y - startYRef.current;
@@ -52,6 +55,7 @@ export function usePullToRefresh(
     };
 
     const onTouchEnd = async () => {
+      if (modalOpen()) { if (startYRef.current !== null) reset(); return; }
       if (startYRef.current == null) return;
       const shouldRefresh =
         pullStateRef.current === "pulling" && pullDistanceRef.current >= threshold;

@@ -32,12 +32,12 @@ it("does not encourage spending to match the previous month",()=>{
  const ndf=result.items.find(i=>i.id==="ndf");expect(ndf?.detail).toContain("justificatifs");expect(JSON.stringify(result)).not.toContain("aller au restaurant");
  expect(result.items.some(i=>i.priority==="attention")).toBe(false);
 });
-it("explains compensation gaps by family without spending another family's surplus",()=>{
+it("combines all compensations while retaining the family breakdown",()=>{
  const group=(name:string,expenses:number,income:number)=>({name,expenses,income,count:1,children:[{name,expenses,income,count:1,children:[]}]});
  const current={...month("2026-10",500),categories:[group("Alimentation",500,0)],incomeCategories:[group("Meryeme",0,200),group("DigitPro NDF",0,800)]};
  const result=buildDailyBrief({date:"2026-10-24",transactions:[],snapshot:snapshot([current])});
  expect(result.compensations.find(f=>f.id==="food")?.balance).toBe(-300);
- expect(result.summary.household).toContain("sans utiliser les excédents");
+ expect(result.summary.household).toContain("couvrent les dépenses sélectionnées");
  expect(result.items.find(i=>i.id==="compensation-food")?.detail).toContain("contributions reçues");
 });
 it("suggests documented business opportunities without inventing tax savings or a budget to spend",()=>{

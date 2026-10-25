@@ -71,3 +71,19 @@ it("distinguishes missing previous-year expense history from zero expenses",()=>
  const report=buildBriefActivity({date:"2026-10-25",transactions:[{...tx("expense","2026-10-10",-100),category:"Logiciels"}],settings:null,invoices:[],cash:null});
  expect(report.previousYearExpensesHt).toBeNull();expect(report.expenseChangePercent).toBeNull();
 });
+it("reconstructs historical days and HT revenue from Gmail invoices without duplicating calendar months",()=>{
+ const historic={...invoice,id:"historic",date:"2025-09-30",amountEur:9840,billedDays:12,tjmHtEur:820};
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:{days:["2025-09-01","2025-10-01"],tjm:940,rates:[{clientName:"Synthetic",startDate:"2025-01-01",endDate:"2025-12-31",tjmHt:820}]},invoices:[historic,historic,{...historic,id:"future",date:"2025-10-26"}],cash:null});
+ expect(report.history[1]).toMatchObject({generatedHt:10660,workedDays:13,invoiceDays:12,invoiceCount:1,historySource:"mixed"});
+});
+it("infers days only with a known invoice TJM, converts TTC and preserves unknown quantities",()=>{
+ const historic={...invoice,id:"historic",date:"2025-09-30",amountEur:9840,amountKind:"TTC" as const,billedDays:null,tjmHtEur:820};
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[historic],cash:null});
+ expect(report.history[1]).toMatchObject({generatedHt:8200,workedDays:10,invoiceDays:10,invoiceEstimatedDays:10,historySource:"gmail"});
+ const unknown=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[{...historic,tjmHtEur:null}],cash:null});
+ expect(unknown.history[1]).toMatchObject({generatedHt:8200,workedDays:null,invoiceDays:null});
+});
+it("does not invent historical activity from unknown invoice amounts",()=>{
+ const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[{...invoice,date:"2025-09-30",amountKind:"inconnu"}],cash:null});
+ expect(report.history[1].generatedHt).toBeNull();expect(report.history[1].workedDays).toBeNull();
+});

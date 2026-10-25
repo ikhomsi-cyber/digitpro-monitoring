@@ -1,52 +1,50 @@
-import { CarFront, House, ReceiptText, Utensils, Wallet } from "lucide-react";
+import { ArrowUpRight, CalendarDays, CarFront, House, ReceiptText, ShieldCheck, TrendingUp, Utensils, Wallet } from "lucide-react";
 import type { BriefActivity } from "@/lib/daily-brief-activity";
 import type { PiloteCompensation } from "@/lib/pilote";
 const money=(value:number)=>new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(value);
 const percent=(value:number)=>Math.min(100,Math.max(0,Number.isFinite(value)?value:0));
 const coverage=(cash:number,debt:number)=>debt>0?percent(cash/debt*100):cash>=0?100:0;
 const familyIcons={rent:House,transport:CarFront,ndf:ReceiptText,food:Utensils,other:Wallet};
+const card="min-w-0 overflow-hidden rounded-3xl border border-ink-200/60 bg-white/75 p-4 shadow-[0_8px_28px_-22px_rgba(0,0,0,.35)] sm:p-5 dark:border-white/[.08] dark:bg-white/[.035]";
+const eyebrow="text-[10px] font-medium uppercase tracking-[.14em] text-ink-400 dark:text-white/45";
 
 export function ActivityBriefVisual({activity,date}:{activity:BriefActivity;date:string}){
-
+ const worked=activity.workedMonth,planned=activity.plannedMonth??0,days=Math.max((worked??0)+planned,1);
  const ceiling=Math.max(...activity.history.slice(0,2).flatMap(row=>[row.generatedHt??0,row.cashedHt??0]),1);
- const worked=activity.workedMonth,planned=activity.plannedMonth??0;
- const days=Math.max((worked??0)+planned,1);
- return <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_1.3fr]">
-  {worked!==null?<figure aria-label={`${worked} jours réalisés et ${planned} jours planifiés sur le mois`} className="min-w-0">
-   <figcaption className="text-[10px] text-ink-400 dark:text-white/40">Jours réalisés / prévus</figcaption>
-   <p className="mt-2 flex items-baseline gap-1.5"><strong className="text-2xl font-semibold tracking-tight tabular-nums">{worked}</strong><span className="text-xs text-ink-500 dark:text-white/50">jours réalisés</span>{planned>0?<span className="ml-auto text-[10px] text-ink-400 dark:text-white/40">+{planned} prévus</span>:null}</p>
-   <div aria-hidden="true" className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-white/5"><span className="bg-[var(--app-accent)]" style={{width:`${percent(worked/days*100)}%`}}/><span className="bg-[var(--app-accent-soft)]" style={{width:`${percent(planned/days*100)}%`}}/></div>
+ return <div className="grid gap-3">
+  {worked!==null?<figure aria-label={`${worked} jours réalisés et ${planned} jours planifiés sur le mois`} className={`${card} flex items-center justify-between gap-4`}>
+   <div><figcaption className={`${eyebrow} flex items-center gap-2`}><CalendarDays size={14}/>Votre rythme</figcaption><p className="mt-3 flex items-baseline gap-2"><strong className="text-4xl font-semibold tracking-tight tabular-nums">{worked}</strong><span className="text-xs text-ink-500 dark:text-white/55">jours réalisés</span></p><p className="mt-2 text-[11px] text-ink-400">{planned?`${planned} jours encore planifiés`:"Aucun jour à venir planifié"} · {date.slice(5,7)}/{date.slice(0,4)}</p></div>
+   <div className="relative grid h-20 w-20 shrink-0 place-items-center"><svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden="true"><circle cx="40" cy="40" r="32" fill="none" stroke="currentColor" strokeWidth="5" className="text-ink-100 dark:text-white/10"/><circle cx="40" cy="40" r="32" fill="none" stroke="var(--app-accent)" strokeWidth="5" strokeLinecap="round" strokeDasharray={`${percent(worked/days*100)*2.0106} 201.06`}/></svg><span className="text-sm font-semibold tabular-nums">{Math.round(percent(worked/days*100))}<span className="ml-0.5 text-[9px] font-normal text-ink-400">%</span></span></div>
   </figure>:null}
-  <figure aria-label="CA généré et encaissé, du 1er janvier à la même date pour chaque année" className="min-w-0">
-   <figcaption className="text-[10px] text-ink-400 dark:text-white/40">CA HT à date · <span className="text-[var(--app-accent)]">généré</span> / <span className="text-ink-500 dark:text-white/60">encaissé</span></figcaption>
-   <div className="mt-2 space-y-3">{activity.history.slice(0,2).map(row=><div key={row.year}><p className="mb-1 text-[10px] text-ink-500 dark:text-white/50">{row.year}</p>{[{label:"Généré",value:row.generatedHt,color:"bg-[var(--app-accent)]"},{label:"Encaissé",value:row.cashedHt,color:"bg-ink-400 dark:bg-white/45"}].map(metric=><div key={metric.label} className="mt-1 flex items-center gap-2"><span className="w-12 text-[9px] text-ink-400">{metric.label}</span><div aria-hidden="true" className="h-1 flex-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/5"><div className={`h-full ${metric.color}`} style={{width:`${percent((metric.value??0)/ceiling*100)}%`}}/></div><span className="w-20 text-right text-[10px] tabular-nums">{metric.value===null?"Non renseigné":money(metric.value)}</span></div>)}</div>)}</div>
+  <figure aria-label="CA généré et encaissé, du 1er janvier à la même date pour chaque année" className={card}>
+   <figcaption className={`${eyebrow} flex items-center gap-2`}><TrendingUp size={14}/>Chiffre d’affaires · HT à date</figcaption>
+   <div className="mt-4 grid grid-cols-2 gap-3">{activity.history.slice(0,2).map((row,index)=><div key={row.year} className={`min-w-0 rounded-2xl p-3 ${index===0?"bg-[var(--app-accent-soft)] ring-1 ring-inset ring-[var(--app-accent)]/10":"bg-ink-50 dark:bg-white/[.035]"}`}><p className="flex items-center justify-between text-[11px] font-medium text-ink-500 dark:text-white/55">{row.year}{index===0?<ArrowUpRight size={13} className="text-[var(--app-accent)]"/>:null}</p><p className="mt-3 text-[10px] text-ink-400">Généré / facturé</p><p className="mt-1 break-words text-lg font-semibold tracking-tight tabular-nums sm:text-xl">{row.generatedHt===null?"—":money(row.generatedHt)}</p><div aria-hidden="true" className="mt-2 h-1 overflow-hidden rounded-full bg-ink-200/60 dark:bg-white/10"><div className="h-full rounded-full bg-[var(--app-accent)]" style={{width:`${percent((row.generatedHt??0)/ceiling*100)}%`}}/></div><div className="mt-4 border-t border-ink-200/50 pt-3 dark:border-white/10"><p className="text-[10px] text-ink-400">Encaissé</p><p className="mt-1 text-sm font-medium tabular-nums">{row.cashedHt===null?"Non renseigné":money(row.cashedHt)}</p></div></div>)}</div>
+   <p className="mt-3 text-[10px] text-ink-400 dark:text-white/35">Du 1er janvier au même jour de chaque année.</p>
   </figure>
  </div>;
 }
-
 export function TreasuryBriefVisual({activity}:{activity:BriefActivity}){
  const treasury=activity.treasury;if(!treasury)return null;
- const current=coverage(treasury.cash,treasury.debt172);
- const next=activity.nextInvoice;
+ const current=coverage(treasury.cash,treasury.debt172),next=activity.nextInvoice;
  const projectedCash=next?treasury.cash+next.invoiceAmountHt*1.2:null;
  const projectedDebt=projectedCash!==null&&treasury.projectedMargin!==null?projectedCash-treasury.projectedMargin:null;
  const projected=projectedCash!==null&&projectedDebt!==null?coverage(projectedCash,projectedDebt):null;
- const rows=[{label:"Aujourd’hui",value:current,projected:false},...(projected===null?[]:[{label:"Encaissement intégral",value:projected,projected:true}])];
- return <figure className="mt-4" aria-label={`Couverture de la réserve CSG à 17,2 % et TVA : ${Math.round(current)} % aujourd’hui${projected===null?"":`, ${Math.round(projected)} % après encaissement intégral hypothétique`}`}>
-  <figcaption className="mb-2 flex items-center justify-between gap-2 text-[10px] text-ink-400 dark:text-white/40"><span>Réserve CSG 17,2 % + TVA</span>{next?<span className="tabular-nums">{next.kind==="estimate"?"Facture estimée":"Facture attendue"} · {money(next.invoiceAmountHt)} HT</span>:null}</figcaption>
-  <div className="space-y-2.5">{rows.map(row=><div key={row.label} className="flex items-center gap-3"><span className="w-28 shrink-0 text-[10px] text-ink-500 dark:text-white/50">{row.label}</span><div aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/5"><div className={`h-full rounded-full ${row.value>=100?"bg-[var(--app-accent)]":row.projected?"bg-[var(--app-accent)]":"bg-amber-400"}`} style={{width:`${row.value}%`}}/></div><span className="w-9 text-right text-[11px] font-medium tabular-nums">{Math.round(row.value)} %</span></div>)}</div>
-  {projected!==null?<p className="mt-2 text-[10px] text-ink-400 dark:text-white/35">Simulation d’encaissement intégral, TVA et réserve supplémentaire incluses.</p>:null}
+ return <figure className={card} aria-label={`Couverture de la réserve : ${Math.round(current)} % aujourd’hui`}>
+  <figcaption className={`${eyebrow} flex items-center gap-2`}><ShieldCheck size={14}/>Votre réserve · CSG 17,2 % + TVA</figcaption>
+  <div className="mt-4 flex items-end justify-between gap-3"><p className="text-3xl font-semibold tracking-tight tabular-nums">{Math.round(current)}<span className="ml-1 text-sm font-normal text-ink-400">%</span></p><span className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${current>=100?"bg-emerald-500/10 text-emerald-600 dark:text-emerald-300":"bg-amber-500/10 text-amber-700 dark:text-amber-300"}`}>{current>=100?"Réserve couverte":"À sécuriser"}</span></div>
+  <div aria-hidden="true" className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.07]"><div className={`h-full rounded-full ${current>=100?"bg-emerald-400":"bg-gradient-to-r from-amber-300 to-amber-500"}`} style={{width:`${current}%`}}/></div>
+  {projected!==null?<div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-ink-50 px-3 py-3 dark:bg-white/[.035]"><div className="min-w-0"><p className="text-[11px] font-medium">Après encaissement intégral</p><p className="mt-1 text-[10px] text-ink-400">Facture · {money(next!.invoiceAmountHt)} HT</p></div><span className="shrink-0 text-lg font-semibold tabular-nums text-[var(--app-accent)]">{Math.round(projected)} %</span></div>:null}
+  <p className="mt-3 text-[10px] leading-relaxed text-ink-400 dark:text-white/35">Simulation selon les règles de l’application, TVA incluse. L’encaissement reste à confirmer.</p>
  </figure>;
 }
-
 export function HouseholdBriefVisual({families}:{families:PiloteCompensation[]}){
- const visible=families.filter(f=>f.id!=="other"&&f.expenses>0);
- if(!visible.length)return null;
- return <figure className="mt-4" aria-label="Part des dépenses couverte par les compensations, famille par famille">
-  <figcaption className="mb-3 text-[10px] text-ink-400 dark:text-white/40">Vos dépenses sont-elles compensées ?</figcaption>
-  <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2">{visible.map(family=>{
-   const Icon=familyIcons[family.id],value=percent(family.income/family.expenses*100);
-   return <div key={family.id} aria-label={`${family.name} : ${Math.round(value)} % couverts ; ${family.balance<0?`${money(-family.balance)} à financer`:`${money(family.balance)} de marge`}`}><div className="flex items-center gap-2"><Icon size={13} strokeWidth={1.6} className="shrink-0 text-ink-400 dark:text-white/45" aria-hidden="true"/><span className="min-w-0 flex-1 text-[11px]">{family.name}</span><span className={`text-[10px] tabular-nums ${family.balance<0?"text-amber-600 dark:text-amber-300":"text-[var(--app-accent-deep)] dark:text-[var(--app-accent)]"}`}>{Math.round(value)} %</span></div><div aria-hidden="true" className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/5"><div className={`h-full rounded-full ${family.balance<0?"bg-amber-400":"bg-[var(--app-accent)]"}`} style={{width:`${value}%`}}/></div><p className="mt-1 text-[10px] text-ink-400 dark:text-white/40">{family.balance<0?`${money(-family.balance)} à financer`:`${money(family.balance)} de marge`}</p></div>;
-  })}</div>
+ const visible=families.filter(f=>f.expenses>0);if(!visible.length)return null;
+ return <figure className={card} aria-label="Détail de la couverture des dépenses par famille">
+  <figcaption className={`${eyebrow} flex items-center gap-2`}><House size={14}/>Les compensations du foyer</figcaption>
+  <div className="mt-4 space-y-4">{visible.map(family=>{const Icon=familyIcons[family.id],value=percent(family.income/family.expenses*100);return <div key={family.id}>
+   <div className="flex items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink-50 text-ink-500 dark:bg-white/5 dark:text-white/55"><Icon size={16} strokeWidth={1.5}/></span><div className="min-w-0 flex-1"><p className="text-xs font-medium">{family.name}</p><p className="mt-0.5 text-[10px] text-ink-400">{money(family.income)} reçus · {money(family.expenses)} dépensés</p></div><span className={`shrink-0 text-xs font-semibold tabular-nums ${family.balance<0?"text-amber-600 dark:text-amber-300":"text-emerald-600 dark:text-emerald-300"}`}>{family.balance<0?"−":"+"}{money(Math.abs(family.balance))}</span></div>
+   <div aria-hidden="true" className="ml-12 mt-2 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.07]"><div className={`h-full rounded-full ${family.balance<0?"bg-amber-400":"bg-emerald-400"}`} style={{width:`${value}%`}}/></div>
+  </div>;})}</div>
+  <p className="mt-4 border-t border-ink-200/50 pt-3 text-[10px] leading-relaxed text-ink-400 dark:border-white/10 dark:text-white/40">Les excédents couvrent les déficits des autres familles dans le total de votre poche.</p>
  </figure>;
 }

@@ -20,7 +20,7 @@ export function PiloteDailyChart({ days, month, views, summary }: { days?: Pilot
   return <div className="relative min-w-0 overflow-hidden rounded-3xl border border-ink-200/60 bg-gradient-to-br from-white via-white to-emerald-50/60 p-5 shadow-[0_12px_40px_-24px_rgba(16,185,129,0.2)] sm:p-6 dark:border-white/[.09] dark:from-white/[.045] dark:via-white/[.015] dark:to-emerald-950/20">
     <h3 className="text-base font-semibold tracking-tight text-ink-900 dark:text-white">Couverture au fil du mois</h3>
     <p className="mt-1 text-[11px] text-ink-500 dark:text-white/50">Entrées et sorties cumulées · {month.split("-").reverse().join("/")} · vues sélectionnées</p>
-    <p className="mt-1 text-[10px] text-ink-400 dark:text-white/40">Solde global à la date affichée : les excédents des familles se compensent ici. Le montant en haut additionne les restes à charge par famille sur tout le mois importé.</p>
+    <p className="mt-1 text-[10px] text-ink-400 dark:text-white/40">Solde global à la date affichée : les excédents des familles se compensent ici. Les montants en haut et en bas utilisent également toutes les compensations, sur tout le mois importé.</p>
     {summary ? <div className="mt-4 border-b border-ink-200/50 pb-4 dark:border-white/10">{summary}</div> : null}
     {fmt.dummy ? <p className="py-8 text-xs text-ink-500">Courbes masquées avec les montants.</p> : !last ? <p className="py-8 text-xs text-ink-500">{days ? "Aucune journée écoulée sur ce mois." : "Le détail quotidien sera disponible après un import Bankin."}</p> : <>
       <div className="mt-5 flex items-center justify-between gap-3">
