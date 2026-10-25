@@ -679,3 +679,14 @@ html.privacy-blur [data-private]:hover,
 html.privacy-blur [data-private]:focus-within {
   filter: blur(0);
 }
+
+/* The assistant inherits the same selected palette and page surface as the dashboard. */
+dialog.daily-assistant-sheet {
+  background: var(--app-page-light);
+  border-color: color-mix(in srgb, var(--app-accent) 16%, #e5e7eb);
+}
+html.dark dialog.daily-assistant-sheet {
+  background: var(--pg-page-bg);
+  background-color: var(--pg-base);
+  border-color: color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
