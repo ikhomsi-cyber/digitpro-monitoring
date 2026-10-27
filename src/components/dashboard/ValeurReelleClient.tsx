@@ -1235,7 +1235,7 @@ export function ValeurReelleClient({
   loadError: string | null;
 }) {
   const fmt = useDashboardDisplayFormat();
-  const [csgRate, setCsgRate] = useState<ValeurReelleCsgRate>(0.097);
+  const [csgRate, setCsgRate] = useState<ValeurReelleCsgRate>(0.172);
   const [selectedYears, setSelectedYears] = useState<number[]>(
     () => defaultDashboardPeriodFilter().selectedYears
   );

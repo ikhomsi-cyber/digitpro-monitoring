@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { GroceryMerchantLogo } from "./GroceryMerchantLogo";
 import { GrocerySpendingSummary } from "./GrocerySpendingSummary";
 import { groceryInsights } from "@/lib/groceries/insights";
+import { GroceryShoppingList } from "./GroceryShoppingList";
 import { GroceryOverview } from "./GroceryOverview";
 import { GmailAccountPicker } from "./GmailAccountPicker";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
@@ -120,6 +121,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
   {stats.pricedOrderCount<stats.orderCount?<p className="text-xs text-ink-500">{stats.orderCount-stats.pricedOrderCount} commande(s) sans total reconnu, exclues du montant et du panier moyen.</p>:null}
   {truncated?<p className="text-xs text-amber-600">Affichage limité aux 500 commandes les plus récentes.</p>:null}
   {!orders.length&&!loading?<div className="rounded-3xl border border-dashed border-emerald-400/30 p-8 text-center"><ShoppingBasket size={32} className="mx-auto mb-4 text-emerald-400"/><h3 className="font-semibold">Votre premier panier commence ici</h3><p className="mx-auto mt-2 max-w-lg text-sm text-ink-500 dark:text-white/55">Connectez le Gmail de vos courses et importez vos confirmations Carrefour, Auchan et autres enseignes compatibles. Les produits reconnus alimenteront votre historique de prix.</p></div>:null}
+  {!loading?<GroceryShoppingList demoMode={demoMode} historyVersion={summaryVersion}/>:null}
   <section ref={sourcePanel} aria-label="Sources et imports Cours" className="space-y-3 border-t border-ink-200/50 pt-5 dark:border-white/[.07]">
    <div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Sources et imports</h3><p className="mt-1 text-[11px] text-ink-500 dark:text-white/45">Le compte Gmail qui reçoit vos confirmations de courses.</p></div>
    <GmailAccountPicker compact status={connection} value={account} onChange={value=>{setAccount(value);setCursor(null);}} onConnect={value=>void connect(value)} disabled={busy||demoMode}/>

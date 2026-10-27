@@ -14,12 +14,13 @@ it("keeps the remaining expense at zero when all families are covered",()=>{
 
 it("shows the household deficit as a negative red amount in the page header",()=>{
  const html=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,families:[family("food",1000,600)]}));
- expect(html).toContain("text-red-600");expect(html.replace(/<[^>]*>/g,"")).toMatch(/-400(?:,00)?\s*€/);expect(html).toContain("toutes compensations");
+ expect(html).toContain("text-red-600");expect(html.replace(/<[^>]*>/g,"")).toMatch(/-400(?:,00)?\s*€/);expect(html).toContain("De votre poche");
 });
-it("makes compensated expenses and the imported cutoff explicit in the header",()=>{
- const text=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,asOf:"2026-10-25",families:[family("food",1000,600)]})).replace(/<[^>]*>/g,"");
- expect(text).toContain("toutes compensations");expect(text).toContain("25/10/2026");expect(text).toMatch(/600(?:,00)?\s*€ de rentrées/);
+it("keeps the header concise while preserving the period and compensated balance",()=>{
+ const text=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,asOf:"2026-10-25",periodLabel:"Octobre 2026",families:[family("food",1000,600)]})).replace(/<[^>]*>/g,"");
+ expect(text).toContain("De votre poche");expect(text).toContain("Octobre 2026");expect(text).toMatch(/-400(?:,00)?\s*€/);expect(text).not.toContain("de rentrées");expect(text).not.toContain("25/10/2026");expect(text).not.toContain("Toutes les compensations sont réunies");
 });
+
 it("does not display zero as a funded amount when dated history is unavailable",()=>{
  const text=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,unavailable:true,families:[]})).replace(/<[^>]*>/g,"");
  expect(text).toContain("Indisponible");expect(text).not.toMatch(/0(?:,00)?\s*€/);
