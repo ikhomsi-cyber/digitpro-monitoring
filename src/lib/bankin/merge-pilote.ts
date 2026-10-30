@@ -14,7 +14,9 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
   const available = new Map<string, number>();
   for (const row of previous.rows) available.set(key(row), (available.get(key(row)) ?? 0) + 1);
   const added: BankinPiloteRow[] = [];
+  const excluded = new Set(previous.excludedRowIdentities ?? []);
   for (const row of incoming.rows) {
+    if (row.identity && excluded.has(row.identity)) continue;
     const id = key(row), remaining = available.get(id) ?? 0;
     if (remaining > 0) available.set(id, remaining - 1);
     else added.push(row);
@@ -22,5 +24,5 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
   if (!added.length) return previous;
   // Row numbers are local to each workbook; assign unique IDs for aggregate calculation.
   const rows = [...previous.rows, ...added].map((row, index) => ({ ...row, sourceRow: index + 2 }));
-  return { ...buildBankinPiloteSnapshot(rows, incoming.sourceFilename, incoming.fileHash), legacyBackup: previous.legacyBackup };
+  return { ...buildBankinPiloteSnapshot(rows, incoming.sourceFilename, incoming.fileHash), legacyBackup: previous.legacyBackup, ...(previous.excludedRowIdentities?.length ? { excludedRowIdentities: previous.excludedRowIdentities } : {}) };
 }

@@ -10,6 +10,6 @@ export function decodePiloteReport(value: unknown): BankinPiloteSnapshot {
     report = JSON.parse(gunzipSync(Buffer.from(report.payloadCompressed, "base64"), { maxOutputLength: 64 * 1024 * 1024 }).toString("utf8"));
   }
   if (!report || typeof report !== "object" || ![1, 2].includes(Number(report.version)) || !Array.isArray(report.months)) throw new Error("Invalid Pilote report");
-  const { rows, rowsCompressed, legacyBackup, ...summary } = report;
+  const { rows, rowsCompressed, legacyBackup, excludedRowIdentities, ...summary } = report;
   return summary as BankinPiloteSnapshot;
 }

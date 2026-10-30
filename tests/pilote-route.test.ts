@@ -14,7 +14,7 @@ beforeEach(() => {
  mocks.maybeSingle.mockResolvedValue({data: null, error: null});
 });
 it.each([false, true])("returns renderable aggregates for compressed=%s without exposing source rows", async compressed => {
- const stored = {...report, rows: [], legacyBackup: {private: "fixture"}};
+ const stored = {...report, rows: [], legacyBackup: {private: "fixture"}, excludedRowIdentities: ["synthetic-hidden-id"]};
  const snapshot = compressed ? {storageVersion: 1, payloadCompressed: gzipSync(JSON.stringify(stored)).toString("base64")} : stored;
  mocks.maybeSingle.mockResolvedValue({data: {snapshot}, error: null});
  const response = await GET();

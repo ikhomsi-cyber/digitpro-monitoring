@@ -196,3 +196,19 @@ describe("declared Morocco rent",()=>{
     expect(buildPiloteCompensations(annual,months).find(f=>f.id==='rent')?.income).toBe(3450);
   });
 });
+
+it("limits NDF expenses to the explicit Bankin NDF DigitPro category", () => {
+  const month = buildPiloteMonths([
+    row(101, -79, "Loisirs", "NDF DigitPro"),
+    row(102, -20, "NDF DigitPro", "Repas"),
+    row(103, -100, "Loisirs", "DigitPro Consulting NDF"),
+    row(104, -30, "DigitPro", "NDF"),
+    row(105, -40, "Divers", "NDF DigitPro autre"),
+    row(106, 589, "Entrées", "DigitPro Consulting NDF"),
+  ])[0];
+  const families = buildPiloteCompensations(month);
+  expect(families.find(f => f.id === "ndf")).toMatchObject({expenses:99,income:589,balance:490});
+  expect(families.find(f => f.id === "other")).toMatchObject({expenses:170});
+  expect(families.reduce((sum,f)=>sum+f.expenses,0)).toBe(month.expenses);
+  expect(piloteCompensationFamily("Divers", "  NDF   DigitPro.  ", false)).toBe("ndf");
+});

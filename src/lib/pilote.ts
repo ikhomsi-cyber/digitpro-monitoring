@@ -89,7 +89,7 @@ export function bankinPiloteExclusion(row: BankinPiloteRow): "hidden" | "interna
   if (names.some(name => ["virement interne", "virements internes"].includes(name))) return "internal";
   return null;
 }
-export type BankinPiloteSnapshot = { version: 1 | 2; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string; rows?: BankinPiloteRow[]; rowsCompressed?: string; legacyBackup?: BankinPiloteSnapshot };
+export type BankinPiloteSnapshot = { version: 1 | 2; months: PiloteMonth[]; sourceFilename: string; fileHash: string; sourceRows: number; excludedInternal: number; excludedHidden: number; shiftedRentCount?: number; importedAt: string; rows?: BankinPiloteRow[]; rowsCompressed?: string; legacyBackup?: BankinPiloteSnapshot; excludedRowIdentities?: string[] };
 export function buildBankinPiloteSnapshot(rows: BankinPiloteRow[], sourceFilename: string, fileHash: string): BankinPiloteSnapshot {
   return { version: 2, rows, months: buildPiloteMonths(rows), shiftedRentCount: rows.filter(row => !bankinPiloteExclusion(row) && piloteReportingMonth(row) !== row.date.slice(0, 7)).length, sourceFilename, fileHash, sourceRows: rows.length, excludedInternal: rows.filter(row => bankinPiloteExclusion(row) === "internal").length, excludedHidden: rows.filter(row => bankinPiloteExclusion(row) === "hidden").length, importedAt: new Date().toISOString() };
 }
@@ -107,7 +107,8 @@ const compensationNames = {
 /** The user's explicit budget rules, evaluated only on original Bankin category names. */
 export function piloteCompensationFamily(parent: string, sub: string, income: boolean): PiloteCompensationFamily {
   const name = sourceName(`${parent} ${sub}`);
-  if (/\bdigitpro\b/.test(name) && /\bndf\b/.test(name)) return "ndf";
+  if (!income && [parent, sub].some(category => sourceName(category).replace(/\s+/g, " ") === "ndf digitpro")) return "ndf";
+  if (income && /\bdigitpro\b/.test(name) && /\bndf\b/.test(name)) return "ndf";
   if (income) {
     if (/\bdigitpro\b/.test(name) && /\bik\b/.test(name)) return "transport";
     if (/\bloyers?\b/.test(name)) return "rent";
