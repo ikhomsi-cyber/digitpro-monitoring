@@ -47,3 +47,13 @@ it("excludes the two confirmed compensated gifts from monthly and daily reports 
  expect(snapshot.months[0].expenses).toBe(20);expect(snapshot.rows).toHaveLength(3);expect(snapshot.rows?.every(row=>!row.hidden)).toBe(true);
  expect(cumulativePiloteDays(buildPiloteDaily(snapshot)!['2026-09'],['secondary']).at(-1)?.expenses).toBe(20);
 });
+
+it("places confirmed Audi and Mercedes purchase categories in secondary while keeping running costs essential",()=>{
+ expect(piloteExpenseView('Auto & Transports','Audi A3')).toBe('secondary');
+ expect(piloteExpenseView('Auto & Transports','Mercedes GLB')).toBe('secondary');
+ for(const name of ['Carburant','Assurance véhicule','Transports en commun'])expect(piloteExpenseView('Auto & Transports',name)).toBe('essential');
+ const source=['Audi A3','Mercedes GLB','Carburant'].map((sub,i)=>({sourceRow:i+2,date:'2026-10-05',amount:-100,parentCategory:'Auto & Transports',subCategory:sub,hidden:false}));
+ const snapshot=buildBankinPiloteSnapshot(source,'synthetic.xlsx','fixture');
+ expect(filterPiloteExpenses(snapshot.months[0],'essential').expenses).toBe(100);
+ expect(cumulativePiloteDays(buildPiloteDaily(snapshot)!['2026-10'],['secondary']).at(-1)?.expenses).toBe(200);
+});

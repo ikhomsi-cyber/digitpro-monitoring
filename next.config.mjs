@@ -9,6 +9,8 @@ const nextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
       { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" }
+    ] }, { source: "/dashboard", headers: [
+      { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" }
     ] }];
   },
   /** Évite erreurs de chunk / `.call` avec certains builds Recharts + App Router. */

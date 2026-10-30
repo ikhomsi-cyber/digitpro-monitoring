@@ -44,7 +44,7 @@ it("renders the comparison and an explicit unavailable state without inventing a
  const snapshot=fixture([row(1,"2026-09-10",-100),row(2,"2026-10-10",-150)]);
  const result=buildPiloteMonthlyComparison(snapshot.months,"2026-10",["essential"],"2026-11-25");
  const text=renderToStaticMarkup(createElement(PiloteMonthlyComparison,{comparison:result})).replace(/<[^>]*>/g,"");
- expect(text).toContain("50 € de plus");expect(text).toContain("Le détail quotidien des deux mois est nécessaire");
+ expect(text).toContain("50 € de plus");expect(text).toContain("L’historique sera disponible après un import Bankin.");
  const unavailable=renderToStaticMarkup(createElement(PiloteMonthlyComparison,{comparison:{status:"unavailable",reason:"missing-month"}}));
  expect(unavailable).toContain("n’a pas de données importées");
 });

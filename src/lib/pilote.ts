@@ -186,6 +186,8 @@ export type PiloteExpenseView = "essential" | "secondary" | "taxes" | "travel";
 export function piloteExpenseView(parent: string, sub: string): PiloteExpenseView {
   if (piloteCompensationFamily(parent, sub, false) === "ndf") return "essential";
   const name = sourceName(`${parent} ${sub}`);
+  // User-confirmed vehicle purchase categories, separate from running transport costs.
+  if (["audi a3", "mercedes glb"].includes(sourceName(sub))) return "secondary";
   if (/\b(impots?|taxes?|csg|per|perin|perco|percol|perp)\b|\bepargne[ -]+retraite\b/.test(name)) return "taxes";
   if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
   if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";
