@@ -6,6 +6,8 @@ import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
 import { GmailAccountPicker } from "./GmailAccountPicker";
 import type { GmailAccount } from "@/lib/gmail/accounts";
+import { PiloteMonthlyComparison } from "./PiloteMonthlyComparison";
+import { buildPiloteMonthlyComparison, type PiloteComparisonAtDate } from "@/lib/bankin/pilote-comparison";
 import { PilotePocketSummary } from "./PilotePocketSummary";
 import { PiloteDailyChart } from "./PiloteDailyChart";
 import type { PiloteDaily } from "@/lib/bankin/pilote-daily";
@@ -112,6 +114,8 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   const { searchParams, piloteExpenseViews:expenseViews, setPiloteExpenseViews:setExpenseViews } = useDashboardSection();
   const [snapshot, setSnapshot] = useState<BankinPiloteSnapshot | null>(null);
   const [daily, setDaily] = useState<PiloteDaily | null>(null);
+  const [comparisonAtDate, setComparisonAtDate] = useState<PiloteComparisonAtDate | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(!demoMode);
   const [loadError, setLoadError] = useState("");
   const loadVersion = useRef(0);
@@ -119,7 +123,7 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
     const version=++loadVersion.current;
     const body=await loadData(refresh);
     if(version!==loadVersion.current)return;
-    setSnapshot(body.snapshot ?? null); setDaily(body.daily ?? null); setLoadError("");
+    setSnapshot(body.snapshot ?? null); setDaily(body.daily ?? null); setComparisonAtDate(body.comparisonAtDate ?? null); setLoadError("");
   }, [loadData]);
   useEffect(() => {
     let alive = true;
@@ -138,6 +142,15 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   const period = isAnnual ? buildPiloteYear(months, selectedYear) : selectedMonth;
   const current = period ? filterPiloteExpenses(period, expenseViews) : undefined;
   const monthIndex = months.findIndex(m => m.month === selectedMonth?.month);
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
+  const comparison = useMemo(() => selectedMonth ? buildPiloteMonthlyComparison(months, selectedMonth.month, expenseViews, today, comparisonAtDate) : null, [months, selectedMonth, expenseViews, today, comparisonAtDate]);
+  const refreshReport = async () => {
+    if (refreshing || busy || demoMode) return;
+    setRefreshing(true);
+    try { await loadSnapshot(true); }
+    catch (error) { setLoadError(error instanceof Error ? error.message : "Actualisation indisponible."); }
+    finally { setRefreshing(false); }
+  };
   const [connection, setConnection] = useState<GmailConnectionStatus | null>(null);
   const [gmailAccount, setGmailAccount] = useState<GmailAccount>(searchParams.get("gmail_account") === "secondary" ? "secondary" : "primary");
   const gmailConnected = connection?.accounts?.find(account => account.id === gmailAccount)?.connected ?? (gmailAccount === "primary" && Boolean(connection?.connected));
@@ -206,6 +219,8 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
         {isAnnual ? <p className="text-[10px] text-ink-500 dark:text-white/45">Totaux {selectedYear} · mois présents dans l’export Bankin</p> : null}
       </div>
     <div className="space-y-2"><div role="group" aria-label="Vue des dépenses" className="flex rounded-full bg-ink-100/70 p-1 dark:bg-white/[0.06]">{([{value: "essential", label: "Essentiel"}, {value: "secondary", label: "Presque essentiel"}, {value: "travel", label: "Voyages"}] as const).map(view => <button key={view.value} type="button" aria-pressed={expenseViews.includes(view.value)} onClick={() => setExpenseViews(selected => selected.includes(view.value) ? selected.filter(value => value !== view.value) : [...selected, view.value])} className={`min-h-10 min-w-0 flex-1 rounded-full px-2 text-xs font-semibold transition ${expenseViews.includes(view.value) ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/60"}`}>{view.label}</button>)}</div></div>
+    {current&&!loading?<div className="flex justify-end"><button type="button" onClick={()=>void refreshReport()} disabled={refreshing||busy||demoMode} className="inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] text-ink-500 transition hover:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 dark:text-white/50 dark:hover:bg-white/5">{refreshing?<Loader2 size={12} className="animate-spin" aria-hidden="true"/>:null}{refreshing?"Actualisation…":"Actualiser le bilan"}</button></div>:null}
+    {comparison&&!isAnnual&&!loading?<PiloteMonthlyComparison comparison={comparison}/>:null}
     {current&&!isAnnual&&selectedMonth?<PiloteDailyChart key={selectedMonth.month} days={daily?.[selectedMonth.month]} month={selectedMonth.month} views={expenseViews}/>:null}
     {fmt.dummy ? <p className="text-xs text-amber-600 dark:text-amber-200">Affichage masqué : les montants et les pourcentages affichés sont fictifs.</p> : null}
     {current&&!loading?<details className="rounded-2xl border border-ink-200/60 bg-white/50 p-4 text-xs dark:border-white/10 dark:bg-white/[.025]">

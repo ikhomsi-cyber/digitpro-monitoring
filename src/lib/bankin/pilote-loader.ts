@@ -1,7 +1,8 @@
 import type { BankinPiloteSnapshot } from "@/lib/pilote";
 import type { PiloteDaily } from "./pilote-daily";
+import type { PiloteComparisonAtDate } from "./pilote-comparison";
 class PiloteAccessError extends Error {}
-export type PiloteDashboardData={snapshot:BankinPiloteSnapshot|null;daily:PiloteDaily|null};
+export type PiloteDashboardData={snapshot:BankinPiloteSnapshot|null;daily:PiloteDaily|null;comparisonAtDate?:PiloteComparisonAtDate|null};
 /** One loader per mounted dashboard. No storage, shared module cache, or cross-user response cache. */
 export function createPiloteLoader(fetcher:typeof fetch=fetch){
  let request:Promise<PiloteDashboardData>|null=null;

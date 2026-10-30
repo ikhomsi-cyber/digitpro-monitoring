@@ -4,7 +4,7 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), maybeSingle: vi.fn(), eq: vi.fn(), from: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ auth: { getUser: mocks.getUser }, from: mocks.from }) }));
 import { GET } from "@/app/api/dashboard/pilote/route";
-import { piloteSnapshotMonths } from "@/lib/pilote";
+import { buildBankinPiloteSnapshot, piloteSnapshotMonths } from "@/lib/pilote";
 const report = { version: 2, months: [], sourceFilename: "synthetic.xlsx", fileHash: "fixture", sourceRows: 0, excludedInternal: 0, excludedHidden: 0, importedAt: "2026-10-24T00:00:00Z" };
 beforeEach(() => {
  vi.resetAllMocks();
@@ -39,4 +39,17 @@ it("does not query reports for unauthenticated callers", async () => {
 it("handles database failure without leaking diagnostics", async () => {
  mocks.maybeSingle.mockResolvedValue({data: null, error: {message: "private-diagnostic"}});
  const response = await GET();expect(response.status).toBe(503);expect(await response.text()).not.toContain("private-diagnostic");
+});
+
+it("provides only current and previous month aggregates through the same Paris cutoff",async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date("2026-10-30T12:00:00Z"));
+ try{
+ const row=(sourceRow:number,date:string,amount:number,hidden=false)=>({sourceRow,date,amount,hidden,parentCategory:"Alimentation",subCategory:"Synthetic",identity:"private-source-id"});
+ const source=buildBankinPiloteSnapshot([row(2,"2026-09-30",-100),row(3,"2026-10-30",-200),row(4,"2026-10-31",-900),row(5,"2026-08-01",-700),row(6,"2026-09-02",-500,true)],"synthetic.xlsx","synthetic");
+ mocks.maybeSingle.mockResolvedValue({data:{snapshot:source},error:null});
+ const response=await GET();const body=await response.json();
+ expect(body.comparisonAtDate.asOf).toBe("2026-10-30");
+ expect(body.comparisonAtDate.months.map((m:{month:string;expenses:number})=>[m.month,m.expenses])).toEqual([["2026-09",100],["2026-10",200]]);
+ expect(JSON.stringify(body)).not.toContain("private-source-id");
+ }finally{vi.useRealTimers()}
 });
