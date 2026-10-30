@@ -2,7 +2,7 @@ import { buildBankinPiloteSnapshot, type BankinPiloteRow, type BankinPiloteSnaps
 
 export class PiloteHistoryError extends Error {}
 
-/** Append missing occurrences, keeping identical legitimate payments and all existing rows. */
+/** Refresh matched Bankin source categories and append missing occurrences without dropping history. */
 export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null, incoming: BankinPiloteSnapshot): BankinPiloteSnapshot {
   if (!incoming.rows) throw new PiloteHistoryError("Le détail de cet export Bankin est manquant.");
   if (!previous) return incoming;
@@ -11,18 +11,31 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
     return { ...incoming, legacyBackup: previous };
   }
   const key = (row: BankinPiloteRow) => row.identity ?? JSON.stringify([row.date, Math.round(row.amount * 100), row.parentCategory, row.subCategory, row.hidden]);
-  const available = new Map<string, number>();
-  for (const row of previous.rows) available.set(key(row), (available.get(key(row)) ?? 0) + 1);
+  const available = new Map<string, number[]>();
+  previous.rows.forEach((row, index) => {
+    const positions = available.get(key(row)) ?? [];
+    positions.push(index); available.set(key(row), positions);
+  });
+  const replacements = new Map<number, BankinPiloteRow>();
   const added: BankinPiloteRow[] = [];
   const excluded = new Set(previous.excludedRowIdentities ?? []);
   for (const row of incoming.rows) {
     if (row.identity && excluded.has(row.identity)) continue;
-    const id = key(row), remaining = available.get(id) ?? 0;
-    if (remaining > 0) available.set(id, remaining - 1);
-    else added.push(row);
+    const index = available.get(key(row))?.shift();
+    if (index === undefined) { added.push(row); continue; }
+    const saved = previous.rows[index];
+    // Only a stable identity can carry category/visibility corrections from Bankin.
+    // Never reconcile distinct payments on amount/date alone.
+    if (row.identity && (saved.parentCategory !== row.parentCategory || saved.subCategory !== row.subCategory || saved.hidden !== row.hidden)) {
+      if (saved.date !== row.date || Math.round(saved.amount * 100) !== Math.round(row.amount * 100)) {
+        throw new PiloteHistoryError("L’identité d’une opération Bankin est incohérente. Le bilan précédent est conservé.");
+      }
+      replacements.set(index, { ...saved, parentCategory: row.parentCategory, subCategory: row.subCategory, hidden: row.hidden });
+    }
   }
-  if (!added.length) return previous;
-  // Row numbers are local to each workbook; assign unique IDs for aggregate calculation.
-  const rows = [...previous.rows, ...added].map((row, index) => ({ ...row, sourceRow: index + 2 }));
+  if (!added.length && !replacements.size) return previous;
+  // Preserve missing history; update only matched source fields and append new occurrences.
+  const rows = [...previous.rows.map((row, index) => replacements.get(index) ?? row), ...added]
+    .map((row, index) => ({ ...row, sourceRow: index + 2 }));
   return { ...buildBankinPiloteSnapshot(rows, incoming.sourceFilename, incoming.fileHash), legacyBackup: previous.legacyBackup, ...(previous.excludedRowIdentities?.length ? { excludedRowIdentities: previous.excludedRowIdentities } : {}) };
 }

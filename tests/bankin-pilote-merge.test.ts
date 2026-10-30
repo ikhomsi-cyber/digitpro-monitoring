@@ -10,10 +10,17 @@ it("preserves old months and absent transactions while adding new and backdated 
   expect(merged.months.map(m => [m.month, m.count, m.expenses])).toEqual([["2025-01", 2, 20], ["2026-10", 3, 30]]);
   expect(old.rows).toHaveLength(3);
 });
-it("ignores reimports, row ordering, and category edits without replacing saved rows", () => {
+it("refreshes source categories on stable identities without adding a second expense", () => {
   const old = snapshot([row("a"), row("b")]);
-  expect(mergeBankinPiloteSnapshots(old, snapshot([row("b"), { ...row("a"), subCategory: "Changed" }]))).toBe(old);
+  const next = snapshot([row("b"), { ...row("a"), subCategory: "Changed" }]);
+  const merged = mergeBankinPiloteSnapshots(old, next);
+  expect(merged.rows).toHaveLength(2);
+  expect(merged.rows?.find(r => r.identity === "a")?.subCategory).toBe("Changed");
+  expect(merged.months[0].expenses).toBe(20);
+  expect(old.rows?.find(r => r.identity === "a")?.subCategory).toBe("Charges");
+  expect(mergeBankinPiloteSnapshots(merged, next)).toBe(merged);
 });
+
 it("keeps genuine identical payments by comparing occurrence counts", () => {
   const old = snapshot([row("a"), row("a")]);
   const next = snapshot([row("a"), row("a"), row("a")]);
@@ -43,4 +50,21 @@ it("uses the next export as the baseline once and archives the legacy report", (
   expect(next.months.map(m => m.expenses)).toEqual([25, 10]);
   expect(mergeBankinPiloteSnapshots(next, incoming)).toBe(next);
   expect(old.months[0].month).toBe("2025-01");
+});
+
+it("moves a recategorized NDF expense out of NDF using Bankin source fields only", () => {
+ const ndf={...row("ndf"),parentCategory:"Loisirs",subCategory:"NDF DigitPro"};
+ const old=snapshot([ndf,row("history","2025-01-01")]);
+ const next=snapshot([{...ndf,parentCategory:"Alimentation",subCategory:"Courses"}]);
+ const merged=mergeBankinPiloteSnapshots(old,next);
+ expect(merged.rows).toHaveLength(2);
+ expect(merged.months.find(m=>m.month==="2026-10")?.categories).toMatchObject([{name:"Alimentation",expenses:10}]);
+ expect(merged.months.find(m=>m.month==="2025-01")).toEqual(old.months.find(m=>m.month==="2025-01"));
+});
+it("honors source visibility changes without reactivating explicitly excluded identities",()=>{
+ const old={...snapshot([row("a"),{...row("protected"),hidden:true}]),excludedRowIdentities:["protected"]};
+ const merged=mergeBankinPiloteSnapshots(old,snapshot([{...row("a"),hidden:true},row("protected")]));
+ expect(merged.rows?.every(r=>r.hidden)).toBe(true);
+ expect(merged.months).toEqual([]);
+ expect(merged.excludedRowIdentities).toEqual(["protected"]);
 });
