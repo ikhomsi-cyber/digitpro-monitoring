@@ -14,10 +14,13 @@ export function piloteReportingMonth(row: BankinPiloteRow): string {
   return date.getUTCDate() >= lastDay - 6 ? new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)).toISOString().slice(0, 7) : original;
 }
 
-/** Explicitly confirmed by the user: the cancelled Minorque hotel debit. */
+/** Exact expenses explicitly confirmed as reimbursed by the user; raw rows remain intact. */
 function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
-  return row.date === "2026-07-09" && row.parentCategory === "Voyage Minorque 26"
+  const hotel = row.date === "2026-07-09" && row.parentCategory === "Voyage Minorque 26"
     && row.subCategory === "Hôtel - 14j" && cents(row.amount) === -131520;
+  const gifts = row.date === "2026-09-08" && row.parentCategory === "Achats & Shopping"
+    && row.subCategory === "Cadeaux" && [-180000, -440000].includes(cents(row.amount));
+  return hotel || gifts;
 }
 
 /** User-confirmed PER payment; retain the original Bankin source row unchanged. */

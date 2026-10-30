@@ -40,3 +40,10 @@ it("moves only the explicitly confirmed savings payment to PER, preserving sourc
  expect(cumulativePiloteDays(daily['2026-09'],['taxes']).at(-1)?.expenses).toBe(30000);
  expect(cumulativePiloteDays(daily['2026-09'],['secondary']).at(-1)?.expenses).toBe(510);
 });
+
+it("excludes the two confirmed compensated gifts from monthly and daily reports without hiding other gifts",()=>{
+ const source=[1800,4400,20].map((amount,i)=>({sourceRow:i+2,date:'2026-09-08',amount:-amount,parentCategory:'Achats & Shopping',subCategory:'Cadeaux',hidden:false}));
+ const snapshot=buildBankinPiloteSnapshot(source,'synthetic.xlsx','fixture');
+ expect(snapshot.months[0].expenses).toBe(20);expect(snapshot.rows).toHaveLength(3);expect(snapshot.rows?.every(row=>!row.hidden)).toBe(true);
+ expect(cumulativePiloteDays(buildPiloteDaily(snapshot)!['2026-09'],['secondary']).at(-1)?.expenses).toBe(20);
+});
