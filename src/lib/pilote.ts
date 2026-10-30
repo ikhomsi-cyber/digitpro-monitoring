@@ -20,11 +20,19 @@ function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
     && row.subCategory === "Hôtel - 14j" && cents(row.amount) === -131520;
 }
 
+/** User-confirmed PER payment; retain the original Bankin source row unchanged. */
+export function piloteReportingCategories(row: BankinPiloteRow): {parent: string; sub: string} {
+  const confirmedPer = row.date === "2026-09-07" && cents(row.amount) === -3000000
+    && row.parentCategory === "Banque" && row.subCategory === "Epargne";
+  return {parent: row.parentCategory, sub: confirmedPer ? "PER" : row.subCategory};
+}
+
 /** Upgrade the previously saved aggregate without requiring another import.
  * New snapshots exclude the exact source row and carry version 2, so this
  * adjustment is never applied to them a second time.
  */
 export function piloteSnapshotMonths(snapshot: BankinPiloteSnapshot): PiloteMonth[] {
+  if (snapshot.rows) return buildPiloteMonths(snapshot.rows);
   if (snapshot.version === 2) return snapshot.months;
   return snapshot.months.map(month => {
     if (month.month !== "2026-07") return month;
@@ -64,8 +72,9 @@ export function buildPiloteMonths(transactions: BankinPiloteRow[]): PiloteMonth[
       const parents = new Map<string, Map<string, { amount: number; count: number }>>();
       for (const tx of rows) {
         if (tx.amount === 0 || (tx.amount > 0) !== positive) continue;
-        const parent = tx.parentCategory || "Sans catégorie";
-        const sub = tx.subCategory || "Sans sous-catégorie";
+        const reporting = piloteReportingCategories(tx);
+        const parent = reporting.parent || "Sans catégorie";
+        const sub = reporting.sub || "Sans sous-catégorie";
         const children = parents.get(parent) ?? new Map();
         const value = children.get(sub) ?? { amount: 0, count: 0 };
         value.amount += Math.abs(cents(tx.amount)); value.count++;

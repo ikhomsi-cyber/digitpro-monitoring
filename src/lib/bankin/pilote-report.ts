@@ -1,6 +1,6 @@
 import "server-only";
 import { gunzipSync } from "node:zlib";
-import type { BankinPiloteSnapshot } from "@/lib/pilote";
+import { buildPiloteMonths, type BankinPiloteRow, type BankinPiloteSnapshot } from "@/lib/pilote";
 
 /** Read both historical reports and the compressed storage envelope. Never expose raw rows. */
 export function decodePiloteReport(value: unknown): BankinPiloteSnapshot {
@@ -11,5 +11,6 @@ export function decodePiloteReport(value: unknown): BankinPiloteSnapshot {
   }
   if (!report || typeof report !== "object" || ![1, 2].includes(Number(report.version)) || !Array.isArray(report.months)) throw new Error("Invalid Pilote report");
   const { rows, rowsCompressed, legacyBackup, excludedRowIdentities, ...summary } = report;
+  if (Array.isArray(rows)) summary.months = buildPiloteMonths(rows as BankinPiloteRow[]);
   return summary as BankinPiloteSnapshot;
 }

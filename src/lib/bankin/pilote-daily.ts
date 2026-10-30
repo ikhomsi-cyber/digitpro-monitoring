@@ -1,4 +1,4 @@
-import { isPiloteReportRow, buildPiloteMonths, filterPiloteIncome, piloteExpenseView, piloteReportingMonth, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
+import { piloteReportingCategories, isPiloteReportRow, buildPiloteMonths, filterPiloteIncome, piloteExpenseView, piloteReportingMonth, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
 export type PiloteDay = { day: number; income: number; essential: number; secondary: number; travel: number; taxes?: number };
 export type PiloteDaily = Record<string, PiloteDay[]>;
 /** Daily amounts only: no labels, accounts or transaction identities leave the server. */
@@ -24,7 +24,8 @@ export function buildPiloteDaily(snapshot: BankinPiloteSnapshot): PiloteDaily | 
     if (row.amount > 0) {
       if (allowedIncome.has(JSON.stringify([month, row.parentCategory || "Sans catégorie", row.subCategory || "Sans sous-catégorie"]))) target.income = Math.round((target.income + row.amount) * 100) / 100;
     } else {
-      const view = piloteExpenseView(row.parentCategory, row.subCategory);
+      const reporting = piloteReportingCategories(row);
+      const view = piloteExpenseView(reporting.parent, reporting.sub);
       target[view] = Math.round(((target[view] ?? 0) - row.amount) * 100) / 100;
     }
   }

@@ -29,3 +29,14 @@ it("does not invent a 31st day for a shorter month",()=>{
  const series=buildPiloteComparisonEvolution(comparison,buildPiloteDaily(source),['taxes'])!;
  expect(series).toHaveLength(31);expect(series[27].current).toBe(20);expect(series[28].current).toBeNull();expect(series[30].previous).toBe(10);
 });
+
+it("moves only the explicitly confirmed savings payment to PER, preserving source rows and daily totals",()=>{
+ const source=[{sourceRow:2,date:'2026-09-07',amount:-30000,parentCategory:'Banque',subCategory:'Epargne',hidden:false},{sourceRow:3,date:'2026-09-07',amount:-10,parentCategory:'Banque',subCategory:'Frais bancaires',hidden:false},{sourceRow:4,date:'2026-09-08',amount:-500,parentCategory:'Banque',subCategory:'Epargne',hidden:false}];
+ const snapshot=buildBankinPiloteSnapshot(source,'synthetic.xlsx','fixture');
+ expect(filterPiloteExpenses(snapshot.months[0],'taxes').expenses).toBe(30000);
+ expect(filterPiloteExpenses(snapshot.months[0],'secondary').expenses).toBe(510);
+ expect(source[0].subCategory).toBe('Epargne');
+ const daily=buildPiloteDaily(snapshot)!;
+ expect(cumulativePiloteDays(daily['2026-09'],['taxes']).at(-1)?.expenses).toBe(30000);
+ expect(cumulativePiloteDays(daily['2026-09'],['secondary']).at(-1)?.expenses).toBe(510);
+});

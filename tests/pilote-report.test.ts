@@ -11,3 +11,9 @@ it('reads historical and compressed reports without returning transaction rows o
 it('rejects corrupt reports before the UI receives an object without months', () => {
  for (const value of [null, {}, { storageVersion: 2, payloadCompressed: 'bad' }, { storageVersion: 1, payloadCompressed: 'bad' }]) expect(() => decodePiloteReport(value)).toThrow();
 });
+
+it('recomputes a saved aggregate from the confirmed PER row without exposing the source',()=>{
+ const decoded=decodePiloteReport({...report,rows:[{sourceRow:2,date:'2026-09-07',amount:-30000,parentCategory:'Banque',subCategory:'Epargne',hidden:false}]});
+ expect(decoded.months[0].categories[0].children[0]).toMatchObject({name:'PER',expenses:30000});
+ expect(decoded).not.toHaveProperty('rows');
+});

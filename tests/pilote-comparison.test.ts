@@ -40,11 +40,11 @@ it("reconciles the top three category contributions and the remaining categories
  expect(result.status).toBe("ready");if(result.status!=="ready")return;
  expect(result.categories).toHaveLength(3);expect(result.categories.reduce((sum,category)=>sum+Math.round(category.delta*100),Math.round(result.otherDelta*100))).toBe(Math.round(result.delta*100));
 });
-it("renders an explicit unavailable state and exact dates without guessing an exhaustive history",()=>{
+it("renders the comparison and an explicit unavailable state without inventing a daily history",()=>{
  const snapshot=fixture([row(1,"2026-09-10",-100),row(2,"2026-10-10",-150)]);
  const result=buildPiloteMonthlyComparison(snapshot.months,"2026-10",["essential"],"2026-11-25");
  const text=renderToStaticMarkup(createElement(PiloteMonthlyComparison,{comparison:result})).replace(/<[^>]*>/g,"");
- expect(text).toContain("01/10/2026");expect(text).toContain("31/10/2026");expect(text).toContain("30/09/2026");expect(text).toContain("sans garantie d’exhaustivité");
+ expect(text).toContain("50 € de plus");expect(text).toContain("Le détail quotidien des deux mois est nécessaire");
  const unavailable=renderToStaticMarkup(createElement(PiloteMonthlyComparison,{comparison:{status:"unavailable",reason:"missing-month"}}));
  expect(unavailable).toContain("n’a pas de données importées");
 });
