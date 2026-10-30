@@ -6,7 +6,7 @@ function Correction({kind,title,description}:{kind:"tax"|"ndf"|"october";title:s
  const repair=async()=>{if(busy||done)return;setBusy(true);try{
   const response=await fetch(`/api/dashboard/pilote/repair-confirmed-${kind}`,{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(kind==="october"?{excludeJojo}:{})});
   const result=await response.json();if(!response.ok)throw new Error(result.error||"Correction impossible.");
-  setDone(true);setMessage(result.corrected?`${result.removed} doublon(s) écarté(s). Total : ${result.amount.toLocaleString("fr-FR")} €. Totaux Pilote recalculés.`:`Le bilan est déjà aligné à ${result.amount.toLocaleString("fr-FR")} €.`);
+  setDone(true);setMessage(result.corrected?`${result.removed} ligne(s) écartée(s). Total : ${result.amount.toLocaleString("fr-FR")} €. Totaux Pilote recalculés.`:`Le bilan est déjà aligné à ${result.amount.toLocaleString("fr-FR")} €.`);
  }catch(error){setMessage(error instanceof Error?error.message:"Correction impossible.");setDone(true);}finally{setBusy(false)}};
  return <section className="space-y-3 rounded-2xl border border-ink-200 p-5"><h2 className="font-semibold">{title}</h2><p>{description}</p>{kind==="october"?<label className="flex gap-2 text-sm"><input type="checkbox" checked={excludeJojo} disabled={busy||done} onChange={event=>setExcludeJojo(event.target.checked)}/>J’ai confirmé que Jojo Distri 5,78 € du 29 octobre est absent ou masqué dans l’analyse Bankin.</label>:null}<button type="button" disabled={busy||done} onClick={()=>void repair()} className="rounded-xl bg-brand-600 px-4 py-3 text-white disabled:opacity-50">{busy?"Correction…":`Corriger ${title}`}</button>{message?<p role="status">{message}</p>:null}</section>;
 }

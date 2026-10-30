@@ -5,6 +5,8 @@ import { eur, formatEurChartAxis, formatSignedEur } from "@/lib/format";
 import { maskMoneyAmount, maskPercent0to100, maskPositiveInt } from "@/lib/dummy-display-numbers";
 import { DASHBOARD_DUMMY_DATA_COOKIE } from "@/lib/dashboard-dummy-data-preference";
 
+const eurWithCents = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 type DummyDataContextValue = {
   active: boolean;
   setActive: (next: boolean) => void;
@@ -81,6 +83,7 @@ export function useDashboardDisplayFormat() {
     () => ({
       dummy,
       euro: (value: number) => eur.format(dummy ? maskMoneyAmount(value) : value),
+      euroExact: (value: number) => eurWithCents.format(dummy ? maskMoneyAmount(value) : value),
       signedEuro: (value: number) => (dummy ? formatSignedEur(maskMoneyAmount(value)) : formatSignedEur(value)),
       chartAxisEuro: (value: number) =>
         formatEurChartAxis(dummy ? maskMoneyAmount(value) : value),
