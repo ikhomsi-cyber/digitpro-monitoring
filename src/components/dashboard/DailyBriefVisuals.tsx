@@ -1,3 +1,4 @@
+import type { HouseholdYearComparison } from "@/lib/daily-brief-household";
 import { ArrowUpRight, CalendarDays, CarFront, House, ReceiptText, ShieldCheck, TrendingUp, Utensils, Wallet } from "lucide-react";
 import type { BriefActivity } from "@/lib/daily-brief-activity";
 import type { PiloteCompensation } from "@/lib/pilote";
@@ -47,5 +48,18 @@ export function HouseholdBriefVisual({families}:{families:PiloteCompensation[]})
    <div aria-hidden="true" className="ml-9 mt-2 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.07]"><div className={`h-full rounded-full ${family.balance<0?"bg-amber-400":"bg-emerald-400"}`} style={{width:`${value}%`}}/></div>
   </div>;})}</div>
   <p className="mt-4 border-t border-ink-200/50 pt-3 text-[10px] leading-relaxed text-ink-400 dark:border-white/10 dark:text-white/40">Les excédents couvrent les déficits des autres familles dans le total de votre poche.</p>
+ </figure>;
+}
+
+export function HouseholdHistoryVisual({history}:{history:HouseholdYearComparison[]}){
+ const current=history[0],previous=history[1];if(!current)return null;
+ const maximum=Math.max(1,...history.map(row=>row.monthOutOfPocket??0));
+ const delta=current.monthOutOfPocket!=null&&previous?.monthOutOfPocket!=null?current.monthOutOfPocket-previous.monthOutOfPocket:null;
+ const change=delta!==null&&previous!.monthOutOfPocket!>0?delta/previous!.monthOutOfPocket!*100:null;
+ return <figure className={card} aria-label="Comparaison annuelle du reste payé de votre poche à date">
+  <figcaption className={`${eyebrow} flex items-center gap-2`}><Wallet size={14}/>De votre poche · à date comparable</figcaption>
+  <div className="mt-4 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] text-ink-400">{current.year} · même période</p><p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">{current.monthOutOfPocket==null?"À compléter":money(current.monthOutOfPocket)}</p></div>{change!==null?<span className={`mb-1 text-xs font-medium tabular-nums ${delta!<=0?"text-emerald-600 dark:text-emerald-300":"text-amber-700 dark:text-amber-300"}`}>{change>0?"+":""}{change.toLocaleString("fr-FR",{maximumFractionDigits:1})} % <span className="text-[10px] font-normal text-ink-400">vs {previous.year}</span></span>:null}</div>
+  <div aria-hidden="true" className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.07]"><div className="h-full rounded-full bg-[var(--app-accent)]" style={{width:`${percent((current.monthOutOfPocket??0)/maximum*100)}%`}}/></div>
+  <dl className="mt-5 space-y-4">{history.slice(1).map(row=><div key={row.year}><div className="flex items-baseline justify-between gap-4"><dt className="text-xs text-ink-500 dark:text-white/55">{row.year}</dt><dd className="text-sm font-medium tabular-nums text-ink-700 dark:text-white/80">{row.monthOutOfPocket==null?"Non renseigné":money(row.monthOutOfPocket)}</dd></div>{row.monthOutOfPocket!=null?<div aria-hidden="true" className="mt-2 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.05]"><div className="h-full rounded-full bg-ink-300 dark:bg-white/25" style={{width:`${percent(row.monthOutOfPocket/maximum*100)}%`}}/></div>:null}</div>)}</dl>
  </figure>;
 }

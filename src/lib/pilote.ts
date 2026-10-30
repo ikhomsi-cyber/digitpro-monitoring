@@ -169,11 +169,12 @@ export function buildPiloteYear(months: PiloteMonth[], year: string): PiloteMont
   return { month: year, income, expenses, balance: (cents(income) - cents(expenses)) / 100, count: rows.reduce((s, m) => s + m.count, 0), categories: merge("categories"), incomeCategories: merge("incomeCategories") };
 }
 
-export type PiloteExpenseView = "essential" | "secondary" | "travel";
+export type PiloteExpenseView = "essential" | "secondary" | "taxes" | "travel";
 /** Display-only partitions; original Bankin labels and income remain unchanged. */
 export function piloteExpenseView(parent: string, sub: string): PiloteExpenseView {
   if (piloteCompensationFamily(parent, sub, false) === "ndf") return "essential";
   const name = sourceName(`${parent} ${sub}`);
+  if (/\b(impots?|taxes?|csg|per|perin|perco|percol|perp)\b|\bepargne[ -]+retraite\b/.test(name)) return "taxes";
   if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
   if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";
   if (/\b(logement|loyers?|lmnp|copro|alimentation|transports?|sante|scolarite|enfants)\b/.test(name)) return "essential";

@@ -21,7 +21,7 @@ export async function GET(request:Request) {
  if(getDashboardEffectiveDataMode(getSupabaseRuntimeMode(), await cookies())==="DEMO")return Response.json({error:"Le point quotidien est disponible avec vos données réelles."},{status:409,headers:privateResponseHeaders});
  const rawViews=new URL(request.url).searchParams.get("views");
  const views=(rawViews===null?["essential"]:rawViews===""?[]:rawViews.split(",")) as PiloteExpenseView[];
- if(views.length>3||views.some(view=>!["essential","secondary","travel"].includes(view)))return Response.json({error:"Vue des dépenses invalide."},{status:400,headers:privateResponseHeaders});
+ if(views.length>4||views.some(view=>!["essential","secondary","taxes","travel"].includes(view)))return Response.json({error:"Vue des dépenses invalide."},{status:400,headers:privateResponseHeaders});
  const date=parisDay();const warnings:string[]=[];
  const [txResult,snapshotResult,balanceResult,workResult,invoicesResult]=await Promise.allSettled([
   (async()=>{

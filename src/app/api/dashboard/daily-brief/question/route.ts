@@ -3,7 +3,7 @@ import { GET as getDailyBrief } from "../route";
 import { requireSameOrigin, privateResponseHeaders } from "@/lib/security/http";
 import { answerBriefQuestion, BriefQuestionError, type QuestionBrief } from "@/lib/daily-brief-question";
 export const maxDuration=60;
-const schema=z.object({question:z.string().trim().min(2).max(2000),views:z.array(z.enum(["essential","secondary","travel"])).max(3).optional(),history:z.array(z.object({role:z.enum(["user","assistant"]),content:z.string().max(4000)}).strict()).max(6).default([])}).strict();
+const schema=z.object({question:z.string().trim().min(2).max(2000),views:z.array(z.enum(["essential","secondary","taxes","travel"])).max(4).optional(),history:z.array(z.object({role:z.enum(["user","assistant"]),content:z.string().max(4000)}).strict()).max(6).default([])}).strict();
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:privateResponseHeaders});
 export async function POST(request:Request){
  const forbidden=requireSameOrigin(request);if(forbidden)return forbidden;

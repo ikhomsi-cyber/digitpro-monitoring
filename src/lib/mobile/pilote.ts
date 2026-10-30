@@ -8,7 +8,8 @@ export function buildMobilePilote(snapshot: BankinPiloteSnapshot | null, options
   const currentYear=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Europe/Paris"}).format(now);
   const period=options.period??months.at(-1)?.month??null;
   const source=period?.length===4?buildPiloteYear(months,period):months.find(m=>m.month===period);
-  const current=source?filterPiloteExpenses(source,options.views):undefined;
+  const expenseViews: PiloteExpenseView[]=options.views.includes("secondary")&&!options.views.includes("taxes")?[...options.views,"taxes"]:options.views;
+  const current=source?filterPiloteExpenses(source,expenseViews):undefined;
   const incomeMonths=period?.length===4?months.filter(m=>m.month.startsWith(`${period}-`)):source?[source]:[];
   const mergeRows=(groups:PiloteGroup[],income:boolean,family:string)=>{
     const rows=new Map<string,{parent:string;name:string;amount:number}>();
@@ -38,7 +39,7 @@ export function buildMobilePilote(snapshot: BankinPiloteSnapshot | null, options
   const daily = snapshot && period?.length === 7 && current ? buildPiloteDaily(snapshot)?.[period] : undefined;
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(now);
   const throughDay = period && period > today.slice(0, 7) ? 0 : period === today.slice(0, 7) ? Number(today.slice(8, 10)) : daily?.length ?? 0;
-  const points = daily ? cumulativePiloteDays(daily, [...new Set(options.views)], throughDay) : [];
+  const points = daily ? cumulativePiloteDays(daily, [...new Set(expenseViews)], throughDay) : [];
   const dailyCoverage = daily && period ? { month: period, daysInMonth: daily.length, points, firstDeficit: points.find(point => point.balance < 0) ?? null } : null;
   return {version:1,dailyCoverage,months:months.map(m=>m.month),years:[...new Set(months.map(m=>m.month.slice(0,4)))].sort().reverse(),period,views:options.views,
     summary:current?{income:current.income,expenses:current.expenses,balance:current.balance,coveragePercent:current.expenses>0?Math.round(current.income/current.expenses*100):100}:null,

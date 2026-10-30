@@ -1,11 +1,11 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowUpRight, ArrowRightLeft, BriefcaseBusiness, Gift, GraduationCap, House, Lightbulb, Loader2, Send, ReceiptText, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
 import { ASSISTANT_HOUSEHOLD_VIEWS } from "@/lib/assistant-household-views";
 import { useDashboardSection } from "./DashboardSectionContext";
 import { useDashboardDummyData } from "./DashboardDisplayFormatContext";
 import { Logo } from "@/components/ui/Logo";
-import { ActivityBriefVisual, HouseholdBriefVisual, TreasuryBriefVisual } from "./DailyBriefVisuals";
+import { ActivityBriefVisual, HouseholdBriefVisual, TreasuryBriefVisual, HouseholdHistoryVisual } from "./DailyBriefVisuals";
 import type { HouseholdYearComparison } from "@/lib/daily-brief-household";
 import type { DailyBrief } from "@/lib/daily-financial-brief";
 type Brief=DailyBrief & {qontoBalance:number|null;householdHistory:HouseholdYearComparison[]};
@@ -23,6 +23,8 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
  useEffect(()=>{conversationScroll.current?.scrollTo({top:0});},[conversation]);
  const questionRequest=useRef<AbortController|null>(null);
  const closingAnimation=useRef<Animation|null>(null);
+ const suppressHandleClick=useRef(false);
+ const sheetDrag=useRef<{id:number;start:number;last:number;time:number;velocity:number;offset:number}|null>(null);
  const pending=useRef<AbortController|null>(null);const lastDate=useRef("");
  const load=useCallback(async()=>{
   pending.current?.abort();const controller=new AbortController();pending.current=controller;
@@ -32,7 +34,7 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
   finally{if(!controller.signal.aborted)setLoading(false);}
  },[viewsKey]);
  useEffect(()=>{lastDate.current="";questionRequest.current?.abort();setAsking(false);setConversation([]);setQuestionError("");if(open&&!masked)void load();},[viewsKey,load]);
- const show=useCallback(()=>{closingAnimation.current?.cancel();closingAnimation.current=null;setOpen(true);if(lastDate.current!==today())void load();},[load]);
+ const show=useCallback(()=>{sheetDrag.current=null;if(dialog.current)dialog.current.style.transform="";closingAnimation.current?.cancel();closingAnimation.current=null;setOpen(true);if(lastDate.current!==today())void load();},[load]);
  useEffect(()=>{
   if(demoMode||masked||section==="courses")return;
   const check=()=>{if(document.visibilityState!=="visible"||open)return;try{if(localStorage.getItem(`digitpro:daily-brief:v2:${userId}`)!==today())show();}catch{show();}};
@@ -61,22 +63,41 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
   finally{if(!controller.signal.aborted)setAsking(false);}
  };
  const close=()=>{
+  sheetDrag.current=null;
   const panel=dialog.current;
   if(panel?.open&&panel.animate&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
    closingAnimation.current?.cancel();
-   const animation=panel.animate([{transform:"translateY(0)"},{transform:"translateY(100%)"}],{duration:250,easing:"ease-in",fill:"forwards"});closingAnimation.current=animation;
-   void animation.finished.then(()=>{if(closingAnimation.current===animation){animation.cancel();closingAnimation.current=null;panel.close();setOpen(false);}}).catch(()=>{});
+   const animation=panel.animate([{transform:panel.style.transform||"translateY(0)"},{transform:"translateY(100%)"}],{duration:250,easing:"ease-in",fill:"forwards"});closingAnimation.current=animation;
+   void animation.finished.then(()=>{if(closingAnimation.current===animation){animation.cancel();closingAnimation.current=null;panel.close();panel.style.transform="";setOpen(false);}}).catch(()=>{});
   }else setOpen(false);
   try{localStorage.setItem(`digitpro:daily-brief:v2:${userId}`,today());}catch{ /* Dismissal is optional; financial data is never persisted. */ }};
+ const dragStart=(event:PointerEvent<HTMLDivElement>)=>{
+  if(!event.isPrimary||event.button!==0)return;
+  suppressHandleClick.current=false;
+  dialog.current?.getAnimations().forEach(animation=>animation.cancel());
+  event.currentTarget.setPointerCapture(event.pointerId);
+  sheetDrag.current={id:event.pointerId,start:event.clientY,last:event.clientY,time:event.timeStamp,velocity:0,offset:0};
+ };
+ const dragMove=(event:PointerEvent<HTMLDivElement>)=>{
+  const drag=sheetDrag.current;if(!drag||drag.id!==event.pointerId)return;
+  drag.velocity=(event.clientY-drag.last)/Math.max(1,event.timeStamp-drag.time);drag.last=event.clientY;drag.time=event.timeStamp;drag.offset=Math.max(0,event.clientY-drag.start);
+  if(dialog.current)dialog.current.style.transform=`translateY(${drag.offset}px)`;
+ };
+ const dragEnd=(event:PointerEvent<HTMLDivElement>,cancelled=false)=>{
+  const drag=sheetDrag.current;if(!drag||drag.id!==event.pointerId)return;sheetDrag.current=null;suppressHandleClick.current=drag.offset>8;
+  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+  if(!cancelled&&(drag.offset>86||(drag.offset>8&&drag.velocity>0.45))){close();return;}
+  const panel=dialog.current;if(panel){if(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)panel.animate([{transform:`translateY(${drag.offset}px)`},{transform:"translateY(0)"}],{duration:200,easing:"ease-out"});panel.style.transform="";}
+ };
  if(demoMode)return null;
  const actions=brief?.items.filter(item=>item.priority!=="info")??[];
  const activity=brief?.activity;
  const pocket=brief?.householdHistory?.[0],previousPocket=brief?.householdHistory?.[1];
  const selectedActions=[actions.find(item=>item.scope==="pro"),actions.find(item=>item.scope==="foyer"),...actions].filter((item,index,all)=>item&&all.findIndex(other=>other?.id===item.id)===index).slice(0,3);
  return <>
-  <button data-pull-refresh-ignore type="button" onClick={show} disabled={masked} aria-label="Ouvrir mon point quotidien" aria-haspopup="dialog" aria-expanded={open} title="Mon point quotidien" className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.6rem)] z-50 inline-flex h-11 w-11 items-center justify-center rounded-full border border-ink-200/80 bg-white/85 text-ink-700 shadow-sm backdrop-blur-xl transition hover:bg-white active:scale-95 disabled:opacity-40 dark:border-white/15 dark:bg-ink-950/85 dark:text-white md:right-5"><Sparkles size={19} strokeWidth={1.7}/></button>
+  <button data-pull-refresh-ignore type="button" onClick={show} disabled={masked} aria-label="Ouvrir mon point quotidien" aria-haspopup="dialog" aria-expanded={open} title="Mon point quotidien" className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.6rem)] z-50 inline-flex h-11 w-11 items-center justify-center rounded-full border border-ink-200/80 bg-white/85 text-ink-700 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl transition hover:bg-white active:scale-95 disabled:opacity-40 dark:border-cyan-100/[0.16] dark:bg-[#06242b]/80 dark:text-white dark:shadow-[0_16px_50px_-20px_rgba(0,22,28,0.9)] md:right-5"><Sparkles size={19} strokeWidth={1.7}/></button>
   <dialog data-pull-refresh-ignore ref={dialog} onClick={event=>{if(event.target!==event.currentTarget)return;const bounds=event.currentTarget.getBoundingClientRect();if(event.clientY<bounds.top||event.clientY>bounds.bottom||event.clientX<bounds.left||event.clientX>bounds.right)close();}} onCancel={event=>{event.preventDefault();close();}} aria-labelledby="daily-brief-title" className="daily-assistant-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto h-[92dvh] max-h-[92dvh] w-full min-w-0 max-w-2xl overflow-x-hidden overflow-y-scroll [scrollbar-gutter:stable] overscroll-contain rounded-t-[2rem] rounded-b-none border border-ink-200 bg-white p-0 text-ink-900 shadow-2xl backdrop:bg-ink-950/55 backdrop:backdrop-blur-sm dark:border-white/10 dark:bg-ink-950 dark:text-white">
-   {!masked?<div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:px-7"><div aria-hidden="true" className="mx-auto mb-5 h-1.5 w-11 rounded-full bg-ink-300/80 dark:bg-white/20"/>
+   {!masked?<div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:px-7"><div data-assistant-drag-handle role="button" tabIndex={0} aria-label="Glisser vers le bas pour fermer le point quotidien" onClick={()=>{if(suppressHandleClick.current){suppressHandleClick.current=false;return;}close();}} onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={event=>dragEnd(event)} onPointerCancel={event=>dragEnd(event,true)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();close();}}} className="-mx-5 -mt-3 mb-2 flex cursor-grab touch-none justify-center py-3 active:cursor-grabbing sm:-mx-7"><div aria-hidden="true" className="h-1.5 w-11 rounded-full bg-ink-300/80 dark:bg-white/20"/></div>
     <header className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2.5"><Logo size={24} withWordmark={false}/><p className="text-[10px] font-medium uppercase tracking-[.18em] text-[var(--app-accent-deep)] dark:text-[var(--app-accent)]">Votre point quotidien</p></div><h2 id="daily-brief-title" className="mt-2 text-xl font-semibold tracking-tight">Voici l’essentiel.</h2><p className="mt-1 text-xs text-ink-400 dark:text-white/40">{new Intl.DateTimeFormat("fr-FR",{dateStyle:"full",timeZone:"Europe/Paris"}).format(new Date())}</p></div><button autoFocus type="button" onClick={close} aria-label="Fermer le point quotidien" className="rounded-full p-2 hover:bg-ink-100 dark:hover:bg-white/10"><X size={18}/></button></header>
     <section className="mt-5" aria-label="Poser une question à votre assistant">
      <form onSubmit={event=>void ask(event)} className="flex items-end gap-2 rounded-2xl border border-ink-200 bg-ink-50/70 p-2 focus-within:border-[var(--app-accent)] dark:border-white/15 dark:bg-white/5">
@@ -105,7 +126,7 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
       <section className="flex items-start gap-3 py-3"><House size={17} className="mt-0.5 shrink-0 text-[var(--app-accent)]" aria-hidden="true"/><div className="min-w-0"><h3 className="text-xs font-semibold">Foyer</h3><p className="mt-1 text-sm">{pocket?.monthOutOfPocket==null?"Reste à charge du mois à compléter":`${money(pocket.monthOutOfPocket)} de votre poche ce mois`}</p><p className="mt-0.5 text-xs text-ink-500 dark:text-white/50">{`Du 1er au ${Number(brief.date.slice(8,10))} · ${ASSISTANT_HOUSEHOLD_VIEWS.map(view=>({essential:"Essentiel",secondary:"Presque essentiel",travel:"Voyages"}[view])).join(" + ")||"Aucune vue"}`}{previousPocket?.monthOutOfPocket!=null?` · ${money(previousPocket.monthOutOfPocket)} sur les mêmes jours du mois en ${previousPocket.year}`:" · comparatif précédent indisponible"}</p></div></section>
      </div>
      {selectedActions.length?<section className="mt-4 border-t border-ink-200/50 pt-4 dark:border-white/10"><h3 className="text-[10px] font-medium uppercase tracking-wider text-ink-400 dark:text-white/40">À faire en priorité</h3><div className="mt-2 space-y-1">{selectedActions.map((item,index)=>item?<details key={item.id} className="py-1.5"><summary className="cursor-pointer text-xs font-medium"><span className="mr-1.5 text-ink-400">{index+1}.</span>{item.title}</summary><p className="mt-2 text-xs leading-relaxed text-ink-500 dark:text-white/55">{item.detail}</p><a href={item.href} onClick={close} className="mt-2 inline-flex items-center gap-1 text-[10px] text-[var(--app-accent-deep)] dark:text-[var(--app-accent)]">{item.when} · Ouvrir<ArrowUpRight size={11}/></a></details>:null)}</div></section>:null}
-     <details className="group/insights mt-5 border-t border-ink-200/60 pt-5 dark:border-white/10"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold"><span>Votre tableau de bord</span><span className="text-ink-400 transition-transform group-open/insights:rotate-90"><ArrowUpRight size={14}/></span></summary><p className="mt-1 text-[11px] text-ink-400 dark:text-white/40">Activité, réserve et équilibre du foyer</p><div className="mt-2 divide-y divide-ink-200/50 dark:divide-white/10">{activity?<><ActivityBriefVisual activity={activity} date={brief.date}/><TreasuryBriefVisual activity={activity}/></>:null}<HouseholdBriefVisual families={brief.compensations}/>{brief.householdHistory?.length?<div className="py-5"><p className="mb-3 text-xs font-medium">De votre poche · comparaison à date</p>{brief.householdHistory.map(row=><p key={row.year} className="flex justify-between text-xs text-ink-500 dark:text-white/50"><span>{row.year}</span><span>{row.monthOutOfPocket==null?"Historique insuffisant":money(row.monthOutOfPocket)}</span></p>)}</div>:null}{pocket?.outOfPocket!=null?<p className="text-[10px] text-ink-400 dark:text-white/40">Pour mémoire, depuis janvier : {money(pocket.outOfPocket)} de reste à charge.</p>:null}</div></details>
+     <details className="group/insights mt-5 border-t border-ink-200/60 pt-5 dark:border-white/10"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold"><span>Votre tableau de bord</span><span className="text-ink-400 transition-transform group-open/insights:rotate-90"><ArrowUpRight size={14}/></span></summary><p className="mt-1 text-[11px] text-ink-400 dark:text-white/40">Activité, réserve et équilibre du foyer</p><div className="mt-2 divide-y divide-ink-200/50 dark:divide-white/10">{activity?<><ActivityBriefVisual activity={activity} date={brief.date}/><TreasuryBriefVisual activity={activity}/></>:null}<HouseholdBriefVisual families={brief.compensations}/>{brief.householdHistory?.length?<HouseholdHistoryVisual history={brief.householdHistory}/>:null}{pocket?.outOfPocket!=null?<p className="text-[10px] text-ink-400 dark:text-white/40">Pour mémoire, depuis janvier : {money(pocket.outOfPocket)} de reste à charge.</p>:null}</div></details>
      {brief.opportunities.length?<details className="mt-4 border-t border-ink-200/60 pt-4 dark:border-white/10"><summary className="cursor-pointer text-xs font-medium"><Lightbulb size={14} className="mr-2 inline-block text-amber-500" aria-hidden="true"/>Idées pour mieux gérer DigitPro</summary><div className="mt-4 space-y-4">{brief.opportunities.map(idea=><article key={idea.id}><a href={idea.href} onClick={close} className="inline-flex items-center gap-2 text-sm font-medium">{idea.id==="client-gifts"?<Gift size={14} className="text-ink-400" aria-hidden="true"/>:idea.id==="tools-training"?<GraduationCap size={14} className="text-ink-400" aria-hidden="true"/>:<ReceiptText size={14} className="text-ink-400" aria-hidden="true"/>}{idea.title}</a><p className="mt-1 text-xs leading-relaxed text-ink-500 dark:text-white/55">{idea.detail}</p></article>)}<p className="text-[11px] leading-relaxed text-ink-400 dark:text-white/40">Priorité aux frais réels déjà engagés et aux besoins utiles. Une dépense consomme de la trésorerie ; son traitement fiscal et la TVA sont à vérifier avec Hiway.</p><a href="https://www.impots.gouv.fr/professionnel/questions/que-puis-je-deduire-de-mes-resultats-professionnels" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-ink-400 underline">Conditions de déduction · impots.gouv.fr<ArrowUpRight size={10}/></a></div></details>:null}
     </>:null}
     <footer className="mt-5 flex items-center justify-between border-t border-ink-200/50 pt-4 dark:border-white/10"><button type="button" disabled={loading} onClick={()=>void load()} className="inline-flex items-center gap-1.5 text-xs text-ink-500 disabled:opacity-40 dark:text-white/50"><RefreshCw size={12}/>Actualiser</button><button type="button" onClick={close} className="rounded-lg bg-ink-900 px-4 py-2 text-xs font-medium text-white dark:bg-white dark:text-ink-900">C’est noté</button></footer>

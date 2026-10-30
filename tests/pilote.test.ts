@@ -99,13 +99,13 @@ describe("Pilote expense views", () => {
   it("partitions every expense once, preserves source names and leaves income unchanged", async () => {
     const {filterPiloteExpenses, piloteExpenseView} = await import("@/lib/pilote");
     expect(piloteExpenseView("Charges LMNP", "Charges copro LMNP")).toBe("essential");
-    expect(piloteExpenseView("Charges LMNP", "Taxe foncière")).toBe("secondary");
+    expect(piloteExpenseView("Charges LMNP", "Taxe foncière")).toBe("taxes");
     const month = buildPiloteMonths([row(1,-100), row(2,-30,"Logement.","Taxe foncière"), row(3,-20,"Auto & Transports.","Entretien"), row(4,-50,"Voyages.","Transport"), row(5,-10,"Divers.","Autre"), row(6,300,"Entrées d’argent.","Salaire")])[0];
-    const views = (["essential","secondary","travel"] as const).map(view => filterPiloteExpenses(month,view));
-    expect(views.map(view => view.expenses)).toEqual([100,60,50]);
+    const views = (["essential","secondary","taxes","travel"] as const).map(view => filterPiloteExpenses(month,view));
+    expect(views.map(view => view.expenses)).toEqual([100,30,30,50]);
     expect(views.reduce((sum,view) => sum + view.expenses,0)).toBe(month.expenses);
     expect(views.every(view => view.incomeCategories === month.incomeCategories && view.income === 300)).toBe(true);
-    expect(views[1].categories.find(category => category.name === "Logement.")?.children[0].name).toBe("Taxe foncière");
+    expect(views[2].categories.find(category => category.name === "Logement.")?.children[0].name).toBe("Taxe foncière");
     expect(month.categories.flatMap(category => category.children).length).toBe(5);
   });
 });
@@ -149,12 +149,12 @@ it("keeps DigitPro NDF expenses and reimbursements together in Essential", async
 it("combines multiple expense types once and supports an empty selection", async () => {
   const {filterPiloteExpenses} = await import("@/lib/pilote");
   const month = buildPiloteMonths([row(1,-100),row(2,-30,"Logement","Taxe foncière"),row(3,-50,"Voyages","Vacances"),row(4,200,"Entrées","Cashback")])[0];
-  expect(filterPiloteExpenses(month,["essential","secondary"]).expenses).toBe(130);
-  expect(filterPiloteExpenses(month,["essential","secondary","travel"]).expenses).toBe(180);
+  expect(filterPiloteExpenses(month,["essential","secondary"]).expenses).toBe(100);
+  expect(filterPiloteExpenses(month,["essential","secondary","taxes","travel"]).expenses).toBe(180);
   expect(filterPiloteExpenses(month,["essential","essential"]).expenses).toBe(100);
   expect(filterPiloteExpenses(month,[])).toMatchObject({expenses:0,income:200,categories:[]});
   const annual = buildPiloteYear([month],"2026")!;
-  expect(filterPiloteExpenses(annual,["essential","secondary"]).expenses).toBe(130);
+  expect(filterPiloteExpenses(annual,["essential","secondary"]).expenses).toBe(100);
 });
 
 

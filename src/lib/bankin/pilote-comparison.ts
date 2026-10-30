@@ -49,3 +49,22 @@ export function buildPiloteMonthlyComparison(months: PiloteMonth[], month: strin
   const period = (value: PiloteMonth): PiloteComparisonPeriod => ({ month: value.month, start: `${value.month}-01`, end: throughDate(value.month, atDate ? Number(today.slice(8, 10)) : undefined), expenses: value.expenses });
   return { status: "ready", current: period(current), previous: period(previous), delta: deltaCents / 100, percent: previousCents > 0 ? deltaCents / previousCents * 100 : null, atDate, categories: contributions.slice(0, 3), otherDelta: (deltaCents - contributions.slice(0, 3).reduce((sum, category) => sum + cents(category.delta), 0)) / 100 };
 }
+
+export type PiloteComparisonPoint={day:number;current:number|null;previous:number|null};
+/** Daily cumulative expenses on one shared day axis; never invent a missing daily history. */
+export function buildPiloteComparisonEvolution(comparison:PiloteMonthlyComparison,daily:import("./pilote-daily").PiloteDaily|null|undefined,views:readonly PiloteExpenseView[]):PiloteComparisonPoint[]|null{
+ if(comparison.status!=="ready"||!daily)return null;
+ const current=daily[comparison.current.month],previous=daily[comparison.previous.month];
+ const currentEnd=Number(comparison.current.end.slice(8)),previousEnd=Number(comparison.previous.end.slice(8));
+ if(!current||!previous||current.length<currentEnd||previous.length<previousEnd)return null;
+ const selected=[...new Set(views)];let a=0,b=0;
+ const points=Array.from({length:Math.max(currentEnd,previousEnd)},(_,index)=>{
+  const day=index+1;
+  if(day<=currentEnd)a+=selected.reduce((sum,view)=>sum+cents(current[index][view]??0),0);
+  if(day<=previousEnd)b+=selected.reduce((sum,view)=>sum+cents(previous[index][view]??0),0);
+  return {day,current:day<=currentEnd?a/100:null,previous:day<=previousEnd?b/100:null};
+ });
+ // An inconsistent/stale response must not draw curves contradicting the comparison totals.
+ if(a!==cents(comparison.current.expenses)||b!==cents(comparison.previous.expenses))return null;
+ return points;
+}
