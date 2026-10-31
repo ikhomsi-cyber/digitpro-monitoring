@@ -10,7 +10,7 @@ export function PilotePocketHistory({months,views}:{months:readonly PiloteMonth[
  const today=new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date());
  const allPoints=useMemo(()=>buildPilotePocketHistory(months,views,today),[months,views,today]);
  const [selected,setSelected]=useState<number|null>(null);
- const [range,setRange]=useState<{from?:string;to?:string}>({});
+ const [range,setRange]=useState<{from?:string;to?:string}>({from:"2022",to:"2026"});
  const years=[...new Set(allPoints.filter(point=>point.balance!==null).map(point=>point.month.slice(0,4)))];
  const from=range.from&&years.includes(range.from)?range.from:years[0];
  const to=range.to&&years.includes(range.to)?range.to:years.at(-1)!;

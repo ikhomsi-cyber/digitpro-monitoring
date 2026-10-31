@@ -139,6 +139,6 @@ export function parseBankinPiloteWorkbook(buffer: ArrayBuffer): import("@/lib/pi
     const hidden = hiddenIndex >= 0 && ["true", "1", "oui", "yes", "x", "masque", "masquee"].includes(normalizeHeaderCell(row[hiddenIndex]));
     // Categories and spreadsheet row numbers can change between exports.
     const identity = createHash("sha256").update(JSON.stringify([date, Math.round(amount * 100), String(row[1] ?? "").normalize("NFC").trim(), String(row[2] ?? "").normalize("NFC").trim()])).digest("hex");
-    return [{ sourceRow: index + 2, identity, date, amount, parentCategory: String(row[4] ?? "").trim(), subCategory: String(row[5] ?? "").trim(), hidden }];
+    return [{ sourceRow: index + 2, identity, label: String(row[1] ?? "").trim(), date, amount, parentCategory: String(row[4] ?? "").trim(), subCategory: String(row[5] ?? "").trim(), hidden }];
   });
 }

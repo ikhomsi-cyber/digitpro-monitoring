@@ -5,18 +5,18 @@ import {buildPiloteComparisonAtDate,buildPiloteMonthlyComparison,buildPiloteComp
 const rows=[['Impôts & Taxes','Impôts sur le revenu',100],['Epargne','PER individuel',50],['Charges LMNP','Taxe foncière',25],['Alimentation','Courses',30],['Achats','Permis de conduire',40],['Voyage','Hôtel',60]].map(([parent,sub,amount],i)=>({sourceRow:i+2,date:'2026-10-05',amount:-Number(amount),parentCategory:String(parent),subCategory:String(sub),hidden:false}));
 it("isolates taxes and PER without matching unrelated words or changing Bankin category names",()=>{
  const snapshot=buildBankinPiloteSnapshot(rows,'synthetic.xlsx','fixture');const month=snapshot.months[0];
- expect(filterPiloteExpenses(month,'taxes').expenses).toBe(175);expect(piloteExpenseView('Achats','Permis de conduire')).toBe('secondary');
- const views=['essential','secondary','taxes','travel'] as const;
+ expect(filterPiloteExpenses(month,'taxes').expenses).toBe(125);expect(piloteExpenseView('Achats','Permis de conduire')).toBe('secondary');
+ const views=['essential','secondary','taxes','savings','travel'] as const;
  expect(views.reduce((sum,v)=>sum+filterPiloteExpenses(month,v).expenses,0)).toBe(month.expenses);
- expect(filterPiloteExpenses(month,['secondary','taxes','taxes']).expenses).toBe(215);
- const days=buildPiloteDaily(snapshot)!;expect(cumulativePiloteDays(days['2026-10'],['taxes']).at(-1)?.expenses).toBe(175);
+ expect(filterPiloteExpenses(month,['secondary','taxes','savings','taxes']).expenses).toBe(215);
+ const days=buildPiloteDaily(snapshot)!;expect(cumulativePiloteDays(days['2026-10'],['taxes']).at(-1)?.expenses).toBe(125);
  expect(month.categories.find(c=>c.name==='Epargne')?.children[0].name).toBe('PER individuel');
 });
 it("draws two consistent daily series on the same comparison window and respects filters",()=>{
  const source=buildBankinPiloteSnapshot([...rows,...rows.map(r=>({...r,sourceRow:r.sourceRow+100,date:'2026-09-05',amount:r.amount/2}))],'synthetic.xlsx','fixture');
  const atDate=buildPiloteComparisonAtDate(source,'2026-10-30');const comparison=buildPiloteMonthlyComparison(source.months,'2026-10',['taxes'],'2026-10-30',atDate);
  const daily=buildPiloteDaily(source)!;const points=buildPiloteComparisonEvolution(comparison,daily,['taxes'])!;
- expect(points).toHaveLength(30);expect(points[3]).toMatchObject({current:0,previous:0});expect(points.at(-1)).toMatchObject({current:175,previous:87.5});
+ expect(points).toHaveLength(30);expect(points[3]).toMatchObject({current:0,previous:0});expect(points.at(-1)).toMatchObject({current:125,previous:62.5});
  expect(buildPiloteComparisonEvolution(comparison,null,['taxes'])).toBeNull();
  expect(buildPiloteComparisonEvolution(comparison,daily,['essential'])).toBeNull();
 });
@@ -33,12 +33,12 @@ it("does not invent a 31st day for a shorter month",()=>{
 it("moves only the explicitly confirmed savings payment to PER, preserving source rows and daily totals",()=>{
  const source=[{sourceRow:2,date:'2026-09-07',amount:-30000,parentCategory:'Banque',subCategory:'Epargne',hidden:false},{sourceRow:3,date:'2026-09-07',amount:-10,parentCategory:'Banque',subCategory:'Frais bancaires',hidden:false},{sourceRow:4,date:'2026-09-08',amount:-500,parentCategory:'Banque',subCategory:'Epargne',hidden:false}];
  const snapshot=buildBankinPiloteSnapshot(source,'synthetic.xlsx','fixture');
- expect(filterPiloteExpenses(snapshot.months[0],'taxes').expenses).toBe(30000);
- expect(filterPiloteExpenses(snapshot.months[0],'secondary').expenses).toBe(510);
+ expect(filterPiloteExpenses(snapshot.months[0],'savings').expenses).toBe(30500);
+ expect(filterPiloteExpenses(snapshot.months[0],'secondary').expenses).toBe(10);
  expect(source[0].subCategory).toBe('Epargne');
  const daily=buildPiloteDaily(snapshot)!;
- expect(cumulativePiloteDays(daily['2026-09'],['taxes']).at(-1)?.expenses).toBe(30000);
- expect(cumulativePiloteDays(daily['2026-09'],['secondary']).at(-1)?.expenses).toBe(510);
+ expect(cumulativePiloteDays(daily['2026-09'],['savings']).at(-1)?.expenses).toBe(30500);
+ expect(cumulativePiloteDays(daily['2026-09'],['secondary']).at(-1)?.expenses).toBe(10);
 });
 
 it("excludes the two confirmed compensated gifts from monthly and daily reports without hiding other gifts",()=>{

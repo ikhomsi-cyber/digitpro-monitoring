@@ -21,6 +21,7 @@ function DeferredPiloteTravel({months,period}:{months:PiloteMonth[];period:strin
   return <div ref={target} className="min-h-64">{visible?<PiloteTravelMap months={months} period={period}/>:<div className="rounded-3xl border border-ink-200/50 p-6 dark:border-white/10"><p className="text-sm font-medium text-ink-600 dark:text-white/60">Vos voyages</p></div>}</div>;
 }
 import { toast } from "sonner";
+import {PiloteBankinBalances} from "./PiloteBankinBalances";
 import { addPiloteMoroccoRent, piloteSnapshotMonths, filterPiloteIncome, filterPiloteExpenses, type PiloteExpenseView, piloteIncomeFamily, buildPiloteYear, buildPiloteCompensations, piloteCompensationFamily, type PiloteMonth, type PiloteCompensation, type BankinPiloteSnapshot } from "@/lib/pilote";
 import { getGmailConnectionStatus, getGmailConnectUrl, type GmailConnectionStatus } from "@/app/dashboard/gmail-actions";
 import { importBankinPersonalXlsx } from "@/app/dashboard/actions";
@@ -61,8 +62,8 @@ function PiloteSourceDetail({ title, rows, income = false }: { title: string; ro
 
 function PiloteCompensationRows({ families, month, sourceMonths }: { families: PiloteCompensation[]; month: PiloteMonth; sourceMonths: PiloteMonth[] }) {
   const fmt = useDashboardDisplayFormat();
-  return <section aria-label="Compensation par famille" className="min-w-0 rounded-3xl border border-ink-200/70 bg-white px-4 py-3 shadow-card dark:border-white/[0.06] dark:bg-white/[0.04] dark:shadow-none">
-    <div className="flex items-center gap-3"><div><h3 className="font-display text-sm font-semibold tracking-tight text-ink-900 dark:text-white">Compensation par famille</h3></div></div>
+  return <details aria-label="Compensation par famille" className="min-w-0 rounded-3xl border border-ink-200/70 bg-white p-6 dark:border-white/10 dark:bg-white/[.035]">
+    <summary className="flex cursor-pointer list-none items-center justify-between gap-3"><div><h3 className="font-semibold text-ink-900 dark:text-white">Compensation par famille</h3></div><ChevronRight size={16}/></summary>
     <div className="mt-1 divide-y divide-ink-200/70 dark:divide-white/10">
       {families.map((family, index) => {
         const expenseRows = month.categories.flatMap(parent => parent.children.filter(sub => piloteCompensationFamily(parent.name, sub.name, false) === family.id).map(sub => ({ parent: parent.name, ...sub })));
@@ -105,7 +106,7 @@ function PiloteCompensationRows({ families, month, sourceMonths }: { families: P
         </details>;
       })}
     </div>
-  </section>;
+  </details>;
 }
 
 export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: boolean; onImported: () => Promise<boolean>; loadData: (refresh?:boolean) => Promise<PiloteDashboardData> }) {
@@ -212,15 +213,16 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   const years = [...new Set(months.map(m => m.month.slice(0, 4)))].reverse();
 
   return <section className="space-y-4 pb-28 md:pb-8" aria-label="Pilote financier">
-    {current&&!loading?<PilotePocketSummary hero families={compensations} globalBalance={current.balance} periodLabel={`${isAnnual?selectedYear:selectedMonth?monthName(selectedMonth.month):""} · ${expenseViews.map(view=>({essential:"Essentiel",secondary:"Presque essentiel",taxes:"Impôts",travel:"Voyages"}[view])).join(" + ")||"Aucune vue"}`}/>:null}
+    {current&&!loading?<PilotePocketSummary hero families={compensations} globalBalance={current.balance} periodLabel={`${isAnnual?selectedYear:selectedMonth?monthName(selectedMonth.month):""} · ${expenseViews.map(view=>({essential:"Essentiel",secondary:"Presque essentiel",taxes:"Impôts",savings:"Épargne",travel:"Voyages"}[view])).join(" + ")||"Aucune vue"}`}/>:null}
       <div className="mx-auto flex w-full max-w-md flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[0.06]" role="group" aria-label="Période de Pilote">{([{value: "month", label: "Mois"}, {value: "year", label: "Année entière"}] as const).map(mode => <button key={mode.value} type="button" aria-pressed={periodMode === mode.value} onClick={() => setPeriodMode(mode.value)} className={`min-h-9 rounded-full px-3.5 text-xs font-semibold transition ${periodMode === mode.value ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/55"}`}>{mode.label}</button>)}</div>
         {isAnnual ? <div className="flex flex-wrap justify-center gap-1" role="group" aria-label="Année analysée">{years.map(year => <button type="button" key={year} aria-pressed={year === selectedYear} onClick={() => setSelected(months.filter(m => m.month.startsWith(`${year}-`)).at(-1)!.month)} className={`min-h-11 rounded-full border px-3 text-xs font-medium tabular-nums ${year === selectedYear ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200" : "border-ink-200/60 text-ink-500 dark:border-white/10 dark:text-white/55"}`}>{year}</button>)}</div> : <div className="flex items-center gap-1"><button type="button" aria-label="Mois précédent" disabled={monthIndex <= 0} onClick={() => setSelected(months[monthIndex - 1].month)} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 disabled:opacity-25 dark:text-white/45 dark:hover:bg-white/[0.06]"><ChevronLeft className="h-4 w-4" /></button><span className="text-sm font-medium capitalize text-ink-700 dark:text-white/75">{selectedMonth ? monthName(selectedMonth.month) : "Aucune donnée"}</span><button type="button" aria-label="Mois suivant" disabled={monthIndex < 0 || monthIndex >= months.length - 1} onClick={() => setSelected(months[monthIndex + 1].month)} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 hover:bg-ink-100/80 disabled:opacity-25 dark:text-white/45 dark:hover:bg-white/[0.06]"><ChevronRight className="h-4 w-4" /></button></div>}
         {isAnnual ? <p className="text-[10px] text-ink-500 dark:text-white/45">Totaux {selectedYear} · mois présents dans l’export Bankin</p> : null}
       </div>
-    <div className="space-y-2"><div role="group" aria-label="Vue des dépenses" className="mx-auto flex w-full max-w-md rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[0.06]">{([{value: "essential", label: "Essentiel"}, {value: "secondary", label: "Presque essentiel"}, {value: "taxes", label: "Impôts"}, {value: "travel", label: "Voyages"}] as const).map(view => <button key={view.value} type="button" aria-pressed={expenseViews.includes(view.value)} onClick={() => setExpenseViews(selected => selected.includes(view.value) ? selected.filter(value => value !== view.value) : [...selected, view.value])} className={`min-h-8 min-w-0 flex-1 whitespace-nowrap rounded-full px-1.5 text-[11px] font-medium transition ${expenseViews.includes(view.value) ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/60"}`}>{view.label}</button>)}</div></div>
+    <div className="space-y-2"><div role="group" aria-label="Vue des dépenses" className="mx-auto flex w-full max-w-md overflow-x-auto rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[0.06]">{([{value: "essential", label: "Essentiel"}, {value: "secondary", label: "Presque essentiel"}, {value: "taxes", label: "Impôts"}, {value: "savings", label: "Épargne"}, {value: "travel", label: "Voyages"}] as const).map(view => <button key={view.value} type="button" aria-pressed={expenseViews.includes(view.value)} onClick={() => setExpenseViews(selected => selected.includes(view.value) ? selected.filter(value => value !== view.value) : [...selected, view.value])} className={`min-h-8 min-w-fit flex-1 whitespace-nowrap rounded-full px-1.5 text-[11px] font-medium transition ${expenseViews.includes(view.value) ? "bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white" : "text-ink-500 dark:text-white/60"}`}>{view.label}</button>)}</div></div>
     {current&&!loading?<div className="flex justify-end"><button type="button" onClick={()=>void refreshReport()} disabled={refreshing||busy||demoMode} className="inline-flex min-h-8 items-center gap-1.5 rounded-full px-2.5 text-[11px] text-ink-500 transition hover:bg-ink-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-50 dark:text-white/50 dark:hover:bg-white/5">{refreshing?<Loader2 size={12} className="animate-spin" aria-hidden="true"/>:null}{refreshing?"Actualisation…":"Actualiser le bilan"}</button></div>:null}
     {comparison&&!isAnnual&&!loading?<PiloteMonthlyComparison comparison={comparison} views={expenseViews} months={months}/>:null}
+    {!demoMode?<PiloteBankinBalances/>:null}
     {current&&!isAnnual&&selectedMonth?<PiloteDailyChart key={selectedMonth.month} days={daily?.[selectedMonth.month]} month={selectedMonth.month} views={expenseViews}/>:null}
     {fmt.dummy ? <p className="text-xs text-amber-600 dark:text-amber-200">Affichage masqué : les montants et les pourcentages affichés sont fictifs.</p> : null}
 

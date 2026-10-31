@@ -1,5 +1,5 @@
-import { piloteReportingCategories, isPiloteReportRow, buildPiloteMonths, filterPiloteIncome, piloteExpenseView, piloteReportingMonth, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
-export type PiloteDay = { day: number; income: number; essential: number; secondary: number; travel: number; taxes?: number };
+import { filterPiloteReportRows, piloteReportingCategories, isPiloteReportRow, buildPiloteMonths, filterPiloteIncome, piloteExpenseView, piloteReportingMonth, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
+export type PiloteDay = { day: number; income: number; essential: number; secondary: number; travel: number; taxes?: number; savings?: number };
 export type PiloteDaily = Record<string, PiloteDay[]>;
 /** Daily amounts only: no labels, accounts or transaction identities leave the server. */
 export function buildPiloteDaily(snapshot: BankinPiloteSnapshot): PiloteDaily | null {
@@ -8,12 +8,11 @@ export function buildPiloteDaily(snapshot: BankinPiloteSnapshot): PiloteDaily | 
   const allowedIncome = new Set(buildPiloteMonths(snapshot.rows).map(filterPiloteIncome).flatMap(month => month.incomeCategories.flatMap(parent => parent.children.map(child => JSON.stringify([month.month, parent.name, child.name])))));
   for (const month of snapshot.months) {
     const [year, number] = month.month.split("-").map(Number);
-    result[month.month] = Array.from({ length: new Date(Date.UTC(year, number, 0)).getUTCDate() }, (_, i) => ({ day: i + 1, income: i === 0 && month.month >= "2024-04" ? 300 : 0, essential: 0, secondary: 0, taxes: 0, travel: 0 }));
+    result[month.month] = Array.from({ length: new Date(Date.UTC(year, number, 0)).getUTCDate() }, (_, i) => ({ day: i + 1, income: i === 0 && month.month >= "2024-04" ? 300 : 0, essential: 0, secondary: 0, taxes: 0, savings: 0, travel: 0 }));
   }
   // Reuse the exact report exclusions, including the explicitly reimbursed expense.
   const seen = new Map<string, Set<number>>();
-  for (const row of snapshot.rows) {
-    if (!isPiloteReportRow(row)) continue;
+  for (const row of filterPiloteReportRows(snapshot.rows)) {
     const month = piloteReportingMonth(row);
     const monthRows=seen.get(month)??new Set<number>();
     if(monthRows.has(row.sourceRow))continue;

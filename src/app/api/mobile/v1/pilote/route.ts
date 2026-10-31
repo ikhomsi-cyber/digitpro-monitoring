@@ -11,9 +11,9 @@ export async function GET(request:Request){
     const parsed=schema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if(!parsed.success)throw new MobileError(400,"Période ou filtre invalide.");
     const views=parsed.data.views?parsed.data.views.split(","):[];
-    if(views.some(v=>!["essential","secondary","taxes","travel"].includes(v)))throw new MobileError(400,"Type de dépenses invalide.");
+    if(views.some(v=>!["essential","secondary","taxes","savings","travel"].includes(v)))throw new MobileError(400,"Type de dépenses invalide.");
     const {data,error}=await client.from("bankin_pilote_snapshots").select("snapshot").eq("user_id",userId).maybeSingle();
     if(error)throw new MobileError(503,"Le bilan Bankin est indisponible.");
-    return mobileJSON(buildMobilePilote(data?.snapshot ? decodePiloteStorage(data.snapshot as unknown as BankinPiloteSnapshot) : null,{...parsed.data,views:[...new Set(views)] as ("essential"|"secondary"|"taxes"|"travel")[]}));
+    return mobileJSON(buildMobilePilote(data?.snapshot ? decodePiloteStorage(data.snapshot as unknown as BankinPiloteSnapshot) : null,{...parsed.data,views:[...new Set(views)] as ("essential"|"secondary"|"taxes"|"savings"|"travel")[]}));
   }catch(error){return mobileFailure(error);}
 }

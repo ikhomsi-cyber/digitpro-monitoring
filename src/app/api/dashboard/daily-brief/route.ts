@@ -21,19 +21,19 @@ export async function GET(request:Request) {
  if(getDashboardEffectiveDataMode(getSupabaseRuntimeMode(), await cookies())==="DEMO")return Response.json({error:"Le point quotidien est disponible avec vos données réelles."},{status:409,headers:privateResponseHeaders});
  const rawViews=new URL(request.url).searchParams.get("views");
  const views=(rawViews===null?["essential"]:rawViews===""?[]:rawViews.split(",")) as PiloteExpenseView[];
- if(views.length>4||views.some(view=>!["essential","secondary","taxes","travel"].includes(view)))return Response.json({error:"Vue des dépenses invalide."},{status:400,headers:privateResponseHeaders});
+ if(views.length>5||views.some(view=>!["essential","secondary","taxes","savings","travel"].includes(view)))return Response.json({error:"Vue des dépenses invalide."},{status:400,headers:privateResponseHeaders});
  const date=parisDay();const warnings:string[]=[];
  const [txResult,snapshotResult,balanceResult,workResult,invoicesResult]=await Promise.allSettled([
   (async()=>{
    const rows:DashboardTx[]=[];
-   for(let page=0;page<10;page++){
-    const {data,error}=await client.from("transactions").select("id,date,label,category,amount,company,scope,category_manual,bank_name").eq("user_id",user.id).eq("scope","pro").lte("date",date).order("date",{ascending:false}).order("id",{ascending:false}).range(page*1000,page*1000+999);
+   for(let page=0;;page++){
+    const {data,error}=await client.from("transactions").select("id,date,label,category,amount,company,scope,category_manual,bank_name").eq("user_id",user.id).lte("date",date).order("date",{ascending:false}).order("id",{ascending:false}).range(page*1000,page*1000+999);
     if(error)throw new Error("transactions unavailable");
     const chunk=data??[];
     rows.push(...chunk.map(row=>({id:row.id,date:row.date,label:row.label??"",category:row.category??"",amount:Number(row.amount),company:row.company??"",scope:row.scope,categoryManual:row.category_manual,bankName:row.bank_name})));
     if(chunk.length<1000)return rows;
    }
-   throw new Error("incomplete history");
+
   })(),
   (async()=>{
    const {data,error}=await client.from("bankin_pilote_snapshots").select("snapshot").eq("user_id",user.id).maybeSingle();
@@ -48,7 +48,7 @@ export async function GET(request:Request) {
  if(txResult.status==="rejected"&&snapshotResult.status==="rejected")return Response.json({error:"Le point quotidien est temporairement indisponible. Réessayez."},{status:503,headers:privateResponseHeaders});
  if(workResult.status==="rejected")warnings.push("Calendrier de travail indisponible.");
  if(invoicesResult.status==="rejected")warnings.push("Factures Hiway indisponibles : couverture de trésorerie non calculée.");
- const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value:null,snapshot:snapshotResult.status==="fulfilled"&&snapshotResult.value?decodePiloteReport(snapshotResult.value):null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,views,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
+ const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value.filter(row=>row.scope!=="personal"):null,snapshot:snapshotResult.status==="fulfilled"&&snapshotResult.value?decodePiloteReport(snapshotResult.value):null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,views,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
  const assistantTransactions=new URL(request.url).searchParams.get("assistantContext")==="1"?buildAssistantTransactions(txResult.status==="fulfilled"?txResult.value:null,snapshotResult.status==="fulfilled"?snapshotResult.value:null,date):undefined;
  return Response.json({...brief,assistantTransactions,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
 }

@@ -45,5 +45,5 @@ it("includes categorized transaction details only for the assistant context",asy
  const body=await (await GET(new Request("https://digitpro.test/api/dashboard/daily-brief?assistantContext=1"))).json();
  expect(body.assistantTransactions.digitpro.transactions[0]).toMatchObject({category:"Transport",categoryManual:true});
  expect(body.assistantTransactions.bankin.transactions[0]).toMatchObject({category:"Alimentation",subcategory:"Courses"});
- expect(JSON.stringify(body.assistantTransactions)).not.toContain("private-");
+ expect(body.assistantTransactions.digitpro.transactions[0].description).toBe("private-label");expect(JSON.stringify(body.assistantTransactions)).not.toMatch(/private-id|private-account/);
 });

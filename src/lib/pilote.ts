@@ -1,4 +1,4 @@
-export type BankinPiloteRow = { sourceRow: number; identity?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
+export type BankinPiloteRow = { sourceRow: number; identity?: string; label?: string; merchant?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
 
 export type PiloteGroup = { name: string; expenses: number; income: number; count: number; children: PiloteGroup[] };
 export type PiloteMonth = { month: string; expenses: number; income: number; balance: number; count: number; categories: PiloteGroup[]; incomeCategories: PiloteGroup[] };
@@ -25,7 +25,7 @@ function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
 
 /** User-confirmed PER payment; retain the original Bankin source row unchanged. */
 export function piloteReportingCategories(row: BankinPiloteRow): {parent: string; sub: string} {
-  const confirmedPer = row.date === "2026-09-07" && cents(row.amount) === -3000000
+  const confirmedPer = (row.date === "2026-09-07" || row.date.startsWith("2024-11-")) && cents(row.amount) === -3000000
     && row.parentCategory === "Banque" && row.subCategory === "Epargne";
   return {parent: row.parentCategory, sub: confirmedPer ? "PER" : row.subCategory};
 }
@@ -58,11 +58,18 @@ export function isPiloteReportRow(row: BankinPiloteRow): boolean {
   return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===row.date;
 }
 
-/** No inferred labels, category mappings or app transactions. */
+/** A unique May 2023 NDF reimbursement near €2,900 was explicitly identified by the user. Never guess when several rows match. */
+export function filterPiloteReportRows(rows: BankinPiloteRow[]): BankinPiloteRow[] {
+ const eligible=rows.filter(isPiloteReportRow);
+ const candidates=eligible.filter(row=>row.date.startsWith("2023-05-")&&row.amount>=2900&&row.amount<3000&&[row.parentCategory,row.subCategory].some(name=>["ndf digitpro","digitpro ndf"].includes(sourceName(name))));
+ const confirmed=candidates.length===1?candidates[0]:null;
+ return eligible.filter(row=>row!==confirmed);
+}
+
+/** Reporting aggregates retain original source rows. */
 export function buildPiloteMonths(transactions: BankinPiloteRow[]): PiloteMonth[] {
   const months = new Map<string, { rows: BankinPiloteRow[]; ids: Set<number> }>();
-  for (const tx of transactions) {
-    if (!isPiloteReportRow(tx)) continue;
+  for (const tx of filterPiloteReportRows(transactions)) {
     const month = piloteReportingMonth(tx);
     const entry = months.get(month) ?? { rows: [], ids: new Set<number>() };
     if (entry.ids.has(tx.sourceRow)) continue;
@@ -181,14 +188,15 @@ export function buildPiloteYear(months: PiloteMonth[], year: string): PiloteMont
   return { month: year, income, expenses, balance: (cents(income) - cents(expenses)) / 100, count: rows.reduce((s, m) => s + m.count, 0), categories: merge("categories"), incomeCategories: merge("incomeCategories") };
 }
 
-export type PiloteExpenseView = "essential" | "secondary" | "taxes" | "travel";
+export type PiloteExpenseView = "essential" | "secondary" | "taxes" | "savings" | "travel";
 /** Display-only partitions; original Bankin labels and income remain unchanged. */
 export function piloteExpenseView(parent: string, sub: string): PiloteExpenseView {
   if (piloteCompensationFamily(parent, sub, false) === "ndf") return "essential";
   const name = sourceName(`${parent} ${sub}`);
   // User-confirmed vehicle purchase categories, separate from running transport costs.
   if (["audi a3", "mercedes glb"].includes(sourceName(sub))) return "secondary";
-  if (/\b(impots?|taxes?|csg|per|perin|perco|percol|perp)\b|\bepargne[ -]+retraite\b/.test(name)) return "taxes";
+  if (/\b(per|perin|perco|percol|perp|epargne)\b/.test(name) || ["appart argenteuil","appart argneteuil","maison casa","maison casablanca","achat maison casa","achat maison casablanca"].includes(sourceName(sub))) return "savings";
+  if (/\b(impots?|taxes?|csg)\b/.test(name)) return "taxes";
   if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
   if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";
   if (/\b(logement|loyers?|lmnp|copro|alimentation|transports?|sante|scolarite|enfants)\b/.test(name)) return "essential";

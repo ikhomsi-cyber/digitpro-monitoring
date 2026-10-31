@@ -47,19 +47,8 @@ const TABS: Tab[] = [
     icon: Navigation,
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "pilote"
   },
-  { href: "/dashboard?section=courses", label: "Cours", icon: ShoppingBasket, isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && (section === "courses" || section === "cours") },
-  {
-    href: "/dashboard?section=sasu&scope=pro",
-    label: "SASU",
-    icon: ChartNoAxesCombined,
-    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
-  },
-  {
-    href: "/dashboard?section=impots",
-    label: "Impôts",
-    icon: Landmark,
-    isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "impots"
-  },
+  { href: "/dashboard?section=courses", label: "Courses", icon: ShoppingBasket, isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && (section === "courses" || section === "cours") },
+
 ];
 
 /** Dock iOS flottant — mobile uniquement. */
@@ -93,67 +82,15 @@ export function DashboardFloatingDock() {
     sectionCtx.navigateWithinDashboard(href);
   };
 
-  return (
-    <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] animate-floatIn px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
-      aria-label="Navigation principale"
-    >
-      <div
-        className={clsx(
-          "pointer-events-auto mx-auto flex max-w-[27rem] items-center justify-between gap-1 rounded-[1.85rem] border px-2 py-2 backdrop-blur-2xl",
-          "border-ink-200/90 bg-white/94 text-ink-900 shadow-[0_18px_60px_-22px_rgba(15,23,42,0.16),inset_0_1px_0_rgba(255,255,255,0.9)]",
-          "dark:border-cyan-100/[0.10] dark:bg-[#082a31]/88 dark:text-white",
-          "dark:shadow-[0_18px_60px_-22px_rgba(0,18,24,0.88),inset_0_1px_0_rgba(255,255,255,0.08)]"
-        )}
-      >
-        {TABS.map((tab) => {
-          const active = tab.isActive(ctx);
-          const Icon = tab.icon;
-          return (
-            <Link
-              key={tab.label}
-              href={tab.href}
-              prefetch={!tab.href.includes("#")}
-              scroll={false}
-              onClick={tab.href.startsWith("/dashboard") ? onDashboardTabClick(tab.href) : undefined}
-              className={clsx(
-                "relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-[1.35rem] px-1 py-2 transition",
-                active
-                  ? "bg-emerald-50 shadow-sm dark:bg-emerald-500/[0.14] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-                  : "hover:bg-ink-50 dark:hover:bg-white/[0.055]"
-              )}
-            >
-              {active ? (
-                <span
-                  className="absolute inset-x-1 top-1 h-10 rounded-[1.15rem] bg-emerald-200/40 blur-sm dark:bg-emerald-300/10"
-                  aria-hidden
-                />
-              ) : null}
-              <span
-                className={clsx(
-                  "relative z-[1] flex h-8 w-8 items-center justify-center rounded-full transition",
-                  active
-                    ? "bg-emerald-500/12 text-emerald-700 shadow-[0_8px_20px_-14px_rgba(16,185,129,0.55)] dark:bg-emerald-500/20 dark:text-white dark:shadow-[0_10px_26px_-18px_rgba(45,212,191,0.7)]"
-                    : "text-ink-500 dark:text-white/72"
-                )}
-              >
-                <Icon className="h-[1.15rem] w-[1.15rem]" strokeWidth={active ? 2.45 : 2.05} aria-hidden />
-                <span className="sr-only">{tab.label}</span>
-              </span>
-              <span
-                className={clsx(
-                  "relative z-[1] mt-1 max-w-[4.2rem] truncate text-center text-[10px] font-bold leading-none tracking-tight",
-                  active ? "text-emerald-800 dark:text-white" : "text-ink-500 dark:text-white/72"
-                )}
-              >
-                {tab.label}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
+  return <nav aria-label="Navigation principale" className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
+   <div className="pointer-events-auto mx-auto flex max-w-sm items-end gap-2">
+    {[{label:"Pro",tabs:TABS.slice(0,3)},{label:"Perso",tabs:TABS.slice(3)}].map(group=><div key={group.label} role="group" aria-label={group.label} style={{flex:group.tabs.length}} className="min-w-0 rounded-[1.35rem] border border-ink-200/70 bg-white/95 px-1 pb-1 pt-1.5 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#06242b]/90">
+     <p className="text-center text-[8px] font-medium uppercase leading-none tracking-[.15em] text-ink-400 dark:text-white/35">{group.label}</p>
+     <div className="mt-0.5 flex">{group.tabs.map(tab=>{const active=tab.isActive(ctx),Icon=tab.icon;return <Link key={tab.label} href={tab.href} aria-current={active?"page":undefined} prefetch scroll={false} onClick={onDashboardTabClick(tab.href)} className={clsx("flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition",active?"bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-200":"text-ink-500 hover:bg-ink-100 dark:text-white/50 dark:hover:bg-white/5")}><Icon size={18} strokeWidth={active?2.2:1.7} aria-hidden="true"/><span className="max-w-full truncate px-0.5 text-[9px] font-medium leading-none">{tab.label}</span></Link>;})}</div>
+    </div>)}
+   </div>
+  </nav>;
+
 }
 
 /** Sidebar premium — desktop uniquement. */
@@ -199,7 +136,7 @@ export function DashboardDesktopSidebar() {
           <PremiumIconBadge icon={House} size="lg" />
         </Link>
         <nav className="mt-7 flex w-full flex-1 flex-col items-stretch gap-2" aria-label="Navigation desktop">
-          {TABS.map((tab) => {
+          {TABS.map((tab,index) => {
             const active = tab.isActive(ctx);
             const Icon = tab.icon;
             return (
@@ -217,6 +154,7 @@ export function DashboardDesktopSidebar() {
                     : "border-ink-200/70 bg-white/60 text-ink-500 hover:border-ink-300 hover:bg-ink-50 hover:text-ink-800 dark:border-white/8 dark:bg-white/[0.035] dark:text-white/48 dark:hover:bg-white/[0.07] dark:hover:text-white/78"
                 )}
               >
+                {index===0||index===3?<span className="text-[8px] font-normal uppercase tracking-widest text-ink-400">{index===0?"Pro":"Perso"}</span>:null}
                 <Icon className="h-[21px] w-[21px]" strokeWidth={active ? 2.25 : 1.85} aria-hidden />
                 <span className="text-[11px] font-semibold leading-tight tracking-tight">{tab.label}</span>
               </Link>

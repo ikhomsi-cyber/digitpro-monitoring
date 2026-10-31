@@ -20,12 +20,6 @@ const ITEMS: readonly {
     match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "activite"
   },
   {
-    href: "/dashboard?section=sasu&scope=pro",
-    label: "SASU",
-    icon: Briefcase,
-    match: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "sasu"
-  },
-  {
     href: "/dashboard?panel=valeur-reelle",
     label: "Valeur",
     icon: Gem,

@@ -8,7 +8,7 @@ export function buildMobilePilote(snapshot: BankinPiloteSnapshot | null, options
   const currentYear=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Europe/Paris"}).format(now);
   const period=options.period??months.at(-1)?.month??null;
   const source=period?.length===4?buildPiloteYear(months,period):months.find(m=>m.month===period);
-  const expenseViews: PiloteExpenseView[]=options.views.includes("secondary")&&!options.views.includes("taxes")?[...options.views,"taxes"]:options.views;
+  const expenseViews: PiloteExpenseView[]=options.views.includes("secondary")&&!options.views.includes("taxes")&&!options.views.includes("savings")?[...options.views,"taxes","savings"]:options.views;
   const current=source?filterPiloteExpenses(source,expenseViews):undefined;
   const incomeMonths=period?.length===4?months.filter(m=>m.month.startsWith(`${period}-`)):source?[source]:[];
   const mergeRows=(groups:PiloteGroup[],income:boolean,family:string)=>{
