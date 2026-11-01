@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, Settings, Navigation, ShoppingBasket } from "lucide-react";
+import { Banknote, ChartNoAxesCombined, Gauge, House, Landmark, Settings, Navigation, ShoppingBasket, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
 import { isDashboardAnalyticsPanel } from "@/lib/dashboard-panel";
 import { PremiumIconBadge } from "@/components/ui/PremiumIconBadge";
@@ -48,6 +48,7 @@ const TABS: Tab[] = [
     isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && section === "pilote"
   },
   { href: "/dashboard?section=courses", label: "Courses", icon: ShoppingBasket, isActive: ({ panel, section }) => !isDashboardAnalyticsPanel(panel) && (section === "courses" || section === "cours") },
+  {href:"/dashboard?section=invest",label:"Invest",icon:ChartNoAxesCombined,isActive:({panel,section})=>!isDashboardAnalyticsPanel(panel)&&section==="invest"},
 
 ];
 
@@ -83,11 +84,12 @@ export function DashboardFloatingDock() {
   };
 
   return <nav aria-label="Navigation principale" className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden">
-   <div className="pointer-events-auto mx-auto flex max-w-sm items-end gap-2">
+   <div className="pointer-events-auto mx-auto flex max-w-md items-end gap-1.5">
     {[{label:"Pro",tabs:TABS.slice(0,3)},{label:"Perso",tabs:TABS.slice(3)}].map(group=><div key={group.label} role="group" aria-label={group.label} style={{flex:group.tabs.length}} className="min-w-0 rounded-[1.35rem] border border-white/50 bg-white/55 px-1 pb-1 pt-1.5 shadow-[0_8px_30px_-14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/15 dark:bg-[#072a31]/45">
      <p className="text-center text-[8px] font-medium uppercase leading-none tracking-[.15em] text-ink-400 dark:text-white/55">{group.label}</p>
      <div className="mt-0.5 flex">{group.tabs.map(tab=>{const active=tab.isActive(ctx),Icon=tab.icon;return <Link key={tab.label} href={tab.href} aria-current={active?"page":undefined} prefetch scroll={false} onClick={onDashboardTabClick(tab.href)} className={clsx("flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition",active?"bg-white/65 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] dark:bg-emerald-300/15 dark:text-emerald-100":"text-ink-500 hover:bg-ink-100 dark:text-white/65 dark:hover:bg-white/10")}><Icon size={18} strokeWidth={active?2.2:1.7} aria-hidden="true"/><span className="max-w-full truncate px-0.5 text-[9px] font-medium leading-none">{tab.label}</span></Link>;})}</div>
     </div>)}
+    <Link href="/dashboard?section=chat" scroll={false} onClick={onDashboardTabClick("/dashboard?section=chat")} aria-label="Chat · assistant pro et perso" aria-current={section==="chat"?"page":undefined} className={clsx("flex h-[60px] w-12 shrink-0 flex-col items-center justify-center gap-1 rounded-[1.35rem] border border-white/50 bg-white/55 shadow-[0_8px_30px_-14px_rgba(0,0,0,.35)] backdrop-blur-2xl dark:border-white/15 dark:bg-[#072a31]/45",section==="chat"?"text-emerald-700 dark:text-emerald-100":"text-ink-500 dark:text-white/65")}><Sparkles size={19} strokeWidth={section==="chat"?2.2:1.7}/><span className="text-[9px] font-medium">Chat</span></Link>
    </div>
   </nav>;
 
@@ -161,6 +163,7 @@ export function DashboardDesktopSidebar() {
             );
           })}
         </nav>
+        <Link href="/dashboard?section=chat" scroll={false} onClick={onDashboardTabClick("/dashboard?section=chat")} aria-current={section==="chat"?"page":undefined} className={clsx("mt-3 flex min-h-[4.75rem] flex-col items-center justify-center gap-1 rounded-2xl border px-2 text-center",section==="chat"?"border-emerald-300/60 bg-emerald-50 text-emerald-700 dark:border-emerald-400/45 dark:bg-emerald-500/15 dark:text-white":"border-ink-200/70 bg-white/60 text-ink-500 dark:border-white/10 dark:bg-white/5 dark:text-white/60")}><Sparkles size={21}/><span className="text-[11px] font-semibold">Chat</span></Link>
         <Link
           href="/parametres"
           prefetch

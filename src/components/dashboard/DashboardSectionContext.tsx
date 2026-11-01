@@ -20,7 +20,9 @@ export type DashboardSection =
   | "private"
   | "impots"
   | "pilote"
-  | "courses";
+  | "courses"
+  | "invest"
+  | "chat";
 
 export function parseDashboardSection(search: string): DashboardSection {
   const sp = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -31,6 +33,8 @@ export function parseDashboardSection(search: string): DashboardSection {
   if (s === "private") return "private";
   if (s === "categorisation") return "activite";
   if (s === "courses" || s === "cours") return "courses";
+  if (s === "chat") return "chat";
+  if (s === "invest") return "invest";
   if (s === "pilote") return "pilote";
   if (s === "impots") return "impots";
   return "full";

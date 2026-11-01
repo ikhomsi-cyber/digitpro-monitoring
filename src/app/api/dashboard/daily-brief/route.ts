@@ -1,3 +1,4 @@
+import {buildInvestments,investmentAssistantSummary} from "@/lib/investments";
 import { buildAssistantTransactions } from "@/lib/assistant-transactions";
 import { decodePiloteStorage, type StoredPiloteSnapshot } from "@/lib/bankin/pilote-storage";
 import { householdOutOfPocketHistory } from "@/lib/daily-brief-household";
@@ -50,5 +51,6 @@ export async function GET(request:Request) {
  if(invoicesResult.status==="rejected")warnings.push("Factures Hiway indisponibles : couverture de trésorerie non calculée.");
  const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value.filter(row=>row.scope!=="personal"):null,snapshot:snapshotResult.status==="fulfilled"&&snapshotResult.value?decodePiloteReport(snapshotResult.value):null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,views,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
  const assistantTransactions=new URL(request.url).searchParams.get("assistantContext")==="1"?buildAssistantTransactions(txResult.status==="fulfilled"?txResult.value:null,snapshotResult.status==="fulfilled"?snapshotResult.value:null,date):undefined;
- return Response.json({...brief,assistantTransactions,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
+ const investments=assistantTransactions?investmentAssistantSummary(buildInvestments(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date)):undefined;
+ return Response.json({...brief,assistantTransactions,investments,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
 }

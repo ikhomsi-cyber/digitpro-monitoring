@@ -25,8 +25,8 @@ function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
 
 /** User-confirmed PER payment; retain the original Bankin source row unchanged. */
 export function piloteReportingCategories(row: BankinPiloteRow): {parent: string; sub: string} {
-  const confirmedPer = (row.date === "2026-09-07" || row.date.startsWith("2024-11-")) && cents(row.amount) === -3000000
-    && row.parentCategory === "Banque" && row.subCategory === "Epargne";
+  const confirmedPer = (row.date === "2026-09-07" || (row.date.startsWith("2024-11-") || row.date.startsWith("2025-11-"))) && cents(row.amount) === -3000000
+    && sourceName(row.parentCategory) === "banque" && sourceName(row.subCategory) === "epargne";
   return {parent: row.parentCategory, sub: confirmedPer ? "PER" : row.subCategory};
 }
 
@@ -195,7 +195,7 @@ export function piloteExpenseView(parent: string, sub: string): PiloteExpenseVie
   const name = sourceName(`${parent} ${sub}`);
   // User-confirmed vehicle purchase categories, separate from running transport costs.
   if (["audi a3", "mercedes glb"].includes(sourceName(sub))) return "secondary";
-  if (/\b(per|perin|perco|percol|perp|epargne)\b/.test(name) || ["appart argenteuil","appart argneteuil","maison casa","maison casablanca","achat maison casa","achat maison casablanca"].includes(sourceName(sub))) return "savings";
+  if (/\b(per|perin|perco|percol|perp|epargne)\b/.test(name) || ["appart argenteuil","appart argneteuil","appart casa","appart casablanca","maison casa","maison casablanca","achat maison casa","achat maison casablanca"].includes(sourceName(sub))) return "savings";
   if (/\b(impots?|taxes?|csg)\b/.test(name)) return "taxes";
   if (/\b(voyages?|vacances?|sejours?)\b/.test(name)) return "travel";
   if (/\b(foncier(?:e)?s?|entretien|travaux|reparations?)\b/.test(name)) return "secondary";

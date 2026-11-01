@@ -22,6 +22,8 @@ import nextDynamic from "next/dynamic";
 import { analyzeLmnp } from "@/lib/lmnp-analyze";
 import { DashboardClient } from "./DashboardClient";
 import { DashboardSectionProvider } from "@/components/dashboard/DashboardSectionContext";
+import {ChatEntry} from "@/components/dashboard/ChatEntry";
+import {InvestEntry} from "@/components/dashboard/InvestEntry";
 import { CoursesEntry } from "@/components/dashboard/CoursesEntry";
 
 const LMNPClient = nextDynamic(
@@ -89,6 +91,9 @@ export default async function DashboardPage({
   const showLmnpPanel = initialDashboardPanel === "lmnp";
   const section = Array.isArray(sp.section) ? sp.section[0] : sp.section;
   const coursesOnly = !showLmnpPanel && (section === "courses" || section === "cours") && sp.panel !== "valeur-reelle";
+  const investOnly = !showLmnpPanel && section === "invest" && sp.panel !== "valeur-reelle";
+  const chatOnly = !showLmnpPanel && section === "chat" && sp.panel !== "valeur-reelle";
+  const personalEntry = coursesOnly || investOnly || chatOnly;
   reportSupabaseEnvDiagnostics("app/dashboard/page");
 
   const envMode = getSupabaseRuntimeMode();
@@ -152,7 +157,7 @@ export default async function DashboardPage({
   let syncFullHistoryOnMount = false;
   let initialHiwayInvoices: HiwayInvoice[] | undefined;
 
-  if (!coursesOnly && envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
+  if (!personalEntry && envMode === "SUPABASE" && dataMode === "SUPABASE" && supabase) {
     const transactionsPromise = (async () => {
       console.time("dashboard:transactions");
       try {
@@ -231,7 +236,7 @@ export default async function DashboardPage({
   return (
     <DashboardDummyDataProvider active={dummyDataActive}>
     <BillableActivityProvider
-      key={coursesOnly ? "courses" : "dashboard"}
+      key={coursesOnly ? "courses" : investOnly ? "invest" : chatOnly ? "chat" : "dashboard"}
       tjmHt={billableTjmHt}
       billableRatePeriods={billableRatePeriods}
       persistToSupabase={persistBillableToSupabase}
@@ -242,7 +247,7 @@ export default async function DashboardPage({
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <Suspense fallback={null}>
-      <DashboardSectionProvider>
+      <DashboardSectionProvider key={user?.id??"demo"}>
         <DashboardDesktopSidebar />
         <DashboardSettingsSheet
           envMode={envMode}
@@ -265,6 +270,10 @@ export default async function DashboardPage({
           demoMode={demoMode}
           loadError={transactionsLoadError}
         />
+      ) : chatOnly ? (
+        <ChatEntry demoMode={demoMode} />
+      ) : investOnly ? (
+        <InvestEntry demoMode={demoMode} />
       ) : coursesOnly ? (
         <CoursesEntry demoMode={demoMode} />
       ) : (

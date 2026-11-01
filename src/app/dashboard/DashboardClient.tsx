@@ -137,6 +137,8 @@ type LazyDashboardSectionKey =
   | "impots"
   | "pilote"
   | "courses"
+  | "invest"
+  | "chat"
   | "sasu-panel";
 
 function lazySectionMountKey(section: DashboardSection): LazyDashboardSectionKey {
@@ -150,6 +152,8 @@ const BillableDaysCalendarBlock = dynamic(
   { loading: () => <div className="min-h-64 animate-pulse rounded-2xl bg-ink-900/5 dark:bg-white/5" role="status" aria-label="Chargement du calendrier" /> }
 );
 
+const AssistantChatSection = dynamic(()=>import("@/components/dashboard/AssistantChatSection").then(mod=>mod.AssistantChatSection), {loading:()=> <p role="status">Chargement du chat…</p>});
+const InvestSection = dynamic(() => import("@/components/dashboard/InvestSection").then(mod => mod.InvestSection), {loading:()=> <div role="status" className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des investissements…</div>});
 const GroceriesSection = dynamic(() => import("@/components/dashboard/GroceriesSection").then(mod => mod.GroceriesSection), { loading: () => <div role="status" className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des courses…</div> });
 const PiloteSection = dynamic(() => import("@/components/dashboard/PiloteSection").then(mod => mod.PiloteSection), { loading: () => <div className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5" role="status" aria-label="Chargement de Pilote" /> });
 
@@ -253,7 +257,7 @@ export function DashboardClient({
   const { section: dashboardSection, searchParams } = useDashboardSection();
   const [loadPiloteData] = useState(() => createPiloteLoader());
   useEffect(() => {
-    if (demoMode || dashboardSection === "courses") return;
+    if (demoMode || dashboardSection === "courses" || dashboardSection === "invest" || dashboardSection === "chat") return;
     // Warm the private report after the first paint, before the first tab selection.
     const timer = window.setTimeout(() => {
       void loadPiloteData().catch(() => {});
@@ -1176,6 +1180,8 @@ export function DashboardClient({
       </div>
       ) : null}
       {mountedSections.has("courses") ? <div className={clsx(dashboardSection !== "courses" && "hidden")} aria-hidden={dashboardSection !== "courses"}><GroceriesSection demoMode={demoMode} /></div> : null}
+      {mountedSections.has("chat") ? <div className={clsx(dashboardSection !== "chat" && "hidden")} aria-hidden={dashboardSection !== "chat"}><AssistantChatSection demoMode={demoMode}/></div> : null}
+      {mountedSections.has("invest") ? <div className={clsx(dashboardSection !== "invest" && "hidden")} aria-hidden={dashboardSection !== "invest"}><InvestSection demoMode={demoMode}/></div> : null}
       {mountedSections.has("pilote") ? <div className={clsx(dashboardSection !== "pilote" && "hidden")} aria-hidden={dashboardSection !== "pilote"}><PiloteSection loadData={loadPiloteData} demoMode={demoMode} onImported={refreshDashboardTransactions} /></div> : null}
       {mountedSections.has("impots") ? (
       <div
