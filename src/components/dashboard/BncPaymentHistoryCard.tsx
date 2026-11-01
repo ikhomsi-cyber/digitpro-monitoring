@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { clsx } from "clsx";
+import {ChevronDown} from "lucide-react";
 import { BncYearAreaChart } from "@/components/dashboard/BncYearAreaChart";
 import { useDashboardDisplayFormat } from "@/components/dashboard/DashboardDisplayFormatContext";
 import { dashboardInsightCard } from "@/lib/dashboard-surfaces";
@@ -189,10 +190,14 @@ export function BncPaymentHistoryCard({ transactions }: { transactions: Dashboar
           </li>
         ))}
       </ul>
+      <details className="group/history mt-3">
+        <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-xs text-ink-500 transition hover:text-ink-800 dark:text-white/55 dark:hover:text-white/80"><span>Voir les graphiques</span><ChevronDown size={14} aria-hidden="true" className="transition group-open/history:rotate-180"/></summary>
+
 
       <div className="mt-4">
         <BncYearAreaChart monthly={monthly} formatEuro={fmt.euro} />
       </div>
+      </details>
     </section>
   );
 }

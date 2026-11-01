@@ -17,9 +17,12 @@ function readDarkFromDom(): boolean {
  */
 export function DarkModeToggle({ className }: { className?: string }) {
   const [dark, setDark] = useState(false);
+  const [cloud,setCloud]=useState(false);
 
   useEffect(() => {
-    setDark(readDarkFromDom());
+    const refresh=()=>{setDark(readDarkFromDom());setCloud(document.documentElement.dataset.colorTheme==="cloud");};
+    refresh();window.addEventListener("app-appearance-change",refresh);
+    return ()=>window.removeEventListener("app-appearance-change",refresh);
   }, []);
 
   const toggle = useCallback(() => {
@@ -39,8 +42,9 @@ export function DarkModeToggle({ className }: { className?: string }) {
     <button
       type="button"
       onClick={toggle}
+      disabled={cloud}
       aria-pressed={dark}
-      title={dark ? "Passer en thème clair" : "Passer en thème sombre"}
+      title={cloud ? "Gris nuage utilise le mode clair" : dark ? "Passer en thème clair" : "Passer en thème sombre"}
       className={clsx(
         "inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-2xl border text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ink-950",
         "border-ink-200/90 bg-white/90 text-ink-700 hover:bg-white dark:border-cyan-100/[0.16] dark:bg-cyan-50/[0.10] dark:text-white dark:hover:bg-cyan-50/[0.16]",

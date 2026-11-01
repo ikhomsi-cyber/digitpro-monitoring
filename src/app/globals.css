@@ -58,7 +58,7 @@ html[data-color-theme="cloud"] {
   --app-accent-deep: #6b7280;
   --app-accent-soft: rgba(156, 163, 175, 0.09);
   --app-accent-glow: rgba(209, 213, 219, 0.38);
-  --app-page-light: #fcfcfd;
+  --app-page-light: #edf0f4;
 }
 
 html[data-color-theme="sand"] {

@@ -42,7 +42,7 @@ export function HouseholdBriefVisual({families}:{families:PiloteCompensation[]})
  const visible=families.filter(f=>f.expenses>0);if(!visible.length)return null;
  return <figure className={card} aria-label="Détail de la couverture des dépenses par famille">
   <figcaption className={`${eyebrow} flex items-center gap-2`}><House size={14}/>Les compensations du foyer</figcaption>
-  <p className="mt-1 text-[10px] text-ink-400 dark:text-white/45">Essentiel + Presque essentiel · toutes compensations réunies</p>
+  <p className="mt-1 text-[10px] text-ink-400 dark:text-white/45">Essentiel + Imprévu · toutes compensations réunies</p>
   <div className="mt-4 space-y-4">{visible.map(family=>{const Icon=familyIcons[family.id],value=percent(family.income/family.expenses*100);return <div key={family.id}>
    <div className="flex items-center gap-3"><span className="grid h-6 w-6 shrink-0 place-items-center text-ink-500 dark:text-white/55"><Icon size={16} strokeWidth={1.5}/></span><div className="min-w-0 flex-1"><p className="text-xs font-medium">{family.name}</p><p className="mt-0.5 text-[10px] text-ink-400">{money(family.income)} reçus · {money(family.expenses)} dépensés</p></div><span className={`shrink-0 text-xs font-semibold tabular-nums ${family.balance<0?"text-amber-600 dark:text-amber-300":"text-emerald-600 dark:text-emerald-300"}`}>{family.balance<0?"−":"+"}{money(Math.abs(family.balance))}</span></div>
    <div aria-hidden="true" className="ml-9 mt-2 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/[.07]"><div className={`h-full rounded-full ${family.balance<0?"bg-amber-400":"bg-emerald-400"}`} style={{width:`${value}%`}}/></div>

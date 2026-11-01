@@ -580,6 +580,7 @@ export async function importBankinPersonalXlsx(formData: FormData) {
     throw new Error("Extension non reconnue : attendu .xls ou .xlsx (export Bankin).");
   }
 
+  const missingOnly = formData.get("missingOnly") === "true";
   const arrayBuffer = await file.arrayBuffer();
   const fileHash = createHash("sha256").update(Buffer.from(arrayBuffer)).digest("hex");
 
@@ -595,14 +596,16 @@ export async function importBankinPersonalXlsx(formData: FormData) {
     throw new Error("Aucune transaction valide (date + montant) dans ce fichier.");
   }
 
-  const result = await importTransactionsInternal(rows, {
+  const result = await importTransactionsWithClient(client, rows, {
     sourceFilename: file.name,
     format: "bankin",
     fileHash
-  });
+  }, {missingOnly});
   const original = parseBankinPiloteWorkbook(arrayBuffer);
-  await saveBankinPiloteSnapshot(client, user.id, buildBankinPiloteSnapshot(original, file.name, fileHash));
-  return result;
+  const stats={added:0};
+  await saveBankinPiloteSnapshot(client, user.id, buildBankinPiloteSnapshot(original, file.name, fileHash), {missingOnly,stats});
+  revalidatePath("/dashboard");
+  return {...result,piloteAdded:stats.added};
 }
 
 export async function deleteTransaction(id: string) {

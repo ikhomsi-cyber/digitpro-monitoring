@@ -1,4 +1,5 @@
 import {
+  appThemeUsesDark,
   appThemeBackgroundColor,
   appThemeChromeColor,
   parseAppColorTheme
@@ -9,6 +10,8 @@ export function syncAppChromeTheme(dark: boolean): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const appTheme = parseAppColorTheme(root.dataset.colorTheme);
+  dark = appThemeUsesDark(appTheme, dark);
+  root.classList.toggle("dark",dark);
   root.style.colorScheme = dark ? "dark" : "light";
   root.style.backgroundColor = appThemeBackgroundColor(appTheme, dark);
   const theme = appThemeChromeColor(appTheme, dark);
@@ -19,4 +22,5 @@ export function syncAppChromeTheme(dark: boolean): void {
     document.head.appendChild(meta);
   }
   meta.setAttribute("content", theme);
+  window.dispatchEvent(new Event("app-appearance-change"));
 }

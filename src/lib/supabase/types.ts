@@ -3,6 +3,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      bankin_balance_sync: {
+        Row: {user_id:string;gmail_account:string;mailbox_key:string;snapshot:Json;revision:number;lease_id:string|null;lease_until:string|null;updated_at:string};
+        Insert: {user_id:string;gmail_account:string;mailbox_key:string;snapshot:Json;revision?:number;lease_id?:string|null;lease_until?:string|null;updated_at?:string};
+        Update: Partial<Database["public"]["Tables"]["bankin_balance_sync"]["Insert"]>;
+        Relationships: [];
+      };
       grocery_orders: {
         Row: { id: string; user_id: string; merchant: string; order_ref: string; ordered_at: string; total_cents: number | null; items: Json; gmail_account: string; gmail_message_id: string; created_at: string; updated_at: string };
         Insert: { id?: string; user_id: string; merchant: string; order_ref: string; ordered_at: string; total_cents?: number | null; items: Json; gmail_account: string; gmail_message_id: string; created_at?: string; updated_at?: string };

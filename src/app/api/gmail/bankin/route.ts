@@ -1,3 +1,4 @@
+import {syncBankinBalances} from '@/lib/gmail/balance-sync';
 import { gmailAccount } from "@/lib/gmail/accounts";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -60,6 +61,10 @@ export async function POST(request: Request) {
         warning = "Les transactions générales n’ont pas pu être entièrement actualisées. Vous pouvez relancer l’import sans supprimer le bilan Pilote.";
         console.warn("[bankin] general transaction sync failed after Pilote was saved");
       }
+      // Export import and balance collection keep independent durable checkpoints.
+      stage = "balance-sync";
+      try { await syncBankinBalances(client, user.id, account, auth, request.signal); }
+      catch { warning = [warning, "L’import Bankin est conservé. La collecte des soldes est en pause ; reprenez-la depuis le bloc Fortuneo."].filter(Boolean).join(" "); }
       return { imported, warning };
     }, account));
     if (!result) return fail("Connectez Gmail avant de récupérer votre export.", 409);

@@ -10,6 +10,7 @@ import {
   parseAppColorTheme,
   type AppColorTheme
 } from "@/lib/app-color-theme";
+import {DARK_MODE_LOCAL_STORAGE_KEY} from "@/lib/dark-mode-flag";
 import { syncAppChromeTheme } from "@/lib/sync-app-chrome-theme";
 
 function readThemeFromDom(): AppColorTheme {
@@ -27,12 +28,14 @@ export function AppColorThemePicker() {
   const selectTheme = useCallback((nextTheme: AppColorTheme) => {
     const root = document.documentElement;
     root.dataset.colorTheme = nextTheme;
+    let preferredDark=root.classList.contains("dark");
     try {
       window.localStorage.setItem(APP_COLOR_THEME_STORAGE_KEY, nextTheme);
+      preferredDark=window.localStorage.getItem(DARK_MODE_LOCAL_STORAGE_KEY)==="1";
     } catch {
       /* Le changement reste actif pour la session en cours. */
     }
-    syncAppChromeTheme(root.classList.contains("dark"));
+    syncAppChromeTheme(preferredDark);
     setTheme(nextTheme);
   }, []);
 
@@ -67,10 +70,10 @@ export function AppColorThemePicker() {
             >
               <span
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-xl shadow-inner"
-                style={{ background: `linear-gradient(135deg, ${option.swatch}, color-mix(in srgb, ${option.swatch} 58%, #111827))` }}
+                style={{ background: option.id === "cloud" ? "linear-gradient(135deg,#edf0f4,#cfd6e0)" : `linear-gradient(135deg, ${option.swatch}, color-mix(in srgb, ${option.swatch} 58%, #111827))` }}
                 aria-hidden
               >
-                {selected ? <Check className="h-4 w-4 text-white" strokeWidth={2.5} /> : null}
+                {selected ? <Check className={option.id === "cloud" ? "h-4 w-4 text-slate-600" : "h-4 w-4 text-white"} strokeWidth={2.5} /> : null}
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-bold text-ink-900 dark:text-white">{option.label}</span>

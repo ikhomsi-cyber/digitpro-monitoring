@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {buildBriefActivity} from "@/lib/daily-brief-activity";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -725,6 +726,11 @@ export function RevolutInsightsSection({
     () => trailingMonthlySeries(scopedTx, chartEndMonth, "income"),
     [scopedTx, periodKey, previousPeriodKey, chartEndMonth]
   );
+  const generatedCaYearHt = useMemo(() => {
+    if (!billable.hydrated || hiwayInvoices === null) return null;
+    const date = new Intl.DateTimeFormat("sv-SE", {timeZone:"Europe/Paris"}).format(new Date());
+    return buildBriefActivity({date, transactions:scopedTx, settings:{days:[...billable.sortedIsos],tjm:billable.tjmHt,rates:[...billable.billableRatePeriods]}, invoices:hiwayInvoices, cash:null}).generatedRevenueHt;
+  }, [billable.hydrated,billable.sortedIsos,billable.tjmHt,billable.billableRatePeriods,hiwayInvoices,scopedTx]);
   const upcomingInvoice = useMemo(
     () =>
       computeUpcomingInvoice({
@@ -855,6 +861,10 @@ export function RevolutInsightsSection({
           <div>
             <div>
               <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
+              {selectedYear === new Date().getFullYear() ? <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
+                CA généré depuis le début de l’année ·{" "}
+                <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">{generatedCaYearHt===null?"—":`${fmt.euro(generatedCaYearHt)} HT`}</span>
+              </p> : null}
               {!isAnnual && selectedYear === new Date().getFullYear() ? <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
                 BNC versé depuis le début de l&apos;année ·{" "}
                 <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">

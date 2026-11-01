@@ -9,3 +9,10 @@ it('keeps years separate and never produces negative ZAKA',()=>{
 });
 
 it("excludes all other banks from history and ZAKA",()=>{expect(bankinBalanceHistory([{account:"Autre banque · Courant",date:"2026-01-01",balance:50000}])).toEqual([]);});
+
+it('compares complete email snapshots without requiring accounts that opened in later years',()=>{
+ const result=bankinBalanceHistory([{account:'Fortuneo · Ancien',date:'2025-01-01',balance:1000,observedAt:1},{account:'Fortuneo · Nouveau',date:'2026-01-01',balance:2000,observedAt:2}])[0];expect(result.history).toHaveLength(2);expect(result.annual.map(row=>row.minimum)).toEqual([1000,2000]);
+});
+it('does not mix balances from two different same-day email snapshots',()=>{
+ const result=bankinBalanceHistory([{account:'Fortuneo · A',date:'2026-01-01',balance:100,observedAt:1},{account:'Fortuneo · B',date:'2026-01-01',balance:200,observedAt:2}])[0];expect(result.history[0].balance).toBe(200);
+});

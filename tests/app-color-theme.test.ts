@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_APP_COLOR_THEME,
-  appThemeBackgroundColor,
+  appThemeUsesDark, appThemeBackgroundColor,
   appThemeChromeColor,
   parseAppColorTheme
 } from "@/lib/app-color-theme";
@@ -21,3 +21,6 @@ describe("app color themes", () => {
     expect(appThemeBackgroundColor("coral", true)).not.toBe(appThemeBackgroundColor("coral", false));
   });
 });
+
+
+it("keeps Gris nuage almost white even with a dark preference",()=>{expect(appThemeUsesDark("cloud",true)).toBe(false);expect(appThemeUsesDark("emerald",true)).toBe(true);expect(appThemeBackgroundColor("cloud",true)).toBe("#EDF0F4");expect(appThemeChromeColor("cloud",true)).toBe("#EDF0F4");});

@@ -3,7 +3,7 @@ import { buildBankinPiloteSnapshot, type BankinPiloteRow, type BankinPiloteSnaps
 export class PiloteHistoryError extends Error {}
 
 /** Refresh matched Bankin source categories and append missing occurrences without dropping history. */
-export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null, incoming: BankinPiloteSnapshot): BankinPiloteSnapshot {
+export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null, incoming: BankinPiloteSnapshot, options: {missingOnly?: boolean} = {}): BankinPiloteSnapshot {
   if (!incoming.rows) throw new PiloteHistoryError("Le détail de cet export Bankin est manquant.");
   if (!previous) return incoming;
   if (!previous.rows) {
@@ -26,7 +26,7 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
     const saved = previous.rows[index];
     // Only a stable identity can carry category/visibility corrections from Bankin.
     // Never reconcile distinct payments on amount/date alone.
-    if (row.identity && (saved.parentCategory !== row.parentCategory || saved.subCategory !== row.subCategory || saved.hidden !== row.hidden)) {
+    if (!options.missingOnly && row.identity && (saved.parentCategory !== row.parentCategory || saved.subCategory !== row.subCategory || saved.hidden !== row.hidden)) {
       if (saved.date !== row.date || Math.round(saved.amount * 100) !== Math.round(row.amount * 100)) {
         throw new PiloteHistoryError("L’identité d’une opération Bankin est incohérente. Le bilan précédent est conservé.");
       }

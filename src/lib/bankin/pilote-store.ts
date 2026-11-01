@@ -20,13 +20,13 @@ function databaseFailure(operation: string, code?: string): PiloteStoreError {
   return new PiloteStoreError(`${reason} Votre bilan précédent est conservé.`, operation, code);
 }
 type Client = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
-export async function saveBankinPiloteSnapshot(client: Client, userId: string, snapshot: BankinPiloteSnapshot) {
+export async function saveBankinPiloteSnapshot(client: Client, userId: string, snapshot: BankinPiloteSnapshot, options: {missingOnly?:boolean;stats?:{added:number}} = {}) {
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data, error: readError } = await client.from("bankin_pilote_snapshots").select("snapshot, updated_at").eq("user_id", userId).maybeSingle();
     if (readError) throw databaseFailure("read", readError.code);
     const previous = data ? decodePiloteStorage(data.snapshot as unknown as BankinPiloteSnapshot) : null;
-    const merged = mergeBankinPiloteSnapshots(previous, snapshot);
-    if (merged === previous) return merged;
+    const merged = mergeBankinPiloteSnapshots(previous, snapshot, options);
+    if (merged === previous) {if(options.stats)options.stats.added=0;return merged;}
     const updatedAt = new Date(Math.max(Date.now(), data ? Date.parse(data.updated_at) + 1 : 0)).toISOString();
     let encoded: StoredPiloteSnapshot;
     try { encoded = encodePiloteStorage(merged); }
@@ -34,14 +34,14 @@ export async function saveBankinPiloteSnapshot(client: Client, userId: string, s
     const values = { snapshot: encoded as unknown as Json, updated_at: updatedAt };
     if (!data) {
       const { error } = await client.from("bankin_pilote_snapshots").insert({ user_id: userId, ...values });
-      if (!error) return merged;
+      if (!error) {if(options.stats)options.stats.added=merged.rows?.length??0;return merged;}
       if (error.code === "23505") continue;
       throw databaseFailure("write", error.code);
     }
     // Compare-and-swap prevents simultaneous Gmail/Excel imports overwriting one another.
     const { data: saved, error } = await client.from("bankin_pilote_snapshots").update(values).eq("user_id", userId).eq("updated_at", data.updated_at).select("user_id").maybeSingle();
     if (error) throw databaseFailure("write", error.code);
-    if (saved) return merged;
+    if (saved) {if(options.stats)options.stats.added=(merged.rows?.length??0)-(previous?.rows?.length??0);return merged;}
   }
   throw new PiloteStoreError("La base n’a confirmé aucune mise à jour du bilan après trois tentatives. Votre bilan précédent est conservé.", "concurrent-update");
 }

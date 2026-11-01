@@ -298,7 +298,8 @@ async function fetchLatestMetrics(client: SupabaseServer) {
 export async function importTransactionsWithClient(
   client: SupabaseServer,
   transactions: ImportTx[],
-  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin" | "powens"; fileHash: string | null }
+  meta: { sourceFilename: string | null; format: "qonto" | "generic" | "bankin" | "powens"; fileHash: string | null },
+  options: {missingOnly?:boolean} = {}
 ): Promise<{
   inserted: Array<{
     id: string;
@@ -477,6 +478,8 @@ export async function importTransactionsWithClient(
     }
   }
 
+  const existingSkipped = options.missingOnly ? toMerge.length : 0;
+  if(options.missingOnly)toMerge=[];
   const mergeBatch = 25;
   for (let i = 0; i < toMerge.length; i += mergeBatch) {
     const slice = toMerge.slice(i, i + mergeBatch);
@@ -505,7 +508,7 @@ export async function importTransactionsWithClient(
     .from("import_sessions")
     .update({
       inserted_count: insertedCount,
-      skipped_duplicate_count: skippedInFile
+      skipped_duplicate_count: skippedInFile + existingSkipped
     })
     .eq("id", importSessionId);
 

@@ -40,8 +40,8 @@ export const APP_COLOR_THEMES = [
   {
     id: "cloud",
     label: "Gris nuage",
-    description: "Très clair, presque blanc",
-    swatch: "#e5e7eb"
+    description: "Gris doux et lumineux",
+    swatch: "#e1e6ed"
   },
   {
     id: "sand",
@@ -62,7 +62,7 @@ const APP_THEME_COLOR_VALUES: Record<AppColorTheme, { light: string; darkBackgro
   coral: { light: "#FFF6F5", darkBackground: "#2a1119", darkChrome: "#74293d" },
   pearl: { light: "#F6F7F9", darkBackground: "#121820", darkChrome: "#334155" },
   mist: { light: "#F8FAFC", darkBackground: "#17202b", darkChrome: "#475569" },
-  cloud: { light: "#FCFCFD", darkBackground: "#1b1e23", darkChrome: "#5b6470" },
+  cloud: { light: "#EDF0F4", darkBackground: "#EDF0F4", darkChrome: "#EDF0F4" },
   sand: { light: "#FBF8F1", darkBackground: "#211B12", darkChrome: "#655136" }
 };
 
@@ -80,4 +80,9 @@ export function appThemeChromeColor(theme: AppColorTheme, dark: boolean): string
 export function appThemeBackgroundColor(theme: AppColorTheme, dark: boolean): string {
   const palette = APP_THEME_COLOR_VALUES[theme];
   return dark ? palette.darkBackground : palette.light;
+}
+
+/** Gris nuage is an intentionally light palette. */
+export function appThemeUsesDark(theme: AppColorTheme, requestedDark: boolean): boolean {
+  return theme !== "cloud" && requestedDark;
 }

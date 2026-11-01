@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/gmail/balance-sync",()=>({syncBankinBalances:vi.fn().mockResolvedValue({pending:false})}));
 const mocks = vi.hoisted(() => ({ client: vi.fn(), mode: vi.fn(), user: vi.fn(), lease: vi.fn(), gmail: vi.fn(), fetch: vi.fn(), parse: vi.fn(), import: vi.fn(), revalidate: vi.fn(), source: vi.fn(), snapshot: vi.fn() }));
 vi.mock("next/headers", () => ({ cookies: async () => ({}) }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));

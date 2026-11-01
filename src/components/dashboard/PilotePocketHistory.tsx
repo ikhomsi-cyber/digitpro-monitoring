@@ -1,6 +1,6 @@
 "use client";
 import {useMemo,useState} from "react";
-import {ChevronDown} from "lucide-react";
+import {YearRangeFilter} from "./YearRangeFilter";
 import {buildPilotePocketHistory,filterPilotePocketHistoryYears} from "@/lib/pilote-pocket-history";
 import type {PiloteMonth,PiloteExpenseView} from "@/lib/pilote";
 import {useDashboardDisplayFormat} from "./DashboardDisplayFormatContext";
@@ -22,11 +22,7 @@ export function PilotePocketHistory({months,views}:{months:readonly PiloteMonth[
  let move=true;const path=points.map((p,i)=>{if(p.balance===null){move=true;return "";}const part=`${move?"M":"L"}${x(i).toFixed(2)},${y(p.balance).toFixed(2)}`;move=false;return part;}).join(" ");
  return <figure className="mt-4 border-t border-ink-200/40 pt-4 dark:border-white/[.07]" aria-label="Historique mensuel de votre poche depuis le premier mois importé">
   <figcaption className="text-xs font-medium text-ink-600 dark:text-white/70">De votre poche · historique mensuel</figcaption>
-  <div className="mt-3 inline-flex items-center gap-0.5 rounded-full border border-ink-200/50 bg-ink-50/60 p-0.5 dark:border-white/10 dark:bg-white/[.04]" role="group" aria-label="Intervalle d’années de l’historique">
-   <label className="relative inline-flex h-8 items-center gap-2 rounded-full pl-3 pr-7 focus-within:ring-1 focus-within:ring-[var(--app-accent)]"><span aria-hidden="true" className="text-[10px] text-ink-400">De</span><span aria-hidden="true" className="text-[11px] font-medium tabular-nums text-ink-600 dark:text-white/75">{from}</span><ChevronDown aria-hidden="true" size={11} className="pointer-events-none absolute right-2.5 text-ink-400"/><select aria-label="Année de début de l’historique" value={from} onChange={event=>{const value=event.target.value;setRange({from:value,to:value>to?value:to});setSelected(null);}} className="absolute inset-0 h-full w-full cursor-pointer opacity-0 text-base">{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
-   <span aria-hidden="true" className="h-3 w-px bg-ink-200/70 dark:bg-white/10"/>
-   <label className="relative inline-flex h-8 items-center gap-2 rounded-full pl-3 pr-7 focus-within:ring-1 focus-within:ring-[var(--app-accent)]"><span aria-hidden="true" className="text-[10px] text-ink-400">À</span><span aria-hidden="true" className="text-[11px] font-medium tabular-nums text-ink-600 dark:text-white/75">{to}</span><ChevronDown aria-hidden="true" size={11} className="pointer-events-none absolute right-2.5 text-ink-400"/><select aria-label="Année de fin de l’historique" value={to} onChange={event=>{const value=event.target.value;setRange({from:value<from?value:from,to:value});setSelected(null);}} className="absolute inset-0 h-full w-full cursor-pointer opacity-0 text-base">{years.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
-  </div>
+  <YearRangeFilter years={years} from={from} to={to} onChange={(from,to)=>{setRange({from,to});setSelected(null);}}/>
   {fmt.dummy?<p className="mt-3 text-xs text-ink-400">Graphique masqué avec les montants.</p>:<>
    <svg viewBox="0 0 560 185" className="mt-3 h-auto w-full" role="img" aria-label="Évolution mensuelle des rentrées moins les dépenses, toutes compensations déduites">
     {[low,(low+high)/2,high].filter((v,i,all)=>all.indexOf(v)===i).map(value=><g key={value}><line x1="44" x2="544" y1={y(value)} y2={y(value)} stroke="currentColor" className="text-ink-200 dark:text-white/10"/><text x="38" y={y(value)+3} textAnchor="end" fontSize="9" fill="currentColor" className="text-ink-400">{fmt.chartAxisEuro(value)}</text></g>)}

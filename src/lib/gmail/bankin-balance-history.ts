@@ -5,8 +5,13 @@ export function bankinBalanceHistory(points:BankinBalancePoint[]){
  return [...banks].map(([bank,rows])=>{
   const accounts=[...new Set(rows.map(p=>p.account))];
   const dates=[...new Set(rows.map(p=>p.date))].sort();
-  // Only compare dates where every observed account of this bank is present.
-  const history=dates.flatMap(date=>{const day=rows.filter(p=>p.date===date);return day.length===accounts.length?[{account:bank,date,balance:Math.round(day.reduce((sum,p)=>sum+p.balance,0)*100)/100}]:[];});
+  // A full parsed email is a snapshot: accounts may legitimately open/close over time.
+  // Never mix different emails from the same day. Legacy undated batches stay conservative.
+  const history=dates.flatMap(date=>{
+   const day=rows.filter(p=>p.date===date),latest=Math.max(0,...day.map(p=>p.observedAt??0));
+   const snapshot=latest?day.filter(p=>p.observedAt===latest):day;
+   return latest||snapshot.length===accounts.length?[{account:bank,date,balance:Math.round(snapshot.reduce((sum,p)=>sum+p.balance,0)*100)/100}]:[];
+  });
   const annual=[...new Set(history.map(p=>p.date.slice(0,4)))].sort().map(year=>{const samples=history.filter(p=>p.date.startsWith(year));const minimum=Math.min(...samples.map(p=>p.balance));return {year,minimum,zaka:Math.round(Math.max(0,minimum)*2.5)/100,observations:samples.length};});
   return {bank,accounts,history,annual};
  });
