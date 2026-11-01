@@ -1,9 +1,8 @@
 import {addPiloteMoroccoRent,buildPiloteMonths,piloteReportingCategories,type BankinPiloteSnapshot,type BankinPiloteRow} from './pilote';
 import {LMNP_PROPERTY} from './lmnp-config';
-import {isLmnpExpense} from './lmnp-analyze';
 export type InvestmentMonth={month:string;bankRent:number;declaredRent:number;charges:number;gain:number};
-export type RentalInvestment={id:'casa'|'argenteuil';name:string;city:string;purchaseAmount:number|null;purchaseDate:string|null;purchaseCount:number;months:InvestmentMonth[]};
-export type PerInvestment={contributions:number|null;withdrawals:number;netContributions:number|null;count:number;years:{year:string;contributions:number;withdrawals:number}[]};
+export type RentalInvestment={id:'casa'|'argenteuil';name:string;city:string;purchaseAmount:number|null;purchaseDate:string|null;purchaseCount:number;chargeTransactions?:{date:string;amount:number}[];purchaseBreakdown?:{notary:number;works:number;other:number;price?:number;promise?:number;prorata?:number};months:InvestmentMonth[]};
+export type PerInvestment={transactions?:{date:string;amount:number;kind:'contribution'|'withdrawal'}[];contributions:number|null;withdrawals:number;netContributions:number|null;count:number;years:{year:string;contributions:number;withdrawals:number}[]};
 export type InvestmentsReport={asOf:string;importedAt:string|null;hasSource:boolean;years:string[];properties:RentalInvestment[];per:PerInvestment};
 const fold=(text:string)=>text.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const cents=(value:number)=>Math.round(value*100),euro=(value:number)=>value/100;
@@ -26,25 +25,56 @@ export function buildInvestments(snapshot:BankinPiloteSnapshot|null,asOf:string)
  const properties:RentalInvestment[]=[{id:'casa',name:'Maison Casa',city:'Casablanca',purchaseAmount:null,purchaseDate:null,purchaseCount:0,months:[]},{id:'argenteuil',name:'Argenteuil',city:'Argenteuil · LMNP',purchaseAmount:null,purchaseDate:null,purchaseCount:0,months:[]}];
  const propertyMonths=new Map<string,Map<string,{bankRent:number;declaredRent:number;charges:number}>>();
  const monthFor=(id:string,month:string)=>{const map=propertyMonths.get(id)??new Map();propertyMonths.set(id,map);const value=map.get(month)??{bankRent:0,declaredRent:0,charges:0};map.set(month,value);return value;};
+ const perTransactions:NonNullable<PerInvestment['transactions']>=[];
  const perYears=new Map<string,{contributions:number;withdrawals:number;count:number}>();
  for(const row of rows){
+  // Sum the original Bankin Charges LMNP category before any investment inference.
+  if([row.parentCategory,row.subCategory].some(value=>fold(value)==='charges lmnp')){
+   if(row.amount<0&&!row.hidden){
+    const property=properties[1];
+    (property.chargeTransactions??=[]).push({date:row.date,amount:euro(-cents(row.amount))});
+    monthFor('argenteuil',row.date.slice(0,7)).charges-=cents(row.amount);
+   }
+   continue;
+  }
   const categories=piloteReportingCategories(row),sub=fold(categories.sub),category=fold(`${categories.parent} ${categories.sub}`),blob=fold(`${category} ${row.label??''}`);
   if(confirmedPer.has(row)||/\b(per|perin|perco|percol|perp)\b|\bepargne retraite\b/.test(category)){
+   if(row.amount!==0)perTransactions.push({date:row.date,amount:Math.abs(row.amount),kind:row.amount<0?'contribution':'withdrawal'});
    const year=row.date.slice(0,4),entry=perYears.get(year)??{contributions:0,withdrawals:0,count:0};
    if(row.amount<0)entry.contributions-=cents(row.amount);else entry.withdrawals+=cents(row.amount);entry.count++;perYears.set(year,entry);continue;
   }
   const parent=fold(categories.parent);
+  // Explicit Bankin category confirmed by the owner: capital works, not recurring rental charges.
+  if(row.amount<0&&[parent,sub].some(value=>value==='travaux lmnp')){
+   const property=properties[1],breakdown=property.purchaseBreakdown??{notary:0,works:0,other:0};
+   breakdown.works=euro(cents(breakdown.works)-cents(row.amount));property.purchaseBreakdown=breakdown;continue;
+  }
   const property=CASA_PURCHASE.has(sub)||CASA_PURCHASE.has(parent)?properties[0]:ARGENTEUIL_PURCHASE.has(sub)||ARGENTEUIL_PURCHASE.has(parent)?properties[1]:null;
-  if(property&&row.amount<0){property.purchaseAmount=euro(cents(property.purchaseAmount??0)-cents(row.amount));property.purchaseCount++;if(!property.purchaseDate||row.date<property.purchaseDate)property.purchaseDate=row.date;continue;}
+  if(property&&row.amount<0){
+   property.purchaseAmount=euro(cents(property.purchaseAmount??0)-cents(row.amount));property.purchaseCount++;
+   if(property.id==='argenteuil'){
+    const breakdown=property.purchaseBreakdown??{notary:0,works:0,other:0};
+    const notary=/\b(notaire|notaires|notarial|notariaux|notarie|etude notariale)\b/.test(blob),works=/\b(travaux|renovation|renovations|artisan|artisans)\b/.test(blob);
+    // Ambiguous or unlabelled acquisition movements stay explicitly unclassified.
+    const key=notary&&!works?'notary':'other';
+    breakdown[key]=euro(cents(breakdown[key])-cents(row.amount));property.purchaseBreakdown=breakdown;
+   }
+   if(!property.purchaseDate||row.date<property.purchaseDate)property.purchaseDate=row.date;continue;
+  }
   // Transfers hidden from the expense budget remain investment contributions when explicitly tagged PER.
   if(row.hidden)continue;
-  const rentalCategory=[parent,sub].some(value=>/^entrees? locati(?:f|fs|ve|ves)$/.test(value));
+  const rentalCategory=[parent,sub].some(value=>/^(?:entrees? locati(?:f|fs|ve|ves)|loyers? recus?)$/.test(value));
   const casaRental=hasCasa(blob)&&/\bloyers?\b/.test(category);
   if(row.amount>0&&(rentalCategory||casaRental)){const id=casaRental?'casa':'argenteuil';if(id==='argenteuil'&&row.date<LMNP_PROPERTY.purchaseDateIso)continue;monthFor(id,row.date.slice(0,7)).bankRent+=cents(row.amount);continue;}
   if(row.amount>=0)continue;
-  const tx={id:String(row.sourceRow),date:row.date,label:row.label??'',company:'',category:`${row.parentCategory} › ${row.subCategory}`,amount:row.amount,scope:'personal' as const};
-  if(hasCasa(blob)&&/\b(charges?|travaux|taxe|fonciere|assurance|gestion|entretien|copropriete)\b/.test(blob))monthFor('casa',row.date.slice(0,7)).charges-=cents(row.amount);
-  else if(!hasCasa(blob)&&row.date>=LMNP_PROPERTY.purchaseDateIso&&([parent,sub].some(value=>value==='charges lmnp')||isLmnpExpense(tx)))monthFor('argenteuil',row.date.slice(0,7)).charges-=cents(row.amount);
+  if(![parent,sub].some(value=>value==='charges lmnp')&&hasCasa(blob)&&/\b(charges?|travaux|taxe|fonciere|assurance|gestion|entretien|copropriete)\b/.test(blob))monthFor('casa',row.date.slice(0,7)).charges-=cents(row.amount);
+ }
+ // Acquisition amounts explicitly confirmed by the owner; replace imported acquisition totals, never add both.
+ const argenteuil=properties[1];
+ if(snapshot?.rows?.length){
+  const works=argenteuil.purchaseBreakdown?.works??0;
+  argenteuil.purchaseBreakdown={price:126000,promise:450,notary:10700,prorata:1496,works,other:0};
+  argenteuil.purchaseAmount=euro(13864600+cents(works));
  }
  // Reuse Pilote's declared Morocco rent only for months actually covered by imported reporting data.
  // An identified Casa bank receipt replaces the declaration for that month, never doubles it.
@@ -56,7 +86,7 @@ export function buildInvestments(snapshot:BankinPiloteSnapshot|null,asOf:string)
  const perRows=[...perYears].sort(([a],[b])=>a.localeCompare(b));const perCount=perRows.reduce((sum,[,value])=>sum+value.count,0);
  const contributions=perRows.reduce((sum,[,value])=>sum+value.contributions,0),withdrawals=perRows.reduce((sum,[,value])=>sum+value.withdrawals,0);
  const years=[...new Set([...rows.map(row=>row.date.slice(0,4)),...properties.flatMap(property=>property.months.map(month=>month.month.slice(0,4)))])].sort().reverse();
- return {asOf,importedAt:snapshot?.importedAt??null,hasSource:!!snapshot?.rows?.length,years,properties,per:{contributions:perCount?euro(contributions):null,withdrawals:euro(withdrawals),netContributions:perCount?euro(contributions-withdrawals):null,count:perCount,years:perRows.map(([year,value])=>({year,contributions:euro(value.contributions),withdrawals:euro(value.withdrawals)}))}};
+ return {asOf,importedAt:snapshot?.importedAt??null,hasSource:!!snapshot?.rows?.length,years,properties,per:{transactions:perTransactions.sort((a,b)=>b.date.localeCompare(a.date)),contributions:perCount?euro(contributions):null,withdrawals:euro(withdrawals),netContributions:perCount?euro(contributions-withdrawals):null,count:perCount,years:perRows.map(([year,value])=>({year,contributions:euro(value.contributions),withdrawals:euro(value.withdrawals)}))}};
 }
 export function rentalInvestmentTotals(property:RentalInvestment,year?:string){
  const months=property.months.filter(month=>!year||month.month.startsWith(year));
@@ -66,6 +96,7 @@ export function rentalInvestmentTotals(property:RentalInvestment,year?:string){
 
 /** Bounded investment context for the already-authorized first-party assistant. */
 export function investmentAssistantSummary(report:InvestmentsReport){
- return {asOf:report.asOf,hasSource:report.hasSource,properties:report.properties.map(property=>({name:property.name,purchaseAmount:property.purchaseAmount,...rentalInvestmentTotals(property)})),per:report.per};
+ const {transactions: _transactions,...per}=report.per;
+ return {asOf:report.asOf,hasSource:report.hasSource,properties:report.properties.map(property=>({name:property.name,purchaseAmount:property.purchaseAmount,...rentalInvestmentTotals(property)})),per};
 }
 export type InvestmentAssistantSummary=ReturnType<typeof investmentAssistantSummary>;
