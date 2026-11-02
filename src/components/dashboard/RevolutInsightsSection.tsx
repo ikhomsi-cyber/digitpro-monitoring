@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {buildBriefActivity} from "@/lib/daily-brief-activity";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { clsx } from "clsx";
 import {
   countsTowardDashboardExpenseTotal,
@@ -858,62 +858,13 @@ export function RevolutInsightsSection({
         </InsightCard>
 
         <InsightCard>
-          <div>
-            <div>
-              <p className="text-sm text-ink-500 dark:text-white/50">Entrées d&apos;argent</p>
-              {selectedYear === new Date().getFullYear() ? <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
-                CA généré depuis le début de l’année ·{" "}
-                <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">{generatedCaYearHt===null?"—":`${fmt.euro(generatedCaYearHt)} HT`}</span>
-              </p> : null}
-              {!isAnnual && selectedYear === new Date().getFullYear() ? <p className="mt-0.5 text-[11px] text-ink-400 dark:text-white/38">
-                BNC versé depuis le début de l&apos;année ·{" "}
-                <span className="font-semibold tabular-nums text-ink-700 dark:text-white/65">
-                  {fmt.euro(bncYearTotalEur)}
-                </span>
-              </p> : null}
-            </div>
-            {!isAnnual && monthKey === monthKeyNow() ? <div className="mt-2 grid grid-cols-2 gap-2 text-left text-[11px] leading-snug tabular-nums">
-              <div
-                className={clsx(
-                  "flex min-w-0 flex-col items-start gap-0.5 rounded-2xl bg-ink-100/70 px-3 py-2.5 dark:bg-white/[0.05]",
-                  upcomingInvoice.amountHtEur <= 0
-                    ? "text-emerald-700 dark:text-emerald-300"
-                    : upcomingInvoice.dueInDays < 0
-                      ? "text-rose-700 dark:text-rose-300"
-                      : "text-amber-700 dark:text-amber-300"
-                )}
-              >
-                <span className="font-bold">{upcomingInvoice.statusLabel}</span>
-                <span className="text-xs font-bold">{fmt.euro(upcomingInvoice.amountTtcEur)} TTC</span>
-                <span className="font-medium opacity-75">{fmt.euro(upcomingInvoice.amountHtEur)} HT</span>
-              </div>
-              <div className="flex min-w-0 flex-col items-start gap-0.5 rounded-2xl bg-sky-100/60 px-3 py-2.5 text-sky-700 dark:bg-sky-400/[0.07] dark:text-sky-300">
-                <span className="font-bold">À facturer</span>
-                <span className="text-xs font-bold">{fmt.euro(currentMonthInvoice.amountTtcEur)} TTC</span>
-                <span className="font-medium opacity-75">{fmt.euro(currentMonthInvoice.amountHtEur)} HT</span>
-              </div>
-            </div> : null}
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <p className="font-display text-2xl font-semibold tabular-nums text-ink-900 dark:text-white">
-              {fmt.euro(current.entrees)}
-            </p>
-            <span
-              className={clsx(
-                "text-sm font-medium tabular-nums",
-                entreesDelta > 0
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : entreesDelta < 0
-                    ? "text-rose-500 dark:text-rose-400"
-                    : "text-ink-400 dark:text-white/45"
-              )}
-            >
-              {entreesDelta >= 0 ? "▲" : "▼"} {fmt.euro(Math.abs(entreesDelta))}
-            </span>
-          </div>
-          <div className="mt-5">
-            <Sparkline points={incomeSeries} stroke="#34d399" />
-          </div>
+          <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-ink-600 dark:text-white/65">Entrées d’argent</p><span className="text-[10px] text-ink-400">{isAnnual?selectedYear:'Mois sélectionné'}</span></div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-3"><p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-ink-900 dark:text-white">{fmt.euro(current.entrees)}</p>{entreesDelta!==0?<span className={clsx('text-xs font-medium tabular-nums',entreesDelta>0?'text-emerald-600 dark:text-emerald-300':'text-rose-500 dark:text-rose-400')}>{entreesDelta>0?'↗':'↘'} {fmt.euro(Math.abs(entreesDelta))}</span>:null}</div>
+          <div className="mt-5"><Sparkline points={incomeSeries} stroke="#34d399"/></div>
+          {selectedYear===new Date().getFullYear()?<details className="group/income mt-4 border-t border-ink-200/40 pt-2 dark:border-white/10"><summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[11px] text-ink-500 dark:text-white/55"><span>CA annuel et facturation</span><ChevronDown size={13} className="transition group-open/income:rotate-180"/></summary>
+           {selectedYear===new Date().getFullYear()?<dl className="mt-2 space-y-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink-400">CA généré · {selectedYear}</dt><dd className="font-medium tabular-nums">{generatedCaYearHt===null?'—':`${fmt.euro(generatedCaYearHt)} HT`}</dd></div>{!isAnnual?<div className="flex justify-between gap-3"><dt className="text-ink-400">BNC versé · {selectedYear}</dt><dd className="font-medium tabular-nums">{fmt.euro(bncYearTotalEur)}</dd></div>:null}</dl>:null}
+           {!isAnnual&&monthKey===monthKeyNow()?<dl className="mt-4 space-y-3 border-t border-ink-200/30 pt-3 text-xs dark:border-white/10">{[{label:upcomingInvoice.statusLabel,ttc:upcomingInvoice.amountTtcEur,ht:upcomingInvoice.amountHtEur},{label:'À facturer',ttc:currentMonthInvoice.amountTtcEur,ht:currentMonthInvoice.amountHtEur}].map(item=><div key={item.label} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500 dark:text-white/55">{item.label}</dt><dd className="text-right tabular-nums"><p className="font-medium">{fmt.euro(item.ttc)} TTC</p><p className="mt-0.5 text-[10px] text-ink-400">{fmt.euro(item.ht)} HT</p></dd></div>)}</dl>:null}
+          </details>:null}
         </InsightCard>
       </div>
     </section>
