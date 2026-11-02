@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { ArrowUpRight, ArrowRightLeft, BriefcaseBusiness, Gift, GraduationCap, House, Lightbulb, Loader2, ReceiptText, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
-import { AssistantQuestionComposer } from "./AssistantQuestionComposer";
 import { ASSISTANT_HOUSEHOLD_VIEWS } from "@/lib/assistant-household-views";
 import { useDashboardSection } from "./DashboardSectionContext";
 import { useDashboardDummyData } from "./DashboardDisplayFormatContext";
@@ -17,12 +16,6 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
  const viewsKey=ASSISTANT_HOUSEHOLD_VIEWS.join(",");
  const masked=useDashboardDummyData();const dialog=useRef<HTMLDialogElement>(null);
  const [open,setOpen]=useState(false),[brief,setBrief]=useState<Brief|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(false);
- const [question,setQuestion]=useState("");
- const [conversation,setConversation]=useState<{role:"user"|"assistant";content:string}[]>([]);
- const [asking,setAsking]=useState(false),[questionError,setQuestionError]=useState("");
- const conversationScroll=useRef<HTMLDivElement>(null);
- useEffect(()=>{conversationScroll.current?.scrollTo({top:0});},[conversation]);
- const questionRequest=useRef<AbortController|null>(null);
  const closingAnimation=useRef<Animation|null>(null);
  const suppressHandleClick=useRef(false);
  const sheetDrag=useRef<{id:number;start:number;last:number;time:number;velocity:number;offset:number}|null>(null);
@@ -34,7 +27,7 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
   catch(err){if(!controller.signal.aborted)setError(err instanceof Error?err.message:"Point quotidien indisponible.");}
   finally{if(!controller.signal.aborted)setLoading(false);}
  },[viewsKey]);
- useEffect(()=>{lastDate.current="";questionRequest.current?.abort();setAsking(false);setConversation([]);setQuestionError("");if(open&&!masked)void load();},[viewsKey,load]);
+ useEffect(()=>{lastDate.current="";if(open&&!masked)void load();},[viewsKey,load]);
  const show=useCallback(()=>{sheetDrag.current=null;if(dialog.current)dialog.current.style.transform="";closingAnimation.current?.cancel();closingAnimation.current=null;setOpen(true);if(lastDate.current!==today())void load();},[load]);
  useEffect(()=>{
   if(demoMode||masked||section==="courses"||section==="chat"||section==="invest")return;
@@ -50,19 +43,7 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
   const animation=!window.matchMedia("(prefers-reduced-motion: reduce)").matches?panel.animate?.([{transform:"translateY(100%)"},{transform:"translateY(0)"}],{duration:300,easing:"cubic-bezier(0.22, 1, 0.36, 1)"}):undefined;
   return()=>{animation?.cancel();document.body.style.overflow=previousOverflow;};
  },[open,masked]);
- useEffect(()=>()=>{pending.current?.abort();questionRequest.current?.abort();closingAnimation.current?.cancel();},[]);
- const ask=async(event:React.FormEvent)=>{
-  event.preventDefault();const text=question.trim();if(text.length<2||asking||masked)return;
-  const controller=new AbortController();questionRequest.current=controller;
-  const history=conversation.slice(-6).map(message=>({...message,content:message.content.slice(0,4000)}));
-  setAsking(true);setQuestionError("");setQuestion("");setConversation(previous=>[...previous,{role:"user" as const,content:text}].slice(-7));
-  try{
-   const response=await fetch("/api/dashboard/daily-brief/question",{method:"POST",headers:{"Content-Type":"application/json"},cache:"no-store",signal:controller.signal,body:JSON.stringify({question:text,history,views:ASSISTANT_HOUSEHOLD_VIEWS})});
-   const body=await response.json();if(!response.ok)throw new Error(body.error??"Analyse indisponible.");
-   if(!controller.signal.aborted)setConversation(previous=>[...previous,{role:"assistant" as const,content:String(body.answer)}].slice(-6));
-  }catch(error){if(!controller.signal.aborted){setQuestionError(error instanceof Error?error.message:"Analyse indisponible.");setQuestion(text);setConversation(previous=>previous.at(-1)?.content===text?previous.slice(0,-1):previous);}}
-  finally{if(!controller.signal.aborted)setAsking(false);}
- };
+ useEffect(()=>()=>{pending.current?.abort();closingAnimation.current?.cancel();},[]);
  const close=()=>{
   sheetDrag.current=null;
   const panel=dialog.current;
@@ -100,20 +81,6 @@ export function DailyFinancialAssistant({userId,demoMode}:{userId:string;demoMod
   <dialog data-pull-refresh-ignore ref={dialog} onClick={event=>{if(event.target!==event.currentTarget)return;const bounds=event.currentTarget.getBoundingClientRect();if(event.clientY<bounds.top||event.clientY>bounds.bottom||event.clientX<bounds.left||event.clientX>bounds.right)close();}} onCancel={event=>{event.preventDefault();close();}} aria-labelledby="daily-brief-title" className="daily-assistant-sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto h-[92dvh] max-h-[92dvh] w-full min-w-0 max-w-2xl overflow-x-hidden overflow-y-scroll [scrollbar-gutter:stable] overscroll-contain rounded-t-[2rem] rounded-b-none border border-ink-200 bg-white p-0 text-ink-900 shadow-2xl backdrop:bg-ink-950/55 backdrop:backdrop-blur-sm dark:border-white/10 dark:bg-ink-950 dark:text-white">
    {!masked?<div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:px-7"><div data-assistant-drag-handle role="button" tabIndex={0} aria-label="Glisser vers le bas pour fermer le point quotidien" onClick={()=>{if(suppressHandleClick.current){suppressHandleClick.current=false;return;}close();}} onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={event=>dragEnd(event)} onPointerCancel={event=>dragEnd(event,true)} onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();close();}}} className="-mx-5 -mt-3 mb-2 flex cursor-grab touch-none justify-center py-3 active:cursor-grabbing sm:-mx-7"><div aria-hidden="true" className="h-1.5 w-11 rounded-full bg-ink-300/80 dark:bg-white/20"/></div>
     <header onPointerDown={dragStart} onPointerMove={dragMove} onPointerUp={event=>dragEnd(event)} onPointerCancel={event=>dragEnd(event,true)} className="flex touch-none select-none items-start justify-between gap-4"><div><div className="flex items-center gap-2.5"><Logo size={24} withWordmark={false}/><p className="text-[10px] font-medium uppercase tracking-[.18em] text-[var(--app-accent-deep)] dark:text-[var(--app-accent)]">Votre point quotidien</p></div><h2 id="daily-brief-title" className="mt-2 text-xl font-semibold tracking-tight">Voici l’essentiel.</h2><p className="mt-1 text-xs text-ink-400 dark:text-white/40">{new Intl.DateTimeFormat("fr-FR",{dateStyle:"full",timeZone:"Europe/Paris"}).format(new Date())}</p></div><button autoFocus type="button" onClick={close} aria-label="Fermer le point quotidien" className="rounded-full p-2 hover:bg-ink-100 dark:hover:bg-white/10"><X size={18}/></button></header>
-    <section className="mt-5" aria-label="Poser une question à votre assistant">
-     <AssistantQuestionComposer question={question} onChange={setQuestion} onSubmit={event=>void ask(event)} busy={asking} loading={loading} active={open&&!masked}/>
-     <div className="mt-3 overflow-hidden rounded-2xl border border-ink-200/70 bg-white/50 dark:border-white/10 dark:bg-white/[0.025]">
-      <div className="grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-3 border-b border-ink-200/50 px-3 py-2 dark:border-white/10"><h3 className="text-xs font-medium">Vos échanges</h3><span className="text-[10px] text-ink-400">Plus récent en premier</span><button type="button" disabled={asking||!conversation.length} aria-hidden={!conversation.length} tabIndex={conversation.length?0:-1} onClick={()=>{setConversation([]);setQuestionError("");}} className={`text-[10px] text-ink-400 underline disabled:opacity-40 ${conversation.length?"":"invisible"}`}>Effacer</button></div>
-      <div ref={conversationScroll} tabIndex={0} role="region" aria-label="Historique des questions et réponses" className="assistant-conversation-scroll h-56 min-w-0 overflow-x-hidden overflow-y-scroll overscroll-contain p-3 [overflow-wrap:anywhere] sm:h-64">
-       {questionError?<p role="alert" className="mb-3 text-xs text-amber-700 dark:text-amber-300">{questionError}</p>:null}
-       {!conversation.length?<p className="py-8 text-center text-xs leading-relaxed text-ink-400 dark:text-white/40">Posez votre question ci-dessus.<br/>Vos réponses apparaîtront dans cet espace.</p>:null}
-       <div className="space-y-4">{conversation.map((message,index)=>({message,index})).filter(({message})=>message.role==="user").reverse().map(({message,index})=><article key={index} className="space-y-2 border-b border-ink-200/50 pb-4 last:border-0 last:pb-0 dark:border-white/10">
-        <div className="rounded-xl bg-[var(--app-accent-soft)] px-3 py-2 text-xs"><p className="mb-1 text-[9px] font-medium uppercase tracking-wider text-ink-400">Votre question</p><p className="whitespace-pre-wrap break-words">{message.content}</p></div>
-        {conversation[index+1]?.role==="assistant"?<div className="px-1 py-1 text-sm leading-relaxed"><p className="mb-1 text-[9px] font-medium uppercase tracking-wider text-[var(--app-accent)]">Assistant</p><p className="whitespace-pre-wrap break-words">{conversation[index+1].content}</p></div>:asking?<p role="status" className="flex items-center gap-2 px-1 py-2 text-xs text-ink-500 dark:text-white/50"><Loader2 size={13} className="animate-spin"/>J’analyse votre question…</p>:null}
-       </article>)}</div>
-      </div>
-     </div>
-    </section>
     {loading?<div role="status" className="flex items-center gap-3 py-12 text-sm text-ink-500"><Loader2 size={17} className="animate-spin"/>Je fais le point sur votre activité…</div>:null}
     {error?<div role="alert" className="py-6 text-sm text-amber-700 dark:text-amber-300">{error}</div>:null}
     {brief&&!loading&&!error?<>

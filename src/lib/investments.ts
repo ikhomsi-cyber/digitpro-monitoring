@@ -1,4 +1,4 @@
-import {addPiloteMoroccoRent,buildPiloteMonths,piloteReportingCategories,type BankinPiloteSnapshot,type BankinPiloteRow} from './pilote';
+import {addPiloteMoroccoRent,filterPiloteReportRows,piloteReportingMonth,piloteReportingCategories,type BankinPiloteSnapshot,type BankinPiloteRow} from './pilote';
 import {LMNP_PROPERTY} from './lmnp-config';
 export type InvestmentMonth={month:string;bankRent:number;declaredRent:number;charges:number;gain:number};
 export type RentalInvestment={id:'casa'|'argenteuil';name:string;city:string;purchaseAmount:number|null;purchaseDate:string|null;purchaseCount:number;chargeTransactions?:{date:string;amount:number}[];purchaseBreakdown?:{notary:number;works:number;other:number;price?:number;promise?:number;prorata?:number};months:InvestmentMonth[]};
@@ -78,7 +78,11 @@ export function buildInvestments(snapshot:BankinPiloteSnapshot|null,asOf:string)
  }
  // Reuse Pilote's declared Morocco rent only for months actually covered by imported reporting data.
  // An identified Casa bank receipt replaces the declaration for that month, never doubles it.
- for(const month of buildPiloteMonths(rows).filter(month=>month.month<=asOf.slice(0,7))){
+ // Only month coverage is needed; do not aggregate/sort the entire Pilote budget by category again.
+ const coveredMonths=new Set(filterPiloteReportRows(rows).map(piloteReportingMonth));
+ for(const key of coveredMonths){
+  if(key>asOf.slice(0,7))continue;
+  const month={month:key,income:0,expenses:0,balance:0,count:0,categories:[],incomeCategories:[]};
   const augmented=addPiloteMoroccoRent(month),declared=cents(augmented.income)-cents(month.income);
   if(declared>0){const value=monthFor('casa',month.month);if(!value.bankRent)value.declaredRent=declared;}
  }

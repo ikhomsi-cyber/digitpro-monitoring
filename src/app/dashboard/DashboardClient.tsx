@@ -9,6 +9,7 @@ import {
   type ReactNode
 } from "react";
 import dynamic from "next/dynamic";
+import {PersonalPageSkeleton} from "@/components/dashboard/PersonalPageSkeleton";
 import { createPiloteLoader } from "@/lib/bankin/pilote-loader";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -153,9 +154,9 @@ const BillableDaysCalendarBlock = dynamic(
 );
 
 const AssistantChatSection = dynamic(()=>import("@/components/dashboard/AssistantChatSection").then(mod=>mod.AssistantChatSection), {loading:()=> <p role="status">Chargement du chat…</p>});
-const InvestSection = dynamic(() => import("@/components/dashboard/InvestSection").then(mod => mod.InvestSection), {loading:()=> <div role="status" className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des investissements…</div>});
-const GroceriesSection = dynamic(() => import("@/components/dashboard/GroceriesSection").then(mod => mod.GroceriesSection), { loading: () => <div role="status" className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des courses…</div> });
-const PiloteSection = dynamic(() => import("@/components/dashboard/PiloteSection").then(mod => mod.PiloteSection), { loading: () => <div className="min-h-64 animate-pulse rounded-3xl bg-emerald-500/5" role="status" aria-label="Chargement de Pilote" /> });
+const InvestSection = dynamic(() => import("@/components/dashboard/InvestSection").then(mod => mod.InvestSection), {loading:()=> <PersonalPageSkeleton kind="invest"/> });
+const GroceriesSection = dynamic(() => import("@/components/dashboard/GroceriesSection").then(mod => mod.GroceriesSection), { loading:()=> <PersonalPageSkeleton kind="courses"/> });
+const PiloteSection = dynamic(() => import("@/components/dashboard/PiloteSection").then(mod => mod.PiloteSection), { loading:()=> <PersonalPageSkeleton kind="pilote"/> });
 
 const ValeurReelleClient = dynamic(
   () =>

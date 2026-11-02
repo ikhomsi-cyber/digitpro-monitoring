@@ -7,8 +7,10 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type Dispatch, type SetStateAction, type ReactNode
 } from "react";
+import {createInvestReportLoader} from "@/lib/invest-report-loader";
 import type { PiloteExpenseView } from "@/lib/pilote";
 import { useSearchParams } from "next/navigation";
 
@@ -34,6 +36,7 @@ export function parseDashboardSection(search: string): DashboardSection {
   if (s === "categorisation") return "activite";
   if (s === "courses" || s === "cours") return "courses";
   if (s === "chat") return "chat";
+  if (s === "rp") return "invest";
   if (s === "invest") return "invest";
   if (s === "pilote") return "pilote";
   if (s === "impots") return "impots";
@@ -44,13 +47,20 @@ type DashboardSectionContextValue = {
   piloteExpenseViews: PiloteExpenseView[];
   setPiloteExpenseViews: Dispatch<SetStateAction<PiloteExpenseView[]>>;
   section: DashboardSection;
+  investReport:ReturnType<typeof createInvestReportLoader>;
+  preloadInvest:()=>void;
   searchParams: URLSearchParams;
   navigateWithinDashboard: (href: string) => void;
 };
 
 const DashboardSectionContext = createContext<DashboardSectionContextValue | null>(null);
 
-export function DashboardSectionProvider({ children }: { children: ReactNode }) {
+export function DashboardSectionProvider({ children,demoMode=false }: { children: ReactNode;demoMode?:boolean }) {
+  const reportRef=useRef<ReturnType<typeof createInvestReportLoader>|null>(null);
+  if(!reportRef.current)reportRef.current=createInvestReportLoader();
+  const investReport=reportRef.current;
+  const preloadInvest=useCallback(()=>{if(!demoMode)void investReport.load().catch(()=>{});},[demoMode,investReport]);
+  useEffect(()=>()=>investReport.clear(),[investReport]);
   const [piloteExpenseViews,setPiloteExpenseViews]=useState<PiloteExpenseView[]>(["essential"]);
   const nextSearchParams = useSearchParams();
   const nextSearch = nextSearchParams.toString();
@@ -87,8 +97,8 @@ export function DashboardSectionProvider({ children }: { children: ReactNode }) 
   }, []);
 
   const value = useMemo(
-    () => ({ section, searchParams, navigateWithinDashboard, piloteExpenseViews, setPiloteExpenseViews }),
-    [section, searchParams, navigateWithinDashboard, piloteExpenseViews]
+    () => ({ section, searchParams, navigateWithinDashboard, piloteExpenseViews, setPiloteExpenseViews,investReport,preloadInvest }),
+    [section, searchParams, navigateWithinDashboard, piloteExpenseViews,investReport,preloadInvest]
   );
 
   return <DashboardSectionContext.Provider value={value}>{children}</DashboardSectionContext.Provider>;

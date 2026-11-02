@@ -7,7 +7,8 @@ import {decodePiloteStorage,type StoredPiloteSnapshot} from '@/lib/bankin/pilote
 import type {BankinPiloteSnapshot} from '@/lib/pilote';
 import {buildInvestments} from '@/lib/investments';
 export async function GET(){
- const json=(body:unknown,status=200)=>Response.json(body,{status,headers:privateResponseHeaders});
+ const started=performance.now();
+ const json=(body:unknown,status=200)=>{const response=Response.json(body,{status,headers:privateResponseHeaders});response.headers.set("Server-Timing",`total;dur=${Math.round(performance.now()-started)}`);return response;};
  if(getDashboardEffectiveDataMode(getSupabaseRuntimeMode(),await cookies())==='DEMO')return json({error:'Investissements indisponibles en mode démo.'},403);
  const client=await createSupabaseServerClient();if(!client)return json({error:'Connexion requise.'},401);
  const {data:{user},error:authError}=await client.auth.getUser();if(authError||!user)return json({error:'Connexion requise.'},401);

@@ -1,4 +1,5 @@
 "use client";
+import {PersonalPageSkeleton} from "./PersonalPageSkeleton";
 import {GroceryHero} from "./GroceryHero";
 import { useCallback,useEffect,useMemo,useRef,useState } from "react";
 import { ShoppingBasket,Mail,Loader2,ChevronLeft,ChevronRight,X } from "lucide-react";
@@ -7,7 +8,8 @@ import { GroceryMerchantLogo } from "./GroceryMerchantLogo";
 import { GrocerySpendingSummary } from "./GrocerySpendingSummary";
 import { groceryInsights } from "@/lib/groceries/insights";
 import { GroceryShoppingList } from "./GroceryShoppingList";
-import { GroceryOverview } from "./GroceryOverview";
+import dynamic from "next/dynamic";
+const GroceryOverview=dynamic(()=>import("./GroceryOverview").then(mod=>mod.GroceryOverview),{loading:()=> <div className="min-h-32 animate-pulse" role="status">Chargement du détail…</div>});
 import { GmailAccountPicker } from "./GmailAccountPicker";
 import { gmailOAuthErrorMessage } from "@/lib/gmail/oauth-errors";
 import { getGmailConnectionStatus,getGmailConnectUrl,type GmailConnectionStatus } from "@/app/dashboard/gmail-actions";
@@ -24,9 +26,17 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
  const [summaryVersion,setSummaryVersion]=useState(0);
  const [productLoad,setProductLoad]=useState({period:"",error:""});
  const sourcePanel=useRef<HTMLElement>(null);
+ const productPanel=useRef<HTMLDivElement>(null);
+ const [productsVisible,setProductsVisible]=useState(false);
+
  const [orders,setOrders]=useState<StoredGroceryOrder[]>([]),[connection,setConnection]=useState<GmailConnectionStatus|null>(null);
  const [account,setAccount]=useState<GmailAccount>(searchParams.get("gmail_account")==="primary"?"primary":"secondary");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(!demoMode),[error,setError]=useState(""),[status,setStatus]=useState("");
+ useEffect(()=>{
+  if(loading||productsVisible||!productPanel.current)return;
+  if(!window.IntersectionObserver){setProductsVisible(true);return;}
+  const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setProductsVisible(true);observer.disconnect();}},{rootMargin:"200px"});observer.observe(productPanel.current);return()=>observer.disconnect();
+ },[loading,productsVisible]);
  const [period,setPeriod]=useState(""),[merchant,setMerchant]=useState("all");
  const [shownTransactions,setShownTransactions]=useState(20);
  const [periodMode,setPeriodMode]=useState<"month"|"year"|"all">("month");
@@ -70,7 +80,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
  const productError=productLoad.period===productPeriod?productLoad.error:"";
  const productsLoading=!loadedProducts.current.has(productPeriod)&&!productError;
  useEffect(()=>{
-  if(demoMode||loading||!productPeriod||loadedProducts.current.has(productPeriod))return;
+  if(demoMode||loading||!productsVisible||!productPeriod||loadedProducts.current.has(productPeriod))return;
   const controller=new AbortController();setProductLoad({period:productPeriod,error:""});
   void fetch(`/api/gmail/groceries?view=products&period=${encodeURIComponent(productPeriod)}`,{cache:"no-store",signal:controller.signal}).then(async response=>{
    const body=await response.json();if(!response.ok)throw new Error(body.error??"Détail des produits indisponible.");if(controller.signal.aborted)return;
@@ -78,7 +88,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
    setOrders(previous=>previous.map(order=>details.has(order.id)?{...order,items:details.get(order.id)!.items}:order));setProductLoad({period:productPeriod,error:""});
   }).catch(error=>{if(!controller.signal.aborted)setProductLoad({period:productPeriod,error:error instanceof Error?error.message:"Détail indisponible."});});
   return()=>controller.abort();
- },[demoMode,loading,productPeriod,summaryVersion]);
+ },[demoMode,loading,productsVisible,productPeriod,summaryVersion]);
  const years=[...new Set(months.map(month=>month.slice(0,4)))];
  const periods=periodMode==="year"?years:months;
  const periodIndex=periods.indexOf(periodMode==="year"?selectedYear:selectedMonth);
@@ -98,6 +108,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
   return [...totals.values()].sort((a,b)=>b.totalCents-a.totalCents);
  },[periodOrders]);
  const euro=(cents:number)=>fmt.dummy?fmt.euro(cents/100):groceryEuro.format(cents/100);
+ if(loading)return <PersonalPageSkeleton kind="courses"/>;
  return <section className="space-y-4 pb-28 md:pb-8" aria-label="Courses · achats alimentaires">
   <GroceryHero totalCents={stats.totalCents} periodLabel={periodMode==="all"?"Tout l’historique":periodLabel} merchant={merchant} loading={loading} unpriced={!!stats.orderCount&&!stats.pricedOrderCount}/>
   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -117,7 +128,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
   {loading?<p role="status" className="text-sm text-ink-500">Chargement des commandes…</p>:null}
 
 
-  {orders.length&&!loading?<GroceryOverview productsLoading={productsLoading} orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:null}
+  <div ref={productPanel} className="min-h-32">{orders.length&&!loading&&productsVisible?<GroceryOverview productsLoading={productsLoading} orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:!loading&&orders.length?<p className="py-4 text-xs text-ink-400">Détail des produits</p>:null}</div>
   {productError?<p role="alert" className="text-xs text-amber-600">{productError} <button type="button" onClick={()=>{setProductLoad({period:productPeriod,error:""});setSummaryVersion(version=>version+1);}} className="underline">Réessayer</button></p>:null}
   {stats.pricedOrderCount<stats.orderCount?<p className="text-xs text-ink-500">{stats.orderCount-stats.pricedOrderCount} commande(s) sans total reconnu, exclues du montant et du panier moyen.</p>:null}
   {truncated?<p className="text-xs text-amber-600">Affichage limité aux 500 commandes les plus récentes.</p>:null}

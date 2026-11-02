@@ -1,4 +1,5 @@
 "use client";
+import {PersonalPageSkeleton} from "./PersonalPageSkeleton";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -18,5 +19,5 @@ export function CoursesEntry({ demoMode }: { demoMode: boolean }) {
   }, []);
   return section === "courses"
     ? <GroceriesSection demoMode={demoMode} />
-    : <p role="status" className="min-h-64 text-sm text-ink-500">Chargement du tableau de bord…</p>;
+    : <PersonalPageSkeleton kind={section==='invest'?'invest':'pilote'}/>;
 }

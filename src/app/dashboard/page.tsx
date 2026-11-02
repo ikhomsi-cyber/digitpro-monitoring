@@ -247,7 +247,7 @@ export default async function DashboardPage({
       initialAnnualRevenueTargetHt={initialAnnualRevenueTargetHt}
     >
     <Suspense fallback={null}>
-      <DashboardSectionProvider key={user?.id??"demo"}>
+      <DashboardSectionProvider key={`${user?.id??"demo"}:${demoMode}`} demoMode={demoMode}>
         <DashboardDesktopSidebar />
         <DashboardSettingsSheet
           envMode={envMode}

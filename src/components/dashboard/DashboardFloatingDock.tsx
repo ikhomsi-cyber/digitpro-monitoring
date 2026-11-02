@@ -52,6 +52,8 @@ const TABS: Tab[] = [
 
 ];
 
+// Warm code only on navigation intent; no financial requests or persistent cache.
+const warmCourses=(href:string)=>{if(href.includes('section=courses'))void import('./GroceriesSection').catch(()=>{});if(href.includes('section=invest'))void import('./InvestSection').catch(()=>{});};
 /** Dock iOS flottant — mobile uniquement. */
 export function DashboardFloatingDock() {
   const pathname = usePathname() ?? "";
@@ -87,7 +89,7 @@ export function DashboardFloatingDock() {
    <div className="pointer-events-auto mx-auto flex max-w-md items-end gap-1.5">
     {[{label:"Pro",tabs:TABS.slice(0,3)},{label:"Perso",tabs:TABS.slice(3)}].map(group=><div key={group.label} role="group" aria-label={group.label} style={{flex:group.tabs.length}} className="min-w-0 rounded-[1.35rem] border border-white/50 bg-white/55 px-1 pb-1 pt-1.5 shadow-[0_8px_30px_-14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/15 dark:bg-[#072a31]/45">
      <p className="text-center text-[8px] font-medium uppercase leading-none tracking-[.15em] text-ink-400 dark:text-white/55">{group.label}</p>
-     <div className="mt-0.5 flex">{group.tabs.map(tab=>{const active=tab.isActive(ctx),Icon=tab.icon;return <Link key={tab.label} href={tab.href} aria-current={active?"page":undefined} prefetch scroll={false} onClick={onDashboardTabClick(tab.href)} className={clsx("flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition",active?"bg-white/65 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] dark:bg-emerald-300/15 dark:text-emerald-100":"text-ink-500 hover:bg-ink-100 dark:text-white/65 dark:hover:bg-white/10")}><Icon size={18} strokeWidth={active?2.2:1.7} aria-hidden="true"/><span className="max-w-full truncate px-0.5 text-[9px] font-medium leading-none">{tab.label}</span></Link>;})}</div>
+     <div className="mt-0.5 flex">{group.tabs.map(tab=>{const active=tab.isActive(ctx),Icon=tab.icon;return <Link key={tab.label} href={tab.href} onPointerEnter={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}} onFocus={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}} onPointerDown={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}} aria-current={active?"page":undefined} prefetch scroll={false} onClick={onDashboardTabClick(tab.href)} className={clsx("flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition",active?"bg-white/65 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] dark:bg-emerald-300/15 dark:text-emerald-100":"text-ink-500 hover:bg-ink-100 dark:text-white/65 dark:hover:bg-white/10")}><Icon size={18} strokeWidth={active?2.2:1.7} aria-hidden="true"/><span className="max-w-full truncate px-0.5 text-[9px] font-medium leading-none">{tab.label}</span></Link>;})}</div>
     </div>)}
     <Link href="/dashboard?section=chat" scroll={false} onClick={onDashboardTabClick("/dashboard?section=chat")} aria-label="Chat · assistant pro et perso" aria-current={section==="chat"?"page":undefined} className={clsx("flex h-[60px] w-12 shrink-0 flex-col items-center justify-center gap-1 rounded-[1.35rem] border border-white/50 bg-white/55 shadow-[0_8px_30px_-14px_rgba(0,0,0,.35)] backdrop-blur-2xl dark:border-white/15 dark:bg-[#072a31]/45",section==="chat"?"text-emerald-700 dark:text-emerald-100":"text-ink-500 dark:text-white/65")}><Sparkles size={19} strokeWidth={section==="chat"?2.2:1.7}/><span className="text-[9px] font-medium">Chat</span></Link>
    </div>
@@ -145,6 +147,7 @@ export function DashboardDesktopSidebar() {
               <Link
                 key={tab.href}
                 href={tab.href}
+                onPointerEnter={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}} onFocus={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}} onPointerDown={()=>{warmCourses(tab.href);if(tab.href.includes("section=invest"))sectionCtx?.preloadInvest();}}
                 prefetch={!tab.href.includes("#")}
                 scroll={false}
                 onClick={tab.href.startsWith("/dashboard") ? onDashboardTabClick(tab.href) : undefined}

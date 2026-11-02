@@ -1,4 +1,5 @@
 "use client";
+import {PersonalPageSkeleton} from "./PersonalPageSkeleton";
 
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Loader2, Mail, Navigation, Upload, ChevronRight, ChevronLeft } from "lucide-react";
@@ -214,6 +215,7 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
   const compensations = current ? buildPiloteCompensations(current, months) : [];
   const years = [...new Set(months.map(m => m.month.slice(0, 4)))].reverse();
 
+ if(loading)return <PersonalPageSkeleton kind="pilote"/>;
   return <section className="space-y-4 pb-28 md:pb-8" aria-label="Pilote financier">
     {current&&!loading?<PilotePocketSummary hero families={compensations} globalBalance={current.balance} periodLabel={`${isAnnual?selectedYear:selectedMonth?monthName(selectedMonth.month):""} · ${expenseViews.map(view=>({essential:"Essentiel",secondary:"Imprévu",taxes:"Impôts",savings:"Épargne",travel:"Voyages"}[view])).join(" + ")||"Aucune vue"}`}/>:null}
       <div className="mx-auto flex w-full max-w-md flex-wrap items-center justify-between gap-2">
