@@ -25,6 +25,8 @@ function isConfirmedReimbursedExpense(row: BankinPiloteRow): boolean {
 
 /** User-confirmed PER payment; retain the original Bankin source row unchanged. */
 export function piloteReportingCategories(row: BankinPiloteRow): {parent: string; sub: string} {
+  // Owner-confirmed November 2026 Extra credit: Meryeme, not unassigned income.
+  if(row.date.startsWith("2026-11-")&&sourceName(row.subCategory)==="extra"&&cents(row.amount)===40000)return {parent:row.parentCategory,sub:"Meryeme"};
   const confirmedPer = (row.date === "2026-09-07" || (row.date.startsWith("2024-11-") || row.date.startsWith("2025-11-"))) && cents(row.amount) === -3000000
     && sourceName(row.parentCategory) === "banque" && sourceName(row.subCategory) === "epargne";
   return {parent: row.parentCategory, sub: confirmedPer ? "PER" : row.subCategory};
@@ -141,6 +143,7 @@ export function piloteCompensationFamily(parent: string, sub: string, income: bo
 }
 
 export function piloteIncomeFamily(month: string, parent: string, sub: string, amount: number): PiloteCompensationFamily {
+  if (month === "2026-11" && sourceName(sub) === "extra" && cents(amount) === 40000) return "food";
   // Explicit user correction: the €500 in Bankin “Extra” in October 2026 is Meryeme.
   if (month === "2026-10" && sourceName(sub) === "extra" && cents(amount) === 50000) return "food";
   // Explicit user correction: the two Extra credits in September 2026 are Meryeme.
