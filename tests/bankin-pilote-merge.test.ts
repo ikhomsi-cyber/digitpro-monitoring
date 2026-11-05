@@ -68,3 +68,21 @@ it("honors source visibility changes without reactivating explicitly excluded id
  expect(merged.months).toEqual([]);
  expect(merged.excludedRowIdentities).toEqual(["protected"]);
 });
+
+it('keeps NDF and IK imports idempotent across overlapping exports and category changes',()=>{
+ const ndf={...row('ndf','2026-11-03',589),parentCategory:'Entrées',subCategory:'NDF DigitPro'};
+ const ik={...row('ik','2026-11-03',496),parentCategory:'Entrées',subCategory:'IK DigitPro'};
+ const first=snapshot([ndf,ik]);
+ const revised=snapshot([{...ndf,parentCategory:'Revenus'},ik,row('later','2026-11-05',100)],'second-file');
+ const merged=mergeBankinPiloteSnapshots(first,revised);
+ expect(merged.rows).toHaveLength(3);
+ expect(merged.months[0].income).toBe(1185);
+ expect(mergeBankinPiloteSnapshots(merged,revised)).toBe(merged);
+ expect(mergeBankinPiloteSnapshots(merged,first).rows).toHaveLength(3);
+});
+it('rejects inconsistent stable identities even without a category change',()=>{
+ const previous=snapshot([row('same','2026-11-03',589)]);
+ expect(()=>mergeBankinPiloteSnapshots(previous,snapshot([row('same','2026-11-04',589)]))).toThrow('incohérente');
+ expect(()=>mergeBankinPiloteSnapshots(previous,snapshot([row('same','2026-11-03',590)]))).toThrow('incohérente');
+ expect(previous.rows?.[0].amount).toBe(589);
+});

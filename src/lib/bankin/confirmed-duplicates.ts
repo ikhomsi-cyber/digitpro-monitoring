@@ -8,3 +8,19 @@ export function confirmedCarrefourPair(oldRows:readonly BankinPiloteRow[],curren
  const old=oldRows.filter(row=>candidate(row,'2026-11-03')),current=currentRows.filter(row=>candidate(row,'2026-11-04'));
  return old.length===1&&current.length===1&&norm(old[0].label!)===norm(current[0].label!)?{old:old[0],current:current[0]}:null;
 }
+
+/** Owner-confirmed November IK total of 986 euros counted twice.
+ * Apply only to exactly two 493-euro IK credits; keep source records intact.
+ */
+export function confirmedNovemberIkDuplicate(rows:readonly BankinPiloteRow[]){
+ const candidates=rows.filter(row=>row.date.startsWith('2026-11-')&&Math.round(row.amount*100)===49300&&/\bdigitpro\b/.test(norm(`${row.parentCategory} ${row.subCategory}`))&&/\bik\b/.test(norm(`${row.parentCategory} ${row.subCategory}`)));
+ if(candidates.length!==2)return null;
+ return [...candidates].sort((a,b)=>a.date.localeCompare(b.date)||a.sourceRow-b.sourceRow)[0];
+}
+
+/** Owner-confirmed November NDF total of 820.06 euros counted twice. */
+export function confirmedNovemberNdfDuplicate(rows:readonly BankinPiloteRow[]){
+ const candidates=rows.filter(row=>row.date.startsWith('2026-11-')&&Math.round(row.amount*100)===41003&&/\bdigitpro\b/.test(norm(`${row.parentCategory} ${row.subCategory}`))&&/\bndf\b/.test(norm(`${row.parentCategory} ${row.subCategory}`)));
+ if(candidates.length!==2)return null;
+ return [...candidates].sort((a,b)=>a.date.localeCompare(b.date)||a.sourceRow-b.sourceRow)[0];
+}

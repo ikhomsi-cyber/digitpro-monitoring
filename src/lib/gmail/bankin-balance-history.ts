@@ -16,3 +16,11 @@ export function bankinBalanceHistory(points:BankinBalancePoint[]){
   return {bank,accounts,history,annual};
  });
 }
+
+// Select the original account cohort before applying the displayed year range.
+export function historicalFortuneoPoints(points:BankinBalancePoint[]){
+ const fortuneo=points.filter(point=>/\bfortuneo\b/i.test(point.account));
+ const firstDate=fortuneo.map(point=>point.date).sort()[0];
+ const originalAccounts=new Set(fortuneo.filter(point=>point.date===firstDate).map(point=>point.account));
+ return fortuneo.filter(point=>originalAccounts.has(point.account));
+}

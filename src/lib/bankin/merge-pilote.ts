@@ -39,6 +39,9 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
       if(!options.missingOnly)replacements.set(index,{...row,sourceRow:saved.sourceRow});
       continue;
     }
+    if(row.identity&&saved.identity===row.identity&&(saved.date!==row.date||Math.round(saved.amount*100)!==Math.round(row.amount*100))){
+      throw new PiloteHistoryError("L’identité d’une opération Bankin est incohérente. Le bilan précédent est conservé.");
+    }
     // Only a stable identity can carry category/visibility corrections from Bankin.
     // Never reconcile distinct payments on amount/date alone.
     if (!options.missingOnly && row.identity && (saved.parentCategory !== row.parentCategory || saved.subCategory !== row.subCategory || saved.hidden !== row.hidden)) {

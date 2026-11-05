@@ -1,4 +1,4 @@
-import {confirmedCarrefourPair} from "./bankin/confirmed-duplicates";
+import {confirmedCarrefourPair,confirmedNovemberIkDuplicate,confirmedNovemberNdfDuplicate} from "./bankin/confirmed-duplicates";
 export type BankinPiloteRow = { sourceRow: number; identity?: string; label?: string; merchant?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
 
 export type PiloteGroup = { name: string; expenses: number; income: number; count: number; children: PiloteGroup[] };
@@ -65,7 +65,9 @@ export function isPiloteReportRow(row: BankinPiloteRow): boolean {
 export function filterPiloteReportRows(rows: BankinPiloteRow[]): BankinPiloteRow[] {
  const eligibleRows=rows.filter(isPiloteReportRow);
  const duplicate=confirmedCarrefourPair(eligibleRows,eligibleRows);
- const eligible=duplicate?eligibleRows.filter(row=>row!==duplicate.old):eligibleRows;
+ const ikDuplicate=confirmedNovemberIkDuplicate(eligibleRows);
+ const ndfDuplicate=confirmedNovemberNdfDuplicate(eligibleRows);
+ const eligible=eligibleRows.filter(row=>row!==duplicate?.old&&row!==ikDuplicate&&row!==ndfDuplicate);
  const candidates=eligible.filter(row=>row.date.startsWith("2023-05-")&&row.amount>=2900&&row.amount<3000&&[row.parentCategory,row.subCategory].some(name=>["ndf digitpro","digitpro ndf"].includes(sourceName(name))));
  const confirmed=candidates.length===1?candidates[0]:null;
  return eligible.filter(row=>row!==confirmed);
@@ -131,6 +133,7 @@ const compensationNames = {
 /** The user's explicit budget rules, evaluated only on original Bankin category names. */
 export function piloteCompensationFamily(parent: string, sub: string, income: boolean): PiloteCompensationFamily {
   const name = sourceName(`${parent} ${sub}`);
+  // Expenses belong here only when Bankin explicitly categorizes them as NDF DigitPro.
   if (!income && [parent, sub].some(category => sourceName(category).replace(/\s+/g, " ") === "ndf digitpro")) return "ndf";
   if (income && /\bdigitpro\b/.test(name) && /\bndf\b/.test(name)) return "ndf";
   if (income) {
