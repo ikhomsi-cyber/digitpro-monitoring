@@ -1,0 +1,11 @@
+import {expect,it} from 'vitest';
+import {buildBankinPiloteSnapshot,buildPiloteMonths,type BankinPiloteRow} from '@/lib/pilote';
+import {mergeBankinPiloteSnapshots} from '@/lib/bankin/merge-pilote';
+let line=2;
+const row=(date:string,identity:string,label='CB BANKIN CARREFOUR'):BankinPiloteRow=>({sourceRow:line++,date,identity,label,amount:-200,parentCategory:'Alimentation & Restau.',subCategory:'Carrefour',hidden:false});
+const snap=(rows:BankinPiloteRow[])=>buildBankinPiloteSnapshot(rows.map((row,i)=>({...row,sourceRow:i+2})),'synthetic.xlsx','synthetic');
+it('counts the confirmed 3/4 November Carrefour pair once without mutating source rows',()=>{const rows=[row('2026-11-03','pending'),row('2026-11-04','booked')],before=structuredClone(rows);expect(buildPiloteMonths(rows)[0]).toMatchObject({expenses:200,count:1});expect(rows).toEqual(before);});
+it('updates the confirmed dated version on import instead of appending another expense',()=>{const previous=snap([row('2026-11-03','pending')]),incoming=snap([row('2026-11-04','booked')]),merged=mergeBankinPiloteSnapshots(previous,incoming);expect(merged.rows).toHaveLength(1);expect(merged.rows![0]).toMatchObject({date:'2026-11-04',identity:'booked'});expect(merged.months[0].expenses).toBe(200);expect(mergeBankinPiloteSnapshots(merged,incoming)).toBe(merged);});
+it('replaying the older export never adds back the obsolete version',()=>{const previous=snap([row('2026-11-04','booked')]),old=snap([row('2026-11-03','pending')]);expect(mergeBankinPiloteSnapshots(previous,old)).toBe(previous);});
+it('preserves missing-only semantics and confirmed exclusions',()=>{const previous=snap([row('2026-11-03','pending')]),incoming=snap([row('2026-11-04','booked')]);expect(mergeBankinPiloteSnapshots(previous,incoming,{missingOnly:true})).toBe(previous);expect(mergeBankinPiloteSnapshots({...previous,excludedRowIdentities:['pending']},incoming).rows).toHaveLength(1);});
+it('does not merge different descriptions, other dates, or ambiguous repeated purchases',()=>{expect(buildPiloteMonths([row('2026-11-03','a'),row('2026-11-04','b','CB BANKIN CARREFOUR AUTRE')])[0].expenses).toBe(400);expect(buildPiloteMonths([row('2026-11-01','a'),row('2026-11-02','b')])[0].expenses).toBe(400);expect(buildPiloteMonths([row('2026-11-03','a'),row('2026-11-03','b'),row('2026-11-04','c')])[0].expenses).toBe(600);});

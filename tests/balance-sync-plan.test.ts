@@ -29,3 +29,15 @@ it('incremental collection fetches only unseen message IDs and advances watermar
  state=await balanceSyncStep(state,mail,now+1000);expect(state.checkedAt).toBe(now+1000);expect(state.incremental).toBeNull();
 });
 it('a persisted pause prevents any Gmail call',async()=>{const mail=source();await expect(balanceSyncStep({...newBalanceSync(now),pauseUntil:now+1000},mail,now)).rejects.toThrow();expect(mail.list).not.toHaveBeenCalled();});
+
+it('loads the latest balance before an unfinished backfill without resetting its cursor',async()=>{
+ const {latestBalanceSyncStep,BALANCE_QUERY}=await import('@/lib/gmail/balance-sync-plan');const mail=source();mail.list.mockResolvedValue({ids:['latest']});
+ const initial={...newBalanceSync(now),phase:'backfill' as const,weekEnd:Date.UTC(2020,1,1),messages:['older']};
+ const updated=await latestBalanceSyncStep(initial,mail,now);expect(mail.list).toHaveBeenCalledWith(BALANCE_QUERY,1);expect(mail.read).toHaveBeenCalledWith('latest');expect(updated.messages).toEqual(['older','latest']);expect(updated.weekEnd).toBe(initial.weekEnd);expect(updated.phase).toBe('backfill');expect(initial.messages).toEqual(['older']);
+ await latestBalanceSyncStep(updated,mail,now);expect(mail.read).toHaveBeenCalledTimes(1);
+});
+it('does not skip refusals or consume quota while the latest-balance check is paused',async()=>{
+ const {latestBalanceSyncStep}=await import('@/lib/gmail/balance-sync-plan');const mail=source();const initial=newBalanceSync(now);
+ await expect(latestBalanceSyncStep({...initial,pauseUntil:now+1},mail,now)).rejects.toThrow();expect(mail.list).not.toHaveBeenCalled();
+ mail.read.mockRejectedValue({response:{status:403}});await expect(latestBalanceSyncStep(initial,mail,now)).rejects.toEqual({response:{status:403}});expect(initial.messages).toEqual([]);expect(mail.list).toHaveBeenCalledTimes(1);expect(mail.read).toHaveBeenCalledTimes(1);
+});

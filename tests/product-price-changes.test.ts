@@ -1,0 +1,13 @@
+import {expect,it} from 'vitest';
+import type {GroceryOrder} from '@/lib/groceries/parser';
+import {groceryProductPriceChanges} from '@/lib/groceries/product-price-changes';
+const item=(price:number,quantity=1,key='lait bio 1 l')=>({name:key,productKey:key,quantity,unitPriceCents:price,totalCents:price*quantity});
+const order=(date:string,price:number,quantity=1,merchant='Carrefour',ref=date):GroceryOrder=>({date,merchant,orderRef:ref,totalCents:price*quantity,items:[item(price,quantity)]});
+const change=(selected:GroceryOrder[],history:GroceryOrder[])=>groceryProductPriceChanges(selected,history).get('carrefour|lait bio 1 l')!;
+it('compares unit prices across quantities and never doubles the selected order',()=>{const old=order('2026-10-01',200,5),latest=order('2026-11-01',220,2);expect(change([latest],[old,latest])).toMatchObject({latestCents:220,previousCents:200,deltaCents:20,percent:10,latestDate:'2026-11-01',previousDate:'2026-10-01'});});
+it('returns decreases and stable prices',()=>{expect(change([order('2026-11-01',180)],[order('2026-10-01',200)])).toMatchObject({deltaCents:-20,percent:-10});expect(change([order('2026-11-01',200)],[order('2026-10-01',200)])).toMatchObject({deltaCents:0,percent:0});});
+it('does not use future prices or another merchant or product format',()=>{const selected=order('2026-10-01',200),other=order('2026-09-01',100);other.items=[item(100,1,'lait bio 6 l')];expect(change([selected],[order('2026-11-01',300),order('2026-09-01',90,1,'Auchan'),other])).toMatchObject({previousCents:null,deltaCents:null,percent:null});});
+it('aggregates same-day orders into one weighted price, not a false price change',()=>{const a=order('2026-10-01',100,1,'Carrefour','a'),b=order('2026-10-01',200,3,'Carrefour','b'),latest=order('2026-11-01',210);expect(change([latest],[a,b])).toMatchObject({previousCents:175,latestCents:210,deltaCents:35,percent:20});});
+it('keeps unknown and zero baselines without inventing percentages',()=>{expect(change([order('2026-11-01',200)],[])).toMatchObject({previousCents:null,deltaCents:null});expect(change([order('2026-11-01',200)],[order('2026-10-01',0)])).toMatchObject({previousCents:0,percent:null});});
+it('marks very large differences as possible format or promotion changes',()=>{expect(change([order('2026-11-01',500)],[order('2026-10-01',200)]).formatUncertain).toBe(true);});
+it('ignores invalid quantities rather than dividing by zero',()=>{const invalid=order('2026-10-01',100);invalid.items[0].quantity=0;expect(change([order('2026-11-01',200)],[invalid]).previousCents).toBeNull();});

@@ -1,3 +1,4 @@
+import {confirmedCarrefourPair} from "./confirmed-duplicates";
 import { buildBankinPiloteSnapshot, type BankinPiloteRow, type BankinPiloteSnapshot } from "@/lib/pilote";
 
 export class PiloteHistoryError extends Error {}
@@ -16,14 +17,28 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
     const positions = available.get(key(row)) ?? [];
     positions.push(index); available.set(key(row), positions);
   });
+  const confirmed=confirmedCarrefourPair(previous.rows,incoming.rows);
+  const reverse=confirmedCarrefourPair(incoming.rows,previous.rows);
+  const confirmedIndex=confirmed?previous.rows.indexOf(confirmed.old):-1;
+  const used=new Set<number>();
   const replacements = new Map<number, BankinPiloteRow>();
   const added: BankinPiloteRow[] = [];
   const excluded = new Set(previous.excludedRowIdentities ?? []);
   for (const row of incoming.rows) {
     if (row.identity && excluded.has(row.identity)) continue;
-    const index = available.get(key(row))?.shift();
+    let index = available.get(key(row))?.shift();
+    while(index!==undefined&&used.has(index))index=available.get(key(row))?.shift();
+    const dateCorrection=index===undefined&&confirmed?.current===row&&confirmedIndex>=0&&!used.has(confirmedIndex);
+    if(dateCorrection)index=confirmedIndex;
+    if(index===undefined&&reverse?.old===row)continue;
     if (index === undefined) { added.push(row); continue; }
+    used.add(index);
     const saved = previous.rows[index];
+    if(dateCorrection){
+      if(saved.identity&&excluded.has(saved.identity))continue;
+      if(!options.missingOnly)replacements.set(index,{...row,sourceRow:saved.sourceRow});
+      continue;
+    }
     // Only a stable identity can carry category/visibility corrections from Bankin.
     // Never reconcile distinct payments on amount/date alone.
     if (!options.missingOnly && row.identity && (saved.parentCategory !== row.parentCategory || saved.subCategory !== row.subCategory || saved.hidden !== row.hidden)) {

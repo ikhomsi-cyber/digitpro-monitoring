@@ -63,8 +63,8 @@ export async function POST(request: Request) {
       }
       // Export import and balance collection keep independent durable checkpoints.
       stage = "balance-sync";
-      try { await syncBankinBalances(client, user.id, account, auth, request.signal); }
-      catch { warning = [warning, "L’import Bankin est conservé. La collecte des soldes est en pause ; reprenez-la depuis le bloc Fortuneo."].filter(Boolean).join(" "); }
+      try { await syncBankinBalances(client, user.id, account, auth, request.signal,{prioritizeLatest:true}); }
+      catch { warning = [warning, "L’import Bankin est conservé. Le solde Fortuneo n’a pas pu être actualisé. Vous pourrez réessayer lors du prochain import."].filter(Boolean).join(" "); }
       return { imported, warning };
     }, account));
     if (!result) return fail("Connectez Gmail avant de récupérer votre export.", 409);

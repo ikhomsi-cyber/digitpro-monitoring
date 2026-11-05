@@ -79,3 +79,7 @@ it("uses only the requested Gmail account and rejects unknown account selectors"
   expect((await POST(new Request("https://digitpro.test/api/gmail/bankin?account=other", {method:"POST",headers:{origin:"https://digitpro.test"}}))).status).toBe(400);
   expect(mocks.gmail).not.toHaveBeenCalled();
 });
+
+it('prioritizes the most recent balance email after a successful Bankin Gmail import',async()=>{
+ const {syncBankinBalances}=await import('@/lib/gmail/balance-sync');const response=await POST(request());expect(response.status).toBe(200);expect(syncBankinBalances).toHaveBeenCalledWith(expect.anything(),'owner','primary',expect.anything(),expect.anything(),{prioritizeLatest:true});
+});

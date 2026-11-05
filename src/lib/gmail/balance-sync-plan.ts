@@ -39,3 +39,14 @@ export async function balanceSyncStep(input:BalanceSyncState,source:BalanceMailS
  return state;
 }
 export function balanceSyncView(state:BalanceSyncState|null){return {points:state?.points.filter(p=>/\bfortuneo\b/i.test(p.account))??[],scanned:state?.scanned??0,missed:state?.missed??0,weeks:state?.weeks??0,backfillComplete:state?.phase==='incremental',pending:!!state&&(state.phase!=='incremental'||!!state.incremental),checkedAt:state?.checkedAt??null,pauseUntil:state?.pauseUntil??0,error:state?.error??null,reason:state?.reason??null,sampling:'weekly' as const};}
+
+/** Prioritize today's newest balance before resuming an unfinished historical scan. */
+export async function latestBalanceSyncStep(input:BalanceSyncState,source:BalanceMailSource,now=Date.now()):Promise<BalanceSyncState>{
+ if(input.pauseUntil>now)throw new Error('Synchronisation en pause.');
+ const listed=await source.list(BALANCE_QUERY,1),id=listed.ids[0];
+ if(!id||input.messages.includes(id))return input;
+ const points=await source.read(id),state=structuredClone(input);
+ state.points=mergeBankinBalancePoints([...state.points,...points]);state.messages.push(id);state.scanned++;
+ if(!points.length)state.missed++;
+ return state;
+}

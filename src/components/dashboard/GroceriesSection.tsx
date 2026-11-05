@@ -128,7 +128,7 @@ export function GroceriesSection({demoMode}:{demoMode:boolean}){
   {loading?<p role="status" className="text-sm text-ink-500">Chargement des commandes…</p>:null}
 
 
-  <div ref={productPanel} className="min-h-32">{orders.length&&!loading&&productsVisible?<GroceryOverview productsLoading={productsLoading} orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:!loading&&orders.length?<p className="py-4 text-xs text-ink-400">Détail des produits</p>:null}</div>
+  <div ref={productPanel} className="min-h-32">{orders.length&&!loading&&productsVisible?<GroceryOverview historyVersion={summaryVersion} productsLoading={productsLoading} orders={filtered} insights={overviewInsights} month={selectedMonth} mode={periodMode} onSelectMonth={month=>{setPeriod(month);changePeriodMode("month");}}/>:!loading&&orders.length?<p className="py-4 text-xs text-ink-400">Détail des produits</p>:null}</div>
   {productError?<p role="alert" className="text-xs text-amber-600">{productError} <button type="button" onClick={()=>{setProductLoad({period:productPeriod,error:""});setSummaryVersion(version=>version+1);}} className="underline">Réessayer</button></p>:null}
   {stats.pricedOrderCount<stats.orderCount?<p className="text-xs text-ink-500">{stats.orderCount-stats.pricedOrderCount} commande(s) sans total reconnu, exclues du montant et du panier moyen.</p>:null}
   {truncated?<p className="text-xs text-amber-600">Affichage limité aux 500 commandes les plus récentes.</p>:null}

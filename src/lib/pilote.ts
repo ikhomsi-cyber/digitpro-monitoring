@@ -1,3 +1,4 @@
+import {confirmedCarrefourPair} from "./bankin/confirmed-duplicates";
 export type BankinPiloteRow = { sourceRow: number; identity?: string; label?: string; merchant?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
 
 export type PiloteGroup = { name: string; expenses: number; income: number; count: number; children: PiloteGroup[] };
@@ -62,7 +63,9 @@ export function isPiloteReportRow(row: BankinPiloteRow): boolean {
 
 /** A unique May 2023 NDF reimbursement near €2,900 was explicitly identified by the user. Never guess when several rows match. */
 export function filterPiloteReportRows(rows: BankinPiloteRow[]): BankinPiloteRow[] {
- const eligible=rows.filter(isPiloteReportRow);
+ const eligibleRows=rows.filter(isPiloteReportRow);
+ const duplicate=confirmedCarrefourPair(eligibleRows,eligibleRows);
+ const eligible=duplicate?eligibleRows.filter(row=>row!==duplicate.old):eligibleRows;
  const candidates=eligible.filter(row=>row.date.startsWith("2023-05-")&&row.amount>=2900&&row.amount<3000&&[row.parentCategory,row.subCategory].some(name=>["ndf digitpro","digitpro ndf"].includes(sourceName(name))));
  const confirmed=candidates.length===1?candidates[0]:null;
  return eligible.filter(row=>row!==confirmed);

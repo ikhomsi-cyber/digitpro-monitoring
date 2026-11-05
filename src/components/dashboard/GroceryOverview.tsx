@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, TrendingUp } from "lucide-react";
 import type { GroceryOrder } from "@/lib/groceries/parser";
 import { groceryInsights, groceryCategoryTotals, groceryCategoryProducts } from "@/lib/groceries/insights";
+import {groceryProductPriceChanges,type ProductPriceChange} from "@/lib/groceries/product-price-changes";
+import {ProductPriceEvolution} from "./ProductPriceEvolution";
 import { GroceryMerchantLogo } from "./GroceryMerchantLogo";
 import { GroceryProductPresentation } from "./GroceryProductPresentation";
 import { useDashboardDisplayFormat } from "./DashboardDisplayFormatContext";
@@ -13,8 +15,21 @@ const muted="text-ink-500 dark:text-white/45";
 const currency=new Intl.NumberFormat("fr-FR",{style:"currency",currency:"EUR",minimumFractionDigits:2,maximumFractionDigits:2});
 const monthLabel=(month:string,long=false)=>new Intl.DateTimeFormat("fr-FR",{month:long?"long":"short",...(long?{year:"numeric"}:{}),timeZone:"UTC"}).format(new Date(`${month}-01T12:00:00Z`));
 
-export function GroceryOverview({orders,insights,month,mode,onSelectMonth,productsLoading=false}:{productsLoading?:boolean;orders:GroceryOrder[];insights:ReturnType<typeof groceryInsights>;month:string;mode:"month"|"year"|"all";onSelectMonth:(month:string)=>void}){
+export function GroceryOverview({orders,insights,month,mode,onSelectMonth,productsLoading=false,historyVersion=0}:{historyVersion?:number;productsLoading?:boolean;orders:GroceryOrder[];insights:ReturnType<typeof groceryInsights>;month:string;mode:"month"|"year"|"all";onSelectMonth:(month:string)=>void}){
  const fmt=useDashboardDisplayFormat();
+ const [wantHistory,setWantHistory]=useState(false),[priceHistory,setPriceHistory]=useState<GroceryOrder[]|null>(null),[priceLoading,setPriceLoading]=useState(false),[priceError,setPriceError]=useState(''),[priceTruncated,setPriceTruncated]=useState(false);
+ const denied=useRef(false);
+ useEffect(()=>{
+  if(!wantHistory||fmt.dummy||denied.current)return;
+  const controller=new AbortController();setPriceLoading(true);setPriceError('');setPriceHistory(null);
+  void fetch('/api/gmail/groceries?view=products&period=all',{cache:'no-store',signal:controller.signal}).then(async response=>{
+   if(response.status===401||response.status===403){denied.current=true;throw new Error('Accès à l’historique refusé. Reconnectez-vous pour comparer les prix.');}
+   if(!response.ok)throw new Error('Comparaison des prix indisponible pour le moment.');
+   const body=await response.json();if(!controller.signal.aborted){setPriceHistory(body.orders??[]);setPriceTruncated(Boolean(body.truncated));}
+  }).catch(error=>{if(!controller.signal.aborted)setPriceError(error instanceof Error?error.message:'Historique indisponible.');}).finally(()=>{if(!controller.signal.aborted)setPriceLoading(false);});
+  return()=>controller.abort();
+ },[wantHistory,fmt.dummy,historyVersion]);
+ const priceChanges=useMemo(()=>priceHistory?groceryProductPriceChanges(orders,priceHistory):new Map<string,ProductPriceChange>(),[orders,priceHistory]);
  const carrefourOrders=useMemo(()=>orders.filter(order=>order.merchant.toLowerCase()==="carrefour"),[orders]);
  const carrefourInsights=useMemo(()=>groceryCategoryTotals(carrefourOrders),[carrefourOrders]);
  const money=(cents:number)=>fmt.dummy?fmt.euro(cents/100):currency.format(cents/100);
@@ -30,7 +45,9 @@ export function GroceryOverview({orders,insights,month,mode,onSelectMonth,produc
   <div className="space-y-4">
    <section className={panel}>
     <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><GroceryMerchantLogo merchant="Carrefour"/><div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Analyse des commandes Carrefour</h3><p className={`mt-1 text-[11px] ${muted}`}>Répartition par rayon · produits des commandes Gmail</p></div></div><div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full" style={{background:gradient?`conic-gradient(${gradient})`:"#64748b20"}} role="img" aria-label="Répartition par rayon, détaillée ci-dessous"><span className="grid h-12 w-12 place-items-center rounded-full bg-white text-xs font-semibold text-ink-700 dark:bg-[#0e3031] dark:text-white">{fmt.dummy?"••":productsLoading?"…":carrefourInsights.categories.length}</span></div></div>
-    <div className="mt-5 divide-y divide-ink-200/40 dark:divide-white/5">{carrefourInsights.categories.map(category=><GroceryCategoryRow key={category.name} category={category} orders={carrefourOrders} totalCents={carrefourInsights.itemTotalCents}/>)}</div>
+    <div className="mt-5 divide-y divide-ink-200/40 dark:divide-white/5">{carrefourInsights.categories.map(category=><GroceryCategoryRow key={category.name} category={category} orders={carrefourOrders} totalCents={carrefourInsights.itemTotalCents} onOpen={()=>setWantHistory(true)} priceChanges={priceChanges} priceLoading={priceLoading}/>)}</div>
+    {priceError?<p role="alert" className="mt-3 text-xs text-amber-600">{priceError}</p>:null}
+    {wantHistory&&priceTruncated?<p className={`mt-3 text-[10px] ${muted}`}>Comparaison sur les 500 dernières commandes détaillées importées.</p>:null}
     {productsLoading?<p role="status" className={`mt-5 text-xs ${muted}`}>Chargement des produits de cette période…</p>:null}
     {!productsLoading&&!carrefourInsights.categories.length?<p className={`mt-5 text-xs ${muted}`}>Aucune commande Carrefour avec détail produit pour cette période.</p>:null}
     <p className={`mt-5 border-t border-ink-200/50 pt-3 text-[10px] leading-relaxed dark:border-white/10 ${muted}`}>Rayons estimés à partir des libellés. Prix des lignes avant frais et remises globales ; le total payé peut différer.</p>
@@ -41,16 +58,16 @@ export function GroceryOverview({orders,insights,month,mode,onSelectMonth,produc
  </div>;
 }
 
-function GroceryCategoryRow({category,orders,totalCents}:{category:{name:string;color:string;totalCents:number};orders:GroceryOrder[];totalCents:number}){
+function GroceryCategoryRow({category,orders,totalCents,onOpen,priceChanges,priceLoading}:{onOpen:()=>void;priceChanges:Map<string,ProductPriceChange>;priceLoading:boolean;category:{name:string;color:string;totalCents:number};orders:GroceryOrder[];totalCents:number}){
  const [open,setOpen]=useState(false);
  const fmt=useDashboardDisplayFormat();
  const products=useMemo(()=>open?groceryCategoryProducts(orders,category.name):[],[open,orders,category.name]);
  const money=(cents:number)=>fmt.dummy?fmt.euro(cents/100):currency.format(cents/100);
- return <details className="group/rayon py-3 first:pt-0 last:pb-0" onToggle={event=>setOpen(event.currentTarget.open)}>
+ return <details className="group/rayon py-3 first:pt-0 last:pb-0" onToggle={event=>{setOpen(event.currentTarget.open);if(event.currentTarget.open)onOpen();}}>
   <summary className="cursor-pointer list-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 [&::-webkit-details-marker]:hidden">
    <div className="flex items-center justify-between gap-3 text-xs"><span className="flex min-w-0 items-center gap-2 text-ink-600 dark:text-white/75"><ChevronRight size={14} aria-hidden="true" className="shrink-0 text-ink-400 transition-transform group-open/rayon:rotate-90"/><span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{backgroundColor:category.color}}/>{category.name}</span><span className="shrink-0 font-medium tabular-nums text-ink-800 dark:text-white/85">{money(category.totalCents)}</span></div>
    <div className="mt-2 h-1 overflow-hidden rounded-full bg-ink-100 dark:bg-white/5"><div className="h-full rounded-full" style={{width:`${totalCents?category.totalCents/totalCents*100:0}%`,backgroundColor:category.color}}/></div>
   </summary>
-  {open?<ul aria-label={`Produits : ${category.name}`} className="mt-3 divide-y divide-ink-200/30 rounded-xl bg-ink-50/60 px-3 dark:divide-white/5 dark:bg-white/[.025]">{products.map(product=><li key={product.key} className="flex items-start justify-between gap-4 py-3"><div className="min-w-0"><GroceryProductPresentation name={product.name}/><p className="mt-1 text-[10px] text-ink-500 dark:text-white/45">{fmt.dummy?"••":product.quantity.toLocaleString("fr-FR",{maximumFractionDigits:3})} unité(s) commandée(s)</p></div><span className="shrink-0 text-xs font-medium tabular-nums text-ink-700 dark:text-white/75">{money(product.totalCents)}</span></li>)}</ul>:null}
+  {open?<ul aria-label={`Produits : ${category.name}`} className="mt-3 divide-y divide-ink-200/30 rounded-xl bg-ink-50/60 px-3 dark:divide-white/5 dark:bg-white/[.025]">{products.map(product=><li key={product.key} className="flex items-start justify-between gap-4 py-3"><div className="min-w-0"><GroceryProductPresentation name={product.name}/><p className="mt-1 text-[10px] text-ink-500 dark:text-white/45">{fmt.dummy?"••":product.quantity.toLocaleString("fr-FR",{maximumFractionDigits:3})} unité(s) commandée(s)</p><ProductPriceEvolution change={priceChanges.get(`carrefour|${product.key}`)} loading={priceLoading}/></div><span className="shrink-0 text-xs font-medium tabular-nums text-ink-700 dark:text-white/75">{money(product.totalCents)}</span></li>)}</ul>:null}
  </details>;
 }

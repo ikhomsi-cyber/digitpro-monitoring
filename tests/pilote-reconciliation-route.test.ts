@@ -16,3 +16,10 @@ it("returns only eligible expense source fields for the requested month, never l
  const response=await GET(request());expect(response.status).toBe(200);expect(await response.json()).toEqual({month:"2026-10",rows:[{sourceRow:2,date:"2026-10-05",expense:10,parent:"Divers",category:"Test"}]});
  expect(mocks.eq).toHaveBeenCalledWith("user_id","synthetic-owner");expect(response.headers.get("cache-control")).toContain("no-store");
 });
+
+it('bounds the date/amount diagnostic and never exposes source descriptions',async()=>{
+ expect((await GET(new Request('https://digitpro.test/api/dashboard/pilote/reconciliation?month=2026-11&date=2026-10-03&expense=200'))).status).toBe(400);
+ const row={sourceRow:2,date:'2026-11-03',amount:-200,parentCategory:'Alimentation',subCategory:'Carrefour',hidden:false,label:'CB BANKIN private detail'};
+ mocks.read.mockResolvedValue({data:{snapshot:buildBankinPiloteSnapshot([row,{...row,sourceRow:3,date:'2026-11-04'}],'synthetic','hash')},error:null});
+ const response=await GET(new Request('https://digitpro.test/api/dashboard/pilote/reconciliation?month=2026-11&date=2026-11-03&expense=200'));const data=await response.json();expect(data.targetCount).toBe(1);expect(data.rows).toHaveLength(2);expect(data.rows.every((r:{sameDescription:boolean;bankinCard:boolean})=>r.sameDescription&&r.bankinCard)).toBe(true);expect(JSON.stringify(data)).not.toContain('private detail');
+});
