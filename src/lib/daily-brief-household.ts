@@ -1,4 +1,4 @@
-import { isPiloteReportRow, buildPiloteMonths, buildPiloteYear, buildPiloteCompensations, filterPiloteIncome, filterPiloteExpenses, addPiloteMoroccoRent, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
+import { isPiloteReportRow, piloteSnapshotMonths, buildPiloteMonths, buildPiloteYear, buildPiloteCompensations, filterPiloteIncome, filterPiloteExpenses, addPiloteMoroccoRent, type BankinPiloteSnapshot, type PiloteExpenseView } from "@/lib/pilote";
 import { pilotePocketTotals } from "./pilote-pocket";
 export type HouseholdYearComparison={year:number;cutoff:string;outOfPocket:number|null;monthOutOfPocket:number|null};
 /** Same source rules, compensation families and expense views as Pilote, at matching historical cutoffs. */
@@ -16,4 +16,11 @@ export function householdOutOfPocketHistory(snapshot:BankinPiloteSnapshot|null,d
   const remaining=(period:NonNullable<typeof annual>)=>pilotePocketTotals(buildPiloteCompensations(filterPiloteExpenses(period,views),months)).remainingCents/100;
   return {year,cutoff,outOfPocket:annual?remaining(annual):null,monthOutOfPocket:month?remaining(month):null};
  });
+}
+
+/** Match Pilote's signed monthly hero balance, using the whole imported month. */
+export function householdMonthBreakdown(snapshot:BankinPiloteSnapshot|null,date:string){
+ const month=snapshot?piloteSnapshotMonths(snapshot).map(filterPiloteIncome).map(addPiloteMoroccoRent).find(period=>period.month===date.slice(0,7)):undefined;
+ if(!month)return {essential:null,combined:null};
+ return {essential:filterPiloteExpenses(month,['essential']).balance,combined:filterPiloteExpenses(month,['essential','secondary']).balance};
 }

@@ -1,7 +1,7 @@
 import {buildInvestments,investmentAssistantSummary} from "@/lib/investments";
 import { buildAssistantTransactions } from "@/lib/assistant-transactions";
 import { decodePiloteStorage, type StoredPiloteSnapshot } from "@/lib/bankin/pilote-storage";
-import { householdOutOfPocketHistory } from "@/lib/daily-brief-household";
+import { householdOutOfPocketHistory,householdMonthBreakdown } from "@/lib/daily-brief-household";
 import type { BankinPiloteSnapshot, PiloteExpenseView } from "@/lib/pilote";
 import { loadDailyBriefWork } from "@/lib/supabase/daily-brief-work";
 import { loadStoredHiwayInvoices } from "@/lib/gmail/hiway-invoice-store";
@@ -52,5 +52,5 @@ export async function GET(request:Request) {
  const brief=buildDailyBrief({date,transactions:txResult.status==="fulfilled"?txResult.value.filter(row=>row.scope!=="personal"):null,snapshot:snapshotResult.status==="fulfilled"&&snapshotResult.value?decodePiloteReport(snapshotResult.value):null,warnings,work:workResult.status==="fulfilled"?workResult.value:null,invoices:invoicesResult.status==="fulfilled"?invoicesResult.value:null,views,cash:balanceResult.status==="fulfilled"?balanceResult.value:null});
  const assistantTransactions=new URL(request.url).searchParams.get("assistantContext")==="1"?buildAssistantTransactions(txResult.status==="fulfilled"?txResult.value:null,snapshotResult.status==="fulfilled"?snapshotResult.value:null,date):undefined;
  const investments=assistantTransactions?investmentAssistantSummary(buildInvestments(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date)):undefined;
- return Response.json({...brief,assistantTransactions,investments,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
+ return Response.json({...brief,householdBreakdown:householdMonthBreakdown(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date),assistantTransactions,investments,householdViews:views,householdHistory:householdOutOfPocketHistory(snapshotResult.status==="fulfilled"?snapshotResult.value:null,date,views),qontoBalance:balanceResult.status==="fulfilled"?balanceResult.value:null},{headers:privateResponseHeaders});
 }

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { householdOutOfPocketHistory } from "@/lib/daily-brief-household";
+import { householdOutOfPocketHistory,householdMonthBreakdown } from "@/lib/daily-brief-household";
 import type { BankinPiloteRow, BankinPiloteSnapshot } from "@/lib/pilote";
 const row=(sourceRow:number,date:string,amount:number,parentCategory="Alimentation",subCategory="Courses"):BankinPiloteRow=>({sourceRow,date,amount,parentCategory,subCategory,hidden:false});
 const snapshot=(rows:BankinPiloteRow[]):BankinPiloteSnapshot=>({version:2,months:[],rows,sourceFilename:"synthetic.xlsx",fileHash:"fixture",sourceRows:rows.length,excludedHidden:0,excludedInternal:0,importedAt:"2026-10-25T08:00:00Z"});
@@ -31,4 +31,17 @@ it("matches the global Pilote deficit after cross-family compensations",()=>{
  const source=snapshot([row(1,"2026-10-01",-1000),row(2,"2026-10-02",269,"Revenus","Meryeme"),row(3,"2026-10-03",152,"DigitPro","NDF")]);
  // Food deficit 731; NDF 152 + declared rent 300 cover 452 across families.
  expect(householdOutOfPocketHistory(source,"2026-10-25")[0].monthOutOfPocket).toBe(279);
+});
+
+it('returns the complete essential and combined out-of-pocket views',()=>{
+ const source=snapshot([row(1,'2026-11-02',-1000,'Logement','Loyer'),row(2,'2026-11-03',-200,'Achats & Shopping','High Tech'),row(3,'2026-11-03',500,'Revenus','Meryeme')]);
+ const breakdown=householdMonthBreakdown(source,'2026-11-07');
+ expect(breakdown).toEqual({essential:-200,combined:-400});
+ expect(-breakdown.combined!).toBe(householdOutOfPocketHistory(source,'2026-11-07',['essential','secondary'])[0].monthOutOfPocket);
+ expect(householdMonthBreakdown(null,'2026-11-07')).toEqual({essential:null,combined:null});
+});
+
+it('matches Pilote signed balances including surplus and later imported rows in the month',()=>{
+ const source=snapshot([row(1,'2026-11-02',-100,'Logement','Loyer'),row(2,'2026-11-12',-500,'Achats & Shopping','High Tech'),row(3,'2026-11-03',500,'Revenus','Meryeme')]);
+ expect(householdMonthBreakdown(source,'2026-11-07')).toEqual({essential:700,combined:200});
 });

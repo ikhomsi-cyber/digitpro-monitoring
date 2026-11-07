@@ -104,3 +104,18 @@ export function investmentAssistantSummary(report:InvestmentsReport){
  return {asOf:report.asOf,hasSource:report.hasSource,properties:report.properties.map(property=>({name:property.name,purchaseAmount:property.purchaseAmount,...rentalInvestmentTotals(property)})),per};
 }
 export type InvestmentAssistantSummary=ReturnType<typeof investmentAssistantSummary>;
+
+/** Casa rents declared as not yet physically recovered, starting April 2026. */
+export function casaRentToRecover(property:RentalInvestment){
+ if(property.id!=='casa')return 0;
+ return euro(property.months.filter(month=>month.month>='2026-04').reduce((sum,month)=>sum+cents(month.bankRent)+cents(month.declaredRent),0));
+}
+
+/** Average over calendar months, including gaps between recorded months. */
+export function rentalMonthlyNetGain(property:RentalInvestment,year?:string){
+ const months=property.months.filter(month=>!year||month.month.startsWith(year)).map(month=>month.month).sort();
+ if(!months.length)return null;
+ const index=(month:string)=>Number(month.slice(0,4))*12+Number(month.slice(5,7))-1;
+ const count=index(months[months.length-1])-index(months[0])+1;
+ return count>0?Math.round(rentalInvestmentTotals(property,year).gain*100/count)/100:null;
+}

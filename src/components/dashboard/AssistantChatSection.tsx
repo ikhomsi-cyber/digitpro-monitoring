@@ -22,6 +22,27 @@ export function AssistantChatSection({demoMode=false,initialMessages=[]}:{demoMo
  const [messages,setMessages]=useState<Message[]>(initialMessages),[brief,setBrief]=useState<DailyBrief|null>(null),[loading,setLoading]=useState(false),[question,setQuestion]=useState(''),[asking,setAsking]=useState(false),[error,setError]=useState(''),[full,setFull]=useState(false),[menu,setMenu]=useState(false),[height,setHeight]=useState<number>(),[feedback,setFeedback]=useState<Record<string,'up'|'down'>>({}),[copied,setCopied]=useState<string|null>(null);
  const root=useRef<HTMLElement>(null),scroll=useRef<HTMLDivElement>(null),header=useRef<HTMLElement>(null),request=useRef<AbortController|null>(null),summaryRequest=useRef<AbortController|null>(null),followBottom=useRef(true);
  const [atBottom,setAtBottom]=useState(true);
+ useEffect(()=>{
+  const panel=scroll.current;if(!panel)return;
+  let gesture:{start:number;x:number;offset:number;time:number}|null=null;
+  const start=(event:TouchEvent)=>{
+   if(event.touches.length!==1||panel.scrollTop>0||!(event.target instanceof Element)||event.target.closest('button,a,input,textarea,select,summary'))return;
+   const touch=event.touches[0];gesture={start:touch.clientY,x:touch.clientX,offset:0,time:event.timeStamp};
+  };
+  const move=(event:TouchEvent)=>{
+   if(!gesture||event.touches.length!==1)return;
+   const touch=event.touches[0],dy=touch.clientY-gesture.start;
+   if(dy<0||Math.abs(touch.clientX-gesture.x)>Math.max(10,dy)){gesture=null;setDragOffset(0);return;}
+   if(dy>8){event.preventDefault();gesture.offset=dy;setDragOffset(dy);}
+  };
+  const end=(event:TouchEvent)=>{
+   if(!gesture)return;const current=gesture;gesture=null;setDragOffset(0);
+   if(event.type!=='touchcancel'&&(current.offset>86||(current.offset>20&&current.offset/Math.max(1,event.timeStamp-current.time)>.45)))closeChat();
+  };
+  panel.addEventListener('touchstart',start,{passive:true});panel.addEventListener('touchmove',move,{passive:false});panel.addEventListener('touchend',end);panel.addEventListener('touchcancel',end);
+  return()=>{panel.removeEventListener('touchstart',start);panel.removeEventListener('touchmove',move);panel.removeEventListener('touchend',end);panel.removeEventListener('touchcancel',end);};
+ },[navigation]);
+
  const loadBrief=useCallback(async()=>{
   if(demoMode||masked)return;
   summaryRequest.current?.abort();const controller=new AbortController();summaryRequest.current=controller;setLoading(true);setError('');
@@ -54,7 +75,7 @@ export function AssistantChatSection({demoMode=false,initialMessages=[]}:{demoMo
    <span aria-hidden="true" className="absolute left-1/2 top-1.5 h-1 w-9 -translate-x-1/2 rounded-full bg-ink-300/60 dark:bg-white/20"/><button type="button" onClick={()=>setMenu(value=>!value)} aria-label="Options de la conversation" aria-expanded={menu} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-50 dark:bg-white/5">{menu?<X size={18}/>:<Menu size={18}/>}</button><div><h2 className="text-base font-semibold tracking-tight">Assistant</h2><p className="text-[10px] text-ink-400 dark:text-white/45">Pro & perso</p></div><button type="button" onClick={()=>setFull(value=>!value)} aria-label={full?'Réduire le chat':'Agrandir le chat'} className="ml-auto grid h-10 w-10 place-items-center rounded-full bg-ink-50 dark:bg-white/5">{full?<Minimize2 size={18}/>:<Maximize2 size={18}/>}</button>
    {menu?<div className="absolute left-4 top-full mt-2 min-w-56 rounded-2xl border border-ink-200/70 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#103c45]"><button type="button" onClick={reset} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-xs hover:bg-ink-50 dark:hover:bg-white/5"><Plus size={15}/>Nouvelle conversation</button><button type="button" onClick={()=>{setMenu(false);void loadBrief();}} disabled={loading} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-xs hover:bg-ink-50 disabled:opacity-50 dark:hover:bg-white/5"><RefreshCw size={15}/>Actualiser le récapitulatif</button></div>:null}
   </header>
-  <div ref={scroll} onScroll={()=>{const element=scroll.current;if(element){const bottom=element.scrollHeight-element.scrollTop-element.clientHeight<70;followBottom.current=bottom;setAtBottom(bottom);}}} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-6 sm:px-6" aria-label="Messages de la conversation" role="log" aria-live="polite" aria-relevant="additions">
+  <div ref={scroll} onPointerDown={event=>{if(event.pointerType==='mouse'&&event.currentTarget.scrollTop<=0&&event.target instanceof Element&&!event.target.closest('button,a,input,textarea,select,summary'))dragStart(event);}} onPointerMove={dragMove} onPointerUp={dragEnd} onPointerCancel={dragEnd} onScroll={()=>{const element=scroll.current;if(element){const bottom=element.scrollHeight-element.scrollTop-element.clientHeight<70;followBottom.current=bottom;setAtBottom(bottom);}}} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 pt-6 sm:px-6" aria-label="Messages de la conversation" role="log" aria-live="polite" aria-relevant="additions">
    {masked?<p className="text-sm text-ink-500 dark:text-white/55">Désactivez le masquage des montants pour utiliser le chat financier.</p>:<>
     <article className="pb-6"><div className="mb-5 flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-full bg-white shadow-sm dark:bg-white/10"><Sparkles size={17}/></span><span className="rounded-full bg-white px-4 py-2 text-xs font-semibold shadow-sm dark:bg-white/10">Récapitulatif</span></div>{loading&&!brief?<p role="status" className="text-sm text-ink-400">Préparation de votre point…</p>:recap?<AssistantAnswer text={recap}/>:<><h3 className="text-xl font-semibold tracking-tight">Parlons de vos finances.</h3><p className="mt-3 text-sm leading-7 text-ink-500 dark:text-white/60">Activité, trésorerie, dépenses du foyer ou investissements : posez votre question, simplement.</p>{demoMode?<p className="mt-3 text-xs text-ink-400">Mode démonstration · aucun appel d’analyse</p>:null}</>}</article>
     {!messages.length&&!asking?<div className="flex flex-wrap gap-2 pb-4">{['Comment va ma trésorerie ?','Que reste-t-il de ma poche ?','Fais le point sur mes investissements'].map(text=><button key={text} type="button" disabled={demoMode} onClick={()=>setQuestion(text)} className="rounded-2xl border border-ink-200/50 bg-white/60 px-3 py-2 text-left text-xs text-ink-600 transition hover:bg-white disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-white/60">{text}</button>)}</div>:null}
