@@ -3,20 +3,29 @@ export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 
 /** Expéditeur et sujet ciblés pour les factures DigitPro émises par Hiway. */
 export const HIWAY_INVOICE_SENDER = "noreply@hiway.fr";
+export const HIWAY_FREELANCE_INVOICE_SENDER = "noreply.hiway@hiway-freelance.com";
+export const QUICKBOOKS_INVOICE_SENDER = "quickbooks@notification.intuit.com";
 /** Préfixe du sujet des emails de facture Hiway (ex. « DigitPro Consulting - Facture F2026-… »). */
 export const HIWAY_INVOICE_SUBJECT_PREFIX = "DigitPro Consulting - Facture F";
 
 /** Requête Gmail (`q`) — recherche large, filtre précis sur le préfixe du sujet ensuite. */
 export function hiwayInvoiceGmailQuery(): string {
-  return `from:${HIWAY_INVOICE_SENDER} subject:(DigitPro Consulting Facture)`;
+  return `{from:${HIWAY_INVOICE_SENDER} from:${HIWAY_FREELANCE_INVOICE_SENDER} from:${QUICKBOOKS_INVOICE_SENDER}} subject:(DigitPro Consulting Facture)`;
 }
 
 export function isHiwayInvoiceSubject(subject: string): boolean {
-  const normalized = subject.trim();
+  const normalized = subject.trim().toLowerCase();
   return (
-    normalized.startsWith(HIWAY_INVOICE_SUBJECT_PREFIX) ||
-    normalized.startsWith("DigitPro Consulting - Facture")
+    normalized.startsWith(HIWAY_INVOICE_SUBJECT_PREFIX.toLowerCase()) ||
+    normalized.startsWith("digitpro consulting - facture")
   );
+}
+
+/** Validate exact sender and subject after Gmail's broad search. */
+export function isDigitProInvoiceEmail(sender:string,subject:string):boolean{
+ const address=(sender.match(/<([^<>]+)>/)?.[1]??sender).trim().toLowerCase();
+ if(address===QUICKBOOKS_INVOICE_SENDER)return subject.trim().toLowerCase().startsWith(HIWAY_INVOICE_SUBJECT_PREFIX.toLowerCase());
+ return [HIWAY_INVOICE_SENDER,HIWAY_FREELANCE_INVOICE_SENDER].includes(address)&&isHiwayInvoiceSubject(subject);
 }
 
 /** Fenêtre de recherche Gmail pour les prélèvements Qonto (aujourd'hui inclus + 10 jours précédents). */

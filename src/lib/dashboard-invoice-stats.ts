@@ -16,8 +16,13 @@ export function withOutstandingInvoiceCsg(
   const round2 = (amount: number) => Math.round(amount * 100) / 100;
   const outstandingHt = round2(outstanding.reduce((sum, invoice) => sum + invoice.amountHt, 0));
   const csg97 = additionalCsgFromInvoiceCaHt(outstandingHt);
-  const csg172 = round2(outstanding
-    .filter((invoice) => invoice.date >= "2023-01-01")
+  // Exclude pre-2023 invoices before matching receipts: they must not consume
+  // payments used by the 17.2% scenario starting on 1 January 2023.
+  const outstanding172 = outstandingHiwayInvoices(
+    invoices?.filter(invoice=>invoice.date>="2023-01-01"),
+    transactions.filter(transaction=>transaction.date.slice(0,10)>="2023-01-01"),now
+  );
+  const csg172 = round2(outstanding172
     .reduce((sum, invoice) => sum + invoice.amountHt, 0) * 0.172);
   const totalDebt = round2(stats.detteTotaleDepuisDebutEur + csg97);
 

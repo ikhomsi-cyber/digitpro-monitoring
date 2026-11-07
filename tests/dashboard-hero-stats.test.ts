@@ -44,3 +44,9 @@ describe("computeDashboardHeroStats", () => {
     expect(stats.csgComparaison172Eur).toBe(0);
   });
 });
+
+it('uses the exact remaining VAT without adding a safety margin',()=>{
+ const stats=computeDashboardHeroStats([revenue(24000)],new Date(2026,7,20));
+ expect(stats.detteTvaDepuisDebutEur).toBe(4000);
+ expect(stats.detteTotaleDepuisDebutEur).toBe(stats.detteCsgDepuisDebutEur+4000);
+});

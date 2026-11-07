@@ -1,10 +1,11 @@
 import "server-only";
 
 import { google, type gmail_v1, type Auth } from "googleapis";
-import { hiwayInvoiceGmailQuery, isHiwayInvoiceSubject } from "@/lib/gmail/config";
+import { hiwayInvoiceGmailQuery, isDigitProInvoiceEmail } from "@/lib/gmail/config";
 import {
   htmlToText,
   parseHiwayInvoice,
+  uniqueHiwayInvoices,
   type HiwayInvoice
 } from "@/lib/gmail/hiway-invoice-parser";
 
@@ -65,15 +66,14 @@ function messageDateIso(message: gmail_v1.Schema$Message): string {
 export async function fetchHiwayInvoicesFromGmail(auth: Auth.OAuth2Client): Promise<HiwayInvoice[]> {
   const gmail = google.gmail({ version: "v1", auth });
 
-  const listRes = await gmail.users.messages.list({
-    userId: "me",
-    q: hiwayInvoiceGmailQuery(),
-    maxResults: MAX_MESSAGES
-  });
-
-  const ids = (listRes.data.messages ?? [])
-    .map((m) => m.id)
-    .filter((id): id is string => Boolean(id));
+  const ids:string[]=[];const seen=new Set<string>();let pageToken:string|undefined;
+  do{
+    const listRes=await gmail.users.messages.list({userId:'me',q:hiwayInvoiceGmailQuery(),maxResults:MAX_MESSAGES,...(pageToken?{pageToken}:{})});
+    for(const message of listRes.data.messages??[]){if(message.id&&!seen.has(message.id)){seen.add(message.id);ids.push(message.id);}}
+    const next=listRes.data.nextPageToken??undefined;
+    if(next===pageToken&&next)throw new Error('Pagination Gmail interrompue.');
+    pageToken=next;
+  }while(pageToken);
 
   const invoices: HiwayInvoice[] = [];
   for (const id of ids) {
@@ -84,7 +84,7 @@ export async function fetchHiwayInvoicesFromGmail(auth: Auth.OAuth2Client): Prom
     });
     const message = msgRes.data;
     const subject = headerValue(message.payload?.headers, "Subject");
-    if (!isHiwayInvoiceSubject(subject)) continue;
+    if (!isDigitProInvoiceEmail(headerValue(message.payload?.headers,"From"),subject)) continue;
     const body = extractBody(message.payload ?? undefined);
     invoices.push(
       parseHiwayInvoice({
@@ -96,7 +96,7 @@ export async function fetchHiwayInvoicesFromGmail(auth: Auth.OAuth2Client): Prom
     );
   }
 
-  return invoices.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return uniqueHiwayInvoices(invoices).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
 /** Récupère l'adresse email du compte Gmail connecté. */

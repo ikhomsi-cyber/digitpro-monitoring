@@ -1,3 +1,4 @@
+import {uniqueHiwayInvoices} from "@/lib/gmail/hiway-invoice-parser";
 import type { HiwayInvoice } from "@/lib/gmail/hiway-invoice-parser";
 import { CSG_ON_BNC_RATE } from "@/lib/valeur-reelle-analyze";
 import type { DashboardTx } from "@/lib/dashboard-metrics";
@@ -23,7 +24,7 @@ export function sumHiwayInvoiceHtForMonth(
 ): number {
   if (!invoices?.length || !monthKey) return 0;
   let total = 0;
-  for (const invoice of invoices) {
+  for (const invoice of uniqueHiwayInvoices(invoices)) {
     if ((invoice.date ?? "").slice(0, 7) !== monthKey) continue;
     total += hiwayInvoiceHtEur(invoice);
   }
@@ -46,7 +47,7 @@ export function outstandingHiwayInvoices(
   if (!invoices?.length) return [];
 
   const todayIso = `${localMonthKey(now)}-${String(now.getDate()).padStart(2, "0")}`;
-  const issued = invoices
+  const issued = uniqueHiwayInvoices(invoices)
     .map((invoice) => ({ date: invoice.date?.slice(0, 10) ?? "", amountHt: hiwayInvoiceHtEur(invoice), ...(invoice.subject ? { subject: invoice.subject } : {}), ...(invoice.dueDate ? { dueDate: invoice.dueDate } : {}) }))
     .filter((invoice) => invoice.date && invoice.date <= todayIso && invoice.amountHt > 0)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -74,6 +75,8 @@ export function outstandingHiwayInvoices(
       const receipt = receipts[receiptIndex]!;
       // Un encaissement antérieur à l'émission ne peut pas régler cette facture.
       if (receipt.date < invoice.date) {
+        // The unallocated remainder belongs to the skipped receipt, not the next one.
+        availableReceiptHt = 0;
         receiptIndex++;
         continue;
       }

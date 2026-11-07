@@ -1,4 +1,5 @@
 "use client";
+import {hiwayInvoiceReference} from "@/lib/gmail/hiway-invoice-parser";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { GmailAccountPicker } from "./GmailAccountPicker";
@@ -235,10 +236,10 @@ export function HiwayInvoicesBlock() {
                     <PremiumIconBadge icon={FileText} size="sm" />
                     <span className="min-w-0">
                       <span className="block truncate text-[11px] font-semibold text-ink-900 dark:text-white">
-                        {invoice.client ?? formatInvoiceDate(invoice.date)}
+                        {hiwayInvoiceReference(invoice.subject) ?? "Facture"} · {formatInvoiceDate(invoice.date)}
                       </span>
                       <span className="block truncate text-[9px] font-medium text-ink-400 dark:text-cyan-50/45">
-                        {invoice.client ? `${formatInvoiceDate(invoice.date)} · ` : ""}
+
                         {invoice.billedDays != null && invoice.tjmHtEur != null
                           ? `${invoice.billedDays % 1 === 0 ? fmt.int(invoice.billedDays) : invoice.billedDays.toFixed(1).replace(".", ",")} j × ${fmt.euro(invoice.tjmHtEur)}`
                           : invoice.billedDays != null

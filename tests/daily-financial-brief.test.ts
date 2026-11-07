@@ -21,11 +21,10 @@ it("does not invent a healthy balance when imports are missing",()=>{
  expect(result.pro).toBeNull();expect(result.household).toBeNull();expect(result.warnings.join(" ")).toContain("indisponible");
  expect(result.items.some(i=>i.priority==="info")).toBe(false);
 });
-it("signals household negative cash flow and rises relative to the previous full month",()=>{
+it("does not show a raw household deficit as an uncompensated Pilote deficit",()=>{
  const result=buildDailyBrief({date:"2026-10-24",transactions:[],snapshot:snapshot([month("2026-09",100),month("2026-10",250)])});
  expect(result.household?.balance).toBe(-150);
- expect(result.items.map(i=>i.id)).toContain("household-cash");expect(result.items.map(i=>i.id)).toContain("foyer-Alimentation");
- expect(result.items.find(i=>i.id==="household-cash")?.detail).toContain("pas du solde bancaire");
+ expect(result.items.map(i=>i.id)).not.toContain("household-cash");expect(result.items.map(i=>i.id)).toContain("foyer-Alimentation");
 });
 it("does not encourage spending to match the previous month",()=>{
  const result=buildDailyBrief({date:"2026-10-24",transactions:[tx("a","2026-10-10",-50,"Repas"),tx("b","2026-09-10",-250,"Repas")],snapshot:null});
@@ -44,4 +43,11 @@ it("suggests documented business opportunities without inventing tax savings or 
  const result=buildDailyBrief({date:"2026-10-24",transactions:[],snapshot:null});
  expect(result.opportunities.map(i=>i.id)).toContain("client-gifts");expect(result.opportunities.find(i=>i.id==="client-gifts")?.detail).toContain("occasion commerciale réelle");
  expect(result.opportunities.find(i=>i.id==="recover-costs")?.detail).toContain("déjà remboursés");
+});
+
+it('uses the same compensated deficit for the household action and summary',()=>{
+ const period=month('2026-11',1000);period.categories[0].children=[{name:'Courses',expenses:1000,income:0,count:1,children:[]}];
+ const result=buildDailyBrief({date:'2026-11-07',transactions:[],snapshot:snapshot([period])});
+ const action=result.items.find(item=>item.id==='household-cash');
+ expect(action?.title).toContain('700');expect(action?.detail).toContain('300');expect(result.summary.household).toContain('700');
 });

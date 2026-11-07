@@ -16,7 +16,6 @@ import {
   analyzeValeurReelle
 } from "@/lib/valeur-reelle-analyze";
 
-const VAT_DEBT_SAFETY_MARGIN_RATE = 0.07;
 /** Correction manuelle demandée sur la dette CSG calculée. */
 const CSG_DEBT_ADJUSTMENT_EUR = 1_200;
 /** Correction historique et déduction supplémentaire de 1 000 € à 17,2 %. */
@@ -121,7 +120,6 @@ function computeMomKpis(
   const prevDetteTva =
     Math.round(
       Math.max(0, prevAllTimeValueAnalysis.vatLiability.remainingVatEur) *
-        (1 + VAT_DEBT_SAFETY_MARGIN_RATE) *
         100
     ) / 100;
   const prevDetteTotale = Math.round((prevDetteCsg + prevDetteTva) * 100) / 100;
@@ -280,7 +278,7 @@ export function computeDashboardHeroStats(
   );
   const csgComparaison172Eur = Math.max(0, Math.round(comparaisonBaseEur * 0.172 * 100) / 100 - CSG_172_ADJUSTMENT_EUR);
   const detteTvaDepuisDebutEur =
-    Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * (1 + VAT_DEBT_SAFETY_MARGIN_RATE) * 100) /
+    Math.round(Math.max(0, allTimeValueAnalysis.vatLiability.remainingVatEur) * 100) /
     100;
   const detteTotaleDepuisDebutEur = Math.round((detteCsgDepuisDebutEur + detteTvaDepuisDebutEur) * 100) / 100;
   const cashDisponibleEur = Math.max(0, soldeQontoEur ?? 0);

@@ -61,3 +61,11 @@ describe("widget payment countdown", () => {
     expect(nextHiwayPaymentDelayDays([{ ...invoice, date: "2025-12-20" }], [], new Date(2026, 0, 10))).toBe(9);
   });
 });
+
+it('does not carry a skipped earlier receipt remainder into a later receipt',()=>{
+ const first={...invoice,id:'first',subject:'Facture F9001',date:'2026-01-01',amountEur:120};
+ const second={...invoice,id:'second',subject:'Facture F9002',date:'2026-02-01',amountEur:240};
+ const receipts=[{id:'partial-extra',date:'2026-01-02',amount:180,category:'Chiffre d’affaires',label:'synthetic',company:'synthetic',scope:'pro' as const},{id:'later',date:'2026-02-02',amount:240,category:'Chiffre d’affaires',label:'synthetic',company:'synthetic',scope:'pro' as const}];
+ expect(sumOutstandingHiwayInvoiceHt([first,second],receipts,new Date(2026,2,1))).toBe(0);
+ expect(sumOutstandingHiwayInvoiceHt([first,second],[receipts[0]],new Date(2026,2,1))).toBe(200);
+});

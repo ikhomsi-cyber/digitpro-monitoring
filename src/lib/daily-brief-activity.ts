@@ -25,7 +25,9 @@ export function buildBriefActivity({date,transactions,settings,invoices,cash}:{d
  const previousYearExpensesHt=rows.some(t=>t.date.startsWith(previousYear)&&t.date<=previousEnd)?annualExpenses(previousYear,previousEnd):null;
  const expenseChangePercent=previousYearExpensesHt!==null&&previousYearExpensesHt>0?round((yearExpensesHt-previousYearExpensesHt)/previousYearExpensesHt*100):null;
  const currentYear=Number(year);
- const history:ActivityYearComparison[]=Array.from({length:4},(_,offset)=>{
+ const sourceYears=[...rows.map(row=>Number(row.date.slice(0,4))),...(settings?.days??[]).filter(day=>day<=date).map(day=>Number(day.slice(0,4))),...(invoices??[]).filter(invoice=>invoice.date<=date).map(invoice=>Number(invoice.date.slice(0,4)))].filter(value=>Number.isInteger(value)&&value>=1900&&value<=currentYear);
+ const firstYear=Math.min(currentYear-1,...sourceYears);
+ const history:ActivityYearComparison[]=Array.from({length:currentYear-firstYear+1},(_,offset)=>{
   const target=currentYear-offset;
   const cutoff=`${target}-${date.slice(5,7)}-${String(Math.min(Number(date.slice(8)),new Date(Date.UTC(target,Number(date.slice(5,7)),0)).getUTCDate())).padStart(2,"0")}`;
   const actualDays=settings?[...new Set(settings.days)].filter(d=>d.startsWith(`${target}-`)&&d<=cutoff):[];

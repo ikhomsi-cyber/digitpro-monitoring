@@ -1,4 +1,5 @@
 import "server-only";
+import {uniqueHiwayInvoices} from "./hiway-invoice-parser";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
@@ -42,7 +43,7 @@ export async function loadStoredHiwayInvoices(
     throw new Error(res.error.message);
   }
 
-  return (res.data ?? []).map(rowToInvoice);
+  return uniqueHiwayInvoices((res.data ?? []).map(rowToInvoice));
 }
 
 export async function upsertHiwayInvoices(

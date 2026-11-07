@@ -62,6 +62,8 @@ const AMOUNT_TOKEN = "([\\d][\\d\\s\\u00a0\\u202f.]*(?:,\\d{1,2})?)\\s*(?:€|eu
 
 function amountRegex(label: string): RegExp[] {
   return [
+    // QuickBooks plain text omits currency on explicit Total HT / TTC lines.
+    new RegExp(`(?:^|\\n)[ \t]*(?:total|montant|net)[ \t]+${label}[ \t]*:?[ \t|]*([0-9][0-9 \\u00a0\\u202f.]*(?:,[0-9]{2}))[ \t]*(?:(?:€|EUR)[ \t]*)?(?:\\r?\\n|$)`, "i"),
     new RegExp(`${label}\\s*(?:HT|TTC)?\\s*:?\\s*${AMOUNT_TOKEN}`, "i"),
     new RegExp(`${AMOUNT_TOKEN}\\s*${label}\\b`, "i"),
     new RegExp(`(?:montant|total|net)\\s*${label}\\s*:?\\s*${AMOUNT_TOKEN}`, "i")
@@ -247,7 +249,7 @@ export function parseHiwayInvoice(input: {
   body: string;
   dateIso: string;
 }): HiwayInvoice {
-  const text = input.body;
+  const text = input.body.replace(/Â(?=[\u00a0\u202f])/g, "");
   const haystack = `${input.subject}\n${text}`;
   const { amountEur, amountKind } = extractAmount(haystack);
   const client = extractClient(haystack);
@@ -272,4 +274,19 @@ export function parseHiwayInvoice(input: {
     tjmHtEur,
     subject: input.subject
   };
+}
+
+/** Invoice reference carried by the imported email subject (no schema migration). */
+export function hiwayInvoiceReference(subject:string):string|null{
+ return subject.match(/\bfacture\s+(F[0-9][A-Z0-9-]*)\b/i)?.[1].toUpperCase()??null;
+}
+
+/** Repeated emails of the same numbered invoice are not additional revenue. */
+export function uniqueHiwayInvoices(invoices:readonly HiwayInvoice[]):HiwayInvoice[]{
+ const seen=new Set<string>();
+ return invoices.filter(invoice=>{
+  const reference=hiwayInvoiceReference(invoice.subject);
+  const key=reference&&invoice.amountEur!==null?JSON.stringify([reference,invoice.date,Math.round(invoice.amountEur*100),invoice.amountKind]):`email:${invoice.id}`;
+  if(seen.has(key))return false;seen.add(key);return true;
+ });
 }

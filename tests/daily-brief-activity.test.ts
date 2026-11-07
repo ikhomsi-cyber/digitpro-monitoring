@@ -87,3 +87,10 @@ it("does not invent historical activity from unknown invoice amounts",()=>{
  const report=buildBriefActivity({date:"2026-10-25",transactions:[],settings:null,invoices:[{...invoice,date:"2025-09-30",amountKind:"inconnu"}],cash:null});
  expect(report.history[1].generatedHt).toBeNull();expect(report.history[1].workedDays).toBeNull();
 });
+
+it('includes every available historical year instead of only four years',()=>{
+ const report=buildBriefActivity({date:'2026-11-07',transactions:[tx('old','2013-01-02',1200),tx('recent','2026-01-02',2400)],settings:null,invoices:[],cash:null});
+ expect(report.history.map(point=>point.year)).toEqual(Array.from({length:14},(_,offset)=>2026-offset));
+ expect(report.history.at(-1)?.cashedHt).toBe(1000);
+ expect(report.history.find(point=>point.year===2014)?.cashedHt).toBeNull();
+});

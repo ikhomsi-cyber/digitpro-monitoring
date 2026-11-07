@@ -53,3 +53,14 @@ describe("CSG des factures dans le dashboard", () => {
     expect(before2023.detteCsgDepuisDebutEur).toBe(6_970);
   });
 });
+
+it('excludes 2022 invoices before allocating receipts in the 17.2 percent scenario',()=>{
+ const older={...invoice,id:'old',date:'2022-12-01',subject:'Facture F1000'};
+ const newer={...invoice,id:'new',date:'2023-01-01',subject:'Facture F1001'};
+ const payment={...receipt,date:'2023-01-02'};
+ const withOld=withOutstandingInvoiceCsg(stats,[older,newer],[payment],now);
+ const withoutOld=withOutstandingInvoiceCsg(stats,[newer],[payment],now);
+ expect(withOld.csgComparaison172Eur).toBe(withoutOld.csgComparaison172Eur);
+ expect(withOld.csgComparaison172Eur).toBe(stats.csgComparaison172Eur);
+ expect(computeCsgRemainingEur(withOld)).toBe(computeCsgRemainingEur(withoutOld));
+});
