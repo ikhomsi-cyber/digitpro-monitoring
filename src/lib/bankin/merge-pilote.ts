@@ -21,6 +21,8 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
       const aliases = available.get(alias) ?? []; aliases.push(index); available.set(alias, aliases);
     }
   });
+  const identityOwners = new Map([...available].map(([id, indexes]) => [id, [...indexes]]));
+  const matchedIdentity = new Map<number, string | undefined>();
   // Reserve every exact match before considering revisions. Two payments present
   // together in an export are distinct occurrences, even with identical labels.
   const incomingIds = new Set(incoming.rows.flatMap(bankinRowIdentities));
@@ -51,11 +53,14 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
   const excluded = new Set(previous.excludedRowIdentities ?? []);
   for (const row of incoming.rows) {
     if (row.identity && excluded.has(row.identity)) continue;
+    if (row.identity && identityOwners.get(row.identity)?.some(index =>
+      matchedIdentity.has(index) && matchedIdentity.get(index) !== row.identity)) continue;
     let index = available.get(key(row))?.shift();
     while(index!==undefined&&used.has(index))index=available.get(key(row))?.shift();
     const revision = index === undefined ? revised.get(row) : undefined;
     if (revision !== undefined) {
       used.add(revision);
+      matchedIdentity.set(revision, row.identity);
       const saved = previous.rows[revision];
       const preferIncoming = row.date > saved.date || (row.date === saved.date && (row.label?.length ?? 0) >= (saved.label?.length ?? 0));
       replacements.set(revision, {
@@ -71,6 +76,7 @@ export function mergeBankinPiloteSnapshots(previous: BankinPiloteSnapshot | null
     if(index===undefined&&reverse?.old===row)continue;
     if (index === undefined) { added.push(row); continue; }
     used.add(index);
+    matchedIdentity.set(index, row.identity);
     const saved = previous.rows[index];
     if(dateCorrection){
       if(saved.identity&&excluded.has(saved.identity))continue;

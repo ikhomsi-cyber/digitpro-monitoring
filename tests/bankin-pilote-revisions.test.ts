@@ -66,3 +66,13 @@ it("recognizes a removed one-letter bank suffix without confusing beneficiaries"
   expect(mergeBankinPiloteSnapshots(snapshot([old]),snapshot([next])).rows).toHaveLength(1);
   expect(mergeBankinPiloteSnapshots(snapshot([old]),snapshot([row("Prlv Sepa Sdc Residence Differente")])).rows).toHaveLength(2);
 });
+
+it("does not recreate a known revision when an export contains both aliases", () => {
+  const a=row("CB Commerce Exemple","2027-01-04"),b=row("CB Commerce Exemple","2027-01-05");
+  const merged=mergeBankinPiloteSnapshots(snapshot([a]),snapshot([b]));
+  for(const rows of [[a,b],[b,a]]) {
+    const next=mergeBankinPiloteSnapshots(merged,snapshot(rows));
+    expect(next.rows).toHaveLength(1);
+    expect(next.months[0].expenses).toBe(42);
+  }
+});
