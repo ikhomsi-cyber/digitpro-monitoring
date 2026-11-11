@@ -1,5 +1,5 @@
 import {confirmedCarrefourPair,confirmedNovemberIkDuplicate,confirmedNovemberNdfDuplicate} from "./bankin/confirmed-duplicates";
-export type BankinPiloteRow = { sourceRow: number; identity?: string; label?: string; merchant?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
+export type BankinPiloteRow = { sourceRow: number; identity?: string; previousIdentities?: string[]; account?: string; label?: string; merchant?: string; date: string; amount: number; parentCategory: string; subCategory: string; hidden: boolean };
 
 export type PiloteGroup = { name: string; expenses: number; income: number; count: number; children: PiloteGroup[] };
 export type PiloteMonth = { month: string; expenses: number; income: number; balance: number; count: number; categories: PiloteGroup[]; incomeCategories: PiloteGroup[] };
