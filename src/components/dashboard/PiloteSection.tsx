@@ -15,6 +15,38 @@ import type { PiloteDaily } from "@/lib/bankin/pilote-daily";
 import dynamic from "next/dynamic";
 import type { PiloteDashboardData } from "@/lib/bankin/pilote-loader";
 const PiloteTravelMap = dynamic(() => import("./PiloteTravelMap").then(module => module.PiloteTravelMap), { ssr: false });
+function PiloteTaxHistory({ months }: { months: PiloteMonth[] }) {
+  const fmt = useDashboardDisplayFormat();
+  const scroll = useRef<HTMLDivElement>(null);
+  const years = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const month of months) {
+      const year = month.month.slice(0, 4);
+      totals.set(year, (totals.get(year) ?? 0) + Math.round(filterPiloteExpenses(month, "taxes").expenses * 100));
+    }
+    return [...totals].sort(([a], [b]) => a.localeCompare(b));
+  }, [months]);
+  const latest = years.at(-1)?.[0];
+  const max = Math.max(1, ...years.map(([, cents]) => cents));
+  useEffect(() => {
+    const chart = scroll.current;
+    if (chart) chart.scrollLeft = chart.scrollWidth - chart.clientWidth;
+  }, [latest, fmt.dummy]);
+  return <section className={dashboardInsightCard} aria-label="Historique des impôts payés">
+    <h3 className="text-base font-semibold">Impôts payés par année</h3>
+    <p className="mt-1 text-xs text-ink-500 dark:text-white/60">Dépenses classées « Impôts » dans Pilote, sur tout l’historique importé.</p>
+    {fmt.dummy ? <p className="mt-3 text-xs text-ink-500 dark:text-white/60">Graphique masqué.</p> : <div ref={scroll} className="mt-4 overflow-x-auto pb-2" tabIndex={0} aria-label="Faire défiler les années">
+      <ul className="flex min-w-max gap-2">
+        {years.map(([year, cents]) => <li key={year} className="flex min-w-[4.5rem] flex-1 flex-col items-center justify-end gap-2 px-1 tabular-nums">
+          <span className="whitespace-nowrap text-xs font-medium">{fmt.euro(cents / 100)}</span>
+          <span aria-hidden="true" className={`w-8 rounded-t-md ${year === latest ? "bg-emerald-500" : "bg-emerald-500/40"}`} style={{ height: Math.max(2, cents / max * 104) }} />
+          <span className="text-xs text-ink-500 dark:text-white/60">{year}</span>
+        </li>)}
+      </ul>
+    </div>}
+  </section>;
+}
+
 function DeferredPiloteTravel({months,period}:{months:PiloteMonth[];period:string}) {
   const target=useRef<HTMLDivElement>(null);
   const [visible,setVisible]=useState(false);
@@ -238,6 +270,7 @@ export function PiloteSection({ demoMode, onImported, loadData }: { demoMode: bo
       <div id="pilote-categories" className="grid scroll-mt-6 gap-5 lg:grid-cols-[1.5fr_1fr]"><details className="group/category rounded-3xl border border-ink-200/70 bg-white p-6 dark:border-white/10 dark:bg-white/[.035]"><summary className="flex cursor-pointer list-none items-center justify-between gap-3"><h3 className="font-semibold text-ink-900 dark:text-white">Où part votre argent ?</h3><ChevronRight size={16} className="text-ink-400 transition group-open/category:rotate-90" /></summary><p className="mt-1 text-xs text-ink-500 dark:text-white/50">Ouvrez une catégorie pour voir ses sous-catégories.</p><div className="mt-5 space-y-2">{current.categories.map((category, index) => <details key={category.name} className="group rounded-2xl border border-ink-100 dark:border-white/[.07]"><summary className="flex cursor-pointer list-none items-center gap-3 p-4"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ink-900 dark:text-white">{category.name}</p><p className="mt-1 text-[10px] text-ink-400 dark:text-white/45">{[...new Set(category.children.map(sub => compensations.find(f => f.id === piloteCompensationFamily(category.name, sub.name, false))!.source))].join(" · ")}</p><div className="mt-2 h-1 rounded-full bg-ink-100 dark:bg-white/5"><div className="h-1 rounded-full" style={{ width: `${category.expenses / current.expenses * 100}%`, backgroundColor: COLORS[index % COLORS.length] }} /></div></div><div className="text-right"><p className="text-sm font-semibold tabular-nums text-ink-900 dark:text-white">{money(category.expenses)}</p><p className="text-[10px] text-ink-400 dark:text-white/40">{fmt.percent0to100(category.expenses / current.expenses * 100)} %</p></div><ChevronRight size={14} className="text-ink-400 transition group-open:rotate-90" /></summary><div className="space-y-3 border-t border-ink-100 px-5 py-4 dark:border-white/5">{category.children.map(sub => <div key={sub.name} className="flex justify-between gap-3 text-xs text-ink-500 dark:text-white/60"><span>{sub.name}<span className="ml-2 text-ink-400 dark:text-white/35">· {fmt.int(sub.count)} op.</span></span><span className="shrink-0 font-medium tabular-nums">{money(sub.expenses)}</span></div>)}</div></details>)}{!current.categories.length ? <p className="text-sm text-ink-500 dark:text-white/60">Aucune sortie ce mois.</p> : null}</div></details>
       <div className="space-y-5"><div className="rounded-3xl border border-ink-200/70 bg-white p-6 dark:border-white/10 dark:bg-white/[.035]"><h3 className="font-semibold text-ink-900 dark:text-white">Les rentrées qui compensent</h3><div className="mt-4 space-y-3">{current.incomeCategories.map(category => <details key={category.name} className="group"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm"><span className="text-ink-600 dark:text-white/70">{category.name}</span><span className="font-semibold tabular-nums text-emerald-500">+ {money(category.income)}</span></summary><div className="mt-2 space-y-2 pl-3">{category.children.map(sub => <p key={sub.name} className="flex justify-between gap-2 text-xs text-ink-400 dark:text-white/45"><span>{sub.name}</span><span>{money(sub.income)}</span></p>)}</div></details>)}{!current.incomeCategories.length ? <p className="text-sm text-ink-500 dark:text-white/60">Aucune rentrée enregistrée.</p> : null}</div></div></div></div>
       <DeferredPiloteTravel months={months} period={current.month} />
+      <PiloteTaxHistory months={months} />
     </> : null}
     <section aria-label="Sources et imports Pilote" className="space-y-3 rounded-3xl border border-ink-200/60 bg-white/40 p-4 dark:border-white/10 dark:bg-white/[.025]">
       <div><h3 className="text-sm font-semibold text-ink-900 dark:text-white">Sources et imports</h3><p className="mt-1 text-[11px] text-ink-500 dark:text-white/45">Ajoutez vos exports Bankin à votre historique.</p></div>

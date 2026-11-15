@@ -1,8 +1,8 @@
 "use client";
 import {ResidenceSection} from "./ResidenceSection";
 import {PersonalPageSkeleton} from "./PersonalPageSkeleton";
-import {useEffect,useMemo,useState,useRef} from 'react';
-import {Building2,House,Landmark,ChevronDown,ChevronLeft,ChevronRight,RefreshCw} from 'lucide-react';
+import {useEffect,useId,useMemo,useState,useRef} from 'react';
+import {Building2,MapPin,ArrowUpRight,House,Landmark,ChevronDown,ChevronLeft,ChevronRight,RefreshCw} from 'lucide-react';
 import {useDashboardDisplayFormat} from './DashboardDisplayFormatContext';
 import {rentalMonthlyNetGain,casaRentToRecover,rentalInvestmentTotals,type InvestmentsReport,type RentalInvestment} from '@/lib/investments';
 import {useOptionalDashboardSection} from "./DashboardSectionContext";
@@ -10,7 +10,13 @@ import {createInvestReportLoader} from "@/lib/invest-report-loader";
 import {demoInvestments} from '@/lib/investments-demo';
 const panel='min-w-0 rounded-3xl border border-ink-200/60 bg-white/40 p-5 dark:border-white/10 dark:bg-white/[.025]';
 const muted='text-ink-500 dark:text-white/50';
-function RentalCard({property,year}:{property:RentalInvestment;year?:string}){
+const propertyAddresses = {argenteuil: "19 place Alessandria, Argenteuil", casa: "Hay Errahma, Casablanca"} satisfies Record<RentalInvestment["id"], string>;
+
+function RentalCard({property,year,demoMode}:{property:RentalInvestment;year?:string;demoMode:boolean}){
+ const [showMap,setShowMap] = useState(false);
+ const mapId = useId();
+ const address = propertyAddresses[property.id];
+ const mapQuery = encodeURIComponent(address);
  const fmt=useDashboardDisplayFormat(),totals=rentalInvestmentTotals(property,year);
  const months=property.months.filter(point=>!year||point.month.startsWith(year));
  let sum=0;const points=months.map(point=>({month:point.month,value:sum+=point.gain}));
@@ -23,6 +29,49 @@ function RentalCard({property,year}:{property:RentalInvestment;year?:string}){
  const gainPercent=property.purchaseAmount!==null&&property.purchaseAmount>0?totals.gain/property.purchaseAmount*100:null;
  return <article className={panel} aria-label={`Investissement ${property.name}`}>
   <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"><Icon size={19} strokeWidth={1.6}/></span><div><h3 className="text-sm font-semibold">{property.name}</h3><p className={`mt-0.5 text-[10px] ${muted}`}>{property.city}</p></div><span className={`ml-auto text-[10px] ${muted}`}>Locatif</span></div>
+  {!demoMode && !fmt.dummy ? (
+   <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-white/40 to-white/20 dark:via-white/[.04] dark:to-transparent">
+    <div className="flex items-center gap-3 p-3.5">
+     <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+      <MapPin size={20} strokeWidth={1.75} aria-hidden="true" />
+     </span>
+     <div className="min-w-0 flex-1">
+      <p className={`text-[11px] ${muted}`}>Localisation</p>
+      <p className="mt-0.5 text-sm font-semibold leading-snug">{address}</p>
+     </div>
+     <a
+      className="grid size-11 shrink-0 place-items-center rounded-xl border border-ink-200/60 bg-white/40 transition hover:bg-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+      aria-label={`Ouvrir dans Google Maps · ${property.name} (nouvel onglet)`}
+      title="Ouvrir dans Google Maps"
+      href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
+      target="_blank"
+      rel="noopener noreferrer"
+     >
+      <ArrowUpRight size={17} aria-hidden="true" />
+     </a>
+    </div>
+    <div id={mapId} hidden={!showMap}>
+     {showMap && (
+      <iframe
+       title={`Carte Google Maps · ${property.name}`}
+       src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
+       className="block h-56 w-full border-0 sm:h-64"
+       referrerPolicy="no-referrer"
+      />
+     )}
+    </div>
+    <button
+     type="button"
+     aria-expanded={showMap}
+     aria-controls={mapId}
+     onClick={() => setShowMap(!showMap)}
+     className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-emerald-500/15 px-4 text-sm font-medium text-emerald-800 transition hover:bg-emerald-500/10 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-emerald-500 dark:text-emerald-200"
+    >
+     {showMap ? "Masquer la carte" : "Afficher la carte"}
+     <ChevronDown size={16} aria-hidden="true" className={showMap ? "rotate-180" : undefined} />
+    </button>
+   </div>
+  ) : null}
   <>
    <div className="mt-6 flex flex-wrap items-end justify-between gap-4"><div><p className={`text-[10px] uppercase tracking-wider ${muted}`}>Gain locatif net</p><p className={`mt-1 text-3xl font-semibold tracking-tight tabular-nums ${totals.gain<0?'text-rose-500':'text-emerald-600 dark:text-emerald-300'}`}>{available?fmt.euro(totals.gain):'—'}</p></div><div className="text-right"><p className="text-xl font-semibold tabular-nums">{gainPercent===null||!available?'—':fmt.dummy?'•• %':`${new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(gainPercent)} %`}</p><p className={`mt-1 text-[10px] ${muted}`}>Rentabilité nette cumulée</p></div></div>
    <p className={`mt-2 text-xs ${muted}`}>Gain net moyen / mois <strong className="ml-1 font-semibold tabular-nums text-ink-900 dark:text-white">{rentalMonthlyNetGain(property,year)===null?'—':fmt.euro(rentalMonthlyNetGain(property,year)!)}</strong></p>
@@ -69,7 +118,7 @@ export function InvestSection({demoMode=false,initialData}:{demoMode?:boolean;in
   {error?<p role="alert" className="text-xs text-amber-600 dark:text-amber-300">{error}</p>:null}
   <div className="mx-auto flex w-full max-w-md flex-wrap items-center justify-between gap-2"><div className="inline-flex rounded-full bg-ink-100/70 p-0.5 dark:bg-white/[.06]" role="group" aria-label="Période des investissements">{([{value:'history',label:'Historique'},{value:'year',label:'Année'}] as const).map(option=><button key={option.value} type="button" aria-pressed={mode===option.value} onClick={()=>setMode(option.value)} className={`min-h-9 rounded-full px-3.5 text-[11px] font-medium transition ${mode===option.value?'bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white':muted}`}>{option.label}</button>)}</div>{mode==='year'&&year?<div className="flex items-center gap-1"><button type="button" aria-label="Année précédente" disabled={index<0||index>=years.length-1} onClick={()=>setSelectedYear(years[index+1])} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 disabled:opacity-25"><ChevronLeft size={16}/></button><span className="text-sm tabular-nums">{year}</span><button type="button" aria-label="Année suivante" disabled={index<=0} onClick={()=>setSelectedYear(years[index-1])} className="grid h-9 w-8 place-items-center rounded-full text-ink-400 disabled:opacity-25"><ChevronRight size={16}/></button></div>:null}</div>
   {loading?<div role="status" className="min-h-56 animate-pulse rounded-3xl bg-emerald-500/5">Chargement des investissements…</div>:data?.hasSource?<>
-   <div className="grid gap-4 xl:grid-cols-2">{[...data.properties].sort((a,b)=>Number(b.id==='argenteuil')-Number(a.id==='argenteuil')).map(property=><RentalCard key={property.id} property={property} year={mode==='year'?year:undefined}/>)}</div>
+   <div className="grid gap-4 xl:grid-cols-2">{[...data.properties].sort((a,b)=>Number(b.id==='argenteuil')-Number(a.id==='argenteuil')).map(property=><RentalCard key={property.id} property={property} demoMode={demoMode} year={mode==='year'?year:undefined}/>)}</div>
    <details className={`${panel} group/per`} aria-label="Épargne PER"><summary className="flex cursor-pointer list-none items-center gap-3 [&::-webkit-details-marker]:hidden"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-500/10 text-violet-500 dark:text-violet-300"><Landmark size={19} strokeWidth={1.6}/></span><div><h3 className="text-sm font-semibold">PER</h3><p className={`mt-0.5 text-[10px] ${muted}`}>Épargne retraite</p></div><strong className="ml-auto text-sm font-semibold tabular-nums text-violet-600 dark:text-violet-300">{perAmount==null?'—':fmt.euro(perAmount)}</strong><ChevronDown size={14} className={`shrink-0 transition group-open/per:rotate-180 ${muted}`}/></summary><div className="mt-5 flex flex-wrap items-baseline justify-between gap-2"><p className={`text-xs ${muted}`}>{mode==='year'?`Versements nets · ${year??'—'}`:'Versements nets cumulés'}</p><strong className="text-2xl font-semibold tabular-nums text-violet-600 dark:text-violet-300">{perAmount==null?'Non identifié':fmt.euro(perAmount)}</strong></div><p className={`mt-2 text-[10px] ${muted}`}>Versements − retraits identifiés dans Bankin.</p><div className="mt-4 max-h-64 overflow-y-auto overscroll-contain" aria-label="Transactions PER"><ul className="divide-y divide-ink-200/40 dark:divide-white/10">{(data.per.transactions??[]).filter(row=>mode!=='year'||row.date.startsWith(year??'')).map((row,index)=><li key={`${row.date}-${index}`} className="flex items-center justify-between gap-3 py-3"><div><p className="text-xs font-medium">{row.kind==='contribution'?'Versement PER':'Retrait PER'}</p><p className={`mt-1 text-[10px] ${muted}`}>{row.date.split('-').reverse().join('/')}</p></div><span className={`text-sm font-semibold tabular-nums ${row.kind==='contribution'?'text-violet-600 dark:text-violet-300':muted}`}>{row.kind==='contribution'?'+':'−'} {fmt.euro(row.amount)}</span></li>)}</ul>{!(data.per.transactions??[]).some(row=>mode!=='year'||row.date.startsWith(year??''))?<p className={`py-3 text-xs ${muted}`}>Aucune opération PER identifiée sur cette période.</p>:null}</div></details>
   </>:!loading&&!error?<div className={`${panel} text-center`}><p className="text-sm">Importez votre historique Bankin pour retrouver vos investissements.</p><a href="/dashboard?section=pilote" className="mt-3 inline-block text-xs text-emerald-600 underline dark:text-emerald-300">Ouvrir les imports Pilote</a></div>:null}
   {data?.hasSource?<ResidenceSection demoMode={demoMode}/>:null}
