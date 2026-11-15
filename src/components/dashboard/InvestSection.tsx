@@ -30,9 +30,9 @@ function RentalCard({property,year,demoMode}:{property:RentalInvestment;year?:st
  return <article className={panel} aria-label={`Investissement ${property.name}`}>
   <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"><Icon size={19} strokeWidth={1.6}/></span><div><h3 className="text-sm font-semibold">{property.name}</h3><p className={`mt-0.5 text-[10px] ${muted}`}>{property.city}</p></div><span className={`ml-auto text-[10px] ${muted}`}>Locatif</span></div>
   {!demoMode && !fmt.dummy ? (
-   <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-white/40 to-white/20 dark:via-white/[.04] dark:to-transparent">
-    <div className="flex items-center gap-3 p-3.5">
-     <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+   <div className="mt-4 border-t border-ink-200/40 pt-2 dark:border-white/10">
+    <div className="flex items-center gap-2">
+     <span className="shrink-0 text-emerald-700 dark:text-emerald-300">
       <MapPin size={20} strokeWidth={1.75} aria-hidden="true" />
      </span>
      <div className="min-w-0 flex-1">
@@ -40,7 +40,7 @@ function RentalCard({property,year,demoMode}:{property:RentalInvestment;year?:st
       <p className="mt-0.5 text-sm font-semibold leading-snug">{address}</p>
      </div>
      <a
-      className="grid size-11 shrink-0 place-items-center rounded-xl border border-ink-200/60 bg-white/40 transition hover:bg-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+      className="grid size-11 shrink-0 place-items-center rounded-full text-ink-500 transition hover:bg-ink-200/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 dark:text-white/60 dark:hover:bg-white/10"
       aria-label={`Ouvrir dans Google Maps · ${property.name} (nouvel onglet)`}
       title="Ouvrir dans Google Maps"
       href={`https://www.google.com/maps/search/?api=1&query=${mapQuery}`}
@@ -55,7 +55,7 @@ function RentalCard({property,year,demoMode}:{property:RentalInvestment;year?:st
       <iframe
        title={`Carte Google Maps · ${property.name}`}
        src={`https://www.google.com/maps?q=${mapQuery}&output=embed`}
-       className="block h-56 w-full border-0 sm:h-64"
+       className="mt-2 block h-56 w-full rounded-xl border-0 sm:h-64"
        referrerPolicy="no-referrer"
       />
      )}
@@ -65,7 +65,7 @@ function RentalCard({property,year,demoMode}:{property:RentalInvestment;year?:st
      aria-expanded={showMap}
      aria-controls={mapId}
      onClick={() => setShowMap(!showMap)}
-     className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-emerald-500/15 px-4 text-sm font-medium text-emerald-800 transition hover:bg-emerald-500/10 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-emerald-500 dark:text-emerald-200"
+     className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-sm font-medium text-emerald-800 transition hover:bg-emerald-500/10 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-emerald-500 dark:text-emerald-200"
     >
      {showMap ? "Masquer la carte" : "Afficher la carte"}
      <ChevronDown size={16} aria-hidden="true" className={showMap ? "rotate-180" : undefined} />
