@@ -1,4 +1,5 @@
 import { buildPiloteComparisonAtDate } from "@/lib/bankin/pilote-comparison";
+import { buildPiloteMonths } from "@/lib/pilote";
 import { decodePiloteReport } from "@/lib/bankin/pilote-report";
 import { buildPiloteDaily } from "@/lib/bankin/pilote-daily";
 import { decodePiloteStorage, type StoredPiloteSnapshot } from "@/lib/bankin/pilote-storage";
@@ -20,11 +21,12 @@ export async function GET() {
     const snapshot = decoded ? decodePiloteReport(decoded) : null;
     const daily=decoded?buildPiloteDaily(decoded):null;
     const asOf=new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Paris"}).format(new Date());
+    const asOfMonths=decoded?.rows?buildPiloteMonths(decoded.rows.filter(row=>row.date<=asOf)).filter(month=>month.month<=asOf.slice(0,7)):null;
     const comparisonAtDate=decoded?buildPiloteComparisonAtDate(decoded,asOf):null;
     const computed=performance.now();
     const timings={auth:Math.round(authenticated-started),database:Math.round(loaded-authenticated),report:Math.round(computed-loaded)};
     if(process.env.NODE_ENV==="development")console.info("[pilote] load timings (ms)",timings);
-    return Response.json({ snapshot, daily, comparisonAtDate }, { headers: {...privateResponseHeaders,"Server-Timing":`auth;dur=${timings.auth}, database;dur=${timings.database}, report;dur=${timings.report}`} });
+    return Response.json({ snapshot, daily, asOfMonths, asOf, comparisonAtDate }, { headers: {...privateResponseHeaders,"Server-Timing":`auth;dur=${timings.auth}, database;dur=${timings.database}, report;dur=${timings.report}`} });
   } catch {
     return Response.json({ error: "Le bilan Pilote sauvegardé est illisible." }, { status: 503, headers: privateResponseHeaders });
   }

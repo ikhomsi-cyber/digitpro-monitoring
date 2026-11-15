@@ -35,3 +35,8 @@ it("shows a positive global surplus instead of a fictitious personal deficit",()
  const text=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,families:[family("food",1000,600),family("ndf",100,1000)]})).replace(/<[^>]*>/g,"");
  expect(text).toContain("Excédent");expect(text).toMatch(/500(?:,00)?\s*€/);
 });
+it("distinguishes the last import date from the complete selected period",()=>{
+ const text=renderToStaticMarkup(createElement(PilotePocketSummary,{hero:true,periodKind:"month",importedAt:"2026-10-20T12:00:00Z",globalBalance:-279,families:[family("food",1000,721)]})).replace(/<[^>]*>/g,"");
+ expect(text).toContain("Dernier import : 20/10/2026");expect(text).toContain("Tout le mois importé");expect(text).toContain("après les sorties enregistrées");expect(text).toMatch(/-279(?:,00)?\s*€/);
+ expect(text).not.toContain("jusqu’au 25/10");
+});

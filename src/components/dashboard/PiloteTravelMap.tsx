@@ -1,5 +1,5 @@
 "use client";
-import {useId,useState} from "react";
+import {useEffect,useId,useMemo,useRef,useState} from "react";
 import shapes from "@/lib/maps/world-shapes.json";
 import {buildPiloteTravel} from "@/lib/pilote-travel";
 import {type PiloteMonth} from "@/lib/pilote";
@@ -35,6 +35,23 @@ export function PiloteTravelMap({months,period}:{months:PiloteMonth[];period:str
   const [selectedYear,setSelectedYear]=useState(currentYear);
   const year=years.includes(selectedYear)?selectedYear:currentYear;
   const data=buildPiloteTravel(scope==="history"?months:scope==="year"?months.filter(m=>m.month.startsWith(`${year}-`)):months.filter(m=>period.length===4?m.month.startsWith(`${period}-`):m.month===period));
+  const annualTravel = useMemo(() => {
+    const groups = new Map<string, PiloteMonth[]>();
+    for (const month of months) {
+      const key = month.month.slice(0, 4);
+      const group = groups.get(key) ?? [];
+      group.push(month);
+      groups.set(key, group);
+    }
+    return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([year, group]) => ({year, total: buildPiloteTravel(group).total}));
+  }, [months]);
+  const annualScroll = useRef<HTMLDivElement>(null);
+  const latestTravelYear = annualTravel.at(-1)?.year;
+  useEffect(() => {
+    const chart = annualScroll.current;
+    if (chart) chart.scrollLeft = chart.scrollWidth - chart.clientWidth;
+  }, [latestTravelYear, fmt.dummy]);
+  const annualMax = Math.max(1, ...annualTravel.map(point => point.total));
   const visited=new Map(data.countries.map(c=>[c.id,c]));const active=data.countries.find(c=>c.id===selected);
   const activeEnvelope=data.envelopes.find(e=>e.id===selected);
   const mapEntries=[...data.envelopes.map(e=>({id:e.id,name:e.countryIds.map(id=>visited.get(id)?.name).join(" + "),amount:e.amount,countryIds:e.countryIds,subtitle:e.name})),...data.countries.map(c=>({...c,amount:Math.round((c.amount-data.envelopes.reduce((sum,e)=>sum+(e.allocations.find(a=>a.id===c.id)?.amount??0),0))*100)/100,countryIds:[c.id],subtitle:c.places.map(p=>p.name).join(" · ")})).filter(c=>c.amount>0)];
@@ -58,6 +75,25 @@ export function PiloteTravelMap({months,period}:{months:PiloteMonth[];period:str
   return <section aria-label="Carte des voyages" className={dashboardInsightCard}>
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className={dashboardPanelTitle}>Vos voyages</h3><p className="mt-1 text-xs text-ink-500 dark:text-white/60">{fmt.int(data.countries.length)} pays · {fmt.euro(data.total)}</p></div><div className="flex rounded-full bg-ink-100/70 p-1 dark:bg-white/5" role="group" aria-label="Période de la carte">{([['history','Historique'],['year','Année'],['period','Période sélectionnée']] as const).map(([value,label])=><button key={value} type="button" aria-pressed={scope===value} onClick={()=>{setScope(value);setSelected(null);}} className={`rounded-full px-3 py-2 text-[11px] font-semibold ${scope===value?'bg-white text-ink-900 shadow-sm dark:bg-white/15 dark:text-white':'text-ink-500 dark:text-white/60'}`}>{label}</button>)}</div></div>
     {scope==="year"?<div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Année des voyages">{years.map(value=><button type="button" key={value} aria-pressed={value===year} onClick={()=>{setSelectedYear(value);setSelected(null);}} className={`rounded-full border px-3 py-2 text-xs font-semibold tabular-nums ${value===year?'border-emerald-400/50 bg-emerald-400/10 text-emerald-700 dark:text-emerald-200':'border-ink-200/60 text-ink-500 dark:border-white/10 dark:text-white/60'}`}>{value}</button>)}</div>:null}
+    {annualTravel.length > 0 ? <div className="mt-4 rounded-2xl border border-ink-200/50 px-3 py-4 dark:border-white/10 dark:bg-white/[.025] sm:px-4">
+      <h4 className="text-sm font-semibold">Dépenses de voyage par année</h4>
+      <p className="mt-1 text-[11px] text-ink-500 dark:text-white/60">Historique importé · sélectionnez une barre pour afficher l’année sur la carte.</p>
+      {fmt.dummy ? <p className="mt-3 text-xs text-ink-500 dark:text-white/60">Graphique masqué.</p> : <div ref={annualScroll} className="mt-3 overflow-x-auto pb-1 pr-1">
+        <div className="flex min-w-max gap-1 border-b border-ink-200/50 dark:border-white/10" role="group" aria-label="Dépenses annuelles de voyage">
+          {annualTravel.map(point => {
+            const active = scope === "year" && point.year === year;
+            const label = `${point.year} : ${fmt.euro(point.total)}`;
+            return <button key={point.year} type="button" aria-label={label} title={label} aria-pressed={active} onClick={() => {setScope("year"); setSelectedYear(point.year); setSelected(null);}} className="group flex min-w-[4.25rem] flex-1 flex-col items-center gap-2 rounded-lg px-1 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400">
+              <span className="flex h-28 w-full flex-col items-center justify-end gap-1.5">
+                <span className={`whitespace-nowrap text-[10px] font-medium tabular-nums ${active ? "text-emerald-700 dark:text-emerald-200" : "text-ink-600 dark:text-white/70"}`}>{fmt.euro(point.total)}</span>
+                <span aria-hidden="true" className={`w-7 rounded-t-md transition-colors ${active ? "bg-emerald-500 dark:bg-emerald-300" : "bg-emerald-500/35 group-hover:bg-emerald-500/60 dark:bg-emerald-300/35"}`} style={{height: Math.max(2, point.total / annualMax * 88)}} />
+              </span>
+              <span className={`text-[10px] tabular-nums ${active ? "font-semibold text-emerald-700 dark:text-emerald-200" : "text-ink-500 dark:text-white/60"}`}>{point.year}</span>
+            </button>;
+          })}
+        </div>
+      </div>}
+    </div> : null}
     <div className="relative mt-4 overflow-hidden rounded-2xl border border-ink-200/40 bg-gradient-to-br from-slate-50 via-emerald-50/40 to-slate-100 dark:border-white/[.07] dark:from-slate-950/60 dark:via-slate-900/40 dark:to-emerald-950/20"><svg viewBox={viewBox} className="aspect-[2/1] w-full" aria-label="Pays visités selon les catégories Bankin"><defs><pattern id={mapId} width={mapWidth/12} height={mapWidth/12} patternUnits="userSpaceOnUse"><path d={`M ${mapWidth/12} 0 L 0 0 0 ${mapWidth/12}`} fill="none" stroke="#94a3b8" strokeOpacity="0.07" strokeWidth="0.4" vectorEffect="non-scaling-stroke"/></pattern></defs><rect x={Number(viewBox.split(" ")[0])} y={Number(viewBox.split(" ")[1])} width={mapWidth} height={Number(viewBox.split(" ")[3])} fill={`url(#${mapId})`} className="text-ink-300/30 dark:text-white/[.045]"/><g strokeWidth="0.6" strokeLinejoin="round">{shapes.map((shape,index)=>{const country=visited.get(shape.id);return <path key={`${shape.id}-${index}`} d={shape.path} vectorEffect="non-scaling-stroke" className={country?'fill-emerald-400/70 stroke-emerald-200 cursor-pointer transition hover:fill-emerald-300 dark:fill-emerald-300/55 dark:stroke-emerald-200/50':'fill-slate-200/80 stroke-slate-300/40 dark:fill-white/[.065] dark:stroke-white/[.09]'} {...(country?{role:'button',tabIndex:0,'aria-label':`${country.name} : ${amountLabel(country.amount)}`,onClick:()=>selectCountry(country.id),onKeyDown:(e:React.KeyboardEvent)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selectCountry(country.id);}}}: {})}><title>{country?`${country.name} · ${amountLabel(country.amount)}`:shape.name}</title></path>;})}{visited.has("MV")?<circle cx="506" cy="172" r={Math.min(3,Number(viewBox.split(" ")[2])/180)} role="button" tabIndex={0} aria-label={`Maldives : ${amountLabel(visited.get("MV")!.amount)}`} className="cursor-pointer fill-emerald-300 stroke-white" onClick={()=>setSelected("MV")} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected('MV');}}}><title>Maldives</title></circle>:null}</g><g>{labels.map(country=>{const {x,y,label}=country;const fontSize=labelFontSize;const labelWidth=country.width;return <g key={country.id} role="button" tabIndex={0} aria-label={`${country.name} : ${label}`} className="cursor-pointer" onClick={()=>setSelected(country.id)} onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setSelected(country.id);}}}>{<line x1={country.anchorX} y1={country.anchorY} x2={x} y2={y} stroke="#6ee7b7" strokeWidth="1" vectorEffect="non-scaling-stroke"/>}<circle cx={country.anchorX} cy={country.anchorY} r={fontSize*0.15} fill="#a7f3d0"/><rect x={x-labelWidth/2} y={y-fontSize} width={labelWidth} height={fontSize*1.8} rx={fontSize*0.5} fill="#12372f" fillOpacity="0.85" stroke="#6ee7b7" strokeWidth="0.7" vectorEffect="non-scaling-stroke"/><text x={x} y={y} textAnchor="middle" dominantBaseline="middle" fill="#f0fdf4" fontSize={fontSize} fontWeight="700" className="tabular-nums" pointerEvents="none">{label}</text><title>{country.name} · {label}</title></g>;})}</g></svg>{active||activeEnvelope?<button type="button" onClick={()=>setSelected(null)} className="absolute right-3 top-3 rounded-full border border-ink-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-ink-700 shadow-sm dark:border-white/15 dark:bg-slate-900/90 dark:text-white">Tous les pays visités</button>:null}</div>
     {active?<div role="status" className="mt-3 text-sm font-medium text-ink-900 dark:text-white">{active.name} · {amountLabel(active.amount)}{data.envelopes.some(e=>e.countryIds.includes(active.id))?<p className="mt-1 text-xs font-normal text-ink-500 dark:text-white/60">Total du pays, enveloppes communes incluses.</p>:null}<ul className="mt-2 space-y-2">{active.places.map(place=><li key={place.name} className="border-b border-ink-200/50 py-2 text-xs last:border-0 dark:border-white/10"><div className="flex justify-between gap-3"><span>{place.name}{place.estimated>0?<span className="block text-[10px] font-normal text-ink-500 dark:text-white/60">Dont {fmt.euro(place.estimated)} répartis à parts égales</span>:null}</span><strong className="tabular-nums">{fmt.euro(place.amount)}</strong></div><ul className="mt-2 space-y-1.5">{place.posts.map(post=><li key={post.name} className="flex justify-between gap-3 font-normal text-ink-500 dark:text-white/65"><span>{post.name}{post.estimated>0?<span className="ml-1 text-[10px]">· estimé</span>:null}</span><span className="shrink-0 tabular-nums">{fmt.euro(post.amount)}</span></li>)}</ul></li>)}</ul></div>:null}
     {activeEnvelope?<div role="status" className="mt-3 text-sm text-ink-900 dark:text-white"><div className="flex justify-between gap-3 font-semibold"><span>{activeEnvelope.name}</span><span>{fmt.euro(activeEnvelope.amount)}</span></div><p className="mt-1 text-xs text-ink-500 dark:text-white/60">{activeEnvelope.countryIds.map(id=>visited.get(id)?.name).join(" + ")} · enveloppe commune</p><ul className="mt-2 space-y-2">{activeEnvelope.posts.map(post=><li key={post.name} className="flex justify-between gap-3 text-xs"><span>{post.name}</span><span className="tabular-nums">{fmt.euro(post.amount)}</span></li>)}</ul></div>:null}
