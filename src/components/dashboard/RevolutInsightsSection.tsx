@@ -861,10 +861,40 @@ export function RevolutInsightsSection({
           <div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-ink-600 dark:text-white/65">Entrées d’argent</p><span className="text-[10px] text-ink-400">{isAnnual?selectedYear:'Mois sélectionné'}</span></div>
           <div className="mt-3 flex flex-wrap items-baseline gap-3"><p className="font-display text-3xl font-semibold tracking-tight tabular-nums text-ink-900 dark:text-white">{fmt.euro(current.entrees)}</p>{entreesDelta!==0?<span className={clsx('text-xs font-medium tabular-nums',entreesDelta>0?'text-emerald-600 dark:text-emerald-300':'text-rose-500 dark:text-rose-400')}>{entreesDelta>0?'↗':'↘'} {fmt.euro(Math.abs(entreesDelta))}</span>:null}</div>
           <div className="mt-5"><Sparkline points={incomeSeries} stroke="#34d399"/></div>
-          {selectedYear===new Date().getFullYear()?<details className="group/income mt-4 border-t border-ink-200/40 pt-2 dark:border-white/10"><summary className="flex min-h-9 cursor-pointer list-none items-center justify-between text-[11px] text-ink-500 dark:text-white/55"><span>CA annuel et facturation</span><ChevronDown size={13} className="transition group-open/income:rotate-180"/></summary>
-           {selectedYear===new Date().getFullYear()?<dl className="mt-2 space-y-3 text-xs"><div className="flex justify-between gap-3"><dt className="text-ink-400">CA généré · {selectedYear}</dt><dd className="font-medium tabular-nums">{generatedCaYearHt===null?'—':`${fmt.euro(generatedCaYearHt)} HT`}</dd></div>{!isAnnual?<div className="flex justify-between gap-3"><dt className="text-ink-400">BNC versé · {selectedYear}</dt><dd className="font-medium tabular-nums">{fmt.euro(bncYearTotalEur)}</dd></div>:null}</dl>:null}
-           {!isAnnual&&monthKey===monthKeyNow()?<dl className="mt-4 space-y-3 border-t border-ink-200/30 pt-3 text-xs dark:border-white/10">{[{label:upcomingInvoice.statusLabel,ttc:upcomingInvoice.amountTtcEur,ht:upcomingInvoice.amountHtEur},{label:'À facturer',ttc:currentMonthInvoice.amountTtcEur,ht:currentMonthInvoice.amountHtEur}].map(item=><div key={item.label} className="flex items-baseline justify-between gap-3"><dt className="text-ink-500 dark:text-white/55">{item.label}</dt><dd className="text-right tabular-nums"><p className="font-medium">{fmt.euro(item.ttc)} TTC</p><p className="mt-0.5 text-[10px] text-ink-400">{fmt.euro(item.ht)} HT</p></dd></div>)}</dl>:null}
-          </details>:null}
+          {selectedYear === new Date().getFullYear() && (
+            <details className="group/income mt-4 border-t border-ink-200/40 dark:border-white/10">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-xs font-semibold text-ink-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-500 dark:text-white/80 [&::-webkit-details-marker]:hidden">
+                <span>CA annuel et facturation</span>
+                <ChevronDown size={16} aria-hidden="true" className="shrink-0 text-ink-400 group-open/income:rotate-180 motion-safe:transition-transform" />
+              </summary>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 py-2">
+                <div>
+                  <dt className="text-xs text-ink-500 dark:text-white/60">CA généré · {selectedYear}</dt>
+                  <dd className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{generatedCaYearHt === null ? '—' : <>{fmt.euro(generatedCaYearHt)} <span className="text-[10px] font-medium text-ink-500 dark:text-white/60">HT</span></>}</dd>
+                </div>
+                {!isAnnual && <div>
+                  <dt className="text-xs text-ink-500 dark:text-white/60">BNC versé · {selectedYear}</dt>
+                  <dd className="mt-1 text-base font-semibold tabular-nums sm:text-lg">{fmt.euro(bncYearTotalEur)}</dd>
+                </div>}
+              </dl>
+              {!isAnnual && monthKey === monthKeyNow() && (
+                <dl className="mt-3 divide-y divide-ink-200/30 border-t border-ink-200/40 dark:divide-white/10 dark:border-white/10">
+                  {[
+                    { id: 'upcoming', label: upcomingInvoice.statusLabel, ttc: upcomingInvoice.amountTtcEur, ht: upcomingInvoice.amountHtEur },
+                    { id: 'to-invoice', label: 'À facturer', ttc: currentMonthInvoice.amountTtcEur, ht: currentMonthInvoice.amountHtEur },
+                  ].map(item => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 py-3 last:pb-0">
+                      <dt className="text-xs font-medium text-ink-600 dark:text-white/70">{item.label}</dt>
+                      <dd className="shrink-0 text-right tabular-nums">
+                        <span className="block text-sm font-semibold">{fmt.euro(item.ttc)} <span className="text-[10px] font-medium text-ink-500 dark:text-white/60">TTC</span></span>
+                        <span className="mt-0.5 block text-[11px] text-ink-500 dark:text-white/60">{fmt.euro(item.ht)} HT</span>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </details>
+          )}
         </InsightCard>
       </div>
     </section>
